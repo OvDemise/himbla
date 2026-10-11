@@ -19,6 +19,14 @@ import { pixelFont } from './fonts.js';
 		// facing away: unlit, full stop (its own back faces in the shadow map only ever added blotches);
 		// facing the sun: the shadow map, eased in from edge-on (continuous through 0: no flicker)
 		grazeSh = grazeD <= 0.0 ? grazeRamp : mix( grazeRamp, grazeSh, smoothstep( 0.04, 0.22, grazeD ) );
+		#else
+		// the ground too, but only right round edge-on (hills keep their long dusk shadows): where a slope
+		// turns from the sun it shades smoothly into the dark instead of shadowing itself through the
+		// shadow map, which drew a band of saw-teeth down the far wall of a crater under a low sun
+		{
+			float gd = dot( geometryNormal, directLight.direction );
+			grazeSh *= smoothstep( -0.02, 0.14, gd ); // (only ever darker: the turn into shadow eased, never lit up)
+		}
 		#endif
 		directLight.color *= grazeSh;
 		}`);

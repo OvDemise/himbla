@@ -1,13 +1,13 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { toon, ink, inkMat, glow, textSprite, nameTag, setMask, vcMaterial, vcable, paintVertices } from './toon.js';
-import { makeDish, makeFigure, makeRover, makeRocket, makeShuttle, makePlanets } from './models.js';
+import { makeDish, makeFigure, makeRover, makeRocket, makeShuttle, makePlanets, makeHoverCar } from './models.js';
 import { mulberry32 } from './rng.js';
 import { FACTIONS } from './locations.js';
 import { SUN, frameQuat, arcDist, dirFromAngles, tangent } from './geo.js';
 import { buildCasino } from './casinoWorld.js'; // casino
 import { Traffic } from './traffic.js';
-import { buildHelium, buildMeridian, buildFunpark, dressLab, dressLabInside, dressMonolith, buildTown, dressIlmb, dressBase, dressArray, buildDen, buildPirateCamp, buildRuin, dressScrap, jobTerminal, part as kitPart } from './settlements.js';
+import { buildHelium, buildMeridian, buildFunpark, dressLab, dressLabInside, dressMonolith, buildTown, dressIlmb, dressBase, dressArray, buildDen, buildPirateCamp, buildRuin, dressScrap, jobTerminal, part as kitPart, dressCasinoLot } from './settlements.js';
 import { makeProp } from './storyAssets.js';
 import { buildHomeTown } from './hometown.js';
 import { spindleGeometry } from './spindle.js';
@@ -528,7 +528,9 @@ export class World {
       B.add(new THREE.BoxGeometry(0.8, 0.5, 0.5), dark, x, h * 0.72, t / 2 + 0.3, { outline: 0.02 });
       B.add(new THREE.BoxGeometry(0.6, 0.15, 0.3), this.glowM(0xff2a4a), x, h * 0.72 - 0.3, t / 2 + 0.45, { outline: 0 });
     }
-    this.col(loc, { type: 'box', x: dx, y: h / 2 + 0.3, z: dz, hx: len / 2 + 0.2, hy: h / 2 + 0.3, hz: t / 2 + 0.2, yaw });
+    // (out to the buttresses and plinth on the outer face, so the outside is one flat face too)
+    const ox = Math.sin(yaw) * 0.5, oz = Math.cos(yaw) * 0.5;
+    this.col(loc, { type: 'box', x: dx + ox, y: h / 2 + 0.3, z: dz + oz, hx: len / 2 + 0.2, hy: h / 2 + 0.3, hz: t / 2 + 0.7, yaw });
   }
 
   // Gate tower: a tapered keep with bands, slit windows, a crenellated top and an emblem panel
@@ -729,6 +731,9 @@ export class World {
       }
     });
     this.put(g, loc, dx, dz, 0, yaw);
+    // one block over the panels and the inverters (you ride over the top of it, or round it)
+    const c = Math.cos(yaw), sn = Math.sin(yaw), lx = -2.7, lz = -2.5;
+    this.col(loc, { type: 'box', x: dx + lx * c + lz * sn, y: 1.05, z: dz - lx * sn + lz * c, hx: W / 2 + 2.2, hy: 1.05, hz: D / 2 - 1, yaw });
     (loc.keep ||= []).push({ x: dx, z: dz, r: Math.hypot(W + 4, D + 2) / 2 + 2 });
   }
 
@@ -746,6 +751,7 @@ export class World {
     p.position.y = 0.15;
     g.add(p);
     this.put(g, loc, dx, dz);
+    this.col(loc, { type: 'cyl', x: dx, z: dz, y0: -2, y1: h, r: 0.35 });
     (loc.keep ||= []).push({ x: dx, z: dz, r: 1.5 });
   }
 
@@ -808,7 +814,7 @@ export class World {
       case 'lab': this.buildLab(loc); break;
       case 'monolith': this.buildMonolith(loc); break;
       case 'funpark': this.buildFunpark(loc); break;
-      case 'casino': this.casino = buildCasino(this, loc); break; // casino
+      case 'casino': this.casino = buildCasino(this, loc); dressCasinoLot(this, loc, makeHoverCar); break; // casino
       case 'ruin': buildRuin(this, loc); break;
       case 'hometown': buildHomeTown(this, loc); this.addFigures(loc, 10, { kind: 'worker', look: (i) => ({ suit: [0xff9f1c, 0x7dff6a, 0x2ec4ff, 0xff7ad9][i % 4] }) }); break;
     }
@@ -877,7 +883,9 @@ export class World {
       lc.rotation.z = -Math.asin(Math.min(1, Math.hypot(x, z) / loc.pos.length()));
       this.put(lc, loc, seat.x, seat.z, dy - 0.25, -Math.PI / 2, false);
       for (const c of lc.userData.cols || []) {
-        const cc = c.type === 'sphere' ? { ...c, x: x + c.z * -1, z: z + c.x, y: c.y + dy } : { ...c, x: x - c.z, z: z + c.x, y0: (c.y0 || 0) + dy, y1: (c.y1 || 0) + dy };
+        // (turned a quarter like the model: boxes turn with it, and everything sits up on the seat)
+        const cc = c.type === 'cyl' ? { ...c, x: x - c.z, z: z + c.x, y0: (c.y0 || 0) + dy, y1: (c.y1 || 0) + dy }
+          : { ...c, x: x - c.z, z: z + c.x, y: c.y + dy, yaw: (c.yaw || 0) - Math.PI / 2 };
         this.col(loc, cc);
       }
     }
@@ -983,6 +991,7 @@ export class World {
       const r = makeRover({ color: 0x55607a, trim: 0xffd23f, pirate: false, flag: 0xffd23f });
       r.root.scale.setScalar(1.15);
       this.put(r.root, loc, 150 + i * 12, -95 + i * 6, 0, 1.2);
+      this.col(loc, { type: 'box', x: 150 + i * 12, y: 1.5, z: -95 + i * 6, hx: 2.5, hy: 1.5, hz: 3.0, yaw: 1.2 });
     }
     const sc = loc.lawless ? textSprite('RUSTMOON', { color: '#7dff3a', size: 90, scale: 1.1 }) : textSprite('SPACECOM', { color: '#ffd23f', size: 90, scale: 1.1 });
     sc.position.set(0, 132, 0);

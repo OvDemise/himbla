@@ -37,6 +37,65 @@ export class GlobeMap {
     this.load();
     for (const l of game.locations) l.discovered = this.discovered.has(l.id);
     this.bindDrag();
+    this.buildLegend();
+  }
+
+  // The key beside the map: every symbol drawn just as the map draws it, and the faction colours.
+  // It starts open; the arrow folds it away into a slim tab (remembered).
+  buildLegend() {
+    const el = document.getElementById('globe-legend');
+    if (!el) return;
+    const icon = (draw) => {
+      const cv = document.createElement('canvas');
+      cv.width = 34; cv.height = 22;
+      const c = cv.getContext('2d');
+      c.translate(17, 11);
+      c.lineJoin = 'round';
+      draw(c);
+      return cv;
+    };
+    const ink = '#120a1e';
+    const star = (c, col, r = 8) => { c.fillStyle = col; c.strokeStyle = ink; c.lineWidth = 2.5; c.beginPath(); for (let i = 0; i < 10; i++) { const a = -Math.PI / 2 + (i * Math.PI) / 5, rr = i % 2 ? r * 0.5 : r; c.lineTo(Math.cos(a) * rr, Math.sin(a) * rr); } c.closePath(); c.fill(); c.stroke(); };
+    const dot = (c, col, r) => { c.fillStyle = col; c.strokeStyle = ink; c.lineWidth = 2.5; c.beginPath(); c.arc(0, 0, r, 0, Math.PI * 2); c.fill(); c.stroke(); };
+    const diamond = (c, col, rim, s2 = 6) => { c.fillStyle = col; c.strokeStyle = rim; c.lineWidth = 2; c.beginPath(); c.moveTo(0, -s2); c.lineTo(s2, 0); c.lineTo(0, s2); c.lineTo(-s2, 0); c.closePath(); c.fill(); c.stroke(); };
+    const rows = [
+      ['PLACES', [
+        [icon((c) => star(c, '#ffd23f')), 'Faction HQ'],
+        [icon((c) => dot(c, '#2ec4ff', 6)), 'Settlement or base'],
+        [icon((c) => dot(c, '#7dff3a', 4.5)), 'Pirate camp'],
+        [icon((c) => { dot(c, '#ff3b5c', 4); c.strokeStyle = '#ff2a4a'; c.lineWidth = 1.5; c.beginPath(); c.arc(0, 0, 9.5, 0, Math.PI * 2); c.stroke(); }), 'Restricted airspace'],
+        [icon((c) => { diamond(c, '#ff9f1c', ink, 4.5); }), 'Outpost'],
+      ]],
+      ['MARKERS', [
+        [icon((c) => { c.rotate(Math.PI / 4); c.fillStyle = '#ff4f2e'; c.strokeStyle = '#fff'; c.lineWidth = 2; c.beginPath(); c.moveTo(0, -9); c.lineTo(7, 7); c.lineTo(0, 3); c.lineTo(-7, 7); c.closePath(); c.fill(); c.stroke(); }), 'You'],
+        [icon((c) => { c.strokeStyle = '#ffd23f'; c.lineWidth = 3; c.beginPath(); c.arc(0, 0, 8, 0, Math.PI * 2); c.stroke(); }), 'Current objective'],
+        [icon((c) => { c.fillStyle = '#ff3b5c'; c.strokeStyle = '#fff'; c.lineWidth = 2; c.beginPath(); c.moveTo(0, -9); c.lineTo(8, 6); c.lineTo(-8, 6); c.closePath(); c.fill(); c.stroke(); c.fillStyle = ink; c.font = pixelFont(7); c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText('!', 0, 2); }), 'Faction event'],
+        [icon((c) => { c.fillStyle = 'rgba(255,79,46,0.4)'; c.strokeStyle = '#ff4f2e'; c.lineWidth = 2; c.beginPath(); c.arc(0, 0, 8, 0, Math.PI * 2); c.fill(); c.stroke(); }), 'Meteor shower'],
+      ]],
+    ];
+    const fac = Object.entries(FACTIONS).filter(([, f]) => f.color && f.name);
+    let html = `<div class="lg-head"><span>LEGEND</span><button class="lg-fold" title="Hide the legend" aria-label="Hide the legend">▶</button></div><div class="lg-body">`;
+    const slots = [];
+    rows.forEach(([title, items]) => {
+      html += `<div class="lg-sec">${title}</div>`;
+      for (const [cv, label] of items) { slots.push(cv); html += `<div class="lg-row"><span class="lg-ic" data-slot="${slots.length - 1}"></span><span>${label}</span></div>`; }
+    });
+    html += `<div class="lg-sec">TERRITORY</div><div class="lg-fac">${fac.map(([, f]) => `<div class="lg-row"><span class="lg-sw" style="background:${f.color}"></span><span>${f.name}</span></div>`).join('')}</div>`;
+    html += `<div class="lg-note">Ground is tinted by whoever holds it. Fog: ground you haven't seen yet.</div></div>`;
+    html += `<button class="lg-tab" title="Show the legend" aria-label="Show the legend"><span class="lg-tab-ar">◀</span><span class="lg-tab-t">LEGEND</span></button>`;
+    el.innerHTML = html;
+    el.querySelectorAll('.lg-ic').forEach((sp) => sp.appendChild(slots[+sp.dataset.slot]));
+    const KEYL = 'mr-map-legend';
+    let folded = false;
+    try { folded = localStorage.getItem(KEYL) === 'folded'; } catch { /* unavailable */ }
+    const set = (f) => {
+      folded = f;
+      el.classList.toggle('folded', f);
+      try { localStorage.setItem(KEYL, f ? 'folded' : 'open'); } catch { /* unavailable */ }
+    };
+    el.classList.toggle('folded', folded);
+    el.querySelector('.lg-fold').addEventListener('click', (e) => { e.stopPropagation(); set(true); });
+    el.querySelector('.lg-tab').addEventListener('click', (e) => { e.stopPropagation(); set(false); });
   }
 
   load() {

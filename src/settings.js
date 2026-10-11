@@ -32,12 +32,22 @@ export const ACTIONS = [
 const RESERVED = ['Escape', 'Enter', 'Digit1', 'Digit2', 'Digit3', 'Digit4', 'Digit5', 'Digit6', 'Digit7', 'Digit8', 'Digit9', 'Digit0'];
 
 const LEVELS = [['off', 'OFF'], ['rare', 'RARE'], ['normal', 'NORMAL'], ['often', 'OFTEN']];
+
+// Quality presets: picking one sets these; changing any of them by hand makes it CUSTOM.
+const PRESETS = {
+  low: { renderScale: 0.75, viewDist: 0.7, terrainDetail: 0.75, shadows: true, shadowRes: 1024, particles: 0.6 },
+  medium: { renderScale: 1, viewDist: 1, terrainDetail: 1, shadows: true, shadowRes: 2048, particles: 1 },
+  high: { renderScale: 1, viewDist: 1.3, terrainDetail: 1.3, shadows: true, shadowRes: 4096, particles: 1.3 },
+};
+const PRESET_KEYS = Object.keys(PRESETS.medium);
+const PRESET_NAME = { low: 'LOW', medium: 'MEDIUM', high: 'HIGH' };
 const pct = (v) => `${Math.round(v * 100)}%`;
 const mult = (v) => `×${v.toFixed(2).replace(/0$/, '')}`;
 
 // type: range | toggle | choice
 export const SCHEMA = {
   graphics: [
+    { key: 'preset', label: 'Quality preset', type: 'choice', def: 'medium', options: [['low', 'LOW'], ['medium', 'MEDIUM'], ['high', 'HIGH'], ['custom', 'CUSTOM']], hint: 'Sets the options below in one go' },
     { key: 'renderScale', label: 'Render scale', type: 'range', min: 0.4, max: 1.5, step: 0.05, def: 1, fmt: pct, hint: 'Lower = faster, blurrier' },
     { key: 'fov', label: 'Field of view', type: 'range', min: 50, max: 100, step: 1, def: 72, fmt: (v) => `${v}°` },
     { key: 'viewDist', label: 'View distance', type: 'range', min: 0.4, max: 1.5, step: 0.05, def: 1, fmt: pct },
@@ -136,7 +146,68 @@ export class Settings {
         for (const s of tab) if (d[s.key] !== undefined && typeof d[s.key] === typeof s.def) this.v[s.key] = d[s.key];
       }
       if (d.binds && typeof d.binds === 'object') this.v.binds = { ...d.binds };
+      if (typeof d.autoTuned === 'boolean') this.v.autoTuned = d.autoTuned;
+      if (d.preset === undefined) this.v.preset = this.matchPreset(); // (settings saved before presets existed)
+      this.stored = true;
     } catch { /* corrupt or unavailable */ }
+  }
+
+  // Which preset the current values amount to ('custom' if none).
+  matchPreset() {
+    for (const [id, p] of Object.entries(PRESETS)) if (PRESET_KEYS.every((k) => this.v[k] === p[k])) return id;
+    return 'custom';
+  }
+
+  usePreset(id) {
+    const p = PRESETS[id];
+    if (!p) return;
+    Object.assign(this.v, p);
+    this.v.preset = id;
+  }
+
+  // First launch (no saved settings): a first guess at the preset from the graphics card and the
+  // CPU, before anything is drawn. A software renderer, an integrated Intel GPU or a small CPU gets
+  // LOW, a big discrete card HIGH, everything else MEDIUM. Then the first half-minute of play is
+  // timed (perfSample), and if it's still struggling it steps down once and says so.
+  autoDetect(renderer) {
+    if (this.stored) return;
+    // (only a brand-new install: anyone who's played already keeps what they had)
+    try { for (let i = 0; i < localStorage.length; i++) if (/^mr-slot|^mr-slots-init|^moonrunner-save/.test(localStorage.key(i) || '')) return; } catch { return; }
+    let gpu = '';
+    try {
+      const gl = renderer.getContext();
+      const ext = gl.getExtension('WEBGL_debug_renderer_info');
+      gpu = String(gl.getParameter(ext ? ext.UNMASKED_RENDERER_WEBGL : gl.RENDERER) || '').toLowerCase();
+    } catch { /* not available */ }
+    const cores = navigator.hardwareConcurrency || 4;
+    let id = 'medium';
+    if (/swiftshader|llvmpipe|software|basic render|mali|adreno|powervr/.test(gpu) || (/intel/.test(gpu) && !/arc/.test(gpu)) || cores <= 4) id = 'low';
+    else if (cores >= 8 && /rtx|rx ?[67]\d{3}|rx ?9\d{3}|radeon pro w|arc a7|apple m\d (pro|max|ultra)/.test(gpu)) id = 'high';
+    this.usePreset(id);
+    this.v.autoTuned = false;
+    this.gpu = gpu;
+    this.save();
+  }
+
+  // Per frame (raw ms between frames): the first-launch check. 5 s to settle, then 25 s timed.
+  perfSample(ms, playing) {
+    if (this.v.autoTuned !== false || !playing || ms > 250 || document.hidden) return;
+    this.pf ||= { t: 0, n: 0, sum: 0 };
+    const pf = this.pf;
+    pf.t += ms / 1000;
+    if (pf.t < 5) return;
+    pf.n++; pf.sum += ms;
+    if (pf.t < 30) return;
+    const avg = pf.sum / pf.n;
+    this.v.autoTuned = true;
+    const down = { high: 'medium', medium: 'low' }[this.v.preset];
+    if (avg > 24 && down) {
+      this.usePreset(down);
+      this.apply();
+      const g = this.game;
+      if (g && g.hud) g.hud.toast(`Graphics set to ${PRESET_NAME[down]} for smoother play. Change it any time in Settings.`, 6);
+    }
+    this.save();
   }
 
   save() {
@@ -325,6 +396,11 @@ export class Settings {
     this.v[s.key] = parseFloat(r.value);
     const out = r.closest('.set-row').querySelector('.set-val');
     if (out) out.textContent = s.fmt ? s.fmt(this.v[s.key]) : this.v[s.key];
+    if (PRESET_KEYS.includes(s.key)) {
+      const was = this.v.preset;
+      this.v.preset = this.matchPreset();
+      if (was !== this.v.preset) for (const b of this.el.querySelectorAll('[data-key="preset"]')) b.classList.toggle('on', s && b.textContent === (PRESET_NAME[this.v.preset] || 'CUSTOM'));
+    }
     this.commit();
   }
 
@@ -337,10 +413,14 @@ export class Settings {
     if (g && g.audio && g.audio.click && act !== 'bind') g.audio.click();
     if (act === 'tab') { this.tab = t.dataset.tab; this.rebinding = null; this.render(); } else if (act === 'back') this.close();
     else if (act === 'reset') this.resetTab();
-    else if (act === 'toggle') { const k = t.dataset.key; this.v[k] = !this.v[k]; this.commit(); this.render(); } else if (act === 'choice') {
+    else if (act === 'toggle') { const k = t.dataset.key; this.v[k] = !this.v[k]; if (PRESET_KEYS.includes(k)) this.v.preset = this.matchPreset(); this.commit(); this.render(); } else if (act === 'choice') {
       const s = this.find(t.dataset.key);
       const opt = s.options[+t.dataset.i];
-      this.v[s.key] = opt[0];
+      if (s.key === 'preset') { if (opt[0] !== 'custom') this.usePreset(opt[0]); }
+      else {
+        this.v[s.key] = opt[0];
+        if (PRESET_KEYS.includes(s.key)) this.v.preset = this.matchPreset();
+      }
       this.commit();
       this.render();
     } else if (act === 'bind') {

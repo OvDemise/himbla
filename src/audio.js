@@ -5,6 +5,7 @@ export class Audio {
     this.enabled = true;
     this.mix = { hum: 1, wind: 1 }; // per-layer level trims for the ambient loops (the trailer lowers them)
     this.levelFloor = 0; // the roaming groove never drops below this (the trailer keeps it up)
+    this.skateTone = 'hum'; // which skate voice sings (cosmetics: each pair of skates has one)
   }
 
   init() {
@@ -36,12 +37,12 @@ export class Audio {
     src.connect(this.windF).connect(this.windG).connect(this.master);
     src.start();
 
-    // skate hum
-    this.hum = ctx.createOscillator(); this.hum.type = 'sawtooth'; this.hum.frequency.value = 60;
-    this.humF = ctx.createBiquadFilter(); this.humF.type = 'lowpass'; this.humF.frequency.value = 400;
+    // skate hum: one shared level (humG, rising with speed), and under it four voices, one per kind of
+    // skate (setSkateTone). All of them stay low and soft: something you stop hearing after a while.
     this.humG = ctx.createGain(); this.humG.gain.value = 0;
-    this.hum.connect(this.humF).connect(this.humG).connect(this.master);
-    this.hum.start();
+    this.humG.connect(this.master);
+    this.skateVoices = this.makeSkateVoices(ctx);
+    this.setSkateTone(this.skateTone);
 
     // thruster
     const src2 = ctx.createBufferSource();
@@ -420,6 +421,103 @@ export class Audio {
     this.master.gain.setTargetAtTime(0.5 * sfx, t, 0.03);
   }
 
+  // The four skate voices (each a little graph into its own gain, all into humG):
+  //   hum      the classic: a sawtooth drone through a low-pass (Q-Lock Standard and the plain ones)
+  //   glide    smooth and airy: two soft triangles a hair apart, slowly beating, a breath of hiss
+  //   rumble   low and mechanical: a filtered square an octave down, with a gentle wheel-throb
+  //   jackpot  the gold rollers: a warm hum with a soft shimmer of fifths and octaves riding on it
+  makeSkateVoices(ctx) {
+    const voice = (level) => { const g = ctx.createGain(); g.gain.value = 0; g.connect(this.humG); return { g, level }; };
+    const osc = (type, out, f = 60) => { const o = ctx.createOscillator(); o.type = type; o.frequency.value = f; o.connect(out); o.start(); return o; };
+    const lp = (f, q = 0.7) => { const b = ctx.createBiquadFilter(); b.type = 'lowpass'; b.frequency.value = f; b.Q.value = q; return b; };
+    const V = {};
+    // hum
+    {
+      const v = voice(1);
+      const f = lp(400); f.connect(v.g);
+      const o = osc('sawtooth', f);
+      v.pitch = (f0, t) => o.frequency.setTargetAtTime(f0, t, 0.1);
+      V.hum = v;
+    }
+    // glide
+    {
+      const v = voice(0.55); // (levels matched to the classic hum's loudness; the brighter voices a touch under it)
+      const f = lp(700, 0.4); f.connect(v.g);
+      const a = osc('triangle', f), b = osc('triangle', f);
+      const air = ctx.createBufferSource(); air.buffer = this.noise; air.loop = true;
+      const af = ctx.createBiquadFilter(); af.type = 'bandpass'; af.frequency.value = 1400; af.Q.value = 0.8;
+      const ag = ctx.createGain(); ag.gain.value = 0.05;
+      air.connect(af).connect(ag).connect(v.g); air.start();
+      v.pitch = (f0, t, s) => {
+        a.frequency.setTargetAtTime(f0 * 1.5, t, 0.12);
+        b.frequency.setTargetAtTime(f0 * 1.5 * 1.006, t, 0.12); // (a slow, soft beat between the two)
+        af.frequency.setTargetAtTime(1100 + s * 900, t, 0.2);
+      };
+      V.glide = v;
+    }
+    // rumble
+    {
+      const v = voice(0.62);
+      const f = lp(260, 1.1);
+      const throb = ctx.createGain(); throb.gain.value = 1;
+      f.connect(throb).connect(v.g);
+      const o = osc('square', f);
+      // the wheel-throb: a slow, shallow tremolo that quickens with speed
+      const lfo = osc('sine', ctx.createGain(), 5);
+      const depth = ctx.createGain(); depth.gain.value = 0.22;
+      lfo.disconnect(); lfo.connect(depth).connect(throb.gain);
+      v.pitch = (f0, t, s) => {
+        o.frequency.setTargetAtTime(f0 * 0.5, t, 0.1);
+        lfo.frequency.setTargetAtTime(4 + s * 9, t, 0.2);
+        f.frequency.setTargetAtTime(220 + s * 160, t, 0.15);
+      };
+      V.rumble = v;
+    }
+    // jackpot
+    {
+      const v = voice(0.5);
+      const f = lp(1600, 0.5); f.connect(v.g);
+      const base = osc('triangle', f);
+      const shimmer = ctx.createGain(); shimmer.gain.value = 0.35; shimmer.connect(f);
+      const fifth = osc('sine', shimmer), oct = osc('sine', shimmer), oct2 = osc('sine', shimmer);
+      // the shimmer breathes in and out slowly, so it glints rather than whines
+      const lfo = osc('sine', ctx.createGain(), 0.35);
+      const depth = ctx.createGain(); depth.gain.value = 0.25;
+      lfo.disconnect(); lfo.connect(depth).connect(shimmer.gain);
+      // the metal: a ring-modulated layer (a tone multiplied by another at a bell's odd ratio) gives a
+      // coin-like, inharmonic ring; it swells and fades in a slow spin, like a coin rolling on its edge
+      const ring = ctx.createGain(); ring.gain.value = 0; // (its gain is driven by the modulator)
+      const ringOut = ctx.createGain(); ringOut.gain.value = 0.28;
+      const ringBp = ctx.createBiquadFilter(); ringBp.type = 'bandpass'; ringBp.Q.value = 2.2;
+      ring.connect(ringBp).connect(ringOut).connect(v.g);
+      const carrier = osc('sine', ring);
+      const mod = osc('sine', ring.gain);
+      const spin = osc('sine', ctx.createGain(), 1.6);
+      const spinDepth = ctx.createGain(); spinDepth.gain.value = 0.18;
+      spin.disconnect(); spin.connect(spinDepth).connect(ringOut.gain);
+      v.pitch = (f0, t, s) => {
+        base.frequency.setTargetAtTime(f0 * 2, t, 0.1);
+        fifth.frequency.setTargetAtTime(f0 * 3, t, 0.1);
+        oct.frequency.setTargetAtTime(f0 * 4.003, t, 0.1);
+        oct2.frequency.setTargetAtTime(f0 * 8.01, t, 0.1);
+        carrier.frequency.setTargetAtTime(f0 * 5.4, t, 0.1);
+        mod.frequency.setTargetAtTime(f0 * 5.4 * 1.414, t, 0.1);
+        ringBp.frequency.setTargetAtTime(f0 * 7, t, 0.1);
+        spin.frequency.setTargetAtTime(1.2 + s * 3.5, t, 0.3); // (the coin spins faster as you do)
+      };
+      V.jackpot = v;
+    }
+    return V;
+  }
+
+  // Which skate voice to use ('hum' | 'glide' | 'rumble' | 'jackpot'): a short crossfade.
+  setSkateTone(id) {
+    this.skateTone = id in { hum: 1, glide: 1, rumble: 1, jackpot: 1 } ? id : 'hum';
+    if (!this.ctx || !this.skateVoices) return;
+    const t = this.ctx.currentTime;
+    for (const [k, v] of Object.entries(this.skateVoices)) v.g.gain.setTargetAtTime(k === this.skateTone ? v.level : 0, t, 0.08);
+  }
+
   toggleMusic() {
     this.musicOn = !this.musicOn;
     return this.musicOn;
@@ -433,7 +531,8 @@ export class Audio {
     this.windG.gain.setTargetAtTime(Math.min(0.5, s) * 0.16 * (grounded ? 1 : 0.6) * this.mix.wind, t, 0.15);
     this.windF.frequency.setTargetAtTime(140 + Math.min(1, s) * 380, t, 0.15);
     this.humG.gain.setTargetAtTime(skating && grounded ? (0.05 + s * 0.06) * this.mix.hum : 0, t, 0.05);
-    this.hum.frequency.setTargetAtTime(55 + s * 120, t, 0.1);
+    const f0 = 55 + s * 120;
+    for (const v of Object.values(this.skateVoices)) v.pitch(f0, t, s);
     this.jetG.gain.setTargetAtTime(thrusting ? 0.16 : 0, t, 0.05);
     this.crowdBoost = Math.max(0, this.crowdBoost - 0.006);
     this.updateMusic(speed);

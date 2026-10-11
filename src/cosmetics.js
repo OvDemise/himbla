@@ -21,14 +21,15 @@ export const OUTFITS = {
 
 // Quantum-Lock Skate finishes, all sold by Meridian. Some need a deed, not just credits.
 export const SKATES = {
-  stock: { name: 'Q-Lock Standard', color: 0x2ee6ff, trail: null },
-  chrome: { name: 'Chrome Comets', cost: 900, req: 0, color: 0xffffff, trail: 0xe8f6ff },
-  solar: { name: 'Solar Flares', cost: 1400, req: 10, color: 0xff7b1c, trail: 0xffb02e, flame: true },
-  seismic: { name: 'Seismic Striders', cost: 1200, req: 0, color: 0xffd23f, trail: 0xffd23f, unlock: { stat: 'meridianEvents', n: 3, text: 'Complete 3 Meridian events' } },
-  hooves: { name: 'Derby Hooves', cost: 800, req: 0, color: 0xa0612b, trail: 0xc9a06b, hooves: true, unlock: { stat: 'raceWins', n: 1, text: 'Win the Chimera Derby' } },
-  void: { name: 'Void Gliders', cost: 1600, req: 25, color: 0x9b4dff, trail: 0x7b2ff7 },
-  survivor: { name: 'Dark-Side Survivors', cost: 1500, req: 0, color: 0x7dff3a, trail: 0x7dff3a, unlock: { stat: 'darkDeliveries', n: 5, text: 'Deliver 5 contracts on the dark side' } },
-  prism: { name: 'Prism Drive', cost: 2500, req: 50, color: 0xff2e88, trail: 'rainbow', rainbow: true },
+  // tone: the skate hum's voice (audio.js setSkateTone): hum, glide or rumble (the gold rollers: jackpot)
+  stock: { name: 'Q-Lock Standard', color: 0x2ee6ff, trail: null, tone: 'hum' },
+  chrome: { name: 'Chrome Comets', cost: 900, req: 0, color: 0xffffff, trail: 0xe8f6ff, tone: 'hum' },
+  solar: { name: 'Solar Flares', cost: 1400, req: 10, color: 0xff7b1c, trail: 0xffb02e, flame: true, tone: 'rumble' },
+  seismic: { name: 'Seismic Striders', cost: 1200, req: 0, color: 0xffd23f, trail: 0xffd23f, unlock: { stat: 'meridianEvents', n: 3, text: 'Complete 3 Meridian events' }, tone: 'rumble' },
+  hooves: { name: 'Derby Hooves', cost: 800, req: 0, color: 0xa0612b, trail: 0xc9a06b, hooves: true, unlock: { stat: 'raceWins', n: 1, text: 'Win the Chimera Derby' }, tone: 'rumble' },
+  void: { name: 'Void Gliders', cost: 1600, req: 25, color: 0x9b4dff, trail: 0x7b2ff7, tone: 'glide' },
+  survivor: { name: 'Dark-Side Survivors', cost: 1500, req: 0, color: 0x7dff3a, trail: 0x7dff3a, unlock: { stat: 'darkDeliveries', n: 5, text: 'Deliver 5 contracts on the dark side' }, tone: 'hum' },
+  prism: { name: 'Prism Drive', cost: 2500, req: 50, color: 0xff2e88, trail: 'rainbow', rainbow: true, tone: 'glide' },
 };
 
 export const LASERS = [
@@ -205,6 +206,8 @@ export class Cosmetics {
 
   applySkates() {
     dressSkates(this.game.player.model, this.skates);
+    const a = this.game.audio;
+    if (a && a.setSkateTone) a.setSkateTone(this.skate.tone || 'hum'); // (each pair of skates hums in its own voice)
   }
 
   // Per frame: skate glow, prism hue, trails.

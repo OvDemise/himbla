@@ -4,6 +4,7 @@ export const PLANET = {
   faceCells: 1280, // finest terrain grid cells per cube-sphere face edge (~4.4 m)
   chunkCells: 80, // cells per terrain chunk edge (16 x 16 chunks per face)
   seed: 1969,
+  painted: true, // the painted Moon (maria, white crests, debris splatters): false brings back the one-tone Moon
 };
 
 export const PHYS = {
