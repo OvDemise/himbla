@@ -170,6 +170,7 @@ export function makeBody(pos) {
     sinceContact: 0,
     altitude: 0,
     thrusting: false,
+    jetLocked: false,
     skating: false,
     lastLat: 0,
     platform: null,
@@ -302,8 +303,11 @@ export function stepSkater(b, input, dt, planet, colliders, params = PHYS, impac
     v.addScaledVector(b.groundN, -params.grip * (1 + Math.min(1, v.length() / 80) * 0.6) * dt);
   }
 
+  // an emptied tank locks the thrusters out until it has recharged to 10%
+  if (b.energy <= 0) b.jetLocked = true;
+  else if (b.jetLocked && b.energy >= b.maxEnergy * 0.1) b.jetLocked = false;
   b.thrusting = false;
-  if (input.thrust && b.energy > 0) {
+  if (input.thrust && b.energy > 0 && !b.jetLocked) {
     v.addScaledVector(input.thrustDir, params.thrustAccel * dt);
     b.energy = Math.max(0, b.energy - params.thrustDrain * dt);
     b.thrusting = true;

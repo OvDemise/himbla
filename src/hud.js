@@ -299,6 +299,7 @@ export class HUD {
     this.distressLog(dt);
     $('hp-fill').style.width = (P.health / P.maxHealth) * 100 + '%';
     $('en-fill').style.width = (P.body.energy / P.body.maxEnergy) * 100 + '%';
+    $('en-fill').style.opacity = P.body.jetLocked ? 0.45 : ''; // dimmed while the thrusters are locked out
     const sk = $('skates');
     const on = P.body.skating;
     sk.textContent = on ? 'Q-LOCK: ENGAGED' : 'Q-LOCK: OFF (BOOTS)';
