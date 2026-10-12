@@ -348,7 +348,6 @@ body:has(#title:not(.hidden)) #hud { visibility: hidden; }
 .swatch { display: inline-block; width: 12px; height: 12px; border: 2px solid #05030c; margin-right: 4px; vertical-align: -2px; }
 
 /* ---- settings ---- */
-#settings { z-index: 60; cursor: default; background: rgba(5, 3, 12, 0.78); }
 #settings { z-index: 60; cursor: default; background: rgba(5, 3, 12, 0.78); align-items: flex-start; padding-top: 16px; box-sizing: border-box; }
 .set-open {
   font-family: var(--comic); font-size: 11px; line-height: 1; padding: 9px 12px 7px; margin: 6px 0 0; cursor: pointer;
