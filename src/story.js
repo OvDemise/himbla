@@ -1745,6 +1745,8 @@ export class Story {
       L.model.armL.rotation.z = -0.3 + Math.sin(L.t * 1.3) * 0.15;
     }
     if (this.active) {
+      // the Spindle mission: its rock is made in the background while the earlier steps play out
+      if (!this.game.spindle.root && this.active.steps.some((st) => st.t === 'spindle')) this.game.spindle.prefetch();
       this.updateStep(dt);
       if (this.active) {
         const s = this.active.steps[this.active.si];

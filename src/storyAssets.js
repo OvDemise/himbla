@@ -291,9 +291,11 @@ const PROPS = {
     for (const [x, z] of [[-12, 8], [-12, -8]]) { k.add(new THREE.SphereGeometry(3.2, 16, 12), T(0xeeecf6), x, 3.6, z, { outline: 0.08 }); k.add(new THREE.TorusGeometry(3.25, 0.2, 4, 20).rotateX(Math.PI / 2), T(0x2ec4ff), x, 3.6, z, { outline: 0 }); k.cyl(0.3, 0.3, 1, 6, T(0x3a3550), x, 0, z, { outline: 0 }); }
     k.text('MERIDIAN LAUNCH COMPLEX', 0, 3.2, 19.2, 0, 14, { fg: '#2ec4ff', bg: '#0d1a33', back: false, off: 0.02 });
     k.box(15, 2.6, 0.3, T(0x3a3550), 0, 1.9, 19.0, { outline: 0.03 });
+    for (const sx of [-1, 1]) k.box(0.4, 1.5, 0.4, T(0x3a3550), sx * 6.5, 0.5, 19.0, { outline: 0.03 }); // (the board's legs)
     k.flag(14, 10, 12, 0x2ec4ff);
     k.column(3.2, 30, 0, 0);
-    k.column(1.8, 32, 9, 0);
+    for (let j = 0; j < 3; j++) k.solid(3, 0.2, 0.8, 5.5, 0, 0, 10 + j * 8);
+    k.solid(7.5, 1.95, 0.25, 0, 19.0, 0, 0.5);
     k.sphere(3.2, -12, 3.6, 8);
     k.sphere(3.2, -12, 3.6, -8);
   },

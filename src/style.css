@@ -1206,3 +1206,36 @@ body.pad-on #padquick { display: block; }
 #padquick small { color: var(--ui-dim); font-size: 8px; margin-left: 4px; }
 #padquick.picking span { color: var(--ui-dim); margin-right: 6px; }
 #padquick.picking span.pq-on { color: #05030c; background: #ffd23f; padding: 1px 4px; }
+
+/* map legend: a comic panel to the left of the globe; folds into a slim tab */
+.globe-row { display: flex; align-items: flex-start; gap: 12px; max-width: 100vw; }
+#globe-legend { position: relative; width: 214px; flex: none; background: var(--ui-bg); color: var(--ui-text); border: 2px solid var(--ui-edge); box-shadow: 0 0 0 2px #05030c, var(--ui-shadow); max-height: min(760px, 92vmin); overflow-y: auto; cursor: default; }
+#globe-legend .lg-head { display: flex; align-items: center; justify-content: space-between; padding: 8px 8px 7px 10px; border-bottom: 2px solid var(--ui-edge); background: var(--ui-bg2, rgba(26, 20, 48, 0.95)); }
+#globe-legend .lg-head span { font-family: var(--comic); font-size: 10px; color: var(--yellow); letter-spacing: 1px; }
+#globe-legend .lg-fold { font-family: var(--comic); font-size: 9px; width: 24px; height: 22px; background: var(--ui-bg); color: var(--cyan); border: 2px solid var(--cyan); cursor: pointer; padding: 0; }
+#globe-legend .lg-fold:hover, #globe-legend .lg-fold.pad-focus { background: var(--cyan); color: #05030c; }
+#globe-legend .lg-body { padding: 4px 10px 10px; }
+#globe-legend .lg-sec { font-family: var(--comic); font-size: 8px; color: var(--ui-violet); margin: 10px 0 4px; letter-spacing: 1px; }
+#globe-legend .lg-row { display: flex; align-items: center; gap: 8px; font-size: 14px; line-height: 1.15; margin: 3px 0; }
+#globe-legend .lg-ic { width: 34px; height: 22px; flex: none; }
+#globe-legend .lg-ic canvas { display: block; }
+#globe-legend .lg-sw { width: 16px; height: 12px; margin: 0 9px; flex: none; border: 2px solid #120a1e; }
+#globe-legend .lg-note { font-size: 12px; color: var(--ui-muted); margin-top: 8px; line-height: 1.25; }
+#globe-legend .lg-tab { display: none; }
+#globe-legend.folded { width: 34px; overflow: visible; }
+#globe-legend.folded .lg-head, #globe-legend.folded .lg-body { display: none; }
+#globe-legend.folded .lg-tab { display: flex; flex-direction: column; align-items: center; gap: 8px; width: 100%; padding: 8px 0; background: var(--ui-bg); color: var(--cyan); border: 0; cursor: pointer; font-family: var(--comic); font-size: 9px; }
+#globe-legend.folded .lg-tab:hover, #globe-legend.folded .lg-tab.pad-focus { background: var(--cyan); color: #05030c; }
+#globe-legend .lg-tab-t { writing-mode: vertical-rl; letter-spacing: 2px; }
+@media (max-width: 1000px) { #globe-legend { width: 168px; } #globe-legend .lg-row { font-size: 12px; } }
+
+/* save slot tools (load game): export / import / restore / delete, stacked beside the card */
+.sv-tools { flex: none; width: 104px; display: flex; flex-direction: column; gap: 4px; }
+.sv-tool { flex: 1; min-height: 22px; font-family: var(--comic); font-size: 8px; color: var(--cyan); background: rgba(10, 8, 20, 0.82); border: 2px solid var(--ui-edge); box-shadow: 0 0 0 2px #05030c; cursor: pointer; padding: 3px 4px; }
+.sv-tool.focus, .sv-tool:hover { color: #05030c; background: var(--cyan); border-color: var(--cyan); }
+.sv-tool.danger { color: var(--red); }
+.sv-tool.danger.focus, .sv-tool.danger:hover { color: #fff; background: var(--red); border-color: var(--red); }
+.sv-tool.warn { color: var(--yellow); border-color: var(--yellow); }
+.sv-tool.warn.focus, .sv-tool.warn:hover { color: #05030c; background: var(--yellow); }
+.sv-bad { color: var(--red) !important; }
+.mm-note { font-family: var(--comic); font-size: 8px; line-height: 1.6; color: var(--green); margin: 0 0 8px; text-align: center; }

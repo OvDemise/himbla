@@ -3,6 +3,114 @@
 What changed in each release. Releases are built by `.github/workflows/release.yml` when a commit message
 contains `[release]` (see the README's Download section). Newest first.
 
+## 0.9.99 — 2026-10-10
+
+**Polish**
+- **Save safety:** the first time a slot is saved each session, what it held is kept as its backup.
+  LOAD GAME gets per-slot tools: EXPORT (the slot to a file), IMPORT (a save file into a slot; what it
+  replaces is backed up first), RESTORE (the save as it was when you last stopped playing) and DELETE.
+  A slot that won't read shows as DAMAGED, with RESTORE to put the backup back.
+- **Quality presets:** Settings → Graphics → Quality preset (LOW / MEDIUM / HIGH, or CUSTOM once you
+  change something by hand). A brand-new install guesses one from the graphics card, then times the
+  first half-minute of play and steps down once (and says so) if it's struggling. Existing players keep
+  what they had.
+- **Camera stays out of walls, smoothly:** the camera's wall check is wider than its near clip and finds
+  exactly where the wall starts (not the nearest half-metre step), so with your back to a dome or any
+  curved wall it slides along it steadily instead of jittering; it eases in quickly and back out slowly.
+- **The Spindle loads instantly:** its rock is now made by a background worker while the mission's earlier
+  steps play out, so the mission starts without the ~2 s freeze.
+- **Map legend:** a key beside the globe map with the main symbols (drawn just as the map draws them) and
+  the faction colours; everything on the map still explains itself on hover. The arrow folds it into a
+  slim tab; it remembers.
+- **Skate tones:** each pair of skates hums in its own voice, all low and easy to live with: the classic
+  HUM (Q-Lock Standard, Chrome Comets, Dark-Side Survivors), a smooth airy GLIDE (Void Gliders, Prism
+  Drive, Lucky Felt Rollers), a low mechanical RUMBLE with a wheel-throb (Solar Flares, Seismic Striders,
+  Derby Hooves), and for the Jackpot Rollers a warm hum with a soft shimmer of gold and a ringing, metallic
+  coin-edge spin that turns faster as you do.
+
+**Mineral tints on the Moon**
+- **Hue, never brightness:** the ground keeps its classic tones and shading, so a tint can't be mistaken
+  for a shadow and the shadows keep all their contrast. Broad regions lean a touch cooler (blue-grey, the
+  maria) or warmer (tan, iron-bearing ground).
+- **By what the ground is:** buff on the ridged highlands and scarp steps, rusty brown down the rilles,
+  a cleaner grey on fresh crater rims and their gravel, dull brown in old worn craters.
+- **Mineral colour boost:** the tints pushed further, warm ones
+  toward orange-brown and cool ones toward blue each by their own amount (the classic tones underneath
+  untouched), and more the higher you are: modest underfoot, richer from high up, like the colour-boosted
+  photos of the Moon.
+- Only colour: no terrain shape moved. (`PLANET.painted` in config.js turns the tints off altogether.)
+
+**Performance**
+- **No more terrain stutter at speed.** The Moon's ground is now worked out on background threads (2-4
+  terrain workers, by CPU): a detailed chunk took ~25 ms on the main thread, longer than a whole frame,
+  so going fast dropped frames every time you crossed into new ground. Measured over 8 s at 80 and
+  160 m/s: frames over 16 ms on terrain went from 5 and 14 to none, worst case from ~25 ms to under 11.
+  The workers build exactly the same ground (checked vertex for vertex, plateaus included), and if a
+  worker can't start, the game builds on the main thread as before.
+- **Build-ahead.** The workers also start on the detailed ground round where you'll be in ~1.5 s, so it's
+  usually ready before you get there; a gap (nothing built yet) gets a quick coarse chunk first.
+
+**Collision pass** (everything that takes up space now has a clean collision shape)
+- **Shared props:** crates, shipping containers, tanks, junk heaps (stepped like the mound), barrels,
+  sandbag walls, lamp posts, pipe runs and conveyor belts all collide, wherever they're used.
+- **Lattice towers** (cranes, masts, derricks, the launch gantry) get a solid core that steps in as they taper.
+- **Wrecked hulls:** the bare rib section and the torn-off plate are solid too, not just the hull.
+- **Fortress walls** (ILMB, Vostok, Daedalus, the arrays): the collision reaches out to the buttresses
+  and plinth, so the outside is one flat face instead of a wall you sink into.
+- **Places:** solar fields, the ILMB's parked rovers, shuttle-stop shelters, raised landing pads, the
+  He-3 ore heap (stepped), the bunker blast doors and tank traps, playgrounds, Coldwater's greenhouses,
+  slide and parked Mule, the lab's cable reels, the Monolith camp's instrument bench.
+- **Chimera Downs:** the inside and outside rails are a fence you hop (not posts to slip between), plus
+  the finish gantry, photo booth, distance poles, jumbotron, winner's arch, the statue and the gate arch.
+
+**Lighting**
+- **No more hard-edged shadow blotches and "spider-web" streaks on the ground.** Far-off terrain is drawn
+  with big, coarse triangles, and it was still casting sun shadows onto the ground near you: flat
+  polygons of shadow that matched no hill on screen, stretched into radial streaks when the sun was low.
+  Only the detailed terrain round you casts now (crater rims still throw their long dusk shadows).
+- **The Spindle's crater "spider-webs" are gone.** Its rock is a grid with a vertex every 7 m, and its small
+  craters (down to 12 m across) had a peaked rim and an ejecta skirt that started with a step, so round
+  each one the grid drew a star of triangles that caught the light. Craters are now at least 30 m across,
+  rims and skirts are rounded with no creases, the pit chains are spaced out, and rayed craters get five
+  broad soft streaks instead of a dozen hairlines.
+- **No more pale smudges round craters from above (Moon and Spindle).** The ground's toon shading had a
+  second step from mid-tone to full sun, so every slope tipped a little toward the sun (each crater's
+  outer flank) jumped a whole tone into a soft pale blob. Past the night side's dark band the light now
+  rises gently to full sun. The Moon's rayed craters also swap a dozen hairline rays (a web of spokes on
+  the coarser far terrain) for five broad soft streaks.
+- **The Spindle is smooth.** Its ridges, crags, crater bowls, terraces, central peaks and rilles were all
+  built from shapes with sharp creases, which its grid drew as lines of light and shade. Every crease is
+  rounded now (bowls ease into their rims, terraces are soft stairs, rilles are smooth troughs with low
+  levees), rims are at least ~14 m across, the grid is finer (5 m, was 7), and each grid square splits
+  along whichever diagonal follows the ground, so slanted rims no longer come out as rows of teeth.
+- **Smooth crater shadows on the Moon.** Each terrain square split along the same diagonal, so a crater
+  rim crossing the grid at a slant zigzagged, and a low sun stretched that into a row of jagged teeth
+  along the rim's shadow. Squares now split along whichever diagonal follows the ground (the ground under
+  your feet uses the same split). Rille floors lost their fine rubble too, which stippled them with
+  specks of shadow at dusk.
+- **No saw-teeth inside crater walls under a low sun.** Where a crater's wall turns away from the sun it
+  was shadowing itself through the shadow map, a band of jagged teeth down the far wall. The ground now
+  eases smoothly into shadow there (it only ever darkens), and crater crests are rounder.
+- **No more soft dark smears on the Spindle.** The rock was lit by the rule meant for buildings and props:
+  every slope within ~12 degrees of edge-on to the sun faded toward dark, and under the roll's low sun
+  that covered the rock in soft smudges at every angle, day and night. It's now lit like the Moon's
+  ground: a crisp turn into shade only where a slope faces away from the sun, so craters and ridges read
+  as relief. Also: the mothership no longer casts a shadow (90 m up, it threw huge soft blobs that
+  crawled along with it), and the sky fill out there is even all round.
+- **No rayed craters on the Spindle.** Even softened, their pale streaks read as smudges round the craters
+  at night. Every crater stays exactly where it was.
+
+**Layout**
+- **Lucky Crater Casino:** the hall no longer sits alone in an empty crater. A neon boulevard leads from
+  the red carpet to a fountain plaza (a tiered fountain spilling a curtain of water, a ring of chip-red
+  tiles, benches and neon palms, the way in left clear), a LUCKY CRATER pylon sign stands out by the
+  road with each word on its own line, and car parks either side, curbed and hedged with a P sign at the
+  way in, are full of parked hover-cars.
+- **Meridian Exchange:** the four warehouses turn their loading docks in to face the tower across the
+  plaza, instead of a pinwheel.
+- **Meridian launch complex:** its sign board stands on legs instead of floating, and its colliders now
+  turn and sit with the tilted complex (the gantry arms and sign were off before).
+
 ## 0.9.98 — 2026-10-10
 
 **Models**

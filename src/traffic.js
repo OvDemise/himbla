@@ -346,7 +346,17 @@ export class Traffic {
     g.add(part(new THREE.BoxGeometry(3.0, 0.2, 0.7), toon(0xfff4e0), 0, 0.7, -0.5, 0.03));
     g.add(part(new THREE.BoxGeometry(3.6, 1.2, 0.12), toon(0x2a2540), 0, 1.9, -1.0, 0));
     g.add(part(new THREE.SphereGeometry(0.22, 8, 6), glow(0xfff6a8), 0, 2.65, 0.5, 0));
-    this.w.put(g, loc, x, z, this.groundY(loc, x, z), yaw);
+    const gy = this.groundY(loc, x, z);
+    this.w.put(g, loc, x, z, gy, yaw);
+    // the back panel and posts as one slab, the bench in front: room to stand under the roof
+    const c = Math.cos(yaw), sn = Math.sin(yaw);
+    const at = (lx, lz) => [x + lx * c + lz * sn, z - lx * sn + lz * c];
+    let [cx, cz] = at(0, -0.85);
+    this.w.col(loc, { type: 'box', x: cx, y: gy + 1.5, z: cz, hx: 1.85, hy: 1.5, hz: 0.3, yaw });
+    [cx, cz] = at(0, -0.5);
+    this.w.col(loc, { type: 'box', x: cx, y: gy + 0.4, z: cz, hx: 1.5, hy: 0.4, hz: 0.35, yaw });
+    [cx, cz] = at(0, 0);
+    this.w.col(loc, { type: 'box', x: cx, y: gy + 2.9, z: cz, hx: 2.0, hy: 0.13, hz: 1.0, yaw });
     if (text) {
       const s = textSprite(text, { color: '#' + new THREE.Color(color).getHexString(), size: 48, scale: 0.24, bg: '#120a1e' });
       s.position.set(x, this.groundY(loc, x, z) + 4.6, z);
@@ -418,6 +428,7 @@ export class Traffic {
       if (raised) {
         const sk = part(new THREE.CylinderGeometry(spec.padR * 1.02, spec.padR * 1.1, base - pick.lo + 1.5, 24), toon(0x5b5870), 0, 0, 0, 0.1);
         this.w.put(sk, loc, pick.x, pick.z, (base + pick.lo - 1.5) / 2 - 0.25);
+        this.w.col(loc, { type: 'cyl', x: pick.x, z: pick.z, y0: pick.lo - 1.5, y1: base + 0.27, r: spec.padR * 1.05 });
       }
       top = Math.max(top, base + 0.27);
       // rim lights so the pad reads at night

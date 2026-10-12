@@ -51,8 +51,8 @@ export class MainMenu {
     let handled = true;
     if (c === 'ArrowDown' || c === 'KeyS') this.move(rows, 1);
     else if (c === 'ArrowUp' || c === 'KeyW') this.move(rows, -1);
-    else if (c === 'ArrowRight' || c === 'KeyD') this.setCol(1);
-    else if (c === 'ArrowLeft' || c === 'KeyA') this.setCol(0);
+    else if (c === 'ArrowRight' || c === 'KeyD') this.setCol(this.col + 1);
+    else if (c === 'ArrowLeft' || c === 'KeyA') this.setCol(Math.max(0, this.col - 1));
     else if (c === 'Enter' || c === 'NumpadEnter' || c === 'Space') { const b = this.current(); if (b) b.click(); }
     else if (c === 'Delete' || c === 'Backspace' || c === 'KeyX') {
       const b = this.body.querySelector(`[data-f="${this.focus}"][data-act="del"]`);
@@ -94,6 +94,7 @@ export class MainMenu {
   }
 
   go(screen, focus = 0) {
+    this.note = null;
     this.screen = screen;
     this.confirm = null;
     this.focus = focus;
@@ -123,10 +124,19 @@ export class MainMenu {
         else { this.confirm = { kind: 'overwrite', n }; this.focus = 0; this.col = 0; this.render(); }
       } else if (!empty) this.choose(n, false);
     } else if (act === 'del') { this.confirm = { kind: 'delete', n }; this.focus = 0; this.col = 0; this.render(); }
+    else if (act === 'export') this.exportSlot(n);
+    else if (act === 'import') {
+      if (S.read(n) || S.damaged(n)) { this.confirm = { kind: 'import', n }; this.focus = 0; this.col = 0; this.render(); } else this.pickFile(n);
+    } else if (act === 'restore') { this.confirm = { kind: 'restore', n }; this.focus = 0; this.col = 0; this.render(); }
     else if (act === 'yes') {
       const c = this.confirm;
       this.confirm = null;
       if (c.kind === 'overwrite') this.choose(c.n, true);
+      else if (c.kind === 'import') { this.pickFile(c.n); this.render(); }
+      else if (c.kind === 'restore') {
+        if (S.restore(c.n)) this.note = `SLOT ${c.n} RESTORED FROM ITS BACKUP`; else this.note = 'COULDN\'T RESTORE THAT BACKUP';
+        this.render();
+      }
       else if (c.kind === 'delete') {
         if (S.remove(c.n)) { location.reload(); return; }
         if (!this.anySaves()) this.go('main'); else this.render();
@@ -135,7 +145,39 @@ export class MainMenu {
     else if (act === 'start') this.startNow();
   }
 
-  anySaves() { return this.saves.list().some((s) => !s.empty); }
+  anySaves() { return this.saves.list().some((s) => !s.empty || s.damaged); }
+
+  // ---------- save files ----------
+  exportSlot(n) {
+    const text = this.saves.exportText(n);
+    if (!text) return;
+    const d = new Date();
+    const stamp = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([text], { type: 'application/json' }));
+    a.download = `moon-runner-slot${n}-${stamp}.json`;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+    this.note = `SLOT ${n} EXPORTED · ${a.download}`;
+    this.render();
+  }
+
+  pickFile(n) {
+    const inp = document.createElement('input');
+    inp.type = 'file';
+    inp.accept = '.json,application/json';
+    inp.addEventListener('change', () => {
+      const f = inp.files && inp.files[0];
+      if (!f) return;
+      f.text().then((text) => {
+        const err = this.saves.importText(n, text);
+        this.note = err ? err.toUpperCase() : `IMPORTED INTO SLOT ${n}`;
+        this.render();
+      });
+    });
+    inp.click();
+  }
 
   // Pick a slot. Resuming the slot that's already loaded starts right away; anything else
   // rewrites the live save keys and reloads into it.
@@ -167,8 +209,19 @@ export class MainMenu {
            <span>PLAY TIME</span><b>${fmtPlayTime(m.playTime)}</b>
            <span>LAST PLAYED</span><b>${fmtDate(m.savedAt)}</b>
          </div>`;
-    const del = s.empty ? '' : `<button class="sv-del" data-act="del" data-n="${s.n}" data-f="${f}" data-c="1" title="Delete slot ${s.n}">DELETE</button>`;
-    return `<div class="sv-row"><button class="sv-card ${s.empty ? 'is-empty' : ''}" data-act="slot" data-n="${s.n}" data-f="${f}" data-c="0" ${canPick ? '' : 'disabled'}>${inner}</button>${del}</div>`;
+    // the slot's tools: on LOAD GAME, export / import / restore the backup / delete; on NEW GAME, delete
+    const tools = [];
+    const btn = (act, label, title, cls = '') => tools.push(`<button class="sv-tool ${cls}" data-act="${act}" data-n="${s.n}" data-f="${f}" data-c="${tools.length + 1}" title="${title}">${label}</button>`);
+    if (this.screen === 'load') {
+      if (!s.empty) btn('export', 'EXPORT', `Save slot ${s.n} to a file`);
+      btn('import', 'IMPORT', `Load a save file into slot ${s.n}`);
+      if (s.hasBackup) btn('restore', 'RESTORE', `Put back slot ${s.n} as it was when you last stopped playing`, s.damaged ? 'warn' : '');
+    }
+    if (!s.empty || s.damaged) btn('del', 'DELETE', `Delete slot ${s.n}`, 'danger');
+    const card = s.damaged
+      ? `<div class="sv-head">${head}</div><div class="sv-empty sv-bad">DAMAGED${s.hasBackup ? ' · RESTORE THE BACKUP →' : ''}</div>`
+      : inner;
+    return `<div class="sv-row"><button class="sv-card ${s.empty ? 'is-empty' : ''}" data-act="slot" data-n="${s.n}" data-f="${f}" data-c="0" ${canPick && !s.damaged ? '' : 'disabled'}>${card}</button>${tools.length ? `<div class="sv-tools">${tools.join('')}</div>` : ''}</div>`;
   }
 
   render() {
@@ -185,11 +238,16 @@ export class MainMenu {
         : `<div class="mm-wait">LOADING SLOT ${S.active}…</div>`;
     } else if (this.confirm) {
       const c = this.confirm;
-      const txt = c.kind === 'delete'
-        ? `DELETE SLOT ${c.n}?<small>This wipes that save for good: credits, upgrades, reputation, story, map, chimeras and highlights.</small>`
-        : `OVERWRITE SLOT ${c.n}?<small>The save in this slot will be replaced by a brand-new game.</small>`;
+      const b = S.backup(c.n);
+      const txt = {
+        delete: `DELETE SLOT ${c.n}?<small>This wipes that save for good, and its backup: credits, upgrades, reputation, story, map, chimeras and highlights.</small>`,
+        overwrite: `OVERWRITE SLOT ${c.n}?<small>The save in this slot will be replaced by a brand-new game.</small>`,
+        import: `IMPORT INTO SLOT ${c.n}?<small>The save in this slot will be replaced by the file you pick. (Its old contents stay as the slot's backup.)</small>`,
+        restore: `RESTORE SLOT ${c.n}?<small>Puts back the save as it was when you last stopped playing${b && b.meta ? ` (₵${(b.meta.credits ?? 0).toLocaleString('en-US')}, ${fmtPlayTime(b.meta.playTime)} played, ${fmtDate(b.meta.savedAt)})` : ''}. What's in the slot now is lost.</small>`,
+      }[c.kind];
+      const yes = { delete: 'DELETE', overwrite: 'OVERWRITE', import: 'PICK A FILE', restore: 'RESTORE' }[c.kind];
       html = `<div class="mm-confirm"><div class="mm-q">${txt}</div>
-        <div class="mm-yn"><button class="mm-item danger" data-act="yes" data-f="0" data-c="0">YES, ${c.kind === 'delete' ? 'DELETE' : 'OVERWRITE'}</button>
+        <div class="mm-yn"><button class="mm-item ${c.kind === 'delete' || c.kind === 'overwrite' ? 'danger' : ''}" data-act="yes" data-f="0" data-c="0">YES, ${yes}</button>
         <button class="mm-item" data-act="no" data-f="1" data-c="0">NO, GO BACK</button></div></div>`;
     } else if (this.screen === 'main') {
       const last = S.lastSlot();
@@ -197,14 +255,14 @@ export class MainMenu {
       const items = [];
       if (last) items.push(['continue', `CONTINUE`, `SLOT ${last}`]);
       items.push(['new', 'NEW GAME', '']);
-      items.push(['load', 'LOAD GAME', '', !any]);
+      items.push(['load', 'LOAD GAME', any ? '' : 'IMPORT A SAVE']);
       items.push(['settings', 'SETTINGS', '']);
       if (isElectron) items.push(['quit', 'QUIT', '']);
       html = `<nav class="mm-list">${items.map(([act, label, sub, dis], i) => `<button class="mm-item" data-act="${act}" data-f="${i}" data-c="0" ${dis || !this.ready ? 'disabled' : ''}><span class="mm-caret">&gt;</span>${label}${sub ? `<small>${sub}</small>` : ''}</button>`).join('')}</nav>`;
     } else {
       const title = this.screen === 'new' ? 'NEW GAME · CHOOSE A SLOT' : 'LOAD GAME';
       const slots = S.list();
-      html = `<div class="mm-sub">${title}</div><div class="sv-list">${slots.map((s, i) => this.card(s, i)).join('')}</div>
+      html = `<div class="mm-sub">${title}</div>${this.note ? `<div class="mm-note">${esc(this.note)}</div>` : ''}<div class="sv-list">${slots.map((s, i) => this.card(s, i)).join('')}</div>
         <button class="mm-item mm-back" data-act="back" data-f="${SLOT_COUNT}" data-c="0"><span class="mm-caret">&lt;</span>BACK</button>`;
     }
     this.body.innerHTML = html;
@@ -216,7 +274,8 @@ export class MainMenu {
     if (hint) {
       hint.textContent = this.screen === 'autostart' ? 'CLICK OR PRESS ENTER'
         : this.screen === 'main' && !this.confirm ? 'UP/DOWN SELECT · ENTER CONFIRM'
-          : 'UP/DOWN SELECT · RIGHT: DELETE · ENTER CONFIRM · ESC BACK';
+          : this.screen === 'load' && !this.confirm ? 'UP/DOWN SLOT · LEFT/RIGHT: EXPORT · IMPORT · RESTORE · DELETE · ESC BACK'
+            : 'UP/DOWN SELECT · RIGHT: DELETE · ENTER CONFIRM · ESC BACK';
     }
   }
 }

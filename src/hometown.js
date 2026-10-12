@@ -142,6 +142,7 @@ function buildingKit(type) {
           k.add(new THREE.CylinderGeometry(3.6, 3.6, 16, 16, 1, true, -Math.PI / 2, Math.PI).rotateX(Math.PI / 2), GLASS(0x9bffb0, 0.32), x, 0.3, 0, { outline: 0 });
           for (let t = -7; t <= 7; t += 3.5) k.add(new THREE.TorusGeometry(3.62, 0.07, 4, 16, Math.PI), T(LT), x, 0.3, t, { outline: 0 });
           for (let r = -1; r <= 1; r++) k.box(1.2, 0.4, 14, T(0x6b4a2a), x + r * 1.6, 0.3, 0, { outline: 0.02 });
+          k.hcyl(3.6, 16, x, 0, 0, 0.3);
           for (let r = -1; r <= 1; r++) for (let j = 0; j < 6; j++) k.add(new THREE.SphereGeometry(0.4, 6, 4), T(0x3f9a3a), x + r * 1.6, 1.0, -6 + j * 2.4, { outline: 0.02 });
         }
         break;
@@ -150,6 +151,7 @@ function buildingKit(type) {
         k.at();
         k.box(8, 0.12, 6, T(0x5b5870), 7, 0.3, -2, { outline: 0 });
         for (let i = 0; i < 3; i++) crate(k, 9, 0.3 + i * 0.9, 4, 0.9, 0x55607a, i);
+        k.solid(2.2, 1.2, 2.6, 7, -2, 0.4, 0.3); // (the Mule parked on its apron)
         break;
       case 'barracks':
         quonset(k, 0, 3, 4.5, 12, 0x6b6f78, 0, KEP);
@@ -164,6 +166,9 @@ function buildingKit(type) {
         k.beam([5.8, 3.6, -5], [8.2, 3.6, -5], 0.08, T(0xff2e88));
         k.add(new THREE.BoxGeometry(1.2, 0.12, 5), T(0x7dff6a), -6, 1.5, -6, { rx: 0.5, outline: 0.02 });
         k.box(1.4, 2.6, 1.4, T(0x2ec4ff), -6, 0.3, -8.6, { outline: 0.03 });
+        k.solid(0.7, 1.3, 0.7, -6, -8.6, 0, 0.3);
+        k.solid(0.6, 0.8, 2.3, -6, -6, 0, 0.6); // (the slide)
+        for (const sx of [-1, 1]) k.column(0.2, 3.9, 7 + sx * 1.4, -5);
         break;
       case 'radio':
         k.box(5, 0.5, 5, T(CONC), 0, 0.3, 0, { outline: 0.03 });

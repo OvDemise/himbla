@@ -73,6 +73,7 @@ const sleep = () => new Promise((r) => {
   setTimeout(go, 50);
 });
 const _v = new THREE.Vector3();
+const _ahead = new THREE.Vector3();
 const _v2 = new THREE.Vector3();
 const JAR_HOLD = 1; // seconds to hold X to empty the jar
 const FROZEN_STATES = new Set(['paused', 'map', 'dialog', 'board', 'log', 'wardrobe', 'dawn']);
@@ -155,6 +156,7 @@ class Game {
     sc.left = -160; sc.right = 160; sc.top = 160; sc.bottom = -160; sc.near = 10; sc.far = 1400;
     this.sun.shadow.bias = -0.0008;
     this.sun.shadow.normalBias = 0.6;
+    this.sun.shadow.radius = 2.5; // (PCF: shadow edges a touch soft, so they don't step along the terrain grid)
     this.scene.add(this.sun, this.sun.target);
     this.hemi = new THREE.HemisphereLight(0x9a8cff, 0x40305a, 0.85);
     this.scene.add(this.hemi);
@@ -269,6 +271,7 @@ class Game {
     this.lastCapture = -999;
     this.wasDark = false;
 
+    this.settings.autoDetect(this.renderer); // settings: first launch picks a quality preset
     this.settings.apply(this, true); // settings
     this.bindUI();
     window.addEventListener('resize', () => this.resize());
@@ -1030,6 +1033,7 @@ class Game {
   frame() {
     const now = performance.now();
     if (this.settings && this.settings.skip(now)) return; // settings: frame-rate cap
+    if (this.settings) this.settings.perfSample(now - this.last, this.state === 'play'); // (first launch: is the preset too much?)
     let rdt = Math.min(0.05, (now - this.last) / 1000);
     this.last = now;
     if (this.trailer) rdt = this.trailer.pre(rdt); // trailer: shot clock, staged input
@@ -1064,7 +1068,9 @@ class Game {
     this.audio.update(P.dead ? 0 : P.speed, P.body.skating, P.body.grounded, P.body.thrusting && playing);
 
     const dark = darkness(P.up);
-    this.planet.update(this.camera.position, { budgetMs: 4, maxDist: (dark > 0.7 ? 1500 : 3200) * (this.settings ? this.settings.v.viewDist : 1) }); // settings
+    // (build-ahead: the terrain workers start on the chunks round where you'll be in ~1.5 s)
+    _ahead.copy(this.player.body.vel).clampLength(0, 200).multiplyScalar(1.5).add(this.camera.position);
+    this.planet.update(this.camera.position, { budgetMs: 4, ahead: _ahead, maxDist: (dark > 0.7 ? 1500 : 3200) * (this.settings ? this.settings.v.viewDist : 1) }); // settings
 
     const u = this.post.material.uniforms;
     u.time.value = this.time;
@@ -1408,21 +1414,39 @@ class Game {
     if (scopeEl) scopeEl.classList.toggle('hidden', !scoped || c.dist > 1.2);
     const alt = this.planet.altitude(want);
     if (alt < 1.2) want.addScaledVector(upAt(want), 1.2 - alt);
-    // keep the camera out of walls (matters indoors)
+    // keep the camera out of walls: sweep a ball from your head back to where the camera wants to
+    // be and find exactly where it first touches something solid (stepped, then narrowed down), so the
+    // stop point slides smoothly along a dome or a slope instead of jumping between steps. The ball is
+    // wider than the camera's near clip (0.5 m), so a wall can't slice into the view.
     const span = want.clone().sub(target);
     const L = span.length();
-    const steps = Math.ceil(L / 0.6);
     const probe = new THREE.Vector3(), nrm = new THREE.Vector3();
+    const solid = (t) => {
+      probe.copy(target).addScaledVector(span, t);
+      for (const col of this.colliders.query(probe, 1.6)) if (!col.platform && this.colliders.contact(col, probe, 0.65, nrm) > 0) return true;
+      return false;
+    };
+    const steps = Math.max(1, Math.ceil(L / 0.5));
+    let reach = 1;
     for (let i = 1; i <= steps; i++) {
-      probe.copy(target).addScaledVector(span, i / steps);
-      let hit = false;
-      for (const col of this.colliders.query(probe, 1)) {
-        if (!col.platform && this.colliders.contact(col, probe, 0.35, nrm) > 0) { hit = true; break; }
-      }
-      if (hit) { want.copy(target).addScaledVector(span, Math.max(0.15, (i - 1) / steps)); break; }
+      if (!solid(i / steps)) continue;
+      let lo = (i - 1) / steps, hi = i / steps;
+      for (let k = 0; k < 5; k++) { const mid = (lo + hi) / 2; if (solid(mid)) hi = mid; else lo = mid; }
+      reach = Math.max(0.12, lo);
+      break;
     }
+    // how far out the camera may sit, smoothed: in quickly (a wall is coming), out slowly; with the
+    // exact stop point that's steady against a curved wall, with no frame-to-frame jitter
+    if (c.reach === undefined || snap) c.reach = reach;
+    else c.reach += (reach - c.reach) * Math.min(1, dt * (reach < c.reach ? 16 : 4));
+    // (a new obstacle cutting in (a tube, a cabin) is eased in over a few frames, not snapped to, but
+    // never more than ~1 m past the stop point: the 0.65 m ball keeps that clear of the view)
+    if (L > 1e-3) c.reach = Math.min(c.reach, reach + 1 / L);
+    want.copy(target).addScaledVector(span, c.reach);
+    const held = c.reach < 0.999;
     if (snap) c.position.copy(want);
-    else c.position.lerp(want, sv && sv.camSmooth < 0.05 ? 1 : Math.min(1, dt * 18 / (sv ? sv.camSmooth : 1))); // settings
+    // (while a wall is holding it in, it follows the stop point closely: the stop point is already smooth)
+    else c.position.lerp(want, held ? Math.min(1, dt * 30) : sv && sv.camSmooth < 0.05 ? 1 : Math.min(1, dt * 18 / (sv ? sv.camSmooth : 1))); // settings
     this.camera.position.copy(c.position);
     if (c.shake > 0) {
       c.shake = Math.max(0, c.shake - dt * 2.5);

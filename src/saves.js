@@ -8,6 +8,10 @@
 //   while playing     -> snapshot live keys into the active slot (timer, deliveries, unload…)
 //
 // Settings ('moonrunner-settings-v1') are global and never touched here.
+//
+// Safety: the first time a slot is written in a session, what it held before is kept as that slot's
+// backup ('mr-slot-N-bak': the save as it was when you last stopped playing). A slot that won't
+// read (damaged) can be restored from it, and any slot can be exported to a file and imported back.
 
 export const SLOT_COUNT = 3;
 const PREFIX = 'moonrunner-';
@@ -17,6 +21,8 @@ const ACTIVE_KEY = 'mr-active-slot';
 const INIT_KEY = 'mr-slots-init';
 const AUTOSTART_KEY = 'mr-autostart'; // sessionStorage: drop straight into play after a reload
 const slotKey = (n) => `mr-slot-${n}`;
+const bakKey = (n) => `mr-slot-${n}-bak`;
+const FILE_FORMAT = 'moon-runner-save';
 
 const ls = () => { try { return window.localStorage; } catch { return null; } };
 const ss = () => { try { return window.sessionStorage; } catch { return null; } };
@@ -26,6 +32,7 @@ export class SaveSlots {
     const L = ls();
     this.switching = false; // set while we rewrite live keys + reload: suppresses unload snapshots
     this.sessionPlay = 0; // seconds played this page load
+    this.backedUp = new Set(); // slots whose old save was kept as the backup this session
     this.migrate();
     const a = L ? parseInt(L.getItem(ACTIVE_KEY), 10) : NaN;
     this.active = a >= 1 && a <= SLOT_COUNT && this.read(a) ? a : null;
@@ -59,20 +66,59 @@ export class SaveSlots {
     for (const k of this.liveKeys()) L.removeItem(k);
   }
 
-  read(n) {
+  read(n) { return this.readKey(slotKey(n)); }
+
+  readKey(key) {
     const L = ls();
     if (!L) return null;
     try {
-      const d = JSON.parse(L.getItem(slotKey(n)) || 'null');
-      return d && typeof d === 'object' && d.data ? d : null;
+      const d = JSON.parse(L.getItem(key) || 'null');
+      return d && typeof d === 'object' && d.data && typeof d.data === 'object' ? d : null;
     } catch { return null; }
+  }
+
+  // the slot's backup (the save as it was before this session wrote it), or null
+  backup(n) { return this.readKey(bakKey(n)); }
+
+  // something is stored in the slot but it won't read
+  damaged(n) {
+    const L = ls();
+    return !!(L && L.getItem(slotKey(n)) && !this.read(n));
+  }
+
+  // Put the backup back in the slot (the slot in use reloads into it).
+  restore(n) {
+    const b = this.backup(n);
+    if (!b) return false;
+    if (!this.write(n, b, { noBackup: true })) return false;
+    if (n === this.active) this.activate(n, false);
+    return true;
+  }
+
+  // The slot as a file: { format, version, slot data }.
+  exportText(n) {
+    const d = this.read(n);
+    if (!d) return null;
+    return JSON.stringify({ format: FILE_FORMAT, v: 1, exportedAt: Date.now(), save: d });
+  }
+
+  // A save file into slot n. Returns an error message, or null on success (the slot in use reloads).
+  importText(n, text) {
+    let f;
+    try { f = JSON.parse(text); } catch { return 'That file isn\'t a Moon-Runner save.'; }
+    const d = f && f.format === FILE_FORMAT ? f.save : f && f.data ? f : null; // (a bare slot blob works too)
+    if (!d || typeof d.data !== 'object') return 'That file isn\'t a Moon-Runner save.';
+    for (const [k, v] of Object.entries(d.data)) if (!k.startsWith(PREFIX) || typeof v !== 'string') return 'That save file is damaged.';
+    if (!this.write(n, { v: d.v || 1, data: d.data, meta: { ...(d.meta || {}), savedAt: Date.now() } }, { forceBackup: true })) return 'There isn\'t room to store that save.';
+    if (n === this.active) this.activate(n, false);
+    return null;
   }
 
   list() {
     const out = [];
     for (let n = 1; n <= SLOT_COUNT; n++) {
       const d = this.read(n);
-      out.push({ n, empty: !d, meta: d ? d.meta || {} : null, active: n === this.active });
+      out.push({ n, empty: !d, damaged: this.damaged(n), hasBackup: !!this.backup(n), meta: d ? d.meta || {} : null, active: n === this.active });
     }
     return out;
   }
@@ -102,9 +148,15 @@ export class SaveSlots {
     } catch { /* storage unavailable */ }
   }
 
-  write(n, blob) {
+  write(n, blob, { noBackup = false, forceBackup = false } = {}) {
     const L = ls();
     if (!L) return false;
+    // the first write to a slot this session keeps what it held (if it read) as the backup
+    if (!noBackup && (forceBackup || !this.backedUp.has(n))) {
+      this.backedUp.add(n);
+      const old = L.getItem(slotKey(n));
+      if (old && this.read(n)) { try { L.setItem(bakKey(n), old); } catch { /* no room: keep going */ } }
+    }
     try { L.setItem(slotKey(n), JSON.stringify(blob)); return true; } catch { /* quota */ }
     // too big: highlight photos are the bulk, so drop them from the slot copy and retry
     try {
@@ -147,7 +199,7 @@ export class SaveSlots {
     this.switching = true;
     this.clearLive();
     if (fresh) {
-      this.write(n, { v: 1, data: {}, meta: { credits: 250, deliveries: 0, faction: null, playTime: 0, savedAt: Date.now(), fresh: true } });
+      this.write(n, { v: 1, data: {}, meta: { credits: 250, deliveries: 0, faction: null, playTime: 0, savedAt: Date.now(), fresh: true } }, { forceBackup: true });
     } else {
       const d = this.read(n);
       if (d) for (const [k, v] of Object.entries(d.data)) { try { L.setItem(k, v); } catch { /* quota */ } }
@@ -163,6 +215,7 @@ export class SaveSlots {
     const L = ls();
     if (!L) return false;
     L.removeItem(slotKey(n));
+    L.removeItem(bakKey(n));
     if (n !== this.active) return false;
     this.switching = true;
     this.clearLive();

@@ -157,7 +157,12 @@ export class Race {
           oval((i / n) * LAP, r, _o);
           const p = [_o.x, h, _o.z];
           if (i < n) k.cyl(0.08, 0.1, h, 6, T(WHITE), _o.x, 0, _o.z, { outline: 0.02 });
-          if (prev) k.beam(prev, p, 0.07, T(WHITE), { outline: 0.015 });
+          if (prev) {
+            k.beam(prev, p, 0.07, T(WHITE), { outline: 0.015 });
+            // (each panel a thin wall up to the top rail: a clean fence to hop, not posts to slip between)
+            const dx = p[0] - prev[0], dz = p[2] - prev[2];
+            k.solid(0.15, h / 2, Math.hypot(dx, dz) / 2, (p[0] + prev[0]) / 2, (p[2] + prev[2]) / 2, Math.atan2(dx, dz));
+          }
           prev = p;
         }
       }
@@ -167,17 +172,21 @@ export class Race {
       for (const z of [43.6, 65.8]) {
         k.box(1.3, 11, 1.3, T(GREEN), FX, 0, z, { outline: 0.06 });
         k.box(1.5, 0.4, 1.5, T(BRASS), FX, 11, z, { outline: 0.03 });
+        k.solid(0.65, 5.5, 0.65, FX, z);
       }
+      k.solid(0.8, 0.9, 11.8, FX, 54.7, 0, 9.2);
       k.box(1.6, 1.8, 23.6, T(GREEN), FX, 9.2, 54.7, { outline: 0.08 });
       for (let i = 0; i < 12; i++) k.box(1.64, 0.5, 1.9, T(i % 2 ? WHITE : 0x16121f), FX, 9.2, 44.3 + i * 1.9, { outline: 0 });
       k.text('FINISH', FX, 10.1, 54.7, -Math.PI / 2, tw('FINISH', 1.4), { fg: '#f2d27a', bg: '#1d4632', off: 0.82 });
       k.box(2.6, 3.2, 2.2, T(CREAM), FX + 2, 0, 68.4, { outline: 0.05 }); // photo-finish booth
       k.box(2.8, 0.3, 2.4, T(GREEN), FX + 2, 3.2, 68.4, { outline: 0.03 });
       k.box(1.8, 0.8, 0.1, G(0x9be7ff), FX + 2, 1.8, 67.25, { outline: 0 });
+      k.solid(1.3, 1.75, 1.15, FX + 2, 68.4);
       // ---- distance poles counting down to the finish, on the inside rail ----
       for (let d = 100; d <= 600; d += 100) {
         oval(FINISH_U - d, RAIL_IN - 0.6, _o);
         k.cyl(0.14, 0.14, 3.4, 8, T(d % 200 ? RED : WHITE), _o.x, 0, _o.z, { outline: 0.03 });
+        k.column(0.2, 3.4, _o.x, _o.z);
         k.text(`${d}`, _o.x, 3.9, _o.z, Math.atan2(-_o.hz, _o.hx), tw(`${d}`, 0.8), { fg: '#ffffff', bg: '#1d4632', off: 0.16 });
       }
       // ---- the grandstand ----
@@ -312,12 +321,15 @@ export class Race {
       // the name sits above the awning, on the fascia (under it, the awning hides it)
       k.text('RACE OFFICE · BETS', ox, 5.65, oz - 6.05, Math.PI, tw('RACE OFFICE · BETS', 1.0), { fg: '#f2d27a', bg: '#1d4632', back: false, off: 0.05 });
       for (const sx of [-1, 1]) k.box(0.4, 7, 0.4, T(DARK), ox + sx * 6.5, 6.8, oz - 5.2, { outline: 0.03 });
+      k.solid(6.9, 4.2, 0.3, ox, oz - 4.75, 0, 6.4); // (the race card board up on its posts)
       // ---- jumbotron in the infield, facing the stands ----
       const S = SCREEN;
       for (const sx of [-1, 1]) k.box(1.4, S.y + S.h / 2 + 1, 1.4, T(DARK), S.x + sx * (S.w / 2 + 1), 0, S.z - 0.8, { outline: 0.06 });
       k.box(S.w + 3.4, S.h + 2.4, 1.2, T(0x16121f), S.x, S.y - S.h / 2 - 1.2, S.z - 0.8, { outline: 0.1 });
       k.box(S.w + 3.6, 0.6, 1.4, T(GREEN), S.x, S.y + S.h / 2 + 1.2, S.z - 0.8, { outline: 0.04 });
       k.box(S.w + 3.7, 0.15, 1.5, T(BRASS), S.x, S.y + S.h / 2 + 1.8, S.z - 0.8, { outline: 0 });
+      for (const sx of [-1, 1]) k.solid(0.7, (S.y + S.h / 2 + 1) / 2, 0.7, S.x + sx * (S.w / 2 + 1), S.z - 0.8);
+      k.solid((S.w + 3.4) / 2, (S.h + 2.4) / 2 + 0.6, 0.7, S.x, S.z - 0.8, 0, S.y - S.h / 2 - 1.2);
       // ---- winner's circle by the finish: a lit dais under a garland arch ----
       const wx = 30, wz = 26;
       k.cyl(6, 6.4, 0.5, 28, T(CREAM), wx, 0, wz, { outline: 0.06 });
@@ -328,8 +340,12 @@ export class Race {
         k.ball(0.45, T(i % 2 ? RED : CREAM), wx + Math.cos(a) * 5, 0.4 + Math.sin(a) * 5, wz + 0.3, { outline: 0.02 });
       }
       k.text("WINNER'S CIRCLE", wx, 6.4, wz + 0.4, 0, tw("WINNER'S CIRCLE", 0.9), { fg: '#f2d27a', bg: '#1d4632', off: 0.3 });
+      for (const sx of [-1, 1]) k.column(0.6, 2.5, wx + sx * 5, wz);
+      k.solid(0.5, 0.5, 0.5, wx, wz, 0, 4.9); // (the top of the arch)
       // statue plinth in the infield (the statue itself is added below)
       k.cyl(3, 3.5, 2.4, 20, T(CONC), -40, 0, 8, { outline: 0.08 });
+      k.column(3.4, 2.4, -40, 8);
+      k.column(1.6, 6.5, -40, 8); // (the statue on it)
       k.text('THE FIRST CHIMERA', -40, 1.5, 11.55, 0, tw('THE FIRST CHIMERA', 0.42), { fg: '#f2d27a', bg: '#1d4632', back: false, off: 0.02 });
       k.text('PLEASE DO NOT RIDE', -40, 0.95, 11.55, 0, tw('PLEASE DO NOT RIDE', 0.32), { fg: '#e8b06a', bg: '#1d4632', back: false, off: 0.02 });
       // ---- the concourse behind the grandstand: paving, food stalls, tables, strings of lights ----
@@ -378,7 +394,9 @@ export class Race {
         k.box(2.4, 12, 2.4, T(CREAM), sx * 9, 0, 0, { outline: 0.06 });
         k.box(2.6, 0.6, 2.6, T(GREEN), sx * 9, 12, 0, { outline: 0.03 });
         k.ball(0.8, T(BRASS), sx * 9, 13.4, 0, { outline: 0.03 });
+        k.solid(1.2, 6, 1.2, sx * 9, 0);
       }
+      k.solid(10.5, 1.3, 0.8, 0, 0, 0, 11);
       k.box(21, 2.6, 1.6, T(GREEN), 0, 11, 0, { outline: 0.08 });
       k.box(21.2, 0.2, 1.7, T(BRASS), 0, 11, 0, { outline: 0 });
       k.text('CHIMERA DOWNS', 0, 12.3, 0, Math.PI, tw('CHIMERA DOWNS', 1.8), { fg: '#f2d27a', bg: '#1d4632', off: 0.85 });

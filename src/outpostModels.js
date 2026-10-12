@@ -178,6 +178,7 @@ class Kit {
   lamp(x, z, h = 7, color = 0xfff3b0) {
     const l = Math.hypot(x, z) || 1, dx = -x / l, dz = -z / l;
     this.cyl(0.12, 0.17, h, 6, T(DARK), x, 0, z, { outline: 0.03 });
+    this.column(0.25, h, x, z);
     this.beam([x, h, z], [x + dx * 1.5, h, z + dz * 1.5], 0.08, T(DARK));
     this.box(0.8, 0.3, 0.55, T(DARK), x + dx * 1.6, h - 0.05, z + dz * 1.6, { ry: Math.atan2(dx, dz), outline: 0.03 });
     this.box(0.66, 0.08, 0.42, G(color), x + dx * 1.6, h - 0.12, z + dz * 1.6, { ry: Math.atan2(dx, dz), outline: 0 });
@@ -252,21 +253,30 @@ function sandbags(k, cx, cz, r, a0, a1, rows = 2) {
       k.add(new THREE.SphereGeometry(0.66, 6, 3).scale(1, 0.5, 0.62), T(0xb59f74), cx + Math.sin(a) * r, F + 0.28 + row * 0.5, cz + Math.cos(a) * r, { ry: a + Math.PI / 2, outline: 0.03 });
     }
   }
+  // the wall as a chain of blocks along the arc, as high as the stack
+  const n = Math.max(1, Math.ceil(((a1 - a0) * r) / 2.4)), da = (a1 - a0) / n;
+  for (let i = 0; i < n; i++) {
+    const a = a0 + (i + 0.5) * da;
+    k.solid((da * r) / 2 + 0.35, (F + rows * 0.5 + 0.1) / 2, 0.42, cx + Math.sin(a) * r, cz + Math.cos(a) * r, a + Math.PI / 2);
+  }
 }
 function crate(k, x, y0, z, s = 1.2, color = 0x9a6a3a, ry = 0) {
   k.box(s, s, s, T(color), x, y0, z, { ry, outline: 0.04 });
   k.box(s * 1.02, s * 0.14, s * 1.02, T(0x5a3a22), x, y0 + s * 0.43, z, { ry, outline: 0 });
+  k.solid(s / 2, s / 2, s / 2, x, z, ry, y0);
 }
 function container(k, x, y0, z, color, ry = 0) {
   k.box(2.45, 2.6, 6.1, T(color), x, y0, z, { ry, outline: 0.06 });
   for (const s of [-1, 1]) k.box(2.55, 2.66, 0.2, T(DARK), x + Math.sin(ry) * s * 3, y0 - 0.03, z + Math.cos(ry) * s * 3, { ry, outline: 0 });
   for (let i = -2; i <= 2; i++) k.box(2.53, 2.4, 0.08, T(color), x + Math.sin(ry) * i * 1.1, y0 + 0.1, z + Math.cos(ry) * i * 1.1, { ry, outline: 0 });
+  k.solid(1.25, 1.3, 3.1, x, z, ry, y0);
 }
 function tank(k, x, z, r, h, color, band) {
   k.cyl(r, r, h, 16, T(color), x, F, z, { outline: 0.08 });
   k.add(new THREE.SphereGeometry(r, 16, 6, 0, Math.PI * 2, 0, Math.PI / 2), T(color), x, F + h, z, { outline: 0.06 });
   k.ring(r + 0.05, 0.16, T(band), x, F + h * 0.72, z);
   k.ring(r + 0.05, 0.16, T(band), x, F + h * 0.62, z);
+  k.column(r, F + h + r * 0.7, x, z);
 }
 // a lumpy heap of wreckage over a frustum mound
 function junkHeap(k, cx, cz, R, H, n, rr) {
@@ -274,6 +284,9 @@ function junkHeap(k, cx, cz, R, H, n, rr) {
   const put = (geo, mat, x, y, z, o) => k.add(geo.scale(sc, sc, sc), mat, x, y, z, o);
   const top = R * 0.22;
   k.add(new THREE.CylinderGeometry(top, R, H, 16, 1), T(0x75685a), cx, F + H / 2 - 0.05, cz, { outline: 0.06 });
+  // (a stepped core: the mound's middle to the top, its skirt half as high, so it reads as a heap)
+  k.column(R * 0.55, F + H * 0.9, cx, cz);
+  k.column(R * 0.85, F + H * 0.4, cx, cz);
   const hh = (r) => (r < top ? H : H * (R - r) / (R - top));
   const cols = [0x6b5a4a, 0x7a3a2a, 0x5a5f6e, 0x8a8698, 0x3a3550, 0xa05a2a, 0x4a6a5a, 0xc9a227];
   for (let i = 0; i < n; i++) {
@@ -541,7 +554,6 @@ function depot(k, wreck) {
   k.beam([15.5, 1.1, -0.2], [13.2, 1.1, -7.3], 0.2, T(LIGHT), { outline: 0.04, seg: 6 });
   k.beam([15.5, 1.1, 2], [20.5, 1.1, 5.5], 0.16, T(LIGHT), { outline: 0.03, seg: 6 });
   k.beam([15.5, 1.1, 2], [16, 1.1, 9.5], 0.16, T(LIGHT), { outline: 0.03, seg: 6 });
-  for (const [x, z] of [[15.5, 2], [20.5, 5.5], [16, 9.5]]) k.column(2.3, 7.6, x, z);
   // landing pad
   k.cyl(6.5, 6.5, 0.12, 32, T(0x4f4b5e), -8, F, 16, { outline: 0 });
   k.ring(5.6, 0.2, T(YEL), -8, F + 0.14, 16);
@@ -642,7 +654,6 @@ function farm(k, wreck) {
   for (const [x, z] of [[-20, 9], [-15.5, 14]]) {
     const l = Math.hypot(x, z);
     k.box(0.18, 3, 0.1, G(0x2ee6ff), x - (x / l) * 2.02, F + 0.6, z - (z / l) * 2.02, { ry: Math.atan2(x, z), outline: 0 });
-    k.column(2.1, 7, x, z);
   }
   k.box(1.6, 1.1, 1.2, T(STEEL), -17.5, F, 6.5, { outline: 0.04 });
   k.beam([-17.5, 0.9, 6.5], [-15.2, 0.9, 1.1], 0.18, T(LIGHT), { outline: 0.03, seg: 6 });

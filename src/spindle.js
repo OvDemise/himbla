@@ -17,13 +17,9 @@ import { makeProp } from './storyAssets.js';
 import { mulberry32 } from './rng.js';
 import { SUN, tangent, GRAV } from './geo.js';
 import { makeShuttle, makePlanets } from './models.js';
+import { RC, L, CIRC, CHECK, CORE_S, PAD_S, wrapW, pointAt, smooth, heightAt, buildRockArrays, ROCK_S0, ROCK_S1 } from './spindleTerrain.js';
 
-const RC = 420;         // the rock's girth (radius round its long axis)
-const L = 5400;         // its length along the axis (x)
-const CIRC = Math.PI * 2 * RC;
 const AX = new THREE.Vector3(1, 0, 0);
-const CHECK = [330, 1300, 2300, 3300, 4300];
-const CORE_S = L - 420, PAD_S = L - 650;
 const TEAL = 0x7dffd4, PINK = 0xff2e88, VIO = 0xc77dff;
 
 // ---------- the shape (also used for the asteroid in the Moon's sky) ----------
@@ -48,178 +44,10 @@ export function spindleGeometry(len = 1000, rad = 120, seed = 3) {
 // ---------- the rock ----------
 // (s, w): metres along the axis, and metres round the girth (w wraps every CIRC; w = 0 is the top, +y)
 const _d = new THREE.Vector3();
-function wrapW(w) { w = ((w % CIRC) + CIRC) % CIRC; return w > CIRC / 2 ? w - CIRC : w; }
 function radial(p, out = new THREE.Vector3()) { out.set(0, p.y, p.z); if (out.lengthSq() < 1e-8) out.set(0, 1, 0); return out.normalize(); }
 function rad(p) { return Math.hypot(p.y, p.z); }
-function pointAt(s, w, r, out = new THREE.Vector3()) { const ph = w / RC; return out.set(s, Math.cos(ph) * r, Math.sin(ph) * r); }
 
-const smooth = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
 const PAD_DECK = 2.4; // the launch pad stands this high on its plinth
-
-// Craters like the Moon's: simple bowls, big complex ones with central peaks, terraced walls, and a few
-// bright rayed ones. Kept off the start, the shrine and the pad (those sites are levelled below).
-const KEEP = [[CHECK[0] - 40, 0, 130], [CORE_S, 0, 120], [PAD_S, 0, 150]];
-const CRATERS = (() => {
-  const rr = mulberry32(91);
-  const out = [];
-  for (let tries = 0; tries < 5000 && out.length < 150; tries++) {
-    const big = rr() < 0.24;
-    const r = big ? 45 + rr() * 70 : 9 + rr() * 30;
-    const c = { s: 380 + rr() * (L - 760), w: (rr() - 0.5) * CIRC, r };
-    if (KEEP.some(([ks, kw, kr]) => Math.hypot(c.s - ks, wrapW(c.w - kw)) < kr + r)) continue;
-    if (out.some((o) => Math.hypot(o.s - c.s, wrapW(o.w - c.w)) < (o.r + r) * 0.7)) continue;
-    c.kind = big ? (rr() < 0.6 ? 'complex' : 'terraced') : rr() < 0.22 ? 'ray' : 'bowl';
-    c.d = r * (big ? 0.24 : 0.32);
-    c.rays = rr() * 6;
-    out.push(c);
-  }
-  // (a chain of small pits along a line here and there: secondary impacts)
-  for (let k = 0; k < 6; k++) {
-    let cs = 500 + rr() * (L - 1000), cw = (rr() - 0.5) * CIRC;
-    const a = rr() * Math.PI;
-    for (let i = 0; i < 7; i++) {
-      const c = { s: cs, w: cw, r: 6 + rr() * 5, kind: 'bowl', rays: 0 };
-      c.d = c.r * 0.35;
-      if (!KEEP.some(([ks, kw, kr]) => Math.hypot(c.s - ks, wrapW(c.w - kw)) < kr + c.r)) out.push(c);
-      cs += Math.cos(a) * 15; cw += Math.sin(a) * 15;
-    }
-  }
-  return out;
-})();
-// (each height sample only looks at the craters that can reach it: binned along the axis)
-const CBIN = 100;
-const CRATER_BINS = (() => {
-  const bins = [];
-  for (const c of CRATERS) {
-    const a = Math.floor((c.s - c.r * 4) / CBIN), b = Math.floor((c.s + c.r * 4) / CBIN);
-    for (let k = a; k <= b; k++) (bins[k] ||= []).push(c);
-  }
-  return bins;
-})();
-// massifs: big rugged mountain blocks standing out of the highlands (kept off the sites and the line in)
-const MASSIFS = (() => {
-  const rr = mulberry32(57);
-  const out = [];
-  for (let tries = 0; tries < 400 && out.length < 9; tries++) {
-    const m = { s: 600 + rr() * (L - 1200), w: (rr() - 0.5) * CIRC, r: 55 + rr() * 50, h: 18 + rr() * 22, ph: rr() * 6 };
-    if (Math.abs(wrapW(m.w)) < m.r + 40) continue; // (not across the straight line down the top)
-    if (KEEP.some(([ks, kw, kr]) => Math.hypot(m.s - ks, wrapW(m.w - kw)) < kr + m.r * 1.6)) continue;
-    if (out.some((o) => Math.hypot(o.s - m.s, wrapW(o.w - m.w)) < o.r + m.r + 60)) continue;
-    out.push(m);
-  }
-  return out;
-})();
-// rilles: sinuous collapsed lava channels, each its own stretch of the rock, with low levees
-// (most run long-ways, down the rock toward the core, a few of them close either side of the line in)
-const RILLES = [
-  { s0: 500, s1: 4600, base: 170, amp: 80, per: 720, wob: 22, wd: 14, dep: 9 },
-  { s0: 700, s1: 3900, base: -230, amp: 100, per: 650, wob: 28, wd: 12, dep: 8 },
-  { s0: 1200, s1: 4900, base: 430, amp: 110, per: 820, wob: 30, wd: 16, dep: 10 },
-  { s0: 400, s1: 3000, base: -500, amp: 95, per: 560, wob: 24, wd: 11, dep: 7 },
-  { s0: 2200, s1: 4800, base: -820, amp: 120, per: 700, wob: 35, wd: 13, dep: 8 },
-  { s0: 900, s1: 2600, base: 750, amp: 160, per: 480, wob: 45, wd: 13, dep: 7 },
-  { s0: 1900, s1: 4000, base: -1100, amp: 200, per: 540, wob: 60, wd: 11, dep: 6 },
-  { s0: 3000, s1: 4700, base: 1150, amp: 150, per: 420, wob: 40, wd: 15, dep: 8 },
-];
-// scarps: long curving cliffs where the crust thrust up over itself (a step of a few metres)
-const SCARPS = [
-  { s: 1450, w: -300, r: 260, hh: 6, a0: -0.9, a1: 0.9 },
-  { s: 2800, w: 400, r: 320, hh: 7, a0: 2.2, a1: 3.9 },
-  { s: 3900, w: -900, r: 240, hh: 5, a0: -0.4, a1: 1.4 },
-];
-// levelled sites: the start, the shrine, the launch pad
-const FLATS = [{ s: CHECK[0] - 40, w: 0, r: 38 }, { s: CORE_S, w: 0, r: 30 }, { s: PAD_S, w: 0, r: 42 }];
-
-// what the last heightAt call found there (for the colouring)
-const TA = { mare: 0, ray: 0, floor: 0, wall: 0, rim: 0, rille: 0 };
-
-function rawHeight(s, w) {
-  const ph = w / RC;
-  // (every term round the girth has a whole number of waves, so it meets itself all the way round)
-  // all highlands: rough, ridged, rolling; no smooth maria out here
-  let h = 5 * Math.sin(s / 83) * Math.cos(ph * 7) + 1.8 * Math.sin(s / 29 + ph * 11) + 0.6 * Math.cos(s / 11 - ph * 23); // (small bumps kept small: big ones read, small ones mottle)
-  h += 14 * Math.cos(ph * 2 + s / 700) + 6 * Math.sin(ph * 3 - s / 450); // the rock is lumpy, not round
-  // ridges running long-ways down the rock (gently wandering), not a product of two waves: that made a
-  // diamond checkerboard of humps that read as patches across the ground
-  const ridge = 1 - Math.abs(Math.sin(ph * 7 + 0.8 * Math.sin(s / 260) + 0.3 * Math.sin(s / 90)));
-  const ridge2 = 1 - Math.abs(Math.sin(ph * 17 + 1.5 * Math.sin(s / 170) + 1.7));
-  h += ridge ** 3 * 9 + ridge2 ** 3 * 2.5;
-  // massifs
-  for (const m of MASSIFS) {
-    const ds = s - m.s;
-    if (Math.abs(ds) > m.r) continue;
-    const d = Math.hypot(ds, wrapW(w - m.w)) / m.r;
-    if (d >= 1) continue;
-    const k = (1 - d * d) ** 2;
-    const crag = 1 - Math.abs(Math.sin(ds / 9 + m.ph) * Math.cos(wrapW(w - m.w) / 13 - m.ph));
-    h += m.h * k * (0.7 + 0.3 * crag * crag);
-  }
-  // rilles (with a low levee each side)
-  TA.rille = 0;
-  for (const r of RILLES) {
-    if (s < r.s0 - 100 || s > r.s1 + 100) continue;
-    const wr = r.base + r.amp * Math.sin(s / r.per) + r.wob * Math.sin(s / (r.per * 0.33) + 1.1);
-    const dd = Math.abs(wrapW(w - wr));
-    if (dd > r.wd * 2) continue;
-    const fade = smooth(r.s0 - 100, r.s0 + 100, s) * (1 - smooth(r.s1 - 100, r.s1 + 100, s));
-    if (dd < r.wd) { h -= r.dep * (1 - (dd / r.wd) ** 2) * fade; TA.rille = Math.max(TA.rille, (1 - (dd / r.wd) ** 2) * fade); }
-    else h += r.dep * 0.2 * Math.sin((Math.PI * (dd - r.wd)) / r.wd) * fade;
-  }
-  // scarps: a curving step, high on the inside of the arc
-  for (const c of SCARPS) {
-    const ds = s - c.s, dw = wrapW(w - c.w);
-    const d = Math.hypot(ds, dw);
-    if (Math.abs(d - c.r) > 30) continue;
-    let a = Math.atan2(dw, ds);
-    if (a < c.a0) a += Math.PI * 2;
-    if (a > c.a1) continue;
-    const edge = Math.min(a - c.a0, c.a1 - a) * c.r; // (the step dies away at the ends of the arc)
-    // (high side +hh/2, low side -hh/2, easing back to nothing 30 m off the cliff so there's no seam)
-    h += c.hh * (0.5 - smooth(c.r - 3, c.r + 3, d)) * smooth(0, 60, edge) * (1 - smooth(12, 30, Math.abs(d - c.r)));
-  }
-  let ray = 0, floor = 0, wall = 0, rim = 0;
-  for (const c of CRATER_BINS[Math.floor(s / CBIN)] || []) {
-    const ds = s - c.s;
-    if (Math.abs(ds) > c.r * 4) continue;
-    const dw = wrapW(w - c.w);
-    const d = Math.hypot(ds, dw);
-    if (d > c.r * 4) continue;
-    const x = d / c.r;
-    if (x < 1) {
-      let dep;
-      if (c.kind === 'complex') {
-        dep = x < 0.65 ? 1 : 1 - ((x - 0.65) / 0.35) ** 2; // a flat floor, steep walls
-        h += c.d * 0.75 * Math.max(0, 1 - x / 0.2) ** 2; // the central peak
-      } else if (c.kind === 'terraced') {
-        const q = 1 - x * x;
-        const st = Math.floor(q * 4) / 4;
-        dep = st + (q - st) * 0.3 + 0.05;
-      } else dep = 1 - x * x;
-      h -= c.d * dep;
-      floor = Math.max(floor, 1 - x);
-      if (x > 0.55) wall = Math.max(wall, smooth(0.55, 0.85, x));
-    } else if (x < 1.35) { h += c.d * 0.42 * (1 - Math.abs(x - 1.17) / 0.18); rim = Math.max(rim, 1 - Math.abs(x - 1.15) / 0.2); } // the rim
-    if (x >= 1 && x < 2) h += c.d * 0.14 * (2 - x); // ejecta
-    if (c.kind === 'ray' && x < 4) ray = Math.max(ray, Math.pow(Math.abs(Math.sin(Math.atan2(dw, ds) * 6 + c.rays)), 16) * (1 - smooth(1.1, 4, x)));
-  }
-  TA.mare = 0; TA.ray = ray; TA.floor = floor; TA.wall = wall; TA.rim = Math.max(0, rim);
-  // the ends: they taper to blunt tips, then fall away into open space
-  const toEnd = Math.min(s, L - s);
-  if (toEnd < 300) h -= Math.pow(1 - Math.max(0, toEnd) / 300, 2) * 90;
-  const e = Math.max(-s, s - L);
-  if (e > 0) h -= Math.min(RC - 110, e * e * 0.06 + e * 1.4);
-  return h;
-}
-for (const f of FLATS) f.h = rawHeight(f.s, f.w);
-
-function heightAt(s, w) {
-  let h = rawHeight(s, w);
-  for (const f of FLATS) {
-    const d = Math.hypot(s - f.s, wrapW(w - f.w));
-    if (d < f.r * 2) { const t = smooth(f.r, f.r * 2, d); h = f.h + (h - f.h) * t; }
-  }
-  return h;
-}
 
 // The planet interface the physics, camera and effects use (planet.js has the Moon's). Heights are
 // measured from the axis, not a centre.
@@ -393,50 +221,49 @@ export class Spindle {
     this.world = new SpindleWorld();
   }
 
+  // Start making the rock in a worker (story.js calls this once the mission that ends here is under
+  // way), so the mission starts without a ~2 s freeze. If it isn't ready in time, build() makes it.
+  prefetch() {
+    if (this.root || this.rockTried || typeof Worker === 'undefined') return;
+    this.rockTried = true; // (once: if the worker fails, build() just makes it when the mission starts)
+    try {
+      const wk = new Worker(new URL('./spindleWorker.js', import.meta.url), { type: 'module' });
+      wk.onmessage = (e) => { if (!this.root) this.rockData = e.data; wk.terminate(); };
+      wk.onerror = () => wk.terminate();
+      wk.postMessage('build');
+    } catch { /* no workers here */ }
+  }
+
   // Build the place the first time it's needed (it's a lot of geometry to keep around otherwise).
   build() {
     if (this.root) return;
     const root = new THREE.Group();
     this.root = root;
-    // the rock: a grid over (s, w) all the way round, heights from heightAt, coloured by height
-    const ds = 7, dw = 7;
-    const S0 = -130, S1 = L + 130;
-    const ns = Math.ceil((S1 - S0) / ds) + 1, nw = Math.round(CIRC / dw);
-    const pos = new Float32Array(ns * nw * 3), col = new Float32Array(ns * nw * 3);
-    const c0 = new THREE.Color(0xb0a8c4), c1 = new THREE.Color(0x8a82a2), c2 = new THREE.Color(0x3e3656), cc = new THREE.Color();
-    const cMare = new THREE.Color(0x5e5878), cRay = new THREE.Color(0xe6e2f4), cFloor = new THREE.Color(0x6d6688), cWall = new THREE.Color(0x4a4366), cRim = new THREE.Color(0xd8d2ec);
-    const rr = mulberry32(5);
-    const pt = new THREE.Vector3();
-    for (let i = 0; i < ns; i++) for (let j = 0; j < nw; j++) {
-      const s = S0 + i * ds, w = (j / nw) * CIRC;
-      const h = heightAt(s, w);
-      pointAt(s, w, RC + h, pt);
-      const k = (i * nw + j) * 3;
-      pos[k] = pt.x; pos[k + 1] = pt.y; pos[k + 2] = pt.z;
-      if (h < -40) cc.copy(c2); else cc.copy(c1).lerp(c0, Math.min(1, Math.max(0, (h + 4) / 18)));
-      // (TA: what heightAt just found here) dark maria, darker crater floors, bright rays
-      cc.lerp(cMare, TA.mare * 0.75).lerp(cFloor, TA.floor * 0.45).lerp(cRay, TA.ray * 0.7);
-      // (crater walls a shade darker, rims a shade brighter: the craters read as craters in any light)
-      cc.lerp(cWall, Math.max(TA.wall * 0.5, TA.rille * 0.55)).lerp(cRim, TA.rim * 0.55);
-      cc.offsetHSL(0, 0, (rr() - 0.5) * 0.04);
-      col[k] = cc.r; col[k + 1] = cc.g; col[k + 2] = cc.b;
-    }
-    const idx = [];
-    // (the last column joins back onto the first: no seam round the girth)
-    for (let i = 0; i < ns - 1; i++) for (let j = 0; j < nw; j++) { const j2 = (j + 1) % nw; const a = i * nw + j, b = i * nw + j2, c = a + nw, d = b + nw; idx.push(a, b, c, b, d, c); }
+    // the rock: a grid over (s, w) all the way round (spindleTerrain.js; usually made ahead of time by
+    // a worker while the mission's earlier steps play out: prefetch)
+    const R = this.rockData || buildRockArrays();
+    this.rockData = null;
     const geo = new THREE.BufferGeometry();
-    geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-    geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
-    geo.setIndex(idx);
-    geo.computeVertexNormals();
+    geo.setAttribute('position', new THREE.BufferAttribute(R.pos, 3));
+    geo.setAttribute('color', new THREE.BufferAttribute(R.col, 3));
+    geo.setAttribute('normal', new THREE.BufferAttribute(R.nor, 3));
+    geo.setIndex(new THREE.BufferAttribute(R.idx, 1));
+    geo.computeBoundingSphere();
+    const S0 = ROCK_S0, S1 = ROCK_S1;
     // (both faces: from any angle the rock is rock, never a window onto the stars)
     // (the toon bands with softened edges: hard ones, on vertices 7 m apart under a low sun, traced the
     // mesh's triangles as pale polygons; a fully smooth ramp turned every bump into a soft stain)
-    const RAMP = [55, 55, 55, 115, 115, 115, 255, 255, 255]; // (three toon bands, their edges just softened)
+    // (a dark band, then one gentle rise to full sun: a mid-to-bright step lit every crater's outer
+    // slope as a pale smudge round it, from above)
+    const RAMP = [55, 55, 70, 125, 160, 195, 230, 255, 255];
     const ramp = new THREE.DataTexture(new Uint8Array(RAMP.flatMap((v) => [v, v, v, 255])), RAMP.length, 1, THREE.RGBAFormat);
     ramp.minFilter = ramp.magFilter = THREE.LinearFilter;
     ramp.needsUpdate = true;
     const rock = new THREE.Mesh(geo, new THREE.MeshToonMaterial({ color: 0xffffff, vertexColors: true, gradientMap: ramp, side: THREE.DoubleSide }));
+    // lit like the Moon's ground (toon.js KEEP_GRAZE_SHADOW): a crisp turn into shade where a slope faces
+    // away from the sun. Without it the rock got the props' rule, a wide fade that darkened every slope
+    // within ~12 degrees of edge-on, and under the roll's low sun that smeared soft dark patches everywhere
+    rock.material.defines = { KEEP_GRAZE_SHADOW: '' };
     rock.receiveShadow = true;
     // (it doesn't throw its own shadow: double-sided and coarse, at the low sun angles of the roll its
     // self-shadow broke into hard pale patches and soft dark blotches. The ship, drones, props and
@@ -520,6 +347,9 @@ export class Spindle {
     root.add(sky);
     // the mothership and the extraction pod
     this.ship = makeMothership();
+    // (no shadow from it: 90 m up and ahead of you under the roll's low sun, its shadow lay across the
+    // rock as huge soft dark smudges that crawled along with it)
+    this.ship.root.traverse((o) => { o.castShadow = false; });
     root.add(this.ship.root);
     const pod = makeShuttle({ color: 0xeeecf6, stripe: 0x2ec4ff });
     pod.root.scale.setScalar(0.6);
@@ -554,6 +384,12 @@ export class Spindle {
     this.root.visible = true;
     this.savedPlanet = g.planet;
     g.planet = this.world;
+    // the sky fill nearly even all round: it's most of the light on the night turn, and the Moon's
+    // bright-above / dark-below split turned every tilt of the ground (and the rock curving away from
+    // you) into soft dark smudges. About as bright overall, just not keyed to which way is up.
+    this.savedHemi = [g.hemi.color.getHex(), g.hemi.groundColor.getHex()];
+    g.hemi.color.setHex(0x8578d8);
+    g.hemi.groundColor.setHex(0x6457ac);
     GRAV.axis = AX; // up is away from the rock's axis now
     this.world.colliders = g.colliders;
     if (g.player.vehicle) g.garage.exit();
@@ -600,6 +436,7 @@ export class Spindle {
     this.hidden = null;
     this.root.visible = false;
     g.planet = this.savedPlanet;
+    if (this.savedHemi) { g.hemi.color.setHex(this.savedHemi[0]); g.hemi.groundColor.setHex(this.savedHemi[1]); this.savedHemi = null; }
     GRAV.axis = null; // (back to the Moon's centre)
     for (const c of this.cols || []) g.colliders.remove(c);
     this.cols = null;
