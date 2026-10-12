@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { toon, glow, ink } from './toon.js';
 import { canvasTex, FONT, fitText, BJ, DUCK, PLK, CLASSIC, PRIZE } from './casinoWorld.js';
 import { PlinkoSim, MULTS, AIM_RANGE, DROP_Y, BALL_R, PEGS, slotCentre } from './plinko.js';
+import { glyphHtml } from './glyphs.js';
 
 // The walk-in Lucky Crater games: BLACKJACK at a real table, the DUCK DERBY and a giant PLINKO
 // board with real ball physics. Everything here is driven from the casino's per-frame update
@@ -206,6 +207,7 @@ export class CasinoGames {
     this.playerWasVisible = g.player.model.root.visible;
     g.player.model.root.visible = false;
     this.ui.classList.remove('hidden');
+    document.body.classList.add('seated'); // (style.css: the rest of the HUD steps aside for the game's own bar)
     this.audio.tone(660, 0.08, 'triangle', 0.12);
     if (id === 'bj') { this.bj.auto = false; if (this.bj.phase === 'done') this.bj.msg = 'ANOTHER HAND?'; }
     if (id === 'duck' && this.dk.phase === 'done') this.newRace();
@@ -221,6 +223,7 @@ export class CasinoGames {
     }
     this.mode = null;
     this.ui.classList.add('hidden');
+    document.body.classList.remove('seated');
     if (!g.player.dead) g.player.model.root.visible = true;
   }
 
@@ -232,6 +235,7 @@ export class CasinoGames {
     const go = code === 'Space' || code === 'Enter';
     if (this.mode === 'bj') {
       const b = this.bj;
+      if (code === 'KeyZ') { b.zoom = !b.zoom; this.audio.tone(b.zoom ? 880 : 660, 0.05, 'triangle', 0.08); this.render(); return; }
       if (go && (b.phase === 'bet' || b.phase === 'done')) this.deal();
       else if (code === 'KeyH') this.hit();
       else if (code === 'KeyS' || (go && b.phase === 'play')) this.stand();
@@ -301,12 +305,15 @@ export class CasinoGames {
     if (this.mode) this.updateCam(dt);
     this.uiTick = (this.uiTick || 0) - dt;
     if (this.mode && this.uiTick <= 0) { this.uiTick = 0.25; this.renderHead(); }
+    // (picking the controller up or putting it down swaps the hints on the bar)
+    if (this.mode && !!this.g.input.padActive !== this.padShown) this.render();
   }
 
   // ---------- camera ----------
   view() {
     const R = BJ.R;
-    if (this.mode === 'bj') return [[BJ.x, 3.9, BJ.z + R + 1.9], [BJ.x, 0.75, BJ.z + 0.7]];
+    // (zoomed: leaning in over the felt, both hands of cards above the action bar)
+    if (this.mode === 'bj') return this.bj.zoom ? [[BJ.x, 3.7, BJ.z + 3.3], [BJ.x, BJ.top, BJ.z + 1.9]] : [[BJ.x, 3.9, BJ.z + R + 1.9], [BJ.x, 0.75, BJ.z + 0.7]];
     if (this.mode === 'duck') {
       const d = this.dk;
       if (d.phase === 'race' || (d.phase === 'done' && this.clock - d.doneAt < 2.5)) {
@@ -697,7 +704,7 @@ export class CasinoGames {
           }
         });
         // keep paddling a bit past the line, then stop
-        if (d.order.length === 4 || d.t > 40) { d.phase = 'done'; d.doneAt = this.clock; }
+        if (d.order.length === 4 || d.t > 40) { d.phase = 'done'; d.doneAt = this.clock; if (this.mode === 'duck') this.render(); }
       }
       if (time - d.lastBoard > 0.3) { d.lastBoard = time; this.drawOddsBoard(); if (this.mode === 'duck') this.render(); }
     } else d.scale = 1;
@@ -894,6 +901,12 @@ export class CasinoGames {
     return out;
   }
 
+  // the controller's aim (gamepad.js): the stick slides the chute, further over = faster
+  padAim(x, dt) {
+    if (this.mode !== 'plinko' || !x) return;
+    this.pk.aim = Math.max(-AIM_RANGE, Math.min(AIM_RANGE, this.pk.aim + x * dt * 1.6));
+  }
+
   aimFromScreen(clientX) {
     // map the mouse across the board's on-screen width onto the chute's aim range
     const cam = this.g.camera;
@@ -948,6 +961,11 @@ export class CasinoGames {
     const btn = (label, k, { on = false, dis = false, cls = '' } = {}) => `<button data-k="${k}" class="${on ? 'on ' : ''}${cls}" ${dis ? 'disabled' : ''}>${label}</button>`;
     const betBtns = (dis) => btn('◀', 'ArrowLeft', { dis, cls: 'sm' }) + btn('▶', 'ArrowRight', { dis, cls: 'sm' });
     let title = '', body = '', msg = '', btns = '';
+    // on a controller the bar names the pad's buttons
+    const pad = this.padShown = !!this.g.input.padActive;
+    const pk = pad;
+    const gl = (...toks) => glyphHtml(toks);
+    const key = (k, tok) => (pad ? gl(tok) : `<i>${k}</i>`);
     if (this.mode === 'bj') {
       const b = this.bj;
       title = 'BLACKJACK';
@@ -957,17 +975,18 @@ export class CasinoGames {
       const pShown = b.player.length ? `${pv.soft && pv.t < 21 ? 'SOFT ' : ''}${pv.t}` : '–';
       body = `<div class="c3-row"><span>DEALER <b>${dShown}</b></span><span>YOU <b>${pShown}</b></span><span>STAKE <b>₵${fmt(b.stake || this.casino.bet)}</b></span></div>`;
       msg = b.msg;
-      if (b.phase === 'play') btns = btn('HIT <i>H</i>', 'KeyH') + btn('STAND <i>S</i>', 'KeyS') + btn('DOUBLE <i>D</i>', 'KeyD', { dis: b.player.length !== 2 || b.doubled || this.g.credits < b.stake });
-      else if (b.phase === 'bet' || b.phase === 'done') btns = betBtns(false) + btn(`DEAL ₵${fmt(this.casino.bet)} <i>SPACE</i>`, 'Space', { cls: 'big' });
+      if (b.phase === 'play') btns = btn(`HIT ${key('H', 'A')}`, 'KeyH') + btn(`STAND ${key('S', 'X')}`, 'KeyS') + btn(`DOUBLE ${key('D', 'Y')}`, 'KeyD', { dis: b.player.length !== 2 || b.doubled || this.g.credits < b.stake });
+      else if (b.phase === 'bet' || b.phase === 'done') btns = betBtns(false) + btn(`DEAL ₵${fmt(this.casino.bet)} ${key('SPACE', 'A')}`, 'Space', { cls: 'big' });
       else btns = btn('…', 'x', { dis: true });
+      btns += btn(`ZOOM ${key('Z', 'R3')}`, 'KeyZ', { on: b.zoom, cls: 'sm' });
     } else if (this.mode === 'duck') {
       const d = this.dk;
       title = 'DUCK DERBY';
       const racing = d.phase === 'race' || d.phase === 'count';
       body = `<div class="c3-ducks">${DUCKS.map((q, i) => `<button data-k="Digit${i + 1}" class="c3-duck${(racing || d.phase === 'done' ? d.bet : d.pick) === i ? ' on' : ''}" ${racing ? 'disabled' : ''}><i style="background:${hex(q.color)}">${i + 1}</i><span>${q.name}</span><b>×${d.odds[i].toFixed(1)}</b>${racing || d.phase === 'done' ? `<em>${['1ST', '2ND', '3RD', '4TH'][this.placeOf(i)]}</em>` : ''}</button>`).join('')}</div>`;
       msg = d.msg;
-      if (d.phase === 'bet') btns = betBtns(false) + btn(`RACE! ₵${fmt(this.casino.bet)} ON #${d.pick + 1} <i>SPACE</i>`, 'Space', { cls: 'big' });
-      else if (d.phase === 'done') btns = btn('NEW RACE <i>SPACE</i>', 'Space', { cls: 'big' });
+      if (d.phase === 'bet') btns = betBtns(false) + btn(`RACE! ₵${fmt(this.casino.bet)} ON #${d.pick + 1} ${key('SPACE', 'A')}`, 'Space', { cls: 'big' });
+      else if (d.phase === 'done') btns = btn(`NEW RACE ${key('SPACE', 'A')}`, 'Space', { cls: 'big' });
       else btns = btn('THEY\'RE OFF…', 'x', { dis: true });
     } else if (this.mode === 'plinko') {
       const p = this.pk;
@@ -975,15 +994,20 @@ export class CasinoGames {
       body = `<div class="c3-row"><span>IN PLAY <b>${this.sim.balls.length}</b></span><span>DROPPED <b>${p.dropped}</b></span><span>SESSION <b class="${p.net >= 0 ? 'up' : 'down'}">${p.net >= 0 ? '+' : '−'}₵${fmt(Math.abs(p.net))}</b></span></div>
         <div class="c3-last">${p.last.map((m) => `<i class="${m >= 8 ? 'hot' : m >= 1 ? 'ok' : ''}">${m}×</i>`).join('')}</div>`;
       msg = p.msg;
-      btns = betBtns(false) + btn('◀ AIM <i>A</i>', 'x', { dis: true, cls: 'hint' }) + btn(`DROP ₵${fmt(this.casino.bet)} <i>SPACE</i>`, 'Space', { cls: 'big' }) + btn('AIM ▶ <i>D</i>', 'x', { dis: true, cls: 'hint' });
+      if (pad) btns = betBtns(false) + btn(`DROP ₵${fmt(this.casino.bet)} ${gl('A')}`, 'Space', { cls: 'big' }) + btn(`◀ AIM ▶ ${gl('LS')}`, 'x', { dis: true, cls: 'hint' });
+      else btns = betBtns(false) + btn('◀ AIM <i>A</i>', 'x', { dis: true, cls: 'hint' }) + btn(`DROP ₵${fmt(this.casino.bet)} <i>SPACE</i>`, 'Space', { cls: 'big' }) + btn('AIM ▶ <i>D</i>', 'x', { dis: true, cls: 'hint' });
     }
     this.$('.c3-title').textContent = title;
     this.$('.c3-body').innerHTML = body;
     const m = this.$('.c3-msg');
     m.textContent = msg;
     m.className = `c3-msg ${this.msgCls || ''}`;
-    this.$('.c3-btns').innerHTML = btns + btn('LEAVE <i>ESC</i>', 'Escape', { cls: 'sm' });
-    this.$('.c3-foot').firstChild.textContent = this.mode === 'plinko' ? 'MOUSE / A · D AIM · CLICK OR HOLD SPACE TO DROP · ◀ ▶ BET' : this.mode === 'duck' ? '1–4 PICK A DUCK · ◀ ▶ BET' : 'H HIT · S STAND · D DOUBLE · ◀ ▶ BET';
+    this.$('.c3-btns').innerHTML = btns + btn(pk ? `LEAVE ${gl('B')}` : 'LEAVE <i>ESC</i>', 'Escape', { cls: 'sm' });
+    const foot = this.$('.c3-foot');
+    foot.classList.toggle('pgx', pk);
+    foot.lastChild.innerHTML = pk ? `${gl('B')} STAND UP` : 'ESC · STAND UP';
+    if (pk) foot.firstChild.innerHTML = (this.mode === 'plinko' ? `${gl('LS')} AIM · ${gl('A')} / ${gl('RT')} DROP, HOLD TO POUR` : this.mode === 'duck' ? `${gl('LS')} PICK A DUCK · ${gl('A')} RACE` : `${gl('A')} DEAL / HIT · ${gl('X')} STAND · ${gl('Y')} DOUBLE · ${gl('R3')} ZOOM`) + ` · ${gl('LB')} ${gl('RB')} BET`;
+    else foot.firstChild.textContent = this.mode === 'plinko' ? 'MOUSE / A · D AIM · CLICK OR HOLD SPACE TO DROP · ◀ ▶ BET' : this.mode === 'duck' ? '1–4 PICK A DUCK · ◀ ▶ BET' : 'H HIT · S STAND · D DOUBLE · Z ZOOM · ◀ ▶ BET';
     this.renderHead();
   }
 }

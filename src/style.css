@@ -210,6 +210,7 @@ button { font-family: var(--comic); }
 
 /* ---------- main menu (title) ---------- */
 body:has(#title:not(.hidden)) #hud { visibility: hidden; }
+.app-ver { position: absolute; right: 16px; bottom: 12px; font-size: 14px; color: var(--ui-muted); opacity: 0.7; pointer-events: none; }
 #title { cursor: default; display: block; background: linear-gradient(90deg, rgba(5,3,12,0.94) 0%, rgba(5,3,12,0.78) 38%, rgba(5,3,12,0.25) 70%, rgba(5,3,12,0.1) 100%); overflow: auto; }
 .mm-scan { position: absolute; inset: 0; pointer-events: none; background: repeating-linear-gradient(0deg, rgba(255,255,255,0.025) 0 1px, transparent 1px 3px); animation: mmScan 8s linear infinite; }
 .mm { position: relative; margin: 0 0 0 max(16px, 7vw); padding: max(24px, 9vh) 0 96px; width: min(560px, calc(100vw - 32px)); }
@@ -348,6 +349,7 @@ body:has(#title:not(.hidden)) #hud { visibility: hidden; }
 
 /* ---- settings ---- */
 #settings { z-index: 60; cursor: default; background: rgba(5, 3, 12, 0.78); }
+#settings { z-index: 60; cursor: default; background: rgba(5, 3, 12, 0.78); align-items: flex-start; padding-top: 16px; box-sizing: border-box; }
 .set-open {
   font-family: var(--comic); font-size: 11px; line-height: 1; padding: 9px 12px 7px; margin: 6px 0 0; cursor: pointer;
   background: var(--ui-bg2); color: var(--cyan); border: 2px solid var(--cyan); box-shadow: 0 0 0 2px #05030c;
@@ -356,7 +358,7 @@ body:has(#title:not(.hidden)) #hud { visibility: hidden; }
 .set-open.quit { color: var(--red); border-color: var(--red); }
 .set-open.quit:hover { background: var(--red); color: #fff; }
 .set-card {
-  width: min(720px, calc(100vw - 32px)); max-height: calc(100vh - 32px); display: flex; flex-direction: column;
+  width: min(720px, calc(100vw - 32px)); height: min(640px, calc(100vh - 32px)); display: flex; flex-direction: column;
   padding: 14px 16px; border-color: var(--cyan); background: rgba(10, 8, 20, 0.96);
 }
 .set-card h1 { font-family: var(--comic); font-weight: normal; font-size: 22px; margin: 2px 0 12px; text-align: center; line-height: 1.2; color: var(--yellow); text-shadow: 3px 3px 0 var(--pink); }
@@ -385,6 +387,30 @@ body:has(#title:not(.hidden)) #hud { visibility: hidden; }
 .set-key.changed { border-color: var(--cyan); color: var(--cyan); }
 .set-key.wait { background: var(--pink); color: #fff; border-color: var(--pink); animation: blink 0.6s steps(2) infinite; }
 .set-row.fixed .set-key { cursor: default; color: var(--ui-dim); background: transparent; }
+.set-pad { display: flex; align-items: center; gap: 5px; flex-shrink: 0; }
+.pg-txt { font-family: var(--comic); font-size: 7px; color: var(--ui-muted); text-transform: uppercase; }
+.pg { display: inline-flex; align-items: center; justify-content: center; box-sizing: border-box; min-width: 20px; height: 20px; font: normal 8px/1 var(--comic); color: var(--ui-text); background: var(--ui-bg2); border: 2px solid var(--ui-muted); border-radius: 50%; }
+.pg-bump { border-radius: 6px; min-width: 28px; padding: 1px 5px 0; }
+.pg-small { border-radius: 10px; min-width: 24px; padding: 1px 5px 0; font-size: 7px; }
+.pg-stick { border-width: 3px; background: #05030c; }
+.pg-dpad { border-radius: 4px; min-width: 18px; height: 18px; }
+.pg { width: auto; padding: 1px 0 0; text-align: center; white-space: nowrap; }  /* (the pixel font rides high in its line box: a pixel of top padding centres it) */
+.pg.long { padding: 1px 5px 0; border-radius: 10px; }
+.pg-bump.long { border-radius: 6px; }
+.pg.tiny { font-size: 5px; }
+.pg-g { color: #05030c; background: var(--green); border-color: var(--green); }
+.pg-r { color: #05030c; background: var(--red); border-color: var(--red); }
+.pg-b { color: #05030c; background: var(--cyan); border-color: var(--cyan); }
+.pg-y { color: #05030c; background: var(--yellow); border-color: var(--yellow); }
+.pg-p { color: #05030c; background: var(--pink); border-color: var(--pink); }
+/* PlayStation face buttons: a dark button with a coloured symbol, as on the pad */
+.pg.pg-sym { padding: 0; background: var(--ui-bg2); border-color: var(--ui-muted); }
+.pg-sym svg { display: block; width: 10px; height: 10px; }
+.pgx .pg-sym svg { width: 9px; height: 9px; }
+.pg-sym.pg-b { color: var(--cyan); }
+.pg-sym.pg-r { color: var(--red); }
+.pg-sym.pg-p { color: var(--pink); }
+.pg-sym.pg-g { color: var(--green); }
 .set-note { margin-top: 8px; font-size: 15px; color: var(--red); text-align: center; }
 .set-foot { display: flex; justify-content: space-between; gap: 10px; margin-top: 12px; }
 .set-btn { font-size: 11px; padding: 9px 14px 7px; }
@@ -700,6 +726,8 @@ body:has(#title:not(.hidden)) #hud { visibility: hidden; }
 /* ---- casino 3D ---- */
 /* walk-in games action bar (casinoGames.js) */
 #cas3d { position: fixed; left: 50%; bottom: 16px; transform: translateX(-50%); z-index: 35; width: min(760px, calc(100vw - 32px)); background: var(--ui-bg); color: var(--ui-text); border: 2px solid var(--ui-edge); box-shadow: 0 0 0 2px #05030c, var(--ui-shadow); padding: 8px 12px 6px; font-family: var(--body); pointer-events: auto; cursor: default; }
+/* seated at blackjack, the Duck Derby or Plinko: only the game's bar and its pop-ups (wins, QUACK!) stay up */
+body.seated #hud > :not(#popups) { display: none !important; }
 #cas3d .c3-head { display: flex; align-items: center; gap: 12px; font-family: var(--comic); font-size: 11px; line-height: 1.4; border-bottom: 2px solid var(--ui-edge); padding-bottom: 6px; flex-wrap: wrap; }
 #cas3d .c3-title { color: var(--yellow); font-size: 14px; font-weight: normal; }
 #cas3d .c3-cred { margin-left: auto; color: #05030c; background: var(--yellow); padding: 3px 6px 2px; }
@@ -720,10 +748,12 @@ body:has(#title:not(.hidden)) #hud { visibility: hidden; }
 #cas3d button:disabled { opacity: 0.4; cursor: default; }
 #cas3d button.big { background: var(--yellow); color: #05030c; border-color: #05030c; flex: 1; }
 #cas3d button.big:hover:not(:disabled) { background: var(--green); color: #05030c; }
+#cas3d button.on { border-color: var(--yellow); color: var(--yellow); }
 #cas3d button.sm { padding: 6px 7px 5px; }
 #cas3d button.hint { background: transparent; box-shadow: none; opacity: 0.6; }
-#cas3d button i { font-style: normal; font-family: var(--body); font-size: 12px; color: var(--ui-muted); margin-left: 4px; }
-#cas3d button.big i { color: #3a3550; }
+#cas3d button i:where(:not(.pg)) { font-style: normal; font-family: var(--body); font-size: 12px; color: var(--ui-muted); margin-left: 4px; }
+#cas3d button.big i:where(:not(.pg)) { color: #3a3550; }
+#cas3d button .pg { margin-left: 4px; vertical-align: middle; }
 #cas3d .c3-ducks { display: grid; grid-template-columns: repeat(2, 1fr); gap: 4px; }
 #cas3d .c3-duck { display: flex; align-items: center; gap: 8px; text-align: left; }
 #cas3d .c3-duck.on { border-color: var(--yellow); background: #3a2d10; }
@@ -1196,8 +1226,35 @@ body.trailer #tutorial, body.trailer #racepanel, body.trailer #vehbar, body.trai
 
 /* controller (gamepad.js): the menu highlight, and pad buttons in prompts */
 .pad-focus { outline: 3px solid #ffd23f !important; outline-offset: 2px; box-shadow: 0 0 0 5px rgba(255, 210, 63, 0.28), 0 0 14px rgba(255, 210, 63, 0.45) !important; position: relative; z-index: 2; }
-b.pg { display: inline-block; padding: 1px 5px 0; border-radius: 9px; background: #ffd23f; color: #05030c; font-weight: normal; }
+/* key names swapped for pad buttons (glyphs.js): smaller than the settings list, and no key-cap box behind them */
+.pgx { display: inline-flex; align-items: center; gap: 3px; vertical-align: middle; }
+/* (!important: popup rules like `#prompt b` and `#powerchip b` box the key name as inline-block, which sits the glyph off the text's centre line) */
+b.pgx { display: inline-flex !important; align-items: center; vertical-align: middle; line-height: 1; background: none !important; padding: 0 !important; margin-right: 5px !important; box-shadow: none !important; }
+.pgx .pg { vertical-align: middle; }
+/* (the pixel font's capitals sit above its line box's middle: lift the glyph to the letters' centre line) */
+b.pgx { position: relative; top: -1px; }
+#prompt b.pgx, #powerchip b.pgx, #toast .pgx { top: -2px; }
+.pgx .pg { min-width: 16px; height: 16px; border-width: 2px; font-size: 6px; }
+.pgx .pg-bump { min-width: 22px; padding: 0 3px; }
+.pgx .pg-small { min-width: 18px; padding: 0 3px; font-size: 5px; }
+.pgx .pg-dpad { min-width: 14px; height: 14px; }
+.pgx .pg.long { padding: 1px 4px 0; border-radius: 8px; }
+.pgx .pg-bump.long { border-radius: 5px; }
+.pgx .pg.tiny { font-size: 4px; }
+td .pg { min-width: 18px; height: 18px; }
+td .pg-txt, .pgx .pg-txt { font-size: 6px; }
 body.pad-on #clickhint { display: none !important; }
+/* the crosshair stays out of the way: it shows while firing, then fades 10 s after the last shot (gamepad.js crosshair()) */
+#crosshair { opacity: 0; transition: opacity 0.8s; }
+body.aim #crosshair { opacity: 1; transition-duration: 0.12s; }
+
+/* the controller's free cursor on the roulette table (gamepad.js), and the table's pad hints */
+#padcursor { position: fixed; z-index: 60; width: 22px; height: 22px; margin: -11px 0 0 -11px; box-sizing: border-box; border: 3px solid #ffd23f; border-radius: 50%; box-shadow: 0 0 0 2px #120a1e, inset 0 0 0 2px #120a1e; pointer-events: none; }
+#padcursor::after { content: ''; position: absolute; left: 50%; top: 50%; width: 4px; height: 4px; margin: -2px 0 0 -2px; border-radius: 50%; background: #fff; }
+#padcursor.down { width: 14px; height: 14px; margin: -7px 0 0 -7px; background: #ffd23f; }
+#padcursor.down::after { display: none; }
+body:not(.pad-on) .rl-pd, body.pad-on .rl-kb { display: none; }
+.rl-ctl .rl-pd { margin-left: 4px; }
 
 /* the controller's quick slot (gamepad.js): only while a controller is in use */
 #padquick { display: none; margin-top: 4px; font-family: var(--comic); font-size: 9px; line-height: 1.5; color: var(--ui-text); max-width: 360px; }

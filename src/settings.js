@@ -2,6 +2,8 @@
 // to localStorage and pushed into the running game by apply(game). Game code reads them as
 // `g.settings ? g.settings.v.<key> : <default>` so it still works without this module.
 
+import { glyphHtml, glyphState, tokensFor } from './glyphs.js';
+
 const KEY = 'moonrunner-settings-v1';
 
 // Remappable actions: the game always checks the DEFAULT code; Input translates.
@@ -98,6 +100,36 @@ export function keyName(code) {
   if (code.startsWith('Numpad')) return 'NUM ' + code.slice(6).toUpperCase();
   return code.toUpperCase();
 }
+
+// [what it does, the buttons]; '#text' is plain text between glyphs
+const PAD_ROWS = [
+  ['Move / steer / carve', ['LS']],
+  ['Look', ['RS']],
+  ['Quantum-Lock skates (hold)', ['LB']],
+  ['Mag-jump / Dive (hold in the air)', ['A']],
+  ['Thrusters (hold)', ['LT']],
+  ['Tricks (hold in the air)', ['B']],
+  ['Interact / job board', ['X']],
+  ['Scoop into jar', ['R3']],
+  ['Vehicle: call / board / leave', ['Y']],
+  ['Power (hold for the winch)', ['RB']],
+  ['Next power', ['DU']],
+  ['Fire', ['RT']],
+  ['Previous / next weapon', ['DL', 'DR']],
+  ['Quick slot: tap to use', ['DD']],
+  ['Quick slot: pick (hold ↓ and press)', ['DD', '#+', 'LB', 'RB']],
+  ['Globe map', ['VIEW', '#tap']],
+  ['Emergency recall', ['VIEW', '#hold']],
+  ['Pause / resume', ['START']],
+  ['Menus: press / back', ['A', 'B']],
+  ['Menus: previous / next tab', ['LB', 'RB']],
+];
+
+// Help-table rows whose key names aren't a single key (the rest go through tokensFor)
+const HELP_PAD = {
+  Mouse: ['RS'], 'Left mouse': ['RT'], 'SPACE (hold)': ['LB'], 'A / D on skates': ['LS'], 'E / Right mouse': ['LT'],
+  'Q + W/S · Q + A/D': ['B', '#+', 'LS'], '1 2 3 4': ['DL', 'DR'], 'X (hold)': ['DD'], 'R (hold)': ['VIEW', '#hold'], M: ['VIEW', '#tap'],
+};
 
 // Help-table / title-card labels rebuilt from the current bindings (k = code -> label).
 const HELP_ROWS = {
@@ -277,15 +309,20 @@ export class Settings {
 
   updateHelp() {
     const k = (c) => this.label(c);
+    const pad = !!(this.game && this.game.input && this.game.input.padActive);
     for (const td of document.querySelectorAll('#help td:first-child')) {
       if (!td.dataset.orig) td.dataset.orig = td.textContent;
+      const toks = pad && (HELP_PAD[td.dataset.orig] || tokensFor(td.dataset.orig));
+      if (toks) { td.innerHTML = glyphHtml(toks); continue; }
       const f = HELP_ROWS[td.dataset.orig];
-      if (f) td.textContent = f(k);
+      td.textContent = f ? f(k) : td.dataset.orig;
     }
     for (const b of document.querySelectorAll('.controls-mini b')) {
       if (!b.dataset.orig) b.dataset.orig = b.textContent;
+      const toks = pad && tokensFor(b.dataset.orig);
+      if (toks) { b.innerHTML = glyphHtml(toks); continue; }
       const f = MINI_ROWS[b.dataset.orig];
-      if (f) b.textContent = f(k);
+      b.textContent = f ? f(k) : b.dataset.orig;
     }
   }
 
@@ -433,7 +470,11 @@ export class Settings {
     const v = this.v;
     const tabs = TABS.map(([id, name]) => `<button class="set-tab ${id === this.tab ? 'on' : ''}" data-act="tab" data-tab="${id}">${name}</button>`).join('');
     let body = '';
-    if (this.tab === 'controls') {
+    const pad = this.game && this.game.input && this.game.input.padActive;
+    if (this.tab === 'controls' && pad) {
+      body = `<div class="set-hint">Controller in use: these buttons are fixed. Touch the keyboard or mouse to see (and change) the key binds.</div>`;
+      body += PAD_ROWS.map(([label, toks]) => `<div class="set-row bind fixed"><span class="set-label">${label}</span><span class="set-pad">${glyphHtml(toks, glyphState.kind)}</span></div>`).join('');
+    } else if (this.tab === 'controls') {
       body = `<div class="set-hint">Click an action, then press the new key. <b>ESC</b> cancels. Taking a key that's already used swaps the two. ESC, ENTER and 1–9 (weapons / menu picks) are fixed.</div>`;
       body += ACTIONS.map((a) => {
         const wait = this.rebinding === a.code;

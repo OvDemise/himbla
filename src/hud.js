@@ -6,12 +6,7 @@ import { WEAPONS } from './weapons.js';
 import { pixelFont } from './fonts.js';
 
 const $ = (id) => document.getElementById(id);
-
-// With a controller in hand, the key names in prompts become its buttons (gamepad.js)
-const PAD_GLYPH = { F: 'X', G: 'R3', X: '↓', V: 'Y', Z: 'RB', M: 'VIEW', R: 'HOLD VIEW', E: 'L3', Q: 'B', SPACE: 'LB', SHIFT: 'A', ESC: 'B', MOUSE: 'R-STICK', 'W A S D': 'L-STICK', ENTER: 'A' };
-export function padGlyphs(html) {
-  return html.replace(/<b>([A-Z0-9 +]{1,8})<\/b>/g, (m, k) => (PAD_GLYPH[k] ? `<b class="pg">${PAD_GLYPH[k]}</b>` : m));
-}
+const MM_RANGE = 700; // metres from the centre to the edge of the minimap when standing still
 
 export class HUD {
   constructor(game) {
@@ -115,7 +110,7 @@ export class HUD {
   prompt(text) {
     const el = $('prompt');
     if (!text) { el.classList.add('hidden'); return; }
-    el.innerHTML = this.game.input.padActive ? padGlyphs(text) : text;
+    el.innerHTML = text; // (key names become pad buttons by themselves: glyphs.js)
     el.classList.remove('hidden');
   }
 
@@ -343,7 +338,7 @@ export class HUD {
       mp.classList.add('hidden');
     }
 
-    this.drawMinimap();
+    this.drawMinimap(dt);
     this.updateArrow();
   }
 
@@ -387,12 +382,19 @@ export class HUD {
   }
 
   // Heading-up local map: everything is projected onto the tangent plane around you.
-  drawMinimap() {
+  drawMinimap(dt = 0) {
     const g = this.game;
     const P = g.player;
     const c = this.mctx;
     const W = this.mini.width, H = this.mini.height;
-    const range = 700;
+    // the faster you go, the further out it looks (up to ~2.8x the standing range), eased so it
+    // opens out quickly on a burst of speed and closes in slowly after
+    const want = MM_RANGE * (1 + Math.min(1.8, Math.max(0, P.speed - 15) / 70));
+    if (!this.mmRange) this.mmRange = MM_RANGE;
+    this.mmRange += (want - this.mmRange) * (1 - Math.exp(-dt * (want > this.mmRange ? 2.5 : 0.8)));
+    const range = this.mmRange;
+    // zoomed out, everything but the settlements (and their names) drops away: fully gone by 1.5x
+    const fade = Math.max(0, Math.min(1, 1 - (range / MM_RANGE - 1) / 0.5));
     const s = (W / 2) / range;
     const up = P.up, fwd = g.cam.fwd, right = g.cam.right;
     const proj = (p) => {
@@ -405,15 +407,16 @@ export class HUD {
     const dark = darkness(up);
     c.fillStyle = dark > 0.5 ? '#0e0b18' : '#2a2440';
     c.fillRect(0, 0, W, H);
+    c.globalAlpha = fade;
     c.strokeStyle = 'rgba(255,255,255,0.12)';
     c.lineWidth = 1;
-    for (const cr of g.planet.craters) {
+    for (const cr of fade > 0.02 ? g.planet.craters : []) {
       if (cr.R < 30 || cr.d.dot(up) < 0.9) continue;
       const [x, y, d] = proj(cr.d);
       if (d > range + cr.R) continue;
       c.beginPath(); c.arc(x, y, cr.R * s, 0, Math.PI * 2); c.stroke();
     }
-    for (const ev of g.events.list) {
+    for (const ev of fade > 0.02 ? g.events.list : []) {
       let [x, y, d] = proj(ev.stage || ev.start);
       if (d > range * 1.4) {
         // event radar (3 transponders to Dr. Zbornak): far events sit on the rim, pointing the way
@@ -429,7 +432,7 @@ export class HUD {
     }
     // an active meteor shower: a red warning zone
     const mw = g.meteors && g.meteors.warning;
-    if (mw) {
+    if (mw && fade > 0.02) {
       const [x, y, d] = proj(mw.dir);
       if (d < range + mw.r) {
         c.fillStyle = `rgba(255,79,46,${0.16 + 0.08 * Math.sin(performance.now() / 200)})`;
@@ -437,6 +440,7 @@ export class HUD {
         c.beginPath(); c.arc(x, y, mw.r * s, 0, Math.PI * 2); c.fill(); c.stroke(); c.setLineDash([]);
       }
     }
+    c.globalAlpha = 1; // (settlements and their names stay)
     for (const l of g.locations) {
       if (!l.discovered) continue;
       const [x, y, d] = proj(l.dir);
@@ -456,9 +460,10 @@ export class HUD {
       c.textAlign = 'center';
       c.strokeText(l.short, x, y - 10); c.fillText(l.short, x, y - 10);
     }
+    c.globalAlpha = fade;
     c.fillStyle = '#9be7ff';
     // wild moon mites show up as little green specks
-    if (g.alchemy) {
+    if (g.alchemy && fade > 0.02) {
       c.fillStyle = '#b8e986';
       for (const m of g.alchemy.mites) {
         if (!m.model || m.gone > 0) continue;
@@ -467,11 +472,11 @@ export class HUD {
       }
     }
     c.fillStyle = '#9be7ff';
-    for (const v of g.world.vehicles) {
+    for (const v of fade > 0.02 ? g.world.vehicles : []) {
       const [x, y, d] = proj(v.pos);
       if (d < range) c.fillRect(x - 2, y - 2, 4, 4);
     }
-    for (const e of g.enemies.list) {
+    for (const e of fade > 0.02 ? g.enemies.list : []) {
       if (e.dead || (e.base && !e.base.awake) || e.kind === 'core') continue;
       const [x, y, d] = proj(e.body ? e.body.pos : e.center);
       if (d > range) continue;
@@ -479,7 +484,8 @@ export class HUD {
       c.beginPath(); c.arc(x, y, e.kind === 'megamite' ? 8 : e.carrying ? 6 : 3.5, 0, Math.PI * 2); c.fill();
       if (e.carrying) { c.strokeStyle = '#fff'; c.lineWidth = 2; c.stroke(); }
     }
-    for (const d of g.enemies.drops) { const [x, y] = proj(d.pos); c.fillStyle = '#2ee6ff'; c.fillRect(x - 4, y - 4, 8, 8); }
+    for (const d of fade > 0.02 ? g.enemies.drops : []) { const [x, y] = proj(d.pos); c.fillStyle = '#2ee6ff'; c.fillRect(x - 4, y - 4, 8, 8); }
+    c.globalAlpha = 1; // (the player and the objective markers stay too)
     const obj = g.objective();
     const obj2 = g.missions.objective2();
     for (const [o, col] of [[obj, '#ffd23f'], [obj2, '#7dff6a']]) {

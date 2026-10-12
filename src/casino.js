@@ -1,6 +1,7 @@
 import { OUTFITS, SKATES } from './cosmetics.js';
 import { pixelFont } from './fonts.js';
 import { CasinoGames } from './casinoGames.js';
+import { glyphHtml } from './glyphs.js';
 
 // The Lucky Crater Casino: slots, blackjack, roulette, a prize wheel, high-low, a prize
 // counter and a loan shark, all in one comic overlay. State lives in game.stats.casino.
@@ -863,6 +864,8 @@ export class Casino {
     let grid = '';
     for (let row = 0; row < 3; row++) for (let col = 0; col < 12; col++) grid += cellN(col * 3 + (3 - row));
     const out = (k) => `<div class="ro ${k}" data-rb="${k}">${OUTSIDE[k][0]}<em data-chip="${k}"></em></div>`;
+    // (key hints and their controller twins are both here: style.css shows whichever is in use)
+    const gl = (...toks) => `<span class="rl-pd pgx">${glyphHtml(toks)}</span>`;
     return `<div class="roul felt">
       <div class="rl-left">
         <div class="rl-wheel"><canvas width="300" height="300" data-rwheel></canvas><div class="rl-ballring" data-rball><i></i></div><div class="rl-ptr">▼</div></div>
@@ -873,8 +876,8 @@ export class Casino {
         <div class="rl-board"><div class="rn c-green zero" data-rb="n0">0<em data-chip="n0"></em></div><div class="rl-grid">${grid}</div></div>
         <div class="rl-dozens">${out('d1')}${out('d2')}${out('d3')}</div>
         <div class="rl-outs">${['low', 'even', 'red', 'black', 'odd', 'high'].map(out).join('')}</div>
-        <div class="rl-info">Click to stack ₵${fmt(this.bet)} chips (bet size ◀ ▶). Number pays 35:1 · dozens 2:1 · outside 1:1 · 0 sweeps the outside. Keys: R B O E, SPACE spins, C clears.</div>
-        <div class="rl-ctl"><span data-rtot></span><button data-act="rclear">CLEAR <small>C</small></button><button class="big" data-act="rspin">SPIN <small>SPACE</small></button></div>
+        <div class="rl-info">Click to stack ₵${fmt(this.bet)} chips (bet size ◀ ▶). Number pays 35:1 · dozens 2:1 · outside 1:1 · 0 sweeps the outside. <span class="rl-kb">Keys: R B O E, SPACE spins, C clears.</span><span class="rl-pd pgx">${glyphHtml(['LS'])} moves the cursor, ${glyphHtml(['A'])} or ${glyphHtml(['RT'])} drops a chip under it, ${glyphHtml(['DL'])} ${glyphHtml(['DR'])} bet size.</span></div>
+        <div class="rl-ctl"><span data-rtot></span><button data-act="rclear">CLEAR <small class="rl-kb">C</small>${gl('Y')}</button><button class="big" data-act="rspin">SPIN <small class="rl-kb">SPACE</small>${gl('X')}</button></div>
       </div>
     </div>`;
   }

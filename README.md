@@ -125,7 +125,16 @@ back. Prompts show the pad's buttons while it's in use.
 
 In menus, dialogs, the board, the wardrobe and the casino, the d-pad (or left stick) moves a
 highlight, `A` presses, `B` backs out, `LB`/`RB` switch tabs and the right stick scrolls. Watching
-a Derby race: `A` cheers, `Y` switches camera, the right stick orbits.
+a Derby race: `A` cheers, `Y` switches camera, the right stick orbits. On the globe map the left
+stick moves a cursor (rest it on a pin to read it), holding `RT` grabs the globe so the cursor drags
+it round, holding `LB` / `RB` turns the map anticlockwise / clockwise, the right stick zooms, and `B` or
+`View` closes it. At the Plinko board the left stick (or d-pad) aims the chute, `A` or `RT` drops a
+ball (hold either to keep them coming), `LB` / `RB` lower and raise the bet, and `B` stands up. At
+the blackjack table `A` deals and hits, `X` stands, `Y` doubles, `R3` zooms in on the cards (`Z` on the keyboard), with the same `LB` / `RB` bet and
+`B` to stand up. At the Duck Derby the left stick (or d-pad) picks a duck and `A` starts the race
+(and sets up the next one), again with `LB` / `RB` for the bet and `B` to stand up. The roulette
+table uses the map's cursor: the left stick moves it, `A` or `RT` drops a chip on the number or bet
+under it (or presses the button it's on), d-pad ← → change the chip size, `X` spins and `Y` clears.
 
 ## Lunar flight
 

@@ -52,6 +52,9 @@ import { clamp, pick, mulberry32 } from './rng.js';
 import { inkMat } from './toon.js';
 import { SUN, dirFromAngles, darkness, arcDist, tangent, upAt } from './geo.js';
 
+// version from package.json (injected by vite.config.js), shown bottom right on the title and pause screens
+for (const el of document.querySelectorAll('.app-ver')) el.textContent = `v${__APP_VERSION__}`;
+
 const SAVE_KEY = 'moonrunner-save-v1';
 const TIPS = [
   'Hold <b>SPACE</b> to engage the Quantum-Lock skates — they grip the ground and glide without friction.',
@@ -291,6 +294,14 @@ class Game {
       e.stopPropagation();
       this.quitToMenu();
     });
+    // (the dev menu's pause entry: shown once the menu has been opened by its F8 / controller combo)
+    document.getElementById('dev-btn-pause').addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.hud.show('pause', false);
+      this.state = this.resumeState || 'play';
+      this.resumeState = null;
+      this.cheats.dev();
+    });
     document.getElementById('pause').addEventListener('click', () => {
       this.hud.show('pause', false);
       this.state = this.resumeState || 'play';
@@ -335,6 +346,7 @@ class Game {
       } else if (this.state === 'log') {
         if (esc || code === 'KeyJ') this.closeModal(esc);
       } else if (this.state === 'dialog') {
+        if (code === 'F8' && this.dialogButtons.dev) { this.pickDialog(this.dialogButtons.length - 1, true); return; }
         const n = parseInt(code.replace('Digit', ''), 10);
         if (code === 'Enter') this.pickDialog(0);
         else if (n >= 1 && n <= this.dialogButtons.length) this.pickDialog(n - 1);
@@ -349,6 +361,7 @@ class Game {
         if (code === 'KeyM') this.openMap();
         if (code === 'KeyJ') this.openLog();
         if (code === 'KeyH') { this.refreshHelp(); document.getElementById('help').classList.toggle('hidden'); }
+        if (code === 'F8') this.cheats.dev(); // hidden dev menu (B, B, X, Y on a controller)
         // hidden testing menu: hold = and ` together
         if ((code === 'Backquote' && this.input.down('Equal')) || (code === 'Equal' && this.input.down('Backquote'))) this.cheats.open();
       } else if (this.state === 'dead' && code === 'Enter') this.respawn();
@@ -1038,7 +1051,7 @@ class Game {
     this.last = now;
     if (this.trailer) rdt = this.trailer.pre(rdt); // trailer: shot clock, staged input
     // paused, map, menus and dialogs freeze the whole world: traffic, the satellite, particles, clocks
-    if (this.pad) this.pad.update(rdt); // (before anything reads input this frame)
+    if (this.pad) { this.pad.update(rdt); this.pad.crosshair(rdt); } // (before anything reads input this frame)
     const frozen = FROZEN_STATES.has(this.state);
     const dt = frozen ? 0 : rdt;
     this.time += dt;
@@ -1130,6 +1143,7 @@ class Game {
   // On the Spindle: you, your shots, the story step and the asteroid; the Moon waits.
   updateAway(dt, c) {
     const P = this.player;
+    this.cheats.tick();
     P.update(dt, this.input, c);
     this.story.update(dt);
     this.spindle.update(dt);
@@ -1215,6 +1229,7 @@ class Game {
 
     this.secrets.preUpdate(dt);
     if (this.spindle.active) { this.updateAway(dt, c); return; }
+    this.cheats.tick();
     P.update(dt, this.input, c);
     this.secrets.update(dt);
     this.missions.update(dt);

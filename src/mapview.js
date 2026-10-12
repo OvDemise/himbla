@@ -157,20 +157,27 @@ export class GlobeMap {
     const m = new THREE.Matrix4().makeBasis(c.right, c.fwd, c.up);
     this.Q.setFromRotationMatrix(m).invert();
     this.zoom = 1;
+    this.cursor = null;
+  }
+
+  // Turn the globe as if dragged by (dx, dy) screen pixels.
+  spin(dx, dy) {
+    const k = 0.006 / this.zoom;
+    this.Q.premultiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), dx * k));
+    this.Q.premultiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), dy * k));
   }
 
   bindDrag() {
     let drag = null;
     const cv = this.canvas;
-    cv.addEventListener('mousedown', (e) => { drag = { x: e.clientX, y: e.clientY }; cv.style.cursor = 'grabbing'; });
+    // (redrawn on the press: back on the mouse, the controller's cursor goes)
+    cv.addEventListener('mousedown', (e) => { drag = { x: e.clientX, y: e.clientY }; cv.style.cursor = 'grabbing'; this.draw(); });
     window.addEventListener('mouseup', () => { drag = null; cv.style.cursor = 'grab'; });
     window.addEventListener('mousemove', (e) => {
       if (!drag) { this.hover(e); return; }
-      const k = 0.006 / this.zoom;
       const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
       drag.x = e.clientX; drag.y = e.clientY;
-      this.Q.premultiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), dx * k));
-      this.Q.premultiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), dy * k));
+      this.spin(dx, dy);
       this.draw();
     });
     cv.addEventListener('wheel', (e) => {
@@ -178,6 +185,30 @@ export class GlobeMap {
       this.zoom = THREE.MathUtils.clamp(this.zoom * (e.deltaY > 0 ? 0.88 : 1.14), 1, 5);
       this.draw();
     }, { passive: false });
+  }
+
+  // The controller's cursor (gamepad.js): one stick moves it (mx, my), and while grab is held it
+  // has hold of the globe and drags it round, the way the mouse does. zoom is the other stick.
+  // roll (-1 / 0 / 1, the bumpers) turns the whole map round its middle, anticlockwise / clockwise.
+  padUpdate(mx, my, grab, zoom, roll, dt) {
+    const W = this.canvas.width, H = this.canvas.height;
+    const cur = this.cursor || (this.cursor = { x: W / 2, y: H / 2, grab: false });
+    // (a curve for precision near the centre, full speed at the edge)
+    const sp = Math.hypot(mx, my) * 620 * dt;
+    const dx = mx * sp, dy = my * sp;
+    cur.x = THREE.MathUtils.clamp(cur.x + dx, 0, W);
+    cur.y = THREE.MathUtils.clamp(cur.y + dy, 0, H);
+    const z = THREE.MathUtils.clamp(this.zoom * Math.exp(-zoom * 1.6 * dt), 1, 5);
+    if (!dx && !dy && !roll && grab === cur.grab && z === this.zoom && this.cursorDrawn) return;
+    this.zoom = z;
+    if (roll) this.Q.premultiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), -roll * 1.4 * dt));
+    cur.grab = grab;
+    const r = this.canvas.getBoundingClientRect();
+    const s = r.width / W; // canvas pixels to screen pixels
+    // (pinned at the edge of the map, a held globe keeps turning)
+    if (grab) { this.spin(dx * s, dy * s); this.tip.classList.add('hidden'); }
+    else this.hover({ clientX: r.left + cur.x * s, clientY: r.top + cur.y * s });
+    this.draw();
   }
 
   project(v, out) {
@@ -458,7 +489,22 @@ export class GlobeMap {
     c.font = pixelFont(11); c.textAlign = 'left'; c.fillStyle = '#ffd23f';
     c.fillText(`CHARTED ${pct}% · ${this.discovered.size} LOCATIONS`, 14, 24);
     c.textAlign = 'right'; c.fillStyle = '#c9c3d9';
-    c.fillText('DRAG TO SPIN · SCROLL TO ZOOM · M / ESC TO CLOSE', W - 14, H - 14);
+    const cur = g.input.padActive && this.cursor;
+    c.fillText(cur ? 'L-STICK MOVE · RT GRAB · LB/RB TURN · R-STICK ZOOM · B CLOSE' : 'DRAG TO SPIN · SCROLL TO ZOOM · M / ESC TO CLOSE', W - 14, H - 14);
+    // the controller's cursor: an open ring with a dot, closed up while it has hold of the globe
+    this.cursorDrawn = !!cur;
+    if (cur) {
+      const rr = cur.grab ? 7 : 11;
+      const ring = () => {
+        c.beginPath(); c.arc(cur.x, cur.y, rr, 0, Math.PI * 2);
+        if (!cur.grab) for (let i = 0; i < 4; i++) { const a = (i * Math.PI) / 2; c.moveTo(cur.x + Math.cos(a) * rr, cur.y + Math.sin(a) * rr); c.lineTo(cur.x + Math.cos(a) * (rr + 6), cur.y + Math.sin(a) * (rr + 6)); }
+        c.stroke();
+      };
+      c.strokeStyle = '#120a1e'; c.lineWidth = 6; ring();
+      c.strokeStyle = '#ffd23f'; c.lineWidth = 2.5; ring();
+      c.fillStyle = cur.grab ? '#ffd23f' : '#fff';
+      c.beginPath(); c.arc(cur.x, cur.y, cur.grab ? rr - 1 : 2, 0, Math.PI * 2); c.fill();
+    }
   }
 
   cellOf(d) {

@@ -242,10 +242,14 @@ export class Player {
     this.params.airHandling = vanes ? 0.42 : 0;
     const steps = Math.ceil(dt / (1 / 120));
     const h = dt / steps;
+    // dev menu speed multiplier: scales how hard everything pushes you, and the landing speeds you survive
+    const sm = g.cheats ? g.cheats.speed : 1;
+    const pr = sm > 1 ? { ...this.params } : this.params;
+    if (sm > 1) for (const k of ['runSpeed', 'runAccel', 'brakeDecel', 'skatePush', 'skatePushMax', 'airControl', 'thrustAccel', 'skateSafeImpact', 'bootSafeImpact']) pr[k] *= sm;
     let landed = false;
     for (let i = 0; i < steps; i++) {
       const before = b.grounded;
-      const imp = stepSkater(b, ctrl, h, g.planet, g.colliders, this.params, this.impacts);
+      const imp = stepSkater(b, ctrl, h, g.planet, g.colliders, pr, this.impacts);
       if (!before && b.grounded) landed = true;
       for (const it of imp) this.onImpact(it, ctrl.skates);
       ctrl.jump = false;
@@ -408,7 +412,7 @@ export class Player {
 
   onImpact(it, skates) {
     const g = this.game;
-    const safe = (g.alchemy && g.alchemy.buffs.cushion > 0) ? 1e9 : skates ? this.params.skateSafeImpact : this.params.bootSafeImpact;
+    const safe = (g.alchemy && g.alchemy.buffs.cushion > 0) ? 1e9 : skates ? this.params.skateSafeImpact * (g.cheats ? g.cheats.speed : 1) : this.params.bootSafeImpact * (g.cheats ? g.cheats.speed : 1);
     if (it.speed > 6) g.audio.thud(it.speed);
     if (g.alchemy && g.alchemy.buffs.bouncy > 0 && it.kind === 'ground' && it.speed > 5) {
       this.body.bounceReady = Math.max(this.body.bounceReady || 0, it.speed);

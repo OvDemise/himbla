@@ -7,12 +7,62 @@ import { TECH } from './story.js';
 import * as THREE from 'three';
 import { greatCircle } from './geo.js';
 
+const DEV_KEY = 'mr-dev-unlocked';
+
 // Testing menu on the ` (backtick) key. Everything goes through the normal dialog, so number
 // keys pick options and Esc closes.
 export class Cheats {
   constructor(game) {
     this.game = game;
-    this.god = false;
+    this.god = false; // unlimited health
+    this.infJet = false; // unlimited jet (thruster energy)
+    this.speed = 1; // player speed multiplier, 1 to 10 (player.js)
+    // once the dev menu has been opened (F8 / controller combo) it gets a button on the pause card, remembered across launches
+    try { this.unlocked = localStorage.getItem(DEV_KEY) === '1'; } catch { this.unlocked = false; }
+    this.showPauseButton();
+  }
+
+  showPauseButton() {
+    const b = document.getElementById('dev-btn-pause');
+    if (b) b.classList.toggle('hidden', !this.unlocked);
+  }
+
+  // Hidden dev menu: F8, or B, B, X, Y on a controller (gamepad.js). Press F8 again to close.
+  dev() {
+    const g = this.game;
+    if (!this.unlocked) {
+      this.unlocked = true;
+      try { localStorage.setItem(DEV_KEY, '1'); } catch { /* unavailable */ }
+      this.showPauseButton();
+    }
+    g.dialog('DEV MENU', '<small>Hidden. Toggles last until you reload.</small>', [
+      { label: `1 · UNLIMITED JET: ${this.infJet ? 'ON' : 'OFF'}`, fn: () => { this.infJet = !this.infJet; this.tick(); this.dev(); } },
+      { label: `2 · UNLIMITED HEALTH: ${this.god ? 'ON' : 'OFF'}`, fn: () => { this.god = !this.god; this.tick(); this.dev(); } },
+      { label: this.speedLabel(), fn: () => { this.setSpeed(this.speed >= 10 ? 1 : this.speed + 1); this.dev(); } },
+      { label: '4 · TELEPORT TO CASINO', fn: () => { const l = g.locations.find((x) => x.id === 'casino'); if (l) this.teleport(l); } },
+      { label: '5 · FULL CHEAT MENU…', fn: () => this.open() },
+      { label: '6 · CLOSE' },
+    ]);
+    g.dialogButtons.dev = true;
+    // the speed row adjusts in place: click / A = +1 (wraps), left / right on a controller (d-pad or stick) = -1 / +1
+    const row = document.querySelector('#dialog [data-i="2"]');
+    if (row) {
+      row.dataset.adj = '1';
+      const bump = (d) => { this.setSpeed(this.speed + d); row.textContent = this.speedLabel(); };
+      row.addEventListener('adj', (e) => bump(e.detail));
+      row.onclick = (e) => { e.stopPropagation(); bump(this.speed >= 10 ? -9 : 1); };
+    }
+  }
+
+  speedLabel() { return `3 · SPEED: ×${this.speed}  (◄ ►)`; }
+
+  setSpeed(v) { this.speed = Math.max(1, Math.min(10, Math.round(v))); }
+
+  // every frame while playing: keeps the tank and health topped up
+  tick() {
+    const P = this.game.player;
+    if (this.infJet) P.body.energy = P.body.maxEnergy;
+    if (this.god && !P.dead) P.health = P.maxHealth;
   }
 
   open() {
