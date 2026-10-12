@@ -725,7 +725,7 @@ export class Enemies {
           const rel = _v.copy(P.vel).sub(e.body.vel);
           const rs = rel.length();
           const closing = e.body.vel.dot(n) - P.vel.dot(n);
-          if (rs > 22 && P.body.skating && P.vel.dot(n) < 0 && e.faction !== 'ally') {
+          if (rs > 22 && P.body.skating && P.vel.dot(n) < 0 && e.faction !== 'ally' && this.isHostileTarget(e)) {
             this.damage(e, (rs - 15) * 4);
             g.fx.pop('SMASH!', e.center.clone().addScaledVector(P.up, 3), { color: '#ffd23f', size: 70 });
             g.damagePlayer(4, 'ram');

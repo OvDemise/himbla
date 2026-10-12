@@ -284,7 +284,8 @@ export class Garage {
       const reach = def.radius || 3.5 * (def.scale || 1);
       const front = _mf.copy(b.pos).addScaledVector(up, 1.2);
       for (const en of g.enemies.targets()) {
-        if (!en.center || (en.faction === 'pirate' && g.enemies.friendly(en)) || (en.ramT || 0) > g.time) continue;
+        // (allied and neutral rovers, patrols and turrets are never rammed: only hostile ones)
+        if (!en.center || !g.enemies.isHostileTarget(en) || (en.ramT || 0) > g.time) continue;
         if (en.center.distanceTo(front) > (en.radius || 1.5) + reach) continue;
         en.ramT = g.time + 0.6;
         g.enemies.damage(en, sp * (def.pirate ? 3 : 2));
