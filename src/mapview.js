@@ -523,7 +523,7 @@ export class GlobeMap {
 
 // What a place offers, for the map tooltip.
 const SPECIAL = {
-  ilmb: 'Repair-bay upgrades · Hall of Highlights',
+  ilmb: 'Repair-bay upgrades',
   meridian: 'Skate finishes',
   antimatter: 'Containment jars · reactor · splice pod · holding pen',
   bounce: 'Skate park · trampolines · bounce domes',

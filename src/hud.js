@@ -161,7 +161,7 @@ export class HUD {
   }
 
   // ---- Job board / shop ----
-  openBoard(loc, offers, { onAccept, onClose, shop, onBuy, upgrades, credits, active, extra, canTake, onAbandon, highlights, rep, event, onEventAbandon }) {
+  openBoard(loc, offers, { onAccept, onClose, shop, onBuy, upgrades, credits, active, extra, canTake, onAbandon, rep, event, onEventAbandon }) {
     const el = $('board');
     const f = FACTIONS[loc.faction];
     const tier = rep.tier(loc.faction);
@@ -213,11 +213,6 @@ export class HUD {
       html += `</div>`;
     }
     html += `</div>`;
-    if (highlights && highlights.length) {
-      html += `<div class="board-hl screen"><h3><span>SCR-03 · HALL OF HIGHLIGHTS</span><span class="term-dim">${highlights.length} FRAME${highlights.length === 1 ? '' : 'S'}</span></h3><div class="hl-strip">`;
-      for (const h of highlights) html += `<figure><img src="${h.url}" alt=""><figcaption>${h.caption}</figcaption></figure>`;
-      html += `</div></div>`;
-    }
     html += `<div class="board-foot">&gt; Click a contract or press 1-${Math.max(1, offers.length)} · F / ESC to log off<span class="term-cursor">_</span></div>`;
     el.innerHTML = html;
     el.classList.add('term');

@@ -240,7 +240,7 @@ export class MainMenu {
       const c = this.confirm;
       const b = S.backup(c.n);
       const txt = {
-        delete: `DELETE SLOT ${c.n}?<small>This wipes that save for good, and its backup: credits, upgrades, reputation, story, map, chimeras and highlights.</small>`,
+        delete: `DELETE SLOT ${c.n}?<small>This wipes that save for good, and its backup: credits, upgrades, reputation, story, map and chimeras.</small>`,
         overwrite: `OVERWRITE SLOT ${c.n}?<small>The save in this slot will be replaced by a brand-new game.</small>`,
         import: `IMPORT INTO SLOT ${c.n}?<small>The save in this slot will be replaced by the file you pick. (Its old contents stay as the slot's backup.)</small>`,
         restore: `RESTORE SLOT ${c.n}?<small>Puts back the save as it was when you last stopped playing${b && b.meta ? ` (₵${(b.meta.credits ?? 0).toLocaleString('en-US')}, ${fmtPlayTime(b.meta.playTime)} played, ${fmtDate(b.meta.savedAt)})` : ''}. What's in the slot now is lost.</small>`,

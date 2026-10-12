@@ -499,7 +499,6 @@ export class Alchemy {
     P.body.sinceContact = 1;
     g.style(120, 'SINGULARITY');
     g.addCredits(300, 'Data');
-    g.actionPanel('launch', null, 'THE REACTOR SAID NO.');
     return { title: 'SINGULARITY!', text: '"Three different things at once?! The containment field folded in half and spat you through the roof. Magnificent. Here is your share of the data."' };
   }
 
@@ -1054,7 +1053,6 @@ const RECIPES = {
     const g = this.game;
     g.fx.explosion(g.world.lab.reactor.clone().addScaledVector(g.player.up, 14), 8, true);
     g.addCredits(150, 'Orbital car');
-    g.actionPanel('launch', null, 'THAT CAR IS IN ORBIT NOW.');
     return { title: 'ORBITAL HOVER-CAR', text: '"The hover-car went straight up through the roof and is now orbiting the Moon. Somebody\'s commute just got a lot longer. Here, hush money."' };
   },
   pirate(names) {

@@ -71,8 +71,6 @@ export const SCHEMA = {
     { key: 'camHeight', label: 'Camera height', type: 'range', min: -1, max: 4, step: 0.1, def: 0, fmt: (v) => `${v > 0 ? '+' : ''}${v.toFixed(1)} m` },
     { key: 'shoulder', label: 'Shoulder offset', type: 'range', min: -2.5, max: 2.5, step: 0.1, def: 0, fmt: (v) => (Math.abs(v) < 0.05 ? 'CENTRE' : `${Math.abs(v).toFixed(1)} m ${v < 0 ? 'LEFT' : 'RIGHT'}`) },
     { key: 'camSmooth', label: 'Camera smoothing', type: 'range', min: 0, max: 3, step: 0.1, def: 1, fmt: (v) => (v < 0.05 ? 'OFF' : mult(v)) },
-    { key: 'panels', label: 'Action panel pop-ups', type: 'choice', def: 'normal', options: LEVELS.slice(0, 3), hint: 'The comic picture-in-picture panels' },
-    { key: 'photos', label: 'Highlight photo frequency', type: 'choice', def: 'normal', options: LEVELS, hint: 'Snapshots pinned to the Hall of Highlights' },
     { key: 'tips', label: 'Show tips', type: 'toggle', def: true },
     { key: 'minimap', label: 'Minimap', type: 'toggle', def: true },
     { key: 'hudScale', label: 'HUD scale', type: 'range', min: 0.6, max: 1.4, step: 0.05, def: 1, fmt: pct },
@@ -250,9 +248,6 @@ export class Settings {
   bound(code) { return this.v.binds[code] || code; }
   label(code) { return keyName(this.bound(code)); }
 
-  // seconds between highlight photos (Infinity = never)
-  photoGap() { return { off: Infinity, rare: 60, normal: 15, often: 4 }[this.v.photos] ?? 15; }
-
   // frame-rate cap: true when this frame should be skipped
   skip(now) {
     const cap = this.v.fpsCap;
@@ -285,7 +280,7 @@ export class Settings {
     }
     if (g.planet) g.planet.lodScale = v.terrainDetail;
     if (g.fx) g.fx.density = v.particles;
-    for (const post of [g.post, g.highlights && g.highlights.post]) {
+    for (const post of [g.post]) {
       if (!post) continue;
       const u = post.material.uniforms;
       if (u.halftone) u.halftone.value = v.halftone ? 1 : 0;

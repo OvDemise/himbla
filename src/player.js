@@ -298,7 +298,6 @@ export class Player {
       this.launchCheck -= dt;
       if (this.launchCheck <= 0 && !b.grounded && b.vel.dot(up) > 0) {
         g.fx.pop(this.speed > 70 ? 'SKY-HIGH!' : 'LAUNCH!', null, { color: '#2ee6ff', size: 72 });
-        g.actionPanel('launch');
       }
     }
 
@@ -395,7 +394,6 @@ export class Player {
         g.fx.pop('STUCK IT!', null, { color: '#7dff6a', size: 70, rot: 6 });
         this.trickLanding = true;
         g.stats.bestTrick = Math.max(g.stats.bestTrick || 0, pts);
-        if (pts >= 60) g.actionPanel('trick', null, `${name}! +${pts}`);
       } else if (!clean) {
         g.fx.pop('WIPEOUT!', null, { color: '#ff2a4a', size: 84, rot: -8 });
         g.damagePlayer(8, 'impact');

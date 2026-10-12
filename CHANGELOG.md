@@ -3,6 +3,12 @@
 What changed in each release. Releases are built by `.github/workflows/release.yml` when a commit message
 contains `[release]` (see the README's Download section). Newest first.
 
+## Unreleased
+
+- **Scarf:** the wind, flutter and acceleration swing on the scarf are capped, so at speed it streams a little but stays close to the runner.
+- **Jet cooldown:** emptying the jet tank locks the thrusters out until it has recharged to 10%; the JET bar dims while locked.
+- **Removed the action panel and Hall of Highlights:** no more picture-in-picture comic panels, highlight photos, their settings, or the highlights screen on the ILMB job terminal.
+
 ## 0.9.99 — 2026-10-10
 
 **Polish**

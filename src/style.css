@@ -142,16 +142,6 @@ button { font-family: var(--comic); }
   animation: pop 1s ease-out forwards;
 }
 
-#action-panel {
-  position: absolute; right: 24px; top: 250px; width: min(34vw, 460px); aspect-ratio: 16 / 10;
-  border: 3px solid var(--ui-text); box-shadow: 0 0 0 3px #05030c, 6px 6px 0 rgba(0,0,0,0.55);
-}
-#action-panel.slam { animation: panelIn 0.35s steps(6); }
-#panel-caption {
-  position: absolute; left: -6px; top: -16px; background: var(--yellow); color: #05030c; font-family: var(--comic);
-  font-size: 10px; line-height: 1; padding: 6px 8px 5px; border: 2px solid #05030c; box-shadow: var(--ui-shadow); white-space: nowrap;
-}
-
 /* ---------- job board ---------- */
 #board { position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(1000px, 94vw); max-height: 90vh; overflow: auto; background: rgba(10, 8, 20, 0.95); }
 .board-head { position: sticky; top: 0; z-index: 2; font-family: var(--comic); font-size: 16px; line-height: 1.3; padding: 10px 14px 8px; border-bottom: 2px solid #05030c; display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; color: #05030c; }
@@ -160,12 +150,6 @@ button { font-family: var(--comic); }
 .board-close:hover { background: var(--red); }
 .darktag { background: #2a1f4f; color: #c9b8ff; padding: 1px 6px; border: 1px solid #8f7bff; }
 .paytag { background: #13240c; color: #7dff3a; padding: 1px 6px; border: 1px solid #7dff3a; font-weight: bold; }
-.board-hl { padding: 0 14px 6px; }
-.board-hl h3 { font-family: var(--comic); font-size: 12px; margin: 0 0 8px; color: var(--yellow); }
-.hl-strip { display: flex; gap: 10px; overflow-x: auto; padding-bottom: 8px; }
-.hl-strip figure { margin: 0; flex: 0 0 200px; background: #05030c; border: 2px solid var(--ui-edge); }
-.hl-strip img { display: block; width: 100%; }
-.hl-strip figcaption { background: var(--ui-bg2); color: var(--yellow); font-family: var(--comic); font-size: 7px; line-height: 1.4; padding: 4px 6px 3px; }
 .board-credits { background: #05030c; color: var(--yellow); padding: 6px 8px 5px; font-size: 12px; line-height: 1; }
 .board-active { margin: 12px 14px 0; padding: 8px 10px 6px; background: var(--ui-bg2); border: 2px solid var(--yellow); color: var(--yellow); font-family: var(--comic); font-size: 10px; line-height: 1.5; display: flex; justify-content: space-between; align-items: center; gap: 10px; }
 .board-active button { font-family: var(--comic); font-size: 9px; padding: 5px 7px 4px; background: var(--red); color: #fff; border: 2px solid #05030c; cursor: pointer; }
@@ -268,7 +252,6 @@ body:has(#title:not(.hidden)) #hud { visibility: hidden; }
   100% { transform: translate(-50%, -80%) rotate(var(--rot)) scale(1.05); opacity: 0; }
 }
 @keyframes slam { 0% { transform: translateX(-50%) scale(1.6); opacity: 0; } 100% { transform: translateX(-50%) scale(1); opacity: 1; } }
-@keyframes panelIn { 0% { opacity: 0; clip-path: inset(0 0 100% 0); } 100% { opacity: 1; clip-path: inset(0 0 0 0); } }
 @keyframes shake { 0%, 100% { margin-left: 0; } 20% { margin-left: -12px; } 40% { margin-left: 10px; } 60% { margin-left: -6px; } 80% { margin-left: 4px; } }
 @keyframes blink { 50% { opacity: 0.25; } }
 @keyframes bob { from { transform: rotate(45deg) translate(0, 0); } to { transform: rotate(45deg) translate(-4px, -4px); } }
@@ -1121,7 +1104,6 @@ body.seated #hud > :not(#popups) { display: none !important; }
 #board.term .screen { position: relative; background: #0a120e; border: 3px solid #23302a; box-shadow: inset 0 0 30px rgba(141, 255, 180, 0.07), 0 0 0 2px #05030c; padding: 0 10px 4px; }
 #board.term .screen::after { content: ''; position: absolute; inset: 0; pointer-events: none; background: repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.18) 0 1px, transparent 1px 3px); }
 #board.term .screen h3 { display: flex; justify-content: space-between; gap: 8px; margin: 0 -10px 10px; padding: 6px 10px 5px; background: #14211b; border-bottom: 2px solid #23302a; color: var(--ph); font-size: 9px; text-shadow: 0 0 6px rgba(141, 255, 180, 0.4); }
-#board.term .board-hl { margin: 0 14px 6px; padding: 0 10px 6px; }
 #board.term .job, #board.term .shop-item { background: #0d1813; border: 1px solid #23302a; border-left: 3px solid #2f4a3c; }
 #board.term .job:hover, #board.term .shop-item:hover { border-color: var(--ph); border-left-color: var(--ph); background: #11221a; box-shadow: 0 0 10px rgba(141, 255, 180, 0.18); }
 #board.term .job-cargo { color: var(--ph); }
@@ -1140,7 +1122,7 @@ body.seated #hud > :not(#popups) { display: none !important; }
 }
 @keyframes dilate-pulse { 50% { opacity: 0.75; } }
 /* ---- trailer director (?trailer, trailer.js): no HUD, just the comic layer and the cards ---- */
-body.trailer #hud > *:not(#popups):not(#action-panel):not(#splash):not(#dilate) { display: none !important; }
+body.trailer #hud > *:not(#popups):not(#splash):not(#dilate) { display: none !important; }
 body.trailer #tutorial, body.trailer #racepanel, body.trailer #vehbar, body.trailer #tip { display: none !important; }
 #trailer { position: fixed; inset: 0; pointer-events: none; z-index: 100; overflow: hidden; }
 #trailer .tr-flash { position: absolute; inset: 0; background: #fffbe6; opacity: 0; }

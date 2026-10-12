@@ -1018,9 +1018,6 @@ export class Race {
       genes.wins = (genes.wins || 0) + 1;
       g.style(60, 'DERBY WIN');
       g.hud.alert(`${genes.name.toUpperCase()} WINS THE ${race.name.toUpperCase()}!`, '#7dff3a', 4);
-      if (g.highlights && g.highlights.capture) {
-        try { g.highlights.capture(g.camera, `${genes.name} won the ${race.name}`, 60); } catch { /* no snapshot */ }
-      }
     } else g.hud.alert(`${genes.name.toUpperCase()} FINISHED #${place}`, place <= 3 ? '#ffd23f' : '#ff9f1c', 3);
     if (prize) g.addCredits(prize, `${race.name} purse`);
     if (betWin) g.addCredits(betWin, 'Derby bet');

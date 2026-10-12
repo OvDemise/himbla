@@ -20,7 +20,6 @@ import { HUD } from './hud.js';
 import { Input } from './input.js';
 import { Audio } from './audio.js';
 import { ComicPost } from './post.js';
-import { Highlights } from './highlights.js';
 import { LOCATIONS, SHOPS, FACTIONS } from './locations.js';
 import { Reputation } from './reputation.js';
 import { Events } from './events.js';
@@ -150,7 +149,6 @@ class Game {
     this.scene = new THREE.Scene();
     this.scene.background = new THREE.Color(0x05030c);
     this.camera = new THREE.PerspectiveCamera(72, window.innerWidth / window.innerHeight, 0.5, 9000);
-    this.panelCam = new THREE.PerspectiveCamera(50, 1.6, 0.3, 9000);
 
     this.sun = new THREE.DirectionalLight(0xfff1d6, 1.6);
     this.sun.castShadow = true;
@@ -207,7 +205,6 @@ class Game {
     this.alchemy = new Alchemy(this);
     this.civilians = this.world.civilians = new Civilians(this); // civilians can be hurt (blast hook + ragdolls)
     this.post = new ComicPost(this.renderer, this.camera);
-    this.highlights = new Highlights(this);
 
     this.credits = 250;
     this.stats = { deliveries: 0, bestTrick: 0 };
@@ -266,12 +263,10 @@ class Game {
     window.addEventListener('keydown', wake, true);
     this.damageFlash = 0;
     this.currentZone = null;
-    this.panel = null;
     this.tipIndex = 0;
     this.tipTimer = 2;
     this.hurtCd = 0;
     this.boardCooldown = 0;
-    this.lastCapture = -999;
     this.wasDark = false;
 
     this.settings.autoDetect(this.renderer); // settings: first launch picks a quality preset
@@ -798,27 +793,6 @@ class Game {
     }
   }
 
-  actionPanel(kind, subject, caption) {
-    if (this.panel && this.panel.t > 0.5 && kind === 'launch') return;
-    const pf = this.settings ? this.settings.v.panels : 'normal'; // settings: pop-up frequency
-    if (pf === 'off' || (pf === 'rare' && (kind === 'launch' || kind === 'trick') && this.time - (this.lastPanelAt ?? -999) < 25)) return; // settings
-    this.lastPanelAt = this.time; // settings
-    const captions = {
-      launch: ['MEANWHILE, FORTY METRES UP…', 'NO BRAKES. NO REGRETS.', 'GRAVITY? NEVER HEARD OF IT.', 'THE CRATER COULDN\'T HOLD HER!'],
-      stolen: ['THE SCRAPJAW GANG STRIKES!', 'HEY! THAT\'S MY PACKAGE!'],
-      delivered: ['SIGNED, SEALED, DELIVERED!', 'ANOTHER HAPPY CUSTOMER!'],
-      trick: ['STYLE FOR MILES!'],
-    };
-    const text = caption || pick(captions[kind]);
-    // big moments get pinned to the Hall of Highlights
-    const worthy = kind === 'trick' || kind === 'delivered' || kind === 'stolen' || (kind === 'launch' && this.player.speed > 55);
-    this.panel = { kind, subject, t: 2.6, text, capture: worthy && this.time - this.lastCapture > (this.settings ? this.settings.photoGap() : 15) ? 0.45 : -1 }; // settings
-    document.getElementById('panel-caption').textContent = text;
-    const el = document.getElementById('action-panel');
-    el.classList.remove('hidden');
-    el.classList.remove('slam'); void el.offsetWidth; el.classList.add('slam');
-  }
-
   // ---------- job board ----------
   openBoard(loc) {
     this.tutorial.on('board');
@@ -843,7 +817,6 @@ class Game {
       extra: this.missions.extra && this.missions.extra.a,
       canTake: this.missions.canTake(),
       onAbandon: () => { this.missions.abandon(); this.refreshBoard(); },
-      highlights: loc.id === 'ilmb' ? this.highlights.items : null,
     });
   }
 
@@ -1097,7 +1070,6 @@ class Game {
     if (this.trailer) this.trailer.post(u);
     this.renderer.setViewport(0, 0, window.innerWidth, window.innerHeight);
     this.post.render(this.scene, this.camera);
-    this.renderPanel(dt);
     this.input.endFrame();
   }
 
@@ -1480,67 +1452,6 @@ class Game {
     }
   }
 
-  renderPanel(dt) {
-    const p = this.panel;
-    const el = document.getElementById('action-panel');
-    if (!p) return;
-    p.t -= dt;
-    if (p.t <= 0) {
-      el.classList.add('hidden');
-      this.panel = null;
-      return;
-    }
-    const P = this.player;
-    const up = P.up;
-    const side = (f) => new THREE.Vector3().crossVectors(f, up).normalize();
-    let focus, from;
-    if (p.kind === 'villain' && p.subject && p.subject.model) {
-      // close-up on the villain's face
-      focus = p.subject.center.clone().addScaledVector(up, 0.5);
-      const f = p.subject.heading.clone();
-      from = focus.clone().addScaledVector(f, 3.2).addScaledVector(side(f), 1.2).addScaledVector(up, 0.2);
-    } else if (p.kind === 'stolen' && p.subject && !p.subject.dead) {
-      focus = p.subject.center.clone();
-      const hv = tangent(p.subject.body.vel, up);
-      if (hv.lengthSq() < 1) hv.copy(this.cam.fwd);
-      from = focus.clone().addScaledVector(side(hv.normalize()), 9).addScaledVector(up, 3);
-    } else if (p.kind === 'delivered' || p.kind === 'trick') {
-      focus = P.center.clone().addScaledVector(up, 0.4);
-      const fwd = P.heading;
-      from = focus.clone().addScaledVector(fwd, p.kind === 'trick' ? 7 : 4.5).addScaledVector(up, p.kind === 'trick' ? 1.5 : -0.3).addScaledVector(side(fwd), 2);
-    } else {
-      focus = P.center.clone();
-      const hv = tangent(P.vel, up);
-      if (hv.lengthSq() < 1) hv.copy(P.heading);
-      hv.normalize();
-      from = focus.clone().addScaledVector(hv, 10).addScaledVector(up, -5).addScaledVector(side(hv), 5);
-    }
-    const alt = this.planet.altitude(from);
-    if (alt < 0.8) from.addScaledVector(upAt(from), 0.8 - alt);
-    this.panelCam.position.copy(from);
-    this.panelCam.up.copy(up);
-    this.panelCam.lookAt(focus);
-    if (p.capture > 0) {
-      p.capture -= dt;
-      if (p.capture <= 0) {
-        this.lastCapture = this.time;
-        this.highlights.capture(this.panelCam, p.text);
-      }
-    }
-    const r = el.getBoundingClientRect();
-    const inset = 6;
-    const x = r.left + inset, w = r.width - inset * 2, h = r.height - inset * 2;
-    const y = window.innerHeight - r.bottom + inset;
-    this.panelCam.aspect = w / h;
-    this.panelCam.updateProjectionMatrix();
-    const R = this.renderer;
-    R.setScissorTest(true);
-    R.setScissor(x, y, w, h);
-    R.setViewport(x, y, w, h);
-    R.render(this.scene, this.panelCam);
-    R.setScissorTest(false);
-    R.setViewport(0, 0, window.innerWidth, window.innerHeight);
-  }
 }
 
 const game = new Game();

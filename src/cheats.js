@@ -269,7 +269,7 @@ export class Cheats {
   confirmReset() {
     const g = this.game;
     const n = g.saves && g.saves.active;
-    g.dialog('RESET THIS SAVE?', `Wipes ${n ? `save slot ${n}` : 'this save'} (credits, upgrades, reputation, map, chimeras, outfits and highlights) and returns to the main menu. Other slots and your settings are kept.`, [
+    g.dialog('RESET THIS SAVE?', `Wipes ${n ? `save slot ${n}` : 'this save'} (credits, upgrades, reputation, map, chimeras and outfits) and returns to the main menu. Other slots and your settings are kept.`, [
       { label: '1 · YES, WIPE IT', fn: () => {
         if (g.saves && n) g.saves.remove(n); // clears the slot and the live working copy
         else { try { for (const k of Object.keys(localStorage)) if (k.startsWith('moonrunner-') && k !== 'moonrunner-settings-v1') localStorage.removeItem(k); } catch { /* unavailable */ } }

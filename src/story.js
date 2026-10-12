@@ -677,7 +677,6 @@ export class Story {
     this.save();
     g.save();
     g.style(80, 'CHAPTER COMPLETE');
-    g.actionPanel('delivered', null, `${def.title.toUpperCase()} — COMPLETE!`);
     g.audio.cash();
     const lock = first ? `<br><br><b style="color:#ff2a4a">You are now ${LEADERS[f].name}'s runner. The other leaders will remember that.</b>` : '';
     const ul = unlocks.length ? `<br><br>${unlocks.map((u) => `★ ${u}`).join('<br>')}` : '';
@@ -1674,7 +1673,6 @@ export class Story {
     this.kade.met++;
     this.save();
     this.splash();
-    g.actionPanel('villain', e, '"NOBODY SKATES MY SIDE OF THE MOON."');
     g.slowmo = 1.4;
     return e;
   }

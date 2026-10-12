@@ -343,7 +343,6 @@ export class Events {
     if (ev.type === 'strike') g.rep.add(ev.target.faction, -4, `Struck ${ev.target.name}`, { war: false });
     if (ev.type === 'raid') { g.rep.add(ev.target.faction, -12, `Raided ${ev.target.name}`, { war: false }); g.rep.add('spacecom', -4, 'Piracy', { silent: true }); }
     g.hud.eventResult(ev, true, text || `+₵${credits}`);
-    g.actionPanel('delivered', null, `${ev.title.toUpperCase()} — DONE!`);
     g.stats.events = (g.stats.events || 0) + 1;
     if (ev.faction === 'meridian') g.stats.meridianEvents = (g.stats.meridianEvents || 0) + 1;
     this.finish(ev);
