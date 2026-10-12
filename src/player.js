@@ -117,6 +117,20 @@ export class Player {
   }
 
   update(dt, input, cam) {
+    this.step(dt, input, cam);
+    this.updateLamp(cam);
+  }
+
+  // helmet lamp follows your gaze (every frame, whichever way you're moving: skating, grinding, riding)
+  updateLamp(cam) {
+    const up = this.body.up;
+    const head = this.model.head.getWorldPosition(_v);
+    this.lamp.position.copy(head).addScaledVector(up, 0.3);
+    this.lamp.target.position.copy(head).addScaledVector(cam.look, 30).addScaledVector(up, -4);
+    this.glowLight.position.copy(head).addScaledVector(up, 1.5);
+  }
+
+  step(dt, input, cam) {
     const g = this.game;
     const b = this.body;
     if (this.dead) return;
@@ -324,12 +338,6 @@ export class Player {
 
     this.center.copy(b.pos).addScaledVector(up, 1.3);
     this.animate(dt, cam, ctrl);
-
-    // helmet lamp follows your gaze
-    const head = this.model.head.getWorldPosition(_v);
-    this.lamp.position.copy(head).addScaledVector(up, 0.3);
-    this.lamp.target.position.copy(head).addScaledVector(cam.look, 30).addScaledVector(up, -4);
-    this.glowLight.position.copy(head).addScaledVector(up, 1.5);
   }
 
   // weapons: 1-4 to switch, left mouse to fire
