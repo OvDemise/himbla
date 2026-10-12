@@ -296,13 +296,14 @@ export class ScarfSim {
     _sw.copy(vel).negate().applyQuaternion(_sq); // relative wind
     const ws = _sw.length();
     _sw.multiplyScalar(0.08 * ws);
+    if (_sw.length() > 4) _sw.setLength(4); // (capped, so at speed it streams a little but stays close to you)
     if (this.prevVel) _sa.copy(vel).sub(this.prevVel).divideScalar(Math.max(dt, 1e-3)).negate().multiplyScalar(0.12).applyQuaternion(_sq);
     else _sa.set(0, 0, 0);
-    if (_sa.length() > 60) _sa.setLength(60); // (a respawn or a teleport isn't a swing)
+    if (_sa.length() > 20) _sa.setLength(20); // (a respawn or a teleport isn't a swing)
     this.prevVel = (this.prevVel || new THREE.Vector3()).copy(vel);
     // (a light breeze to the right keeps it off the middle of your back)
     const fx = _sg.x + _sw.x + _sa.x + 1.2, fy = _sg.y + _sw.y + _sa.y, fz = _sg.z + _sw.z + _sa.z;
-    const flut = Math.min(1, ws / 14);
+    const flut = Math.min(0.5, ws / 28);
     const halfW = hw ?? (back > 1 ? 0.42 : 0.3);
     const steps = Math.min(4, Math.ceil(dt / (1 / 120)));
     const h2 = (dt / steps) ** 2;
