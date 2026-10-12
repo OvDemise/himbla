@@ -741,6 +741,7 @@ export class Enemies {
             P.body.sinceContact = 1;
           }
           const vn = P.vel.dot(n) - e.body.vel.dot(n);
+          if (vn < 0 && g.grind) g.grind.knockOff(P, n);
           if (vn < 0) P.vel.addScaledVector(n, -vn * 1.4);
           P.body.pos.addScaledVector(n, (e.radius + 1.2 - d) * 0.8);
         }

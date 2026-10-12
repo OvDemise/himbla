@@ -669,6 +669,7 @@ class Game {
     const P = this.player;
     if (P.dead || amount <= 0 || this.cheats.god) return;
     if (this.story.absorb(from)) return;
+    if (cause === 'ram' && this.grind) this.grind.knockOff(P);
     // the vehicle soaks hits (and can be wrecked); a sniper round goes straight through the glass
     if (P.vehicle && cause !== 'sniper') { amount = this.garage.hit(amount); if (amount <= 0) return; }
     P.health -= amount;
@@ -1365,6 +1366,7 @@ class Game {
     const n = P.center.clone().sub(pos).normalize();
     const rel = P.vel.clone().sub(vel).dot(n);
     P.body.pos.addScaledVector(n, r + 1 - d);
+    if (rel < 0 && this.grind) this.grind.knockOff(P, n);
     if (rel < 0) {
       P.vel.addScaledVector(n, -rel * 1.5);
       if (-rel > 12) {

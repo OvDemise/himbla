@@ -160,8 +160,20 @@ export class Grinder {
     return true;
   }
 
+  // Struck by something solid (a rover, a road vehicle, a ram): thrown off the rail, away from
+  // the hit if its direction is known, with no grab again for a moment. No grind points.
+  knockOff(P, n = null) {
+    const A = this.active;
+    if (!A) return;
+    const g = this.game, b = P.body;
+    this.pop(P, false, true);
+    if (n) b.vel.addScaledVector(n, 10);
+    this.cool = 1;
+    g.fx.pop('KNOCKED OFF!', P.center.clone(), { color: '#ff5a3c', size: 50 });
+  }
+
   // off the rail: carried on along it, with a hop (bigger if you jumped)
-  pop(P, jumped) {
+  pop(P, jumped, knocked = false) {
     const g = this.game, b = P.body, A = this.active;
     railAt(A.r, A.s, _p, _t);
     _u.copy(_p).normalize();
@@ -174,9 +186,11 @@ export class Grinder {
     if (m.armL) m.armL.rotation.set(0, 0, 0);
     if (m.armR) m.armR.rotation.set(0, 0, 0);
     m.torso.rotation.x = 0;
-    const pts = Math.round(15 + A.t * 30);
-    g.style(pts, 'GRIND');
-    g.fx.pop(`GRIND +${pts}`, null, { color: '#ffd23f', size: 40 });
+    if (!knocked) {
+      const pts = Math.round(15 + A.t * 30);
+      g.style(pts, 'GRIND');
+      g.fx.pop(`GRIND +${pts}`, null, { color: '#ffd23f', size: 40 });
+    }
     if (jumped) g.audio.jump();
     this.active = null;
     this.cool = 0.6;
