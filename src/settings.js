@@ -3,6 +3,7 @@
 // `g.settings ? g.settings.v.<key> : <default>` so it still works without this module.
 
 import { glyphHtml, glyphState, tokensFor } from './glyphs.js';
+import { gyroSupported } from './gyro.js';
 
 const KEY = 'moonrunner-settings-v1';
 
@@ -395,6 +396,9 @@ export class Settings {
     this.el.classList.remove('hidden');
     this.render();
     const g = this.game;
+    // (the PlayStation link row follows the pad coming and going while this is open)
+    const gy = g && g.pad && g.pad.gyro;
+    if (gy) gy.onStatus = () => { if (this.open && this.tab === 'gameplay') this.render(); };
     if (g && g.audio && g.audio.click) g.audio.click();
   }
 
@@ -402,6 +406,8 @@ export class Settings {
     if (!this.open) return;
     this.open = false;
     this.rebinding = null;
+    const gy = this.game && this.game.pad && this.game.pad.gyro;
+    if (gy) gy.onStatus = null;
     this.el.classList.add('hidden');
     this.save();
     const g = this.game;
@@ -466,7 +472,7 @@ export class Settings {
       this.render();
     } else if (act === 'gyro-connect') {
       const gy = g && g.pad && g.pad.gyro;
-      if (gy) { gy.onStatus = () => { if (this.open && this.tab === 'gameplay') this.render(); }; gy.request().then(() => this.render()); }
+      if (gy) gy.request().then(() => this.render());
     }
   }
 
@@ -505,7 +511,8 @@ export class Settings {
       if (this.tab === 'gameplay') {
         // the gyro is read straight from the pad (WebHID): it may need a one-time CONNECT
         const gy = this.game && this.game.pad && this.game.pad.gyro;
-        if (gy) body += `<div class="set-row"><span class="set-label">PlayStation controller link<small>${gy.status}</small></span><span class="set-ctl"><button class="set-btn" data-act="gyro-connect">CONNECT</button></span></div>`;
+        const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;');
+        if (gy) body += `<div class="set-row"><span class="set-label">PlayStation controller link<small>${esc(gy.status)}</small></span><span class="set-ctl">${gyroSupported() ? '<button class="set-btn" data-act="gyro-connect">CONNECT</button>' : ''}</span></div>`;
       }
     }
     this.el.innerHTML = `<div class="panel set-card">

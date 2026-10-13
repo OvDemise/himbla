@@ -34,7 +34,7 @@ export class GyroPad {
     this.on = false; // Circle is held: integrate
     this.lastT = 0; // performance.now() of the last motion report
     this.still = 0; // seconds the pad has been still (re-learns the gyro's zero offset)
-    this.status = gyroSupported() ? 'Not connected' : 'Not supported in this browser (needs Chrome, Edge or the desktop app)';
+    this.status = gyroSupported() ? 'Not connected' : (typeof window !== 'undefined' && window.isSecureContext === false ? 'Needs a secure page (https:// or localhost)' : 'Not supported in this browser (needs Chrome, Edge or the desktop app)');
     this.onStatus = null; // set by the settings screen to refresh itself
     this._report = (e) => this.report(e);
     if (gyroSupported()) {
@@ -53,7 +53,9 @@ export class GyroPad {
     if (!gyroSupported()) return;
     try {
       for (const d of await navigator.hid.getDevices()) if (this.isPad(d) && !this.dev) await this.attach(d);
-    } catch { /* not allowed here */ }
+    } catch (err) {
+      if (err && /permissions? policy/i.test(err.message || '')) this.setStatus('Blocked by the page hosting the game (it has to allow "hid")');
+    }
   }
 
   // the CONNECT button: the browser's own picker (needs a real click, not a controller press)
@@ -62,9 +64,14 @@ export class GyroPad {
     try {
       const picked = await navigator.hid.requestDevice({ filters: FILTERS });
       for (const d of picked) if (this.isPad(d)) await this.attach(d);
-      if (!picked.length && !this.dev) this.setStatus('No controller chosen');
+      if (!picked.length && !this.dev) this.setStatus('No PlayStation controller found');
     } catch (err) {
-      if (!this.dev) this.setStatus(err && err.name === 'SecurityError' ? 'Click the button with the mouse (a controller press is not allowed to ask)' : `Could not connect (${(err && err.message) || err})`);
+      if (!this.dev) {
+        const msg = (err && err.message) || String(err);
+        this.setStatus(/permissions? policy/i.test(msg) ? 'Blocked by the page hosting the game (it has to allow "hid")'
+          : err && err.name === 'SecurityError' ? 'Click the button with the mouse (a controller press is not allowed to ask)'
+            : `Could not connect (${msg})`);
+      }
     }
     return this.status;
   }
@@ -87,7 +94,7 @@ export class GyroPad {
       this.setStatus(`${d.productName || (this.model === 'ds5' ? 'DualSense' : 'DualShock 4')}: waiting for motion data`);
     } catch (err) {
       this.dev = null;
-      this.setStatus(`Could not open the controller (${(err && err.message) || err}). Close anything else using it.`);
+      this.setStatus(`Could not open the controller (${(err && err.message) || err}). Close other apps using it (Steam, DS4Windows); on Linux it also needs a udev rule (see the README).`);
     }
   }
 
@@ -119,8 +126,9 @@ export class GyroPad {
     if (this.model === 'ds5') off = id === 0x31 ? 16 : id === 0x01 ? 15 : -1;
     else off = id === 0x11 ? 14 : id === 0x01 ? 12 : -1;
     if (off < 0 || d.byteLength < off + 6 || (id === 0x01 && d.byteLength < 24)) return; // (short Bluetooth report: no motion)
-    const t = performance.now();
-    const dt = this.lastT ? Math.min(0.05, Math.max(0, (t - this.lastT) / 1000)) : 0;
+    // (the time the browser received it, not when this handler got to run: reports queued behind a stalled frame still count)
+    const t = typeof e.timeStamp === 'number' && e.timeStamp > 0 ? e.timeStamp : performance.now();
+    const dt = this.lastT ? Math.min(STALE, Math.max(0, (t - this.lastT) / 1000)) : 0;
     this.lastT = t;
     const tr = id === 0x01 ? 'USB' : 'Bluetooth';
     if (tr !== this.transport) { this.transport = tr; this.setStatus(`${this.dev && this.dev.productName ? this.dev.productName : 'PlayStation controller'}: connected (${tr})`); }
@@ -142,7 +150,7 @@ export class GyroPad {
     }
   }
 
-  live() { return !!this.dev && this.lastT > 0 && (performance.now() - this.lastT) / 1000 < STALE; }
+  live() { return !!this.dev && this.lastT > 0 && (performance.now() - this.lastT) / 1000 < STALE; } // (lastT is an event timestamp: the same clock as performance.now())
 
   // Circle went down: how the pad is held now is neutral
   begin() { this.theta.x = 0; this.theta.z = 0; this.on = true; }
