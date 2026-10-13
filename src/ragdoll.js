@@ -8,13 +8,14 @@ import { PHYS } from './config.js';
 // tumble axis, the spin and every limb's kick are random, and what the body hits decides the rest.
 // The model is then posed from the particles: the whole runner is rigidly fitted to the torso cage
 // and each limb pivot aims at its particle. The player's own body keeps its momentum and its
-// controls: the ragdoll is kept over it (a tether on the sideways drift) so the two never part.
-// When it has settled it gets back up, blending into the normal pose.
+// controls: the player's body is carried by the ragdoll (sync): the camera follows it, and the
+// player ends up wherever it comes to rest. It runs until everything has stopped moving, then gets
+// back up, blending into the normal pose.
 
 const PEL = 0, CHE = 1, HED = 2, SHL = 3, SHR = 4, HPL = 5, HPR = 6, HNL = 7, HNR = 8, FTL = 9, FTR = 10;
 const RAD = [0.28, 0.28, 0.26, 0.2, 0.2, 0.22, 0.22, 0.16, 0.16, 0.18, 0.18]; // (how thick each part is)
-const STEP = 1 / 90, ITER = 6, GRAV = 1.5; // (x the game's gravity: a fall should read as a fall)
-const TETHER = 8; // per second
+const STEP = 1 / 120, ITER = 6, GRAV = 1.5; // (x the game's gravity: a fall should read as a fall)
+const MAXV = 140; // m/s: nothing flies off faster than this
 const GETUP = 0.55;
 
 // [a, b, kind]: 0 rigid, -1 no closer than k x rest (min)
@@ -143,17 +144,13 @@ export class Ragdoll {
 
   simulate(h) {
     const p = this.p, prev = this.prev;
-    const b = this.b;
     for (let i = 0; i < p.length; i++) {
       _vel.subVectors(p[i], prev[i]).multiplyScalar(0.996);
+      if (_vel.length() > MAXV * h) _vel.setLength(MAXV * h);
       prev[i].copy(p[i]);
       const len = p[i].length() || 1;
       p[i].add(_vel).addScaledVector(p[i], -this.G * h * h / len);
     }
-    // the tether: the sideways drift towards the player's body (it moves the whole figure, not its spin)
-    _sh.copy(b.pos).addScaledVector(b.up, 0.9).sub(p[PEL]);
-    _sh.addScaledVector(b.up, -_sh.dot(b.up)).multiplyScalar(Math.min(1, TETHER * h));
-    for (let i = 0; i < p.length; i++) { p[i].add(_sh); prev[i].add(_sh); }
     for (let it = 0; it < ITER; it++) {
       for (const [a, c, d] of this.rigid) {
         _d.subVectors(p[c], p[a]);
@@ -170,8 +167,26 @@ export class Ragdoll {
       }
       for (let i = 0; i < p.length; i++) this.collide(i, it === ITER - 1);
     }
-    // settled? (the pelvis has nearly stopped)
-    this.calm = _vel.subVectors(p[PEL], prev[PEL]).length() / h < 4 ? this.calm + h : 0;
+    // settled? (the trunk and head have all but stopped)
+    let fast = 0;
+    for (const i of [PEL, CHE, HED]) fast = Math.max(fast, _vel.subVectors(p[i], prev[i]).length() / h);
+    this.calm = fast < 0.7 ? this.calm + h : 0;
+  }
+
+  // The player's body goes where the ragdoll goes: the pelvis, brought down to the feet's level
+  // while it's in the air and to the ground once it's lying. Called after update().
+  sync(dt) {
+    const b = this.b, pel = this.p[PEL];
+    if (this.getUp >= 0) { b.vel.set(0, 0, 0); return; } // (settled: stay put and stand up here)
+    b.up.copy(pel).normalize();
+    const sr = this.g.planet.surface(pel, _n);
+    const h = Math.max(0, pel.length() - sr);
+    b.pos.copy(pel).addScaledVector(b.up, -Math.min(0.95, h));
+    b.vel.subVectors(pel, this.prev[PEL]).multiplyScalar(1 / STEP);
+    b.groundN.copy(_n);
+    b.grounded = h < 0.7;
+    b.airTime = b.grounded ? 0 : b.airTime + dt;
+    b.skating = false; b.thrusting = false;
   }
 
   // false when it's done and the runner is back on their feet
@@ -185,9 +200,9 @@ export class Ragdoll {
     this.limbs.forEach((o, i) => st.q[i].copy(o.quaternion));
     this.t += dt;
     if (this.getUp < 0) {
-      this.acc = Math.min(this.acc + dt, STEP * 6);
+      this.acc = Math.min(this.acc + dt, STEP * 8);
       while (this.acc >= STEP) { this.simulate(STEP); this.acc -= STEP; }
-      if ((this.calm > 0.6 && this.t > 1.1) || this.t > 2.8) this.getUp = 0;
+      if ((this.calm > 0.5 && this.t > 0.6) || this.t > 14) this.getUp = 0; // (the cap is only a safety net)
     } else this.getUp += dt / GETUP;
 
     // pose: fit the whole runner to the torso cage, then aim each limb at its particle

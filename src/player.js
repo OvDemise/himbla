@@ -259,6 +259,16 @@ export class Player {
       return;
     }
 
+    // ragdolling: the ragdoll (ragdoll.js) carries your body until it comes to rest; no skater physics
+    if (this.rag) {
+      b.jumped = false;
+      this.updateWeapons(dt, input, cam);
+      this.center.copy(b.pos).addScaledVector(b.up, 1.3);
+      this.animate(dt, cam, ctrl);
+      if (this.rag) this.rag.sync(dt);
+      return;
+    }
+
     const wasGrounded = b.grounded;
     const airBefore = b.airTime;
     b.jumped = false;
@@ -527,8 +537,7 @@ export class Player {
       m.armL.rotation.z = -0.15; m.armR.rotation.z = 0.15;
     }
     if (this.rag) {
-      if (this.rag.update(dt)) { if (b.grounded) b.vel.multiplyScalar(Math.exp(-1 * dt)); } // (tumbling scrubs off speed)
-      else { this.rag.release(); this.rag = null; }
+      if (!this.rag.update(dt)) { this.rag.release(); this.rag = null; }
     }
     // physics scarf: hangs at rest, streams with speed, drapes over whatever is on your back
     if (!this.scarfSim) this.scarfSim = new ScarfSim(m);
