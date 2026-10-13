@@ -120,7 +120,7 @@ back. Prompts show the pad's buttons while it's in use.
 | `LT` · `RT` | Thrusters (Rail Lance: scope) · fire |
 | `L3` · `R3` | Thrusters · scoop into the jar |
 | D-pad ← → · ↑ | Previous / next weapon · next power |
-| D-pad ↓ (tap · hold) | Use the quick slot · pick what it is (← → or keep holding): empty jar, wardrobe, reputation log, pen link, Teleporter, help, music |
+| D-pad ↓ (tap) · right stick · `A` / `B` | Open the radial menu (tap again to close): vehicles, wardrobe, reputation log, music, help, empty jar, pen link, Teleporter · pick a wedge (it glows like the minimap: white in the light, purple on the dark side) · use it / cancel |
 | `View` (tap · hold) · `Start` | Globe map · emergency recall · pause |
 
 In menus, dialogs, the board, the wardrobe and the casino, the d-pad (or left stick) moves a

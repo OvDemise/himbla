@@ -40,9 +40,10 @@
 //                                               DUCK DERBY
 //                                               left stick / d-pad  pick a duck   A  race · new race
 //                                               LB / RB     lower / raise the bet   B  stand up
-//   d-pad ↓      the quick slot: tap to use it, or hold it and press LB / RB to pick what it is
-//                (previous / next): empty the jar, wardrobe, reputation log, pen
-//                link, Teleporter, help, music. The chip under the power chip shows which.
+//   d-pad ↓      the radial menu (tap to open, tap again to close): vehicles, wardrobe, reputation log,
+//                music, help, empty the jar, pen link, Teleporter. The right stick picks a wedge (the
+//                highlight glows like the minimap: purple on the dark side, white in the light), A or
+//                d-pad ↓ again uses it, B / Start cancels.
 import { WEAPONS, weaponUnlocked } from './weapons.js';
 import { Glyphs, glyphState, glyphHtml } from './glyphs.js';
 
@@ -51,17 +52,18 @@ const AIM_SHOW = 10; // seconds the crosshair stays up after the last shot
 const B = { A: 0, B: 1, X: 2, Y: 3, LB: 4, RB: 5, LT: 6, RT: 7, VIEW: 8, START: 9, L3: 10, R3: 11, UP: 12, DOWN: 13, LEFT: 14, RIGHT: 15 };
 // buttons held straight onto default key codes in play
 const HOLD = { [B.A]: 'ShiftLeft', [B.B]: 'KeyQ', [B.X]: 'KeyF', [B.Y]: 'KeyV', [B.LB]: 'Space', [B.RB]: 'KeyZ', [B.L3]: 'KeyE', [B.R3]: 'KeyG' };
-// the quick slot on d-pad down: everything that has no button of its own (has: is it yours yet)
-const QUICK = [
-  { code: 'KeyX', name: 'EMPTY JAR', has: (g) => (g.upgrades.jar || 0) > 0 },
+// the radial menu on d-pad down: everything that has no button of its own, clockwise from the top.
+// `has`: is it yours yet (the wedge stays in place, dimmed, until it is); `code`: the key it presses
+const RADIAL = [
+  { id: 'vehicles', name: 'VEHICLES', has: (g) => g.garage && g.garage.owned().length > 0 },
   { code: 'KeyC', name: 'WARDROBE' },
-  { code: 'KeyJ', name: 'REPUTATION LOG' },
+  { code: 'KeyJ', name: 'REP LOG' },
+  { code: 'KeyN', name: 'MUSIC', state: (g) => (g.audio.musicOn === false ? 'OFF' : 'ON') },
+  { code: 'KeyH', name: 'HELP' },
+  { code: 'KeyX', name: 'EMPTY JAR', has: (g) => (g.upgrades.jar || 0) > 0 },
   { code: 'KeyP', name: 'PEN LINK', has: (g) => (g.upgrades.penlink || 0) > 0 },
   { code: 'KeyT', name: 'TELEPORTER', has: (g) => g.story && g.story.tech.includes('teleport') },
-  { code: 'KeyH', name: 'HELP' },
-  { code: 'KeyN', name: 'MUSIC ON / OFF' },
 ];
-const QUICK_KEY = 'mr-pad-quick';
 // the panels a highlight can work in, topmost first
 const UI_ROOTS = ['settings', 'dialog', 'board', 'replog', 'wardrobe', 'casino', 'help', 'pause', 'death', 'globe-wrap'];
 const FOCUSABLE = 'button, [data-i], [data-k], [data-f], [data-tab], a[href], input, select, .wd-tile, [role="button"]';
@@ -84,9 +86,7 @@ export class Gamepad {
     this.navDir = null;
     this.focus = null;
     this.aimT = AIM_SHOW; // seconds since the last shot (starts faded out)
-    this.held = false; // d-pad down is down (the bumpers now pick the quick slot)
-    this.bumpMask = {}; // bumpers that picked it and are still down: not a skate / power press
-    try { this.quick = localStorage.getItem(QUICK_KEY) || 'KeyX'; } catch { this.quick = 'KeyX'; }
+    this.radial = null; // the open radial menu: { sel } (null while closed)
     this.input.padMove = { x: 0, y: 0, on: false };
     this.kind = 'xbox';
     this.glyphs = new Glyphs();
@@ -105,7 +105,7 @@ export class Gamepad {
     I.padActive = on;
     document.body.classList.toggle('pad-on', on);
     if (on) this.game.hud.show('clickhint', false);
-    else { this.clearFocus(); this.hideCursor(); this.releaseAll(); I.padMove.on = false; }
+    else { this.clearFocus(); this.hideCursor(); this.closeRadial(); this.releaseAll(); I.padMove.on = false; }
     // key names across the UI become this pad's buttons (and back), and so do the help tables
     this.glyphs.set(on, this.kind);
     const s = this.game.settings;
@@ -144,6 +144,7 @@ export class Gamepad {
     const st = g.state;
     if (st === 'play' && !menu && !(g.settings && g.settings.open)) this.devCombo(pressed, dt);
     const setOpen = g.settings && g.settings.open;
+    if (this.radial && (st !== 'play' || menu || setOpen)) this.closeRadial(); // (a dialog or screen opened over it)
     const roul = st === 'casino' && !g.casino.mode && g.casino.tab === 'roulette' && !setOpen && !menu;
     if (!roul) this.hideCursor();
     if (setOpen) this.ui(btn, pressed, lx, ly, ry, dt); // settings sit over the title / pause card: they get the highlight
@@ -191,63 +192,96 @@ export class Gamepad {
     // sticks: analog movement (and WASD past halfway, for vehicles, tricks and anything reading keys)
     I.padMove.x = lx; I.padMove.y = ly; I.padMove.on = !!(lx || ly);
     this.set('KeyW', ly < -0.45); this.set('KeyS', ly > 0.45); this.set('KeyA', lx < -0.45); this.set('KeyD', lx > 0.45);
-    this.look(rx, ry, dt);
-    for (const i of [B.LB, B.RB]) if (!btn[i]) this.bumpMask[i] = false;
-    for (const [i, code] of Object.entries(HOLD)) this.set(code, btn[i] && !((i == B.LB || i == B.RB) && (btn[B.DOWN] || this.bumpMask[i])));
+    // (the right stick picks a wedge while the radial menu is open, so it doesn't look round; A and B
+    // are the radial's own buttons then, and aren't a jump or a trick)
+    if (!this.radial) this.look(rx, ry, dt);
+    for (const [i, code] of Object.entries(HOLD)) this.set(code, btn[i] && !(this.radial && (i == B.A || i == B.B)));
     I.mouse[0] = trig(B.RT) > 0.35;
     I.mouse[2] = trig(B.LT) > 0.35;
-    // (left/right are the weapons; with d-pad down held the bumpers pick the quick slot instead)
-    if (pressed(B.LEFT) && !btn[B.DOWN]) this.cycleWeapon(-1);
-    if (pressed(B.RIGHT) && !btn[B.DOWN]) this.cycleWeapon(1);
+    if (pressed(B.LEFT)) this.cycleWeapon(-1);
+    if (pressed(B.RIGHT)) this.cycleWeapon(1);
     if (pressed(B.UP)) I.wheelSteps += 1;
     // View: a tap opens the map, holding it is the emergency recall (R, held)
     if (btn[B.VIEW]) { this.viewT = this.viewT < 0 ? 0 : this.viewT + dt; this.set('KeyR', this.viewT > 0.35); }
     else if (this.viewT >= 0) { if (this.viewT <= 0.35) this.tap('KeyM'); this.set('KeyR', false); this.viewT = -1; }
-    this.quickSlot(btn, pressed, dt);
-    if (pressed(B.START)) this.pause();
+    const wasOpen = !!this.radial; // (Start cancels the wheel without also pausing)
+    this.radialMenu(btn, pressed, rx, ry);
+    if (pressed(B.START) && !wasOpen) this.pause();
   }
 
-  // d-pad down: tap = use the quick slot; hold it and press LB / RB to pick which one (previous / next)
-  quickSlot(btn, pressed) {
+  // d-pad down: tap to open the radial menu, tap again to use the highlighted wedge (or just close it
+  // if none is picked). The right stick picks (the pick stays until you pick another), A uses it,
+  // B / Start cancels.
+  radialMenu(btn, pressed, rx, ry) {
     const g = this.game;
-    const list = QUICK.filter((q) => !q.has || q.has(g));
-    let i = Math.max(0, list.findIndex((q) => q.code === this.quick));
-    if (btn[B.DOWN]) {
-      this.held = true;
-      const step = pressed(B.LB) ? -1 : pressed(B.RB) ? 1 : 0;
-      if (step) {
-        this.picking = true; // (picked something: letting go of d-pad down won't also use it)
-        this.bumpMask[step < 0 ? B.LB : B.RB] = true; // (and the bumper that picked it isn't a skate / power press)
-        i = (i + step + list.length) % list.length;
-        this.quick = list[i].code;
-        try { localStorage.setItem(QUICK_KEY, this.quick); } catch { /* unavailable */ }
-        if (g.audio && g.audio.tone) g.audio.tone(760, 0.04, 'square', 0.04);
-      }
-    } else if (this.held) {
-      // let go: a quick tap uses it; after picking, it just stays picked
-      if (!this.picking && list[i]) this.pulse(list[i].code);
-      this.held = false;
-      this.picking = false;
+    if (!this.radial) {
+      if (pressed(B.DOWN)) this.openRadial();
+      return;
     }
-    this.drawQuick(list, i);
+    const R = this.radial;
+    if (Math.hypot(rx, ry) > 0.55) {
+      const n = RADIAL.length;
+      const a = Math.atan2(rx, -ry); // 0 at the top, clockwise
+      const sel = ((Math.round((a / (Math.PI * 2)) * n) % n) + n) % n;
+      if (sel !== R.sel) {
+        R.sel = sel;
+        if (g.audio && g.audio.tone) g.audio.tone(700 + sel * 40, 0.04, 'square', 0.04);
+      }
+    }
+    if (pressed(B.B) || pressed(B.START)) { this.closeRadial(); return; }
+    if (pressed(B.A) || pressed(B.DOWN)) {
+      const q = R.sel >= 0 ? RADIAL[R.sel] : null;
+      if (q && q.has && !q.has(g)) { if (g.audio && g.audio.tone) g.audio.tone(180, 0.1, 'sawtooth', 0.05); return; } // (not yours yet: stays open)
+      this.closeRadial();
+      if (q) this.useRadial(q);
+      return;
+    }
+    this.drawRadial();
   }
 
-  // the chip: which feature d-pad down does (and, while it's held, the bumpers that change it)
-  drawQuick(list, i) {
-    let el = document.getElementById('padquick');
+  useRadial(q) {
+    const g = this.game;
+    if (q.id === 'vehicles') g.garage.pick();
+    else this.pulse(q.code);
+  }
+
+  openRadial() {
+    this.radial = { sel: -1 };
+    this.drawRadial(true);
+    if (this.game.audio && this.game.audio.tone) this.game.audio.tone(520, 0.08, 'triangle', 0.12);
+  }
+
+  closeRadial() {
+    this.radial = null;
+    const el = document.getElementById('padradial');
+    if (el) el.classList.add('hidden');
+  }
+
+  // the wheel: built once per opening, then only the highlight moves
+  drawRadial(build) {
+    const g = this.game, R = this.radial;
+    let el = document.getElementById('padradial');
     if (!el) {
       el = document.createElement('div');
-      el.id = 'padquick';
-      el.className = 'chip';
-      const p = document.getElementById('powerchip') || document.getElementById('weaponchip');
-      if (p) p.after(el); else document.getElementById('hud').appendChild(el);
+      el.id = 'padradial';
+      document.getElementById('hud').appendChild(el);
+      build = true;
     }
-    const cur = list[i] ? list[i].name : '—';
-    const html = this.held
-      ? `${glyphHtml(['LB'])} <span class="pq-on">${cur}</span> ${glyphHtml(['RB'])} <small>${i + 1}/${list.length}</small>`
-      : `<b>↓</b> ${cur}`;
-    if (el.innerHTML !== html) el.innerHTML = html;
-    el.classList.toggle('picking', !!this.held);
+    if (build) {
+      const n = RADIAL.length;
+      el.innerHTML = '<div class="pr-ring"></div><div class="pr-hub"></div>' + RADIAL.map((q, i) => {
+        const a = (i / n) * Math.PI * 2 - Math.PI / 2;
+        const locked = q.has && !q.has(g);
+        const st = q.state ? ` <small>${q.state(g)}</small>` : '';
+        return `<div class="pr-item${locked ? ' locked' : ''}" data-i="${i}" style="left:${50 + Math.cos(a) * 36}%;top:${50 + Math.sin(a) * 36}%"><b>${q.name}</b>${locked ? '<small>LOCKED</small>' : st}</div>`;
+      }).join('');
+      el.classList.remove('hidden');
+    }
+    el.querySelectorAll('.pr-item').forEach((it) => it.classList.toggle('on', +it.dataset.i === R.sel));
+    const q = R.sel >= 0 ? RADIAL[R.sel] : null;
+    const hub = `${q ? `<b>${q.name}</b>` : 'MENU'}<small>${glyphHtml(['RS'])} pick · ${glyphHtml(['A'])} use · ${glyphHtml(['B'])} cancel</small>`;
+    const h = el.querySelector('.pr-hub');
+    if (h.innerHTML !== hub) h.innerHTML = hub;
   }
   // a key held for a couple of frames (some actions read it held, some on the press)
   pulse(code) {
