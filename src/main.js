@@ -1175,7 +1175,7 @@ class Game {
       if (isDark) this.hud.alert('☾ ENTERING THE DARK SIDE ☾', '#3a2b6f', 3.5);
       else this.hud.alert('☀ BACK IN THE LIGHT', '#ff9f1c', 2.5);
     }
-    document.getElementById('darkchip').classList.toggle('hidden', !isDark);
+    document.getElementById('minimap').classList.toggle('dark', isDark); // (the minimap glows purple on the dark side, faint white in the light)
   }
 
   updatePlay(dt) {
