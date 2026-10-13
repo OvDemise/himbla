@@ -1398,7 +1398,7 @@ class Game {
     const want = target.clone().addScaledVector(place, -c.dist).addScaledVector(up, scoped ? 0 : 0.8 + (sv ? sv.camHeight : 0)); // settings
     if (sv && sv.shoulder && !scoped) want.addScaledVector(c.right, sv.shoulder); // settings
     // Rail Lance scope: first-person, narrow field of view, runner hidden
-    if (!P.dead && this.state !== 'cutscene') P.model.root.visible = c.dist > 1.2 && !(P.seat && P.seat.hidden);
+    if (!P.dead && this.state !== 'cutscene') P.model.root.visible = c.dist > 1.2 && !(P.seat && P.seat.hidden) && !(P.vehicle && P.vehicle.def.hideRider); // (hideRider: crewed inside, like the BTR-M)
     const scopeEl = document.getElementById('scope');
     if (scopeEl) scopeEl.classList.toggle('hidden', !scoped || c.dist > 1.2);
     const alt = this.planet.altitude(want);

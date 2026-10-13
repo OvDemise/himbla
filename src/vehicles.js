@@ -8,7 +8,7 @@ import { toon, glow, ink } from './toon.js';
 // Faction vehicles unlocked through the story. V calls yours in (or hops out).
 export const VEHICLES = {
   interceptor: { hp: 220, name: 'SPACECOM Lunar Interceptor', faction: 'spacecom', max: 88, engine: 38, turn: 2.6, grip: 12, armor: 0.75, color: 0xfff4e0, trim: 0xffd23f, desc: 'Fast, nimble, lightly armoured.' },
-  apc: { hp: 480, name: 'Vostok BTR-M Moon APC', faction: 'vostok', max: 62, engine: 24, turn: 1.9, grip: 18, armor: 0.4, color: 0x6b6f78, trim: 0xff3b5c, scale: 1.35, desc: 'Slow tank of a thing. Shrugs off fire.' },
+  apc: { hp: 480, name: 'Vostok BTR-M Moon APC', faction: 'vostok', max: 62, engine: 24, turn: 1.9, grip: 18, armor: 0.4, color: 0x6b6f78, trim: 0xff3b5c, scale: 1.35, hideRider: true, desc: 'Slow tank of a thing. Shrugs off fire.' },
   skimmer: { hp: 180, name: 'Daedalus Phase Skimmer', faction: 'daedalus', max: 100, engine: 34, turn: 2.2, grip: 4, armor: 0.85, color: 0x1a1426, trim: 0xc77dff, hover: true, desc: 'Hovers. Drifts. Terrifyingly fast.' },
   mule: { hp: 300, name: 'Kepler Homestead Mule', faction: 'kepler', max: 58, engine: 26, turn: 2.2, grip: 16, armor: 0.6, color: 0x6a8f3a, trim: 0xff9f1c, scale: 1.2, cargoSafe: true, desc: 'Hauler. Cargo rides in a padded bed and takes no jostle damage.' },
   // (id stays 'van' so existing saves keep it: it's a light-bike now)
@@ -103,7 +103,7 @@ export class Garage {
     const seat = new THREE.Mesh(new THREE.BoxGeometry(1, 1.2, 0.3), toon(0x221d33));
     ink(seat, 0.04);
     seat.position.set(0, 2.4, -0.6);
-    m.root.add(seat);
+    if (!def.hideRider) m.root.add(seat);
     return m;
   }
 
