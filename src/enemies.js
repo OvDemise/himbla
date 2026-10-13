@@ -430,6 +430,8 @@ export class Enemies {
   }
 
   // roaming hunters alive (the roaming pool), and den guards alive (the den pool)
+  maxRoamers() { return MAX_ROAMERS; }
+  maxDen() { return MAX_DEN; }
   roamCount() { return this.hunters(); }
   denFull(extra = 0) { return this.denCount() + extra > MAX_DEN; }
   denCount() { return this.list.filter((e) => e.faction === 'pirate' && e.home && e.kind !== 'core' && !e.dead).length; }
@@ -655,7 +657,9 @@ export class Enemies {
     const home = this.shelterAt(P.pos);
     // (and none at all once SPACECOM has dismantled the clans)
     const storyFight = g.story && g.story.engaged(); // (a chapter's objective is close: its own enemies only)
-    if (!P.dead && !inSafe && !riding && !home && !aligned && !FACTIONS.rustmoon.gone && !storyFight && !(g.tutorial && g.tutorial.quiet())) {
+    const squadsOn = !P.dead && !inSafe && !riding && !home && !aligned && !FACTIONS.rustmoon.gone && !storyFight && !(g.tutorial && g.tutorial.quiet());
+    this.dbg = { squadsOn, carrying: !!carrying, dark: dark > 0.5, why: P.dead ? 'dead' : inSafe ? 'safe zone' : riding ? 'on a ship' : home ? 'sheltered' : aligned ? 'riding with Rustmoon' : FACTIONS.rustmoon.gone ? 'clans gone' : storyFight ? 'story fight' : 'tutorial' }; // (dev overlay)
+    if (squadsOn) {
       if (carrying) {
         this.pirateTimer -= dt * (1 + dark) * blood;
         if (this.pirateTimer <= 0) {

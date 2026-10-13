@@ -16,6 +16,7 @@ export class Cheats {
     this.game = game;
     this.god = false; // unlimited health
     this.infJet = false; // unlimited jet (thruster energy)
+    this.spawnDebug = false; // bottom-right pirate counts + spawn timers overlay
     this.speed = 1; // player speed multiplier, 1 to 10 (player.js)
     // once the dev menu has been opened (F8 / controller combo) it gets a button on the pause card, remembered across launches
     try { this.unlocked = localStorage.getItem(DEV_KEY) === '1'; } catch { this.unlocked = false; }
@@ -40,8 +41,9 @@ export class Cheats {
       { label: `2 · UNLIMITED HEALTH: ${this.god ? 'ON' : 'OFF'}`, fn: () => { this.god = !this.god; this.tick(); this.dev(); } },
       { label: this.speedLabel(), fn: () => { this.setSpeed(this.speed >= 10 ? 1 : this.speed + 1); this.dev(); } },
       { label: '4 · TELEPORT TO RUSTMOON HOLD', fn: () => { const l = g.locations.find((x) => x.id === 'rustmoon'); if (l) this.teleport(l); } },
-      { label: '5 · FULL CHEAT MENU…', fn: () => this.open() },
-      { label: '6 · CLOSE' },
+      { label: `5 · PIRATE SPAWN DEBUG: ${this.spawnDebug ? 'ON' : 'OFF'}`, fn: () => { this.spawnDebug = !this.spawnDebug; this.tick(); this.dev(); } },
+      { label: '6 · FULL CHEAT MENU…', fn: () => this.open() },
+      { label: '7 · CLOSE' },
     ]);
     g.dialogButtons.dev = true;
     // the speed row adjusts in place: click / A = +1 (wraps), left / right on a controller (d-pad or stick) = -1 / +1
@@ -63,6 +65,39 @@ export class Cheats {
     const P = this.game.player;
     if (this.infJet) P.body.energy = P.body.maxEnergy;
     if (this.god && !P.dead) P.health = P.maxHealth;
+    this.updateSpawnDebug();
+  }
+
+  // Dev overlay (bottom right): pirates alive per pool and when the next patrol spawn is attempted
+  updateSpawnDebug() {
+    let el = this.dbgEl;
+    if (!this.spawnDebug) { if (el) el.classList.add('hidden'); return; }
+    const E = this.game.enemies;
+    if (!el) {
+      el = this.dbgEl = document.createElement('div');
+      el.id = 'spawn-debug';
+      document.body.appendChild(el);
+    }
+    el.classList.remove('hidden');
+    const d = E.dbg || {};
+    const t = (v) => `${Math.max(0, v).toFixed(1)}s`;
+    const kinds = (list) => `${list.filter((e) => e.kind === 'rover').length} rover · ${list.filter((e) => e.kind !== 'rover').length} skater`;
+    const alive = E.list.filter((e) => e.faction === 'pirate' && e.kind !== 'core' && !e.dead);
+    const roam = alive.filter((e) => !e.home && !e.targetObj);
+    const den = alive.filter((e) => e.home);
+    const raid = alive.filter((e) => !e.home && e.targetObj);
+    const rows = [`<b>PIRATES</b>`,
+      `roaming ${roam.length}/${E.maxRoamers()}  (${kinds(roam)})`,
+      `dens ${den.length}/${E.maxDen()}  (${kinds(den)})`];
+    if (raid.length) rows.push(`event raiders ${raid.length}`);
+    rows.push(`<b>NEXT PATROL</b>`);
+    if (!d.squadsOn) rows.push(`blocked: ${d.why || '?'}`);
+    else {
+      rows.push(`dark side ${d.dark ? t(E.darkTimer) : 'idle (not dark)'}`);
+      rows.push(`cargo run ${d.carrying ? t(E.pirateTimer) : 'idle (no cargo)'}`);
+    }
+    rows.push(`den check ${t(E.lairTimer)}`);
+    el.innerHTML = rows.join('<br>');
   }
 
   open() {
