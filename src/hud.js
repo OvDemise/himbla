@@ -142,6 +142,36 @@ export class HUD {
     this.bannerT = 4;
   }
 
+  // New-event pop-up: slides in from the left under the location banner, holds for 3 s, slides out to
+  // the right. They queue, one at a time.
+  eventPopup(text, color = '#ffd23f') {
+    if (!this.evQ) this.evQ = [];
+    this.evQ.push({ text, color });
+  }
+
+  updateEventPopup(dt) {
+    const el = $('evpop');
+    if (!el) return;
+    if (!this.evCur) {
+      if (!this.evQ || !this.evQ.length) return;
+      this.evCur = this.evQ.shift();
+      this.evT = 0;
+      el.textContent = this.evCur.text;
+      el.style.setProperty('--c', this.evCur.color);
+      el.className = 'pre'; // (parked off the left edge, no transition)
+      el.classList.remove('hidden');
+      void el.offsetWidth;
+      el.className = 'in';
+    }
+    this.evT += dt;
+    // sit just under the location banner while it's up, otherwise where the banner would be
+    const b = $('banner');
+    const top = b && !b.classList.contains('hidden') ? b.getBoundingClientRect().bottom + 10 : window.innerHeight * 0.22;
+    el.style.top = `${Math.round(top)}px`;
+    if (this.evT >= 0.45 + 3 && el.className === 'in') el.className = 'out';
+    if (this.evT >= 0.45 + 3 + 0.5) { el.className = 'hidden'; this.evCur = null; }
+  }
+
   delivered(info) {
     const el = $('result');
     el.className = 'panel result win';
@@ -302,6 +332,7 @@ export class HUD {
     if (this.toastT > 0 && (this.toastT -= dt) <= 0) $('toast').classList.add('hidden');
     if (this.grabT > 0 && (this.grabT -= dt) <= 0) $('grab').classList.add('hidden');
     if (this.bannerT > 0 && (this.bannerT -= dt) <= 0) $('banner').classList.add('hidden');
+    this.updateEventPopup(dt);
     if (this.resultT > 0) { $('result').classList.remove('hidden'); if ((this.resultT -= dt) <= 0) $('result').classList.add('hidden'); }
 
     this.drawSpeedo(P.speed * 3.6);

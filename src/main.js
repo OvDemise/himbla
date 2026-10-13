@@ -662,7 +662,8 @@ class Game {
   style(points, label) {
     // style only pays during a delivery (it pools into the job's bonus); outside one it's just for show
     if (this.missions.active) this.missions.stylePool += points;
-    if (label) this.fx.pop(`${label}! +${points}`, null, { color: '#ff7ad9', size: 44, life: 1.3 });
+    // (and the +points only shows when they count)
+    if (label) this.fx.pop(this.missions.active ? `${label}! +${points}` : `${label}!`, null, { color: '#ff7ad9', size: 44, life: 1.3 });
   }
 
   damagePlayer(amount, cause, from = null) {

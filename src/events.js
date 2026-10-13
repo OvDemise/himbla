@@ -192,7 +192,7 @@ export class Events {
     }
     this.list.push(ev);
     const g = this.game;
-    if (ev.stage.distanceTo(g.player.pos) <= EVENT_RANGE) g.hud.toast(`📡 ${FACTIONS[faction].name.toUpperCase()}: ${ev.title}`, 4); // (a far-off one starts quietly)
+    if (ev.stage.distanceTo(g.player.pos) <= EVENT_RANGE) g.hud.eventPopup(`📡 ${FACTIONS[faction].name.toUpperCase()}: ${ev.title}`, FACTIONS[faction].color); // (a far-off one starts quietly)
     return ev;
   }
 
@@ -316,7 +316,7 @@ export class Events {
     ev.marker = this.marker(pos, 'rustmoon', '✖ SOS');
     ev.marker.add(this.startProp(ev));
     this.list.push(ev);
-    if (pos.distanceTo(g.player.pos) <= EVENT_RANGE) g.hud.toast('📡 WEAK DISTRESS SIGNAL FROM THE DARK SIDE…', 5);
+    if (pos.distanceTo(g.player.pos) <= EVENT_RANGE) g.hud.eventPopup('📡 WEAK DISTRESS SIGNAL FROM THE DARK SIDE…', FACTIONS.rustmoon.color);
     return ev;
   }
 
