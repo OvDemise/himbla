@@ -394,6 +394,10 @@ body:has(#title:not(.hidden)) #hud { visibility: hidden; }
 .pg-b { color: #05030c; background: var(--cyan); border-color: var(--cyan); }
 .pg-y { color: #05030c; background: var(--yellow); border-color: var(--yellow); }
 .pg-p { color: #05030c; background: var(--pink); border-color: var(--pink); }
+/* Xbox art: the picture is the whole button */
+.pg.pg-img, .pgx .pg.pg-img { background: none; border: 0; padding: 0; min-width: 0; width: auto; height: 20px; border-radius: 0; }
+.pg-img img { display: block; height: 100%; width: auto; }
+.pgx .pg.pg-img { height: 18px; }
 /* PlayStation face buttons: a dark button with a coloured symbol, as on the pad */
 .pg.pg-sym { padding: 0; background: var(--ui-bg2); border-color: var(--ui-muted); }
 .pg-sym svg { display: block; width: 10px; height: 10px; }
