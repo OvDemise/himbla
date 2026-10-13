@@ -75,6 +75,10 @@ export const SCHEMA = {
     { key: 'minimap', label: 'Minimap', type: 'toggle', def: true },
     { key: 'hudScale', label: 'HUD scale', type: 'range', min: 0.6, max: 1.4, step: 0.05, def: 1, fmt: pct },
     { key: 'units', label: 'Speed units', type: 'choice', def: 'kmh', options: [['kmh', 'KM/H'], ['ms', 'M/S']] },
+    { key: 'gyro', label: 'PlayStation gyro', type: 'toggle', def: true, hint: 'Hold Circle and tilt the pad: it works like the left stick' },
+    { key: 'gyroRange', label: 'Gyro: tilt for a full push', type: 'range', min: 15, max: 60, step: 5, def: 30, fmt: (v) => `${v}°`, hint: 'Smaller = more sensitive' },
+    { key: 'gyroInvX', label: 'Gyro: flip left / right', type: 'toggle', def: false },
+    { key: 'gyroInvY', label: 'Gyro: flip forward / back', type: 'toggle', def: false },
   ],
   audio: [
     { key: 'master', label: 'Master volume', type: 'range', min: 0, max: 1, step: 0.05, def: 1, fmt: pct },
@@ -107,6 +111,7 @@ const PAD_ROWS = [
   ['Mag-jump / Dive (hold in the air)', ['A']],
   ['Thrusters (hold)', ['LT']],
   ['Tricks (hold in the air)', ['B']],
+  ['PlayStation gyro: tilt like the left stick', ['B', '#+', '#tilt']],
   ['Interact / job board', ['X']],
   ['Scoop into jar', ['R3']],
   ['Vehicle: call / board / leave', ['Y']],
@@ -459,6 +464,9 @@ export class Settings {
     } else if (act === 'bind') {
       this.rebinding = this.rebinding === t.dataset.code ? null : t.dataset.code;
       this.render();
+    } else if (act === 'gyro-connect') {
+      const gy = g && g.pad && g.pad.gyro;
+      if (gy) { gy.onStatus = () => { if (this.open && this.tab === 'gameplay') this.render(); }; gy.request().then(() => this.render()); }
     }
   }
 
@@ -494,6 +502,11 @@ export class Settings {
         }
         return `<div class="set-row"><span class="set-label">${s.label}${s.hint ? `<small>${s.hint}</small>` : ''}</span><span class="set-ctl">${ctl}</span></div>`;
       }).join('');
+      if (this.tab === 'gameplay') {
+        // the gyro is read straight from the pad (WebHID): it may need a one-time CONNECT
+        const gy = this.game && this.game.pad && this.game.pad.gyro;
+        if (gy) body += `<div class="set-row"><span class="set-label">PlayStation controller link<small>${gy.status}</small></span><span class="set-ctl"><button class="set-btn" data-act="gyro-connect">CONNECT</button></span></div>`;
+      }
     }
     this.el.innerHTML = `<div class="panel set-card">
       <h1>SETTINGS</h1>

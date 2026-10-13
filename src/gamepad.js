@@ -46,6 +46,7 @@
 //                d-pad ↓ again uses it, B / Start cancels.
 import { WEAPONS, weaponUnlocked } from './weapons.js';
 import { Glyphs, glyphState, glyphHtml } from './glyphs.js';
+import { GyroPad } from './gyro.js';
 
 const DEAD = 0.18; // stick deadzone (radial)
 const AIM_SHOW = 10; // seconds the crosshair stays up after the last shot
@@ -90,6 +91,10 @@ export class Gamepad {
     this.input.padMove = { x: 0, y: 0, on: false };
     this.kind = 'xbox';
     this.glyphs = new Glyphs();
+    // PlayStation motion sensors (WebHID): while Circle is held, tilting the pad stands in for the left stick
+    this.gyro = new GyroPad();
+    this.gyroOn = false;
+    this.gyro.init();
     window.addEventListener('gamepadconnected', (e) => {
       this.game.hud.toast(`Controller connected: ${(e.gamepad.id || 'gamepad').replace(/\(.*\)/, '').trim().slice(0, 40)}`, 2.5);
     });
@@ -105,7 +110,7 @@ export class Gamepad {
     I.padActive = on;
     document.body.classList.toggle('pad-on', on);
     if (on) this.game.hud.show('clickhint', false);
-    else { this.clearFocus(); this.hideCursor(); this.closeRadial(); this.releaseAll(); I.padMove.on = false; }
+    else { this.clearFocus(); this.hideCursor(); this.closeRadial(); this.releaseAll(); I.padMove.on = false; this.gyroOn = false; this.gyro.end(); }
     // key names across the UI become this pad's buttons (and back), and so do the help tables
     this.glyphs.set(on, this.kind);
     const s = this.game.settings;
@@ -145,6 +150,7 @@ export class Gamepad {
     if (st === 'play' && !menu && !(g.settings && g.settings.open)) this.devCombo(pressed, dt);
     const setOpen = g.settings && g.settings.open;
     if (this.radial && (st !== 'play' || menu || setOpen)) this.closeRadial(); // (a dialog or screen opened over it)
+    if (this.gyroOn && (st !== 'play' || menu || setOpen)) { this.gyroOn = false; this.gyro.end(); }
     const roul = st === 'casino' && !g.casino.mode && g.casino.tab === 'roulette' && !setOpen && !menu;
     if (!roul) this.hideCursor();
     if (setOpen) this.ui(btn, pressed, lx, ly, ry, dt); // settings sit over the title / pause card: they get the highlight
@@ -189,6 +195,14 @@ export class Gamepad {
   play(gp, btn, pressed, released, trig, lx, ly, rx, ry, dt) {
     const g = this.game, I = this.input;
     this.clearFocus();
+    // PlayStation gyro: with Circle held, how far the pad has been turned since Circle went down is added to the
+    // left stick, so the same lines below move you on the ground and flip / spin you in the air
+    const gy = this.gyroStick(btn);
+    if (gy) {
+      lx += gy.x; ly += gy.y;
+      const m = Math.hypot(lx, ly);
+      if (m > 1) { lx /= m; ly /= m; }
+    }
     // sticks: analog movement (and WASD past halfway, for vehicles, tricks and anything reading keys)
     I.padMove.x = lx; I.padMove.y = ly; I.padMove.on = !!(lx || ly);
     this.set('KeyW', ly < -0.45); this.set('KeyS', ly > 0.45); this.set('KeyA', lx < -0.45); this.set('KeyD', lx > 0.45);
@@ -214,6 +228,16 @@ export class Gamepad {
     const wasOpen = !!this.radial; // (Start cancels the wheel without also pausing)
     this.radialMenu(btn, pressed, rx, ry);
     if (pressed(B.START) && !wasOpen) this.pause();
+  }
+
+  // the gyro's virtual stick while Circle is held on a PlayStation pad (null otherwise); starts and stops its tracking on the press
+  gyroStick(btn) {
+    const G = this.gyro, S = this.game.settings;
+    const on = this.kind === 'ps' && G.live() && !(S && S.v.gyro === false) && btn[B.B] && !this.radial && !this.radialMask;
+    if (on !== this.gyroOn) { this.gyroOn = on; if (on) G.begin(); else G.end(); }
+    if (!on) return null;
+    const v = S ? S.v : {};
+    return G.stick(v.gyroRange || 30, 5, !!v.gyroInvX, !!v.gyroInvY);
   }
 
   // d-pad down: tap to open the radial menu, tap again to use the highlighted wedge (or just close it

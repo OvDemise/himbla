@@ -1,5 +1,5 @@
 // Desktop wrapper: runs the built game (dist/) in its own window, no browser needed.
-const { app, BrowserWindow, Menu, shell } = require('electron');
+const { app, BrowserWindow, Menu, shell, session } = require('electron');
 const path = require('path');
 
 // keep the GPU busy rather than throttling when the window loses focus mid-run
@@ -40,6 +40,22 @@ function createWindow() {
   });
 }
 
-app.whenReady().then(createWindow);
+// PlayStation gyro: the game reads the pad's motion sensors over WebHID. Electron shows no device picker, so
+// Sony controllers (vendor 0x054c) are allowed up front; the page then finds them with navigator.hid.getDevices().
+const SONY = 0x054c;
+function allowSonyPads() {
+  const ses = session.defaultSession;
+  ses.setDevicePermissionHandler((details) => details.deviceType === 'hid' && details.device.vendorId === SONY);
+  // (once a check handler exists it answers every permission check, so everything else stays allowed as before)
+  ses.setPermissionCheckHandler(() => true);
+  // a real navigator.hid.requestDevice() call picks the first Sony pad without a chooser
+  ses.on('select-hid-device', (event, details, callback) => {
+    event.preventDefault();
+    const d = details.deviceList.find((x) => x.vendorId === SONY);
+    callback(d ? d.deviceId : '');
+  });
+}
+
+app.whenReady().then(() => { allowSonyPads(); createWindow(); });
 app.on('window-all-closed', () => app.quit());
 app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow(); });
