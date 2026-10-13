@@ -157,14 +157,7 @@ export class SaveSlots {
       const old = L.getItem(slotKey(n));
       if (old && this.read(n)) { try { L.setItem(bakKey(n), old); } catch { /* no room: keep going */ } }
     }
-    try { L.setItem(slotKey(n), JSON.stringify(blob)); return true; } catch { /* quota */ }
-    // too big: highlight photos are the bulk, so drop them from the slot copy and retry
-    try {
-      const data = { ...blob.data };
-      for (const k of Object.keys(data)) if (k.includes('highlights')) delete data[k];
-      L.setItem(slotKey(n), JSON.stringify({ ...blob, data }));
-      return true;
-    } catch { return false; }
+    try { L.setItem(slotKey(n), JSON.stringify(blob)); return true; } catch { return false; /* quota */ }
   }
 
   playTime() { return this.playBase + this.sessionPlay; }

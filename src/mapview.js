@@ -171,12 +171,20 @@ export class GlobeMap {
     let drag = null;
     const cv = this.canvas;
     // (redrawn on the press: back on the mouse, the controller's cursor goes)
-    cv.addEventListener('mousedown', (e) => { drag = { x: e.clientX, y: e.clientY }; cv.style.cursor = 'grabbing'; this.draw(); });
-    window.addEventListener('mouseup', () => { drag = null; cv.style.cursor = 'grab'; });
+    cv.addEventListener('mousedown', (e) => { drag = { x: e.clientX, y: e.clientY, moved: 0 }; cv.style.cursor = 'grabbing'; this.draw(); });
+    window.addEventListener('mouseup', (e) => {
+      // (a press that never turned the globe is a click: the dev menu's map teleport takes it)
+      if (drag && drag.moved < 4 && e.target === cv) {
+        const r = cv.getBoundingClientRect();
+        this.clickAt(((e.clientX - r.left) / r.width) * cv.width, ((e.clientY - r.top) / r.height) * cv.height);
+      }
+      drag = null; cv.style.cursor = 'grab';
+    });
     window.addEventListener('mousemove', (e) => {
       if (!drag) { this.hover(e); return; }
       const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
       drag.x = e.clientX; drag.y = e.clientY;
+      drag.moved += Math.abs(dx) + Math.abs(dy);
       this.spin(dx, dy);
       this.draw();
     });
@@ -210,6 +218,20 @@ export class GlobeMap {
     else this.hover({ clientX: r.left + cur.x * s, clientY: r.top + cur.y * s });
     this.draw();
   }
+
+  // Dev menu's map teleport: a click (or A on the controller cursor) on a location's pin takes you there.
+  clickAt(sx, sy) {
+    const g = this.game;
+    if (!g.cheats.mapTeleport || !this.pins) return false;
+    let best = null, bd = 16;
+    for (const p of this.pins) { if (!p.loc) continue; const d = Math.hypot(p.x - sx, p.y - sy); if (d < bd) { bd = d; best = p; } }
+    if (!best) return false;
+    g.closeModal(false);
+    g.cheats.teleport(best.loc);
+    return true;
+  }
+
+  padClick() { return this.cursor ? this.clickAt(this.cursor.x, this.cursor.y) : false; }
 
   project(v, out) {
     const p = out.copy(v).normalize().applyQuaternion(this.Q);
@@ -368,7 +390,7 @@ export class GlobeMap {
       c.lineWidth = 3; c.strokeStyle = '#120a1e'; c.fillStyle = '#fff';
       c.strokeText(l.short, p.x, p.y - r - 4); c.fillText(l.short, p.x, p.y - r - 4);
       const feats = services(l);
-      this.pins.push({ x: p.x, y: p.y, html: `<b>${l.name}</b><br><span style="color:${f.color}">${f.name}</span>${l.hq ? ' · HQ' : ''}${ruined ? ' · RUINED' : ''}<br>${l.blurb}${feats ? `<br><small style="color:#9be7ff">${feats}</small>` : ''}` });
+      this.pins.push({ loc: l, x: p.x, y: p.y, html: `<b>${l.name}</b><br><span style="color:${f.color}">${f.name}</span>${l.hq ? ' · HQ' : ''}${ruined ? ' · RUINED' : ''}<br>${l.blurb}${feats ? `<br><small style="color:#9be7ff">${feats}</small>` : ''}` });
     }
     // an active meteor shower: a pulsing red zone (shown through the fog: it's a public warning)
     const mw = g.meteors && g.meteors.warning;
@@ -523,7 +545,7 @@ export class GlobeMap {
 
 // What a place offers, for the map tooltip.
 const SPECIAL = {
-  ilmb: 'Repair-bay upgrades · Hall of Highlights',
+  ilmb: 'Repair-bay upgrades',
   meridian: 'Skate finishes',
   antimatter: 'Containment jars · reactor · splice pod · holding pen',
   bounce: 'Skate park · trampolines · bounce domes',

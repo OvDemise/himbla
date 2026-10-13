@@ -375,7 +375,7 @@ export class Alchemy {
   // X: into the reactor if you're beside it, otherwise tip it out. Shift+X always tips it out.
   empty(forceDump = false) {
     const g = this.game;
-    if (!this.jar.length) { g.hud.toast(this.owned ? (this.artifact ? 'Only the alien artifact is left, and its compartment is sealed.' : 'The jar is empty. Scoop something with G.') : 'You don\'t have a jar yet.', 1.8); return; }
+    if (!this.jar.length) { g.hud.toast(this.owned ? (this.artifact ? 'Only the alien artifact is left, and its compartment is sealed.' : 'The jar is empty. Press G to scoop something.') : 'You don\'t have a jar yet.', 1.8); return; }
     const lab = g.world.lab;
     if (!forceDump && lab && g.player.pos.distanceTo(lab.reactor) < 11) this.feedReactor();
     else this.dump();
@@ -499,7 +499,6 @@ export class Alchemy {
     P.body.sinceContact = 1;
     g.style(120, 'SINGULARITY');
     g.addCredits(300, 'Data');
-    g.actionPanel('launch', null, 'THE REACTOR SAID NO.');
     return { title: 'SINGULARITY!', text: '"Three different things at once?! The containment field folded in half and spat you through the roof. Magnificent. Here is your share of the data."' };
   }
 
@@ -1054,7 +1053,6 @@ const RECIPES = {
     const g = this.game;
     g.fx.explosion(g.world.lab.reactor.clone().addScaledVector(g.player.up, 14), 8, true);
     g.addCredits(150, 'Orbital car');
-    g.actionPanel('launch', null, 'THAT CAR IS IN ORBIT NOW.');
     return { title: 'ORBITAL HOVER-CAR', text: '"The hover-car went straight up through the roof and is now orbiting the Moon. Somebody\'s commute just got a lot longer. Here, hush money."' };
   },
   pirate(names) {

@@ -37,7 +37,7 @@ pitch black, lit only by your helmet lamp, and full of pirate dens.
 Grab the latest build from the repo's **Releases** page:
 - **Windows:** `Moon-Runner-…-windows-portable.exe` — double-click to play (SmartScreen may warn because the
   build isn't code-signed: *More info → Run anyway*). Or the `win-x64.zip` — unzip, run `Moon-Runner.exe`.
-- **Linux:** `…-linux-x86_64.AppImage` — `chmod +x`, then run it.
+- **Linux:** `…-linux-x86_64.AppImage` — `chmod +x`, then run it. (For the PlayStation gyro the pad's `/dev/hidraw*` node has to be readable: Steam's `steam-devices` udev rules do it, or add `KERNEL=="hidraw*", ATTRS{idVendor}=="054c", MODE="0660", TAG+="uaccess"` to a file in `/etc/udev/rules.d/`.)
 - **macOS:** `…-mac-universal.zip` — unzip, right-click the app → Open (if it says "damaged", run
   `xattr -cr Moon-Runner.app` once; the build isn't notarized).
 
@@ -120,7 +120,8 @@ back. Prompts show the pad's buttons while it's in use.
 | `LT` · `RT` | Thrusters (Rail Lance: scope) · fire |
 | `L3` · `R3` | Thrusters · scoop into the jar |
 | D-pad ← → · ↑ | Previous / next weapon · next power |
-| D-pad ↓ (tap · hold) | Use the quick slot · pick what it is (← → or keep holding): empty jar, wardrobe, reputation log, pen link, Teleporter, help, music |
+| D-pad ↓ (tap) · right stick · `A` / `B` | Open the radial menu (tap again to use the highlighted wedge, or to close it if none is picked): vehicles, wardrobe, reputation log, music, help, empty jar, pen link, Teleporter · pick a wedge (it glows like the minimap: white in the light, purple on the dark side) · use it / cancel |
+| `Circle` held + tilt the pad (PlayStation) | **Gyro:** how far you turn the pad since Circle went down acts like the left stick: pitch it forward / back and turn it like a steering wheel to move on the ground, or to flip and spin in the air. Settings → Gameplay: on / off, how far is a full push, flip either axis |
 | `View` (tap · hold) · `Start` | Globe map · emergency recall · pause |
 
 In menus, dialogs, the board, the wardrobe and the casino, the d-pad (or left stick) moves a
@@ -176,9 +177,6 @@ restricted military zones work (their turrets open fire without clearance). Afte
   have solid decks: land on one and it carries you along, then launch off it. Land
   crooked and you **WIPE OUT**: you take damage, lose speed and the cargo gets jostled. Without
   an active contract, style pays out half its value in credits straight away.
-- **Hall of Highlights:** big launches, trick landings, thefts and deliveries are snapped by the
-  action-panel camera, run through the comic post-process, and shown on the bottom screen of the ILMB job
-  terminal. They're saved in `localStorage`.
 - **Job boards** are terminals: status screens (credits, standing, uplink), then a contracts screen and a gear
   screen. At the ILMB the board stands in the plaza as a kiosk of screens under a canopy.
 - **Skiing physics:** gravity pulls toward the Moon's centre and along the slope you're on. With the skates on, friction
@@ -493,8 +491,7 @@ dialogs, job board and wardrobe) freezes the whole world: traffic, the satellite
 
 `Esc` → SETTINGS (or the button on the title screen). Graphics: render scale, FOV, view distance, terrain
 detail, shadows and their resolution, halftone, speed lines, ink strength, particles, screen shake, damage
-flash, frame cap. Gameplay: mouse sensitivity, invert Y, camera distance/height/shoulder/smoothing, comic
-panels and highlight-photo frequency, tips, minimap, HUD scale, km/h or m/s. Audio:
+flash, frame cap. Gameplay: mouse sensitivity, invert Y, camera distance/height/shoulder/smoothing, tips, minimap, HUD scale, km/h or m/s. Audio:
 master, music, effects. Controls: remap every action key (taking a key that's in use swaps the two).
 
 ## Cheat menu (testing)
@@ -590,7 +587,7 @@ crowd-noise bed for now (the cheering is due a rework), and the race countdown b
   **While your chimera races, the camera locks onto it:** `1`–`5` (or `C`) switch between chase, infield rail,
   leader, grandstand and blimp cameras, the mouse orbits the chase cam, and `SPACE` spends one of three **crowd
   cheers** for a short surge that burns stamina (a dim creature may get spooked instead). Chaos as ever: stumbles,
-  zooms, wrong-way runs, giant hops, and the occasional explosion and reassembly. Wins land on the Hall of Highlights.
+  zooms, wrong-way runs, giant hops, and the occasional explosion and reassembly.
 - **The Monolith:** touch it (90 s cooldown) and it casts one of three spells, never the same twice running: **Low-G** (30 s at under half gravity), **Time Dilation** (20 s with pirates, their shots, traffic and meteors at 40 % speed while you keep full speed) or **Echo Decoys** (30 s with three holograms of you skating alongside; anyone shooting at you picks one of the four at random, and a hologram shatters when hit).
 - **Bounce Dome Funpark:** inflatable domes, a turreted bouncy castle and a row of trampolines that throw you back
   up harder than you landed, plus a **skate park**: a volcano bowl (ride up the outside and drop in, or hit it fast and
@@ -603,7 +600,7 @@ crowd-noise bed for now (the cheering is due a rework), and the race countdown b
 
 | Location | Type | Notes |
 | --- | --- | --- |
-| International Moon Base (ILMB) | SPACECOM HQ | Fortress walls, turrets, artillery, embassies, job board, repair bay, launch pad, Hall of Highlights |
+| International Moon Base (ILMB) | SPACECOM HQ | Fortress walls, turrets, artillery, embassies, job board, repair bay, launch pad |
 | Meridian Exchange · Shackleton Radar Array · Helium-3 Exchange | Meridian | Trade hub (trading tower with a price ticker, warehouses, a container gantry and tower cranes at work), radar research (an observatory with a turning cupola), and a working strip-mine (bucket-wheel excavator, ore conveyor, pumping derrick, Horton-sphere tank farm) |
 | Kepler Civic Center · Tranquility Commons · Aldrin Heights · Twilight Waystation · Hertzsprung Refuge | Kepler | Towns, safe rest and repair |
 | Farside Listening Post | SPACECOM (dark side) | Hazard-pay destination |
@@ -636,8 +633,7 @@ crowd-noise bed for now (the cheering is due a rework), and the race countdown b
 - A post pass (`src/post.js`) that draws ink lines from the depth buffer, halftone dots in
   shadow, radial **speed lines** that scale with velocity, and damage and alert vignettes
 - Shattered crater rims: a band of broken regolith along the peak of every grindable lip (an uneven rocky core breaking up into patches, a scuffed halo, dark pebbles and bright chips of fresh rock that fade out with distance), worked out per pixel from the ~64 nearest craters so it never follows the terrain triangles. The rocky band and the grind rail come from the same measurement (planet.rimOf): only firm lips get either. Overlapping craters share one outline round the whole cluster (a crater on the floor of one at least twice its size keeps its own); the giants (over 120 m) get neither. The terrain's toon ramp has soft steps, so lighting bands don't saw-tooth round steep walls
-- Onomatopoeia pop-ups (WHOOSH!, KRAK!, KA-BOOM!, YOINK!) and inset **action panels** with
-  captions for big launches, thefts and deliveries
+- Onomatopoeia pop-ups (WHOOSH!, KRAK!, KA-BOOM!, YOINK!)
 
 ## Code map
 
@@ -671,7 +667,6 @@ src/
   rails.js       grinding the snake rocks' crests and crater rims
   meteors.js     meteor showers: the warning zone, falling rocks (colliders), chunks and scorch marks
   chimerastats.js chimera racing stats and the race model (distance, going, cheers) the bookie simulates
-  highlights.js  action-shot capture (shown on the ILMB job terminal)
   physics.js     collider hash + shared skater movement model (player and pirate skaters)
   player.js      input → movement, weapon, animation, style events
   enemies.js     pirates (skaters/rovers), military bases, turrets, artillery, theft/recovery

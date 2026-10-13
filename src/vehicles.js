@@ -8,7 +8,7 @@ import { toon, glow, ink } from './toon.js';
 // Faction vehicles unlocked through the story. V calls yours in (or hops out).
 export const VEHICLES = {
   interceptor: { hp: 220, name: 'SPACECOM Lunar Interceptor', faction: 'spacecom', max: 88, engine: 38, turn: 2.6, grip: 12, armor: 0.75, color: 0xfff4e0, trim: 0xffd23f, desc: 'Fast, nimble, lightly armoured.' },
-  apc: { hp: 480, name: 'Vostok BTR-M Moon APC', faction: 'vostok', max: 62, engine: 24, turn: 1.9, grip: 18, armor: 0.4, color: 0x6b6f78, trim: 0xff3b5c, scale: 1.35, desc: 'Slow tank of a thing. Shrugs off fire.' },
+  apc: { hp: 480, name: 'Vostok BTR-M Moon APC', faction: 'vostok', max: 62, engine: 24, turn: 1.9, grip: 18, armor: 0.4, color: 0x6b6f78, trim: 0xff3b5c, scale: 1.35, hideRider: true, desc: 'Slow tank of a thing. Shrugs off fire.' },
   skimmer: { hp: 180, name: 'Daedalus Phase Skimmer', faction: 'daedalus', max: 100, engine: 34, turn: 2.2, grip: 4, armor: 0.85, color: 0x1a1426, trim: 0xc77dff, hover: true, desc: 'Hovers. Drifts. Terrifyingly fast.' },
   mule: { hp: 300, name: 'Kepler Homestead Mule', faction: 'kepler', max: 58, engine: 26, turn: 2.2, grip: 16, armor: 0.6, color: 0x6a8f3a, trim: 0xff9f1c, scale: 1.2, cargoSafe: true, desc: 'Hauler. Cargo rides in a padded bed and takes no jostle damage.' },
   // (id stays 'van' so existing saves keep it: it's a light-bike now)
@@ -26,11 +26,17 @@ export class Garage {
     this.choice = null;
     this.hp = {}; // hull left on each vehicle (repairs slowly while you're not driving it)
     this.wreckedUntil = {}; // id -> game time it's rebuilt
-    this.bar = document.createElement('div');
-    this.bar.id = 'vehbar';
-    this.bar.className = 'hidden';
-    this.bar.innerHTML = '<span class="vb-name"></span><div class="vb-track"><div class="vb-fill"></div></div><span class="vb-num"></span>';
-    document.getElementById('hud').appendChild(this.bar);
+    // While you drive, two rows replace the HULL and JET bars in the speed tracker: the vehicle's name,
+    // then HP and its hull bar.
+    this.hullRow = document.getElementById('hp-fill').closest('.bar');
+    this.jetRow = document.getElementById('en-fill').closest('.bar');
+    this.nameRow = document.createElement('div');
+    this.nameRow.className = 'bar veh-row hidden';
+    this.nameRow.innerHTML = '<label class="veh-name"></label>';
+    this.hpRow = document.createElement('div');
+    this.hpRow.className = 'bar veh-row veh-hp hidden';
+    this.hpRow.innerHTML = '<label>HP:</label><div class="track"><div class="fill vb-fill"></div></div><span class="vb-num"></span>';
+    this.jetRow.after(this.nameRow, this.hpRow);
   }
 
   maxHp(id) { return Math.round(VEHICLES[id].hp * (1 + 0.15 * (this.game.upgrades.plating || 0))); }
@@ -97,7 +103,7 @@ export class Garage {
     const seat = new THREE.Mesh(new THREE.BoxGeometry(1, 1.2, 0.3), toon(0x221d33));
     ink(seat, 0.04);
     seat.position.set(0, 2.4, -0.6);
-    m.root.add(seat);
+    if (!def.hideRider) m.root.add(seat);
     return m;
   }
 
@@ -284,7 +290,8 @@ export class Garage {
       const reach = def.radius || 3.5 * (def.scale || 1);
       const front = _mf.copy(b.pos).addScaledVector(up, 1.2);
       for (const en of g.enemies.targets()) {
-        if (!en.center || (en.faction === 'pirate' && g.enemies.friendly(en)) || (en.ramT || 0) > g.time) continue;
+        // (allied and neutral rovers, patrols and turrets are never rammed: only hostile ones)
+        if (!en.center || !g.enemies.isHostileTarget(en) || (en.ramT || 0) > g.time) continue;
         if (en.center.distanceTo(front) > (en.radius || 1.5) + reach) continue;
         en.ramT = g.time + 0.6;
         g.enemies.damage(en, sp * (def.pirate ? 3 : 2));
@@ -313,15 +320,22 @@ export class Garage {
     // field repairs: hull creeps back while you're not behind the wheel
     for (const id of Object.keys(this.hp)) if (!(g.player.vehicle && g.player.vehicle.id === id)) this.hp[id] = Math.min(this.maxHp(id), this.hp[id] + dt * 2);
     const pv = g.player.vehicle;
-    this.bar.classList.toggle('hidden', !pv || g.state !== 'play');
+    const show = !!pv && g.state === 'play';
+    if (show !== this.rowsShown) {
+      this.rowsShown = show;
+      this.nameRow.classList.toggle('hidden', !show);
+      this.hpRow.classList.toggle('hidden', !show);
+      this.hullRow.classList.toggle('hidden', show);
+      this.jetRow.classList.toggle('hidden', show);
+    }
     if (pv) {
       const max = this.maxHp(pv.id), hp = Math.max(0, this.hp[pv.id] ?? max);
       const k = hp / max;
-      this.bar.querySelector('.vb-name').textContent = pv.def.name.toUpperCase();
-      const fill = this.bar.querySelector('.vb-fill');
+      this.nameRow.firstChild.textContent = pv.def.name.toUpperCase();
+      const fill = this.hpRow.querySelector('.vb-fill');
       fill.style.width = `${k * 100}%`;
       fill.style.background = k > 0.5 ? '#2ee6ff' : k > 0.25 ? '#ffd23f' : '#ff2a4a';
-      this.bar.querySelector('.vb-num').textContent = `${Math.ceil(hp)}/${max}`;
+      this.hpRow.querySelector('.vb-num').textContent = `${Math.ceil(hp)}/${max}`;
       // smoke when it's hurting
       if (k < 0.35 && Math.random() < dt * 20) g.fx.spawn(pv.model.root.position.clone().addScaledVector(pv.e.body.pos.clone().normalize(), 3), pv.e.body.pos.clone().normalize().multiplyScalar(4), { color: k < 0.15 ? 0xff6a2a : 0x3a3550, size: 0.9, life: 0.9, count: 1, spread: 1 });
     }

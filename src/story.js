@@ -320,6 +320,9 @@ const CHAPTERS = {
 
 const _v = new THREE.Vector3();
 
+const KADE_BASE = 0.08; // chance Kade rides along with a squad
+const KADE_STEP = 0.04; // added after each squad that doesn't bring him, until you reach the light
+
 export class Story {
   constructor(game) {
     this.game = game;
@@ -677,7 +680,6 @@ export class Story {
     this.save();
     g.save();
     g.style(80, 'CHAPTER COMPLETE');
-    g.actionPanel('delivered', null, `${def.title.toUpperCase()} — COMPLETE!`);
     g.audio.cash();
     const lock = first ? `<br><br><b style="color:#ff2a4a">You are now ${LEADERS[f].name}'s runner. The other leaders will remember that.</b>` : '';
     const ul = unlocks.length ? `<br><br>${unlocks.map((u) => `★ ${u}`).join('<br>')}` : '';
@@ -1660,12 +1662,25 @@ export class Story {
 
   // ---------- Captain Kade, the sniper ----------
   // Rarely shows up with a regular dark-side pirate squad (unless you ride with Rustmoon).
+  // Each squad that gets as far as the roll and misses raises the chance by KADE_STEP; it stays raised
+  // until you step into the light (enemies.js resets it), or Kade turns up. Returns what happened,
+  // for the dev overlay.
   maybeKade() {
     const g = this.game;
-    if (this.kade.captured || g.rep.aligned() || this.faction === 'rustmoon' || g.time < this.kade.nextAt) return;
-    if (darkness(g.player.up) < 0.5 || g.enemies.list.some((e) => e.kind === 'kade' && !e.dead)) return;
-    if (Math.random() > 0.08) return;
-    this.spawnKade(false);
+    const chance = this.kadeChance ?? KADE_BASE;
+    const skip = (why) => ({ rolled: false, why, chance });
+    if (this.kade.captured) return skip('Kade captured');
+    if (g.rep.aligned() || this.faction === 'rustmoon') return skip('riding with Rustmoon');
+    if (g.time < this.kade.nextAt) return skip('Kade cooling down');
+    if (darkness(g.player.up) < 0.5) return skip('not on the dark side');
+    if (g.enemies.list.some((e) => e.kind === 'kade' && !e.dead)) return skip('Kade already out');
+    if (Math.random() < chance) {
+      this.kadeChance = KADE_BASE;
+      this.spawnKade(false);
+      return { rolled: true, hit: true, chance, next: KADE_BASE };
+    }
+    this.kadeChance = Math.min(1, chance + KADE_STEP);
+    return { rolled: true, hit: false, chance, next: this.kadeChance };
   }
 
   spawnKade(final) {
@@ -1674,7 +1689,6 @@ export class Story {
     this.kade.met++;
     this.save();
     this.splash();
-    g.actionPanel('villain', e, '"NOBODY SKATES MY SIDE OF THE MOON."');
     g.slowmo = 1.4;
     return e;
   }

@@ -6,6 +6,7 @@ import { VEHICLES } from './vehicles.js';
 import { TECH } from './story.js';
 import * as THREE from 'three';
 import { greatCircle } from './geo.js';
+import { AIPaths, EnemyMarkers } from './aipaths.js';
 
 const DEV_KEY = 'mr-dev-unlocked';
 
@@ -16,6 +17,10 @@ export class Cheats {
     this.game = game;
     this.god = false; // unlimited health
     this.infJet = false; // unlimited jet (thruster energy)
+    this.mapTeleport = false; // click a location (or press A with the controller cursor on it) in the full map to go there
+    this.aiPaths = false; // draw every AI's current path / steering goal
+    this.showFps = false; // frame-rate readout under the minimap
+    this.spawnDebug = false; // bottom-right pirate counts + spawn timers overlay
     this.speed = 1; // player speed multiplier, 1 to 10 (player.js)
     // once the dev menu has been opened (F8 / controller combo) it gets a button on the pause card, remembered across launches
     try { this.unlocked = localStorage.getItem(DEV_KEY) === '1'; } catch { this.unlocked = false; }
@@ -39,9 +44,13 @@ export class Cheats {
       { label: `1 · UNLIMITED JET: ${this.infJet ? 'ON' : 'OFF'}`, fn: () => { this.infJet = !this.infJet; this.tick(); this.dev(); } },
       { label: `2 · UNLIMITED HEALTH: ${this.god ? 'ON' : 'OFF'}`, fn: () => { this.god = !this.god; this.tick(); this.dev(); } },
       { label: this.speedLabel(), fn: () => { this.setSpeed(this.speed >= 10 ? 1 : this.speed + 1); this.dev(); } },
-      { label: '4 · TELEPORT TO CASINO', fn: () => { const l = g.locations.find((x) => x.id === 'casino'); if (l) this.teleport(l); } },
-      { label: '5 · FULL CHEAT MENU…', fn: () => this.open() },
-      { label: '6 · CLOSE' },
+      { label: '4 · TELEPORT TO RUSTMOON HOLD', fn: () => { const l = g.locations.find((x) => x.id === 'rustmoon'); if (l) this.teleport(l); } },
+      { label: `5 · PIRATE SPAWN DEBUG: ${this.spawnDebug ? 'ON' : 'OFF'}`, fn: () => { this.spawnDebug = !this.spawnDebug; this.tick(); this.dev(); } },
+      { label: `6 · SHOW FPS: ${this.showFps ? 'ON' : 'OFF'}`, fn: () => { this.showFps = !this.showFps; this.tick(); this.dev(); } },
+      { label: `7 · SHOW AI PATHS: ${this.aiPaths ? 'ON' : 'OFF'}`, fn: () => { this.aiPaths = !this.aiPaths; this.tick(); this.dev(); } },
+      { label: '8 · FULL CHEAT MENU…', fn: () => this.open() },
+      { label: `9 · CLICK MAP TO TELEPORT: ${this.mapTeleport ? 'ON' : 'OFF'}`, fn: () => { this.mapTeleport = !this.mapTeleport; this.dev(); } },
+      { label: 'CLOSE' },
     ]);
     g.dialogButtons.dev = true;
     // the speed row adjusts in place: click / A = +1 (wraps), left / right on a controller (d-pad or stick) = -1 / +1
@@ -63,6 +72,91 @@ export class Cheats {
     const P = this.game.player;
     if (this.infJet) P.body.energy = P.body.maxEnergy;
     if (this.god && !P.dead) P.health = P.maxHealth;
+    this.updateSpawnDebug();
+    this.updateFps();
+    if (this.aiPaths) (this.paths ||= new AIPaths(this.game)).update();
+    else if (this.paths) this.paths.hide();
+  }
+
+  // Frame rate under the minimap, averaged over half a second
+  updateFps() {
+    let el = this.fpsEl;
+    if (!this.showFps) { if (el) el.classList.add('hidden'); this.fpsN = 0; return; }
+    if (!el) {
+      el = this.fpsEl = document.createElement('div');
+      el.id = 'fps-readout';
+      (document.getElementById('undermap') || document.body).appendChild(el);
+    }
+    el.classList.remove('hidden');
+    const now = performance.now();
+    if (!this.fpsN) { this.fpsN = 0; this.fpsT = now; }
+    this.fpsN++;
+    if (now - this.fpsT >= 500) {
+      const fps = (this.fpsN * 1000) / (now - this.fpsT);
+      el.textContent = `${Math.round(fps)} FPS`;
+      el.style.color = fps >= 55 ? '#7dff3a' : fps >= 30 ? '#ffd23f' : '#ff4a4a';
+      this.fpsN = 0; this.fpsT = now;
+    }
+  }
+
+  // Spawn-debug note under the big alert banner (only while the pirate spawn debug is on)
+  alertNote(text, secs) {
+    if (!this.spawnDebug) return;
+    let el = this.noteEl;
+    if (!el) {
+      el = this.noteEl = document.createElement('div');
+      el.id = 'alert-note';
+      document.body.appendChild(el);
+    }
+    const a = document.getElementById('alert');
+    const r = a ? a.getBoundingClientRect() : null;
+    el.style.top = `${r ? r.bottom + 8 : 120}px`;
+    el.textContent = text;
+    el.classList.remove('hidden');
+    clearTimeout(this.noteT);
+    this.noteT = setTimeout(() => el.classList.add('hidden'), secs * 1000);
+  }
+
+  // Dev overlay (bottom right): pirates alive per pool and when the next patrol spawn is attempted
+  updateSpawnDebug() {
+    let el = this.dbgEl;
+    if (!this.spawnDebug) { if (el) el.classList.add('hidden'); if (this.marks) this.marks.hide(); return; }
+    (this.marks ||= new EnemyMarkers(this.game)).update(); // (rings + beacons on every enemy)
+    const E = this.game.enemies;
+    if (!el) {
+      el = this.dbgEl = document.createElement('div');
+      el.id = 'spawn-debug';
+      document.body.appendChild(el);
+    }
+    el.classList.remove('hidden');
+    const d = E.dbg || {};
+    const t = (v) => `${Math.max(0, v).toFixed(1)}s`;
+    const kinds = (list) => `${list.filter((e) => e.kind === 'rover').length} rover · ${list.filter((e) => e.kind !== 'rover').length} skater`;
+    const alive = E.list.filter((e) => e.faction === 'pirate' && e.kind !== 'core' && !e.dead);
+    const roam = E.hunterList();
+    const den = alive.filter((e) => e.home);
+    const raid = alive.filter((e) => !e.home && e.targetObj);
+    const rows = [`<b>PIRATES</b>`,
+      `roaming ${roam.length}/${E.maxRoamers()}  (${kinds(roam)})`,
+      `dens ${den.length}/${E.maxDen()}  (${kinds(den)})`];
+    if (raid.length) rows.push(`event raiders ${raid.length}`);
+    const S = this.game.story;
+    if (S) rows.push(`Kade chance next squad ${Math.round((S.kadeChance ?? 0.08) * 100)}%`);
+    const gp = this.game.pad && this.game.pad.gyro;
+    if (gp && gp.dev) rows.push(gp.debug());
+    rows.push(`total hunters ${roam.length} (dark-side spawns skip at 3+)`);
+    rows.push(`<b>NEXT PATROL</b>`);
+    if (!d.squadsOn) rows.push(`blocked: ${d.why || '?'}`);
+    else {
+      rows.push(`dark side ${d.dark ? t(E.darkTimer) : 'idle (not dark)'}`);
+      rows.push(`cargo run ${d.carrying ? t(E.pirateTimer) : 'idle (no cargo)'}`);
+    }
+    rows.push(`den check ${t(E.lairTimer)}`);
+    const dt = E.dbgDarkTry, s = E.dbgSpawn;
+    rows.push(`<b>LAST SQUAD ATTEMPT</b>`);
+    rows.push(dt ? `dark-side timer fired ×${dt.n}, last ${t(this.game.time - dt.at)} ago${dt.skip ? ` (skipped: ${dt.hunters} hunters out, needs <3)` : ` (${dt.hunters} hunters out)`}` : 'dark-side timer has not fired yet');
+    rows.push(s ? `spawner ${t(this.game.time - s.at)} ago: wanted ${s.want} · tries ${s.tries} · in a settlement zone ${s.zoned} · spawned ${s.spawned}` : 'spawner has not run yet');
+    el.innerHTML = rows.join('<br>');
   }
 
   open() {
@@ -76,8 +170,27 @@ export class Cheats {
       { label: '6 · UNLOCK ALL GEAR, WEAPONS & COSMETICS', fn: () => { this.unlockAll(); this.open(); } },
       { label: '7 · LAB KIT (big jar, items, 3 chimeras)', fn: () => { this.labKit(); this.open(); } },
       { label: '8 · MORE…', fn: () => this.moreMenu() },
-      { label: '9 · CLOSE' },
+      { label: '9 · SPAWN A VEHICLE…', fn: () => this.vehicleMenu() },
+      { label: 'CLOSE' },
     ]);
+  }
+
+  // Drops any faction vehicle next to you and puts you in it (owned or not; doesn't unlock it, so V
+  // still only calls the ones the story has given you)
+  vehicleMenu() {
+    const g = this.game;
+    const ids = Object.keys(VEHICLES);
+    g.dialog('SPAWN A VEHICLE', '<small>Drops it beside you and hops you in. Replaces any vehicle already out.</small>', ids.map((k, i) => ({
+      label: `${i + 1} · ${VEHICLES[k].name}`,
+      fn: () => {
+        if (g.player.vehicle) g.garage.exit();
+        g.garage.hp[k] = g.garage.maxHp(k); // (fresh hull, and not stuck in a rebuild)
+        g.garage.wreckedUntil[k] = 0;
+        g.garage.choice = k;
+        g.garage.summon(k);
+        g.garage.enter();
+      },
+    })).concat([{ label: `${ids.length + 1} · BACK`, fn: () => this.open() }]));
   }
 
   moreMenu() {
@@ -269,7 +382,7 @@ export class Cheats {
   confirmReset() {
     const g = this.game;
     const n = g.saves && g.saves.active;
-    g.dialog('RESET THIS SAVE?', `Wipes ${n ? `save slot ${n}` : 'this save'} (credits, upgrades, reputation, map, chimeras, outfits and highlights) and returns to the main menu. Other slots and your settings are kept.`, [
+    g.dialog('RESET THIS SAVE?', `Wipes ${n ? `save slot ${n}` : 'this save'} (credits, upgrades, reputation, map, chimeras and outfits) and returns to the main menu. Other slots and your settings are kept.`, [
       { label: '1 · YES, WIPE IT', fn: () => {
         if (g.saves && n) g.saves.remove(n); // clears the slot and the live working copy
         else { try { for (const k of Object.keys(localStorage)) if (k.startsWith('moonrunner-') && k !== 'moonrunner-settings-v1') localStorage.removeItem(k); } catch { /* unavailable */ } }

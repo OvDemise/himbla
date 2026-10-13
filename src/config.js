@@ -58,3 +58,6 @@ export const PHYS = {
   bootSafeImpact: 22,
   impactDamage: 1.3,
 };
+
+// Distress events farther than this from the player (metres) stay out of the log above the speedometer, and don't pop up when they start
+export const EVENT_RANGE = 3500;

@@ -4,6 +4,25 @@
 // (Xbox / PlayStation / Switch). Back on the keyboard they all swap back. The pad's actual mapping is
 // in gamepad.js; this only names it.
 
+// The real Xbox One button art (Xelu's controller prompts, CC0), inlined like the other assets
+import xA from './assets/xbox/A.png?inline';
+import xB from './assets/xbox/B.png?inline';
+import xX from './assets/xbox/X.png?inline';
+import xY from './assets/xbox/Y.png?inline';
+import xLB from './assets/xbox/LB.png?inline';
+import xRB from './assets/xbox/RB.png?inline';
+import xLT from './assets/xbox/LT.png?inline';
+import xRT from './assets/xbox/RT.png?inline';
+import xView from './assets/xbox/Windows.png?inline';
+import xMenu from './assets/xbox/Menu.png?inline';
+import xLS from './assets/xbox/Left_Stick.png?inline';
+import xRS from './assets/xbox/Right_Stick.png?inline';
+import xDU from './assets/xbox/Dpad_Up.png?inline';
+import xDD from './assets/xbox/Dpad_Down.png?inline';
+import xDL from './assets/xbox/Dpad_Left.png?inline';
+import xDR from './assets/xbox/Dpad_Right.png?inline';
+const XBOX_ART = { A: xA, B: xB, X: xX, Y: xY, LB: xLB, RB: xRB, LT: xLT, RT: xRT, VIEW: xView, START: xMenu, LS: xLS, RS: xRS, L3: xLS, R3: xRS, DU: xDU, DD: xDD, DL: xDL, DR: xDR };
+
 export const glyphState = { kind: 'xbox' };
 
 // tokens are standard-mapping buttons: each family names (and colours) them its own way
@@ -24,10 +43,17 @@ const SYMS = {
 };
 
 // '#text' in a token list is plain text between glyphs
+// [label, colour token] of a face button for a pad family (for the in-world signs, which draw their own glyphs)
+export function faceInfo(token, kind = glyphState.kind) {
+  const f = (FACE[kind] || FACE.xbox)[token] || token;
+  return Array.isArray(f) ? f : [f, ''];
+}
+
 export function glyphHtml(tokens, kind = glyphState.kind) {
   const face = FACE[kind] || FACE.xbox;
   return tokens.map((t) => {
     if (t[0] === '#') return `<span class="pg-txt">${t.slice(1)}</span>`;
+    if (kind === 'xbox' && XBOX_ART[t]) return `<i class="pg pg-img pg-${SHAPE[t] || 'face'} xb-${t.toLowerCase()}"><img src="${XBOX_ART[t]}" alt="${t}" draggable="false"></i>`;
     const f = face[t] || MISC[t] || t;
     const [txt, col] = Array.isArray(f) ? f : [f, ''];
     if (SYMS[txt]) return `<i class="pg pg-face pg-sym pg-${col}"><svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round">${SYMS[txt]}</svg></i>`;
@@ -49,7 +75,7 @@ export function tokensFor(text) {
   return null;
 }
 
-const SKIP = '#settings, #help, .controls-mini, #padquick, .pgx, script, style, textarea, input, select, canvas';
+const SKIP = '#settings, #help, .controls-mini, #padradial, .pgx, script, style, textarea, input, select, canvas';
 const KEY_IN_TEXT = /\b(Press|press|PRESS|Hold|hold|HOLD) (ENTER|SPACE|SHIFT|[A-Z])(?![A-Za-z0-9'’])/g;
 const esc = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;');
 

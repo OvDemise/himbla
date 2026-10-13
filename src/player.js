@@ -3,6 +3,7 @@ import { PHYS } from './config.js';
 import { makeBody, stepSkater } from './physics.js';
 import { makeRunner, makeCrate, ScarfSim } from './models.js';
 import { frameQuat, upAt } from './geo.js';
+import { Ragdoll } from './ragdoll.js';
 import { WEAPONS, weaponUnlocked, fireWeapon } from './weapons.js';
 
 const SPEED_MARKS = [
@@ -114,9 +115,32 @@ export class Player {
     t.flip = t.spin = 0;
     t.active = false;
     this.model.trick.rotation.set(0, 0, 0);
+    this.model.trick.position.y = 1.2;
+    if (this.rag) { this.rag.release(); this.rag = null; }
+  }
+
+  // A wipeout or a hard crash: the runner goes limp and falls as a physics ragdoll (ragdoll.js).
+  // Only the model's pose: you keep your momentum and your controls. sign: +1 tumbles forward, -1 back.
+  startRagdoll(sign = 1) {
+    if (this.rag || this.vehicle || this.dead) return;
+    this.rag = new Ragdoll(this.game, this.model, this.body, sign);
   }
 
   update(dt, input, cam) {
+    this.step(dt, input, cam);
+    this.updateLamp(cam);
+  }
+
+  // helmet lamp follows your gaze (every frame, whichever way you're moving: skating, grinding, riding)
+  updateLamp(cam) {
+    const up = this.body.up;
+    const head = this.model.head.getWorldPosition(_v);
+    this.lamp.position.copy(head).addScaledVector(up, 0.3);
+    this.lamp.target.position.copy(head).addScaledVector(cam.look, 30).addScaledVector(up, -4);
+    this.glowLight.position.copy(head).addScaledVector(up, 1.5);
+  }
+
+  step(dt, input, cam) {
     const g = this.game;
     const b = this.body;
     if (this.dead) return;
@@ -154,7 +178,7 @@ export class Player {
     }
 
     const wish = new THREE.Vector3();
-    const trickHeld = input.down('KeyQ') && !b.grounded && b.airTime > 0.12;
+    const trickHeld = input.down('KeyQ') && !b.grounded && b.airTime > 0.12 && !this.rag;
     if (!trickHeld && input.padMove && input.padMove.on) {
       // a controller's left stick: analog (a gentle push, a gentle carve)
       wish.addScaledVector(cam.fwd, -input.padMove.y).addScaledVector(cam.right, input.padMove.x);
@@ -191,6 +215,12 @@ export class Player {
       dive: this.diveLatch = !b.grounded && !jumpNow && (this.diveLatch || (jumpKey && b.airTime > 0.15)) && (input.down('ShiftLeft') || input.down('ShiftRight')),
       thrustDir,
     };
+    // ragdolling: limp, so no skating, jets, jumping, diving or steering until you're back on your feet
+    if (this.rag) {
+      wish.set(0, 0, 0);
+      ctrl.skates = ctrl.thrust = ctrl.jump = ctrl.dive = false;
+      this.jumpBuf = 0; this.diveLatch = false;
+    }
 
     // driving a faction vehicle: the garage does the physics, you can still shoot
     if (this.vehicle) {
@@ -226,6 +256,16 @@ export class Player {
         }
       }
       this.upSmooth.copy(b.up);
+      return;
+    }
+
+    // ragdolling: the ragdoll (ragdoll.js) carries your body until it comes to rest; no skater physics
+    if (this.rag) {
+      b.jumped = false;
+      this.updateWeapons(dt, input, cam);
+      this.center.copy(b.pos).addScaledVector(b.up, 1.3);
+      this.animate(dt, cam, ctrl);
+      if (this.rag) this.rag.sync(dt);
       return;
     }
 
@@ -298,7 +338,6 @@ export class Player {
       this.launchCheck -= dt;
       if (this.launchCheck <= 0 && !b.grounded && b.vel.dot(up) > 0) {
         g.fx.pop(this.speed > 70 ? 'SKY-HIGH!' : 'LAUNCH!', null, { color: '#2ee6ff', size: 72 });
-        g.actionPanel('launch');
       }
     }
 
@@ -325,12 +364,6 @@ export class Player {
 
     this.center.copy(b.pos).addScaledVector(up, 1.3);
     this.animate(dt, cam, ctrl);
-
-    // helmet lamp follows your gaze
-    const head = this.model.head.getWorldPosition(_v);
-    this.lamp.position.copy(head).addScaledVector(up, 0.3);
-    this.lamp.target.position.copy(head).addScaledVector(cam.look, 30).addScaledVector(up, -4);
-    this.glowLight.position.copy(head).addScaledVector(up, 1.5);
   }
 
   // weapons: 1-4 to switch, left mouse to fire
@@ -377,6 +410,7 @@ export class Player {
       }
       this.model.trick.rotation.set(t.flip, t.spin, 0, 'YXZ');
     }
+    let wiped = false;
     if (landedAfter >= 0 && t.active) {
       const flips = Math.round(Math.abs(t.flip) / TAU);
       const spins = Math.round(Math.abs(t.spin) / TAU);
@@ -395,7 +429,6 @@ export class Player {
         g.fx.pop('STUCK IT!', null, { color: '#7dff6a', size: 70, rot: 6 });
         this.trickLanding = true;
         g.stats.bestTrick = Math.max(g.stats.bestTrick || 0, pts);
-        if (pts >= 60) g.actionPanel('trick', null, `${name}! +${pts}`);
       } else if (!clean) {
         g.fx.pop('WIPEOUT!', null, { color: '#ff2a4a', size: 84, rot: -8 });
         g.damagePlayer(8, 'impact');
@@ -403,8 +436,11 @@ export class Player {
         g.missions.jostle(18, true);
         g.audio.thud(30);
         this.trickLanding = true;
+        wiped = true;
       }
+      const ragFlip = t.flip;
       this.resetTrick();
+      if (wiped) this.startRagdoll(ragFlip < 0 ? -1 : 1);
     } else if (b.grounded && !t.active) {
       this.model.trick.rotation.set(0, 0, 0);
     }
@@ -420,13 +456,16 @@ export class Player {
       return;
     }
     if (it.speed > safe) {
-      // half what it used to be, capped so one bad landing rarely kills outright; and a landing with
-      // lots of speed along the ground is a glancing blow (30 m/s of glide halves it again)
+      // a soft-capped curve: damage keeps rising with every m/s over your safe speed but flattens out,
+      // topping out at half your max health, so a fast crash always hurts more than a slow one yet one
+      // bad landing can't kill outright. A landing with lots of speed along the ground is a glancing
+      // blow (30 m/s of glide halves it). impactDamage (1.3) is the tuning knob around that.
       const glancing = it.kind === 'ground' ? 1 / (1 + (it.glide || 0) / 30) : 1;
-      const dmg = Math.min(22, (it.speed - safe) * this.params.impactDamage * 0.5 * glancing);
+      const dmg = 0.5 * this.maxHealth * (1 - Math.exp(-(it.speed - safe) / 60)) * (this.params.impactDamage / 1.3) * glancing;
       g.damagePlayer(dmg, 'impact');
       g.fx.pop(it.speed - safe > 12 ? 'KRA-KOOM!' : 'KRAK!', this.body.pos.clone().addScaledVector(this.up, 2), { color: '#ff4f2e', size: 54 });
       g.fx.dust(this.body.pos, this.body.vel, 14, this.up);
+      this.startRagdoll(it.kind === 'ground' ? 1 : -1); // (a wall throws you back-first)
     } else if (it.speed > 9) {
       g.fx.dust(this.body.pos, this.body.vel, 5, this.up);
     }
@@ -496,6 +535,9 @@ export class Player {
       m.legL.rotation.x = s * 0.9 * run; m.legR.rotation.x = -s * 0.9 * run;
       m.armL.rotation.x = -s * 0.8 * run; m.armR.rotation.x = s * 0.8 * run;
       m.armL.rotation.z = -0.15; m.armR.rotation.z = 0.15;
+    }
+    if (this.rag) {
+      if (!this.rag.update(dt)) { this.rag.release(); this.rag = null; }
     }
     // physics scarf: hangs at rest, streams with speed, drapes over whatever is on your back
     if (!this.scarfSim) this.scarfSim = new ScarfSim(m);

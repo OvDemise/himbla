@@ -3,6 +3,15 @@
 What changed in each release. Releases are built by `.github/workflows/release.yml` when a commit message
 contains `[release]` (see the README's Download section). Newest first.
 
+## Unreleased
+
+- **PlayStation gyro:** with a DualShock 4 or DualSense, hold Circle and tilt the pad: how far you've turned it since Circle went down is added to the left stick, so it moves you on the ground and flips / spins you in the air. The browser's gamepad interface can't see a PlayStation gyro, so it's read over WebHID (Chrome, Edge and the desktop app; the desktop app allows Sony pads up front, a browser asks once under Settings → Gameplay → CONNECT). Settings → Gameplay has an on / off toggle, how much tilt is a full push, and flips for left / right and forward / back. With the spawn debug on, the bottom-right overlay shows the live gyro readout.
+- **Controller radial menu (d-pad down):** replaces the quick-slot chip under the weapons. Tap d-pad down to open a wheel of everything without a button of its own (vehicles, wardrobe, reputation log, music, help, empty jar, pen link, Teleporter); the right stick picks a wedge, `A` (or d-pad down again) uses it, `B` / `Start` cancels. The picked wedge glows like the minimap: faint white in the light, purple on the dark side. Wedges you don't own yet stay in place, dimmed.
+- **Impact damage:** a soft-capped curve (up to half your max health per hit) instead of a flat cap of 22, so faster crashes keep hurting more. Style points no longer pay credits outside a delivery.
+- **Scarf:** the wind, flutter and acceleration swing on the scarf are capped, so at speed it streams a little but stays close to the runner.
+- **Jet cooldown:** emptying the jet tank locks the thrusters out until it has recharged to 10%; the JET bar dims while locked.
+- **Removed the action panel and Hall of Highlights:** no more picture-in-picture comic panels, highlight photos, their settings, or the highlights screen on the ILMB job terminal.
+
 ## 0.9.99 — 2026-10-10
 
 **Polish**

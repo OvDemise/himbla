@@ -3,6 +3,7 @@
 // `g.settings ? g.settings.v.<key> : <default>` so it still works without this module.
 
 import { glyphHtml, glyphState, tokensFor } from './glyphs.js';
+import { gyroSupported } from './gyro.js';
 
 const KEY = 'moonrunner-settings-v1';
 
@@ -71,12 +72,14 @@ export const SCHEMA = {
     { key: 'camHeight', label: 'Camera height', type: 'range', min: -1, max: 4, step: 0.1, def: 0, fmt: (v) => `${v > 0 ? '+' : ''}${v.toFixed(1)} m` },
     { key: 'shoulder', label: 'Shoulder offset', type: 'range', min: -2.5, max: 2.5, step: 0.1, def: 0, fmt: (v) => (Math.abs(v) < 0.05 ? 'CENTRE' : `${Math.abs(v).toFixed(1)} m ${v < 0 ? 'LEFT' : 'RIGHT'}`) },
     { key: 'camSmooth', label: 'Camera smoothing', type: 'range', min: 0, max: 3, step: 0.1, def: 1, fmt: (v) => (v < 0.05 ? 'OFF' : mult(v)) },
-    { key: 'panels', label: 'Action panel pop-ups', type: 'choice', def: 'normal', options: LEVELS.slice(0, 3), hint: 'The comic picture-in-picture panels' },
-    { key: 'photos', label: 'Highlight photo frequency', type: 'choice', def: 'normal', options: LEVELS, hint: 'Snapshots pinned to the Hall of Highlights' },
     { key: 'tips', label: 'Show tips', type: 'toggle', def: true },
     { key: 'minimap', label: 'Minimap', type: 'toggle', def: true },
     { key: 'hudScale', label: 'HUD scale', type: 'range', min: 0.6, max: 1.4, step: 0.05, def: 1, fmt: pct },
     { key: 'units', label: 'Speed units', type: 'choice', def: 'kmh', options: [['kmh', 'KM/H'], ['ms', 'M/S']] },
+    { key: 'gyro', label: 'PlayStation gyro', type: 'toggle', def: true, hint: 'Hold Circle and tilt the pad: it works like the left stick' },
+    { key: 'gyroRange', label: 'Gyro: tilt for a full push', type: 'range', min: 15, max: 60, step: 5, def: 30, fmt: (v) => `${v}°`, hint: 'Smaller = more sensitive' },
+    { key: 'gyroInvX', label: 'Gyro: flip left / right', type: 'toggle', def: false },
+    { key: 'gyroInvY', label: 'Gyro: flip forward / back', type: 'toggle', def: false },
   ],
   audio: [
     { key: 'master', label: 'Master volume', type: 'range', min: 0, max: 1, step: 0.05, def: 1, fmt: pct },
@@ -109,6 +112,7 @@ const PAD_ROWS = [
   ['Mag-jump / Dive (hold in the air)', ['A']],
   ['Thrusters (hold)', ['LT']],
   ['Tricks (hold in the air)', ['B']],
+  ['PlayStation gyro: tilt like the left stick', ['B', '#+', '#tilt']],
   ['Interact / job board', ['X']],
   ['Scoop into jar', ['R3']],
   ['Vehicle: call / board / leave', ['Y']],
@@ -116,8 +120,9 @@ const PAD_ROWS = [
   ['Next power', ['DU']],
   ['Fire', ['RT']],
   ['Previous / next weapon', ['DL', 'DR']],
-  ['Quick slot: tap to use', ['DD']],
-  ['Quick slot: pick (hold ↓ and press)', ['DD', '#+', 'LB', 'RB']],
+  ['Radial menu: open / use the pick', ['DD']],
+  ['Radial menu: pick a wedge', ['RS']],
+  ['Radial menu: use / cancel', ['A', 'B']],
   ['Globe map', ['VIEW', '#tap']],
   ['Emergency recall', ['VIEW', '#hold']],
   ['Pause / resume', ['START']],
@@ -250,9 +255,6 @@ export class Settings {
   bound(code) { return this.v.binds[code] || code; }
   label(code) { return keyName(this.bound(code)); }
 
-  // seconds between highlight photos (Infinity = never)
-  photoGap() { return { off: Infinity, rare: 60, normal: 15, often: 4 }[this.v.photos] ?? 15; }
-
   // frame-rate cap: true when this frame should be skipped
   skip(now) {
     const cap = this.v.fpsCap;
@@ -285,7 +287,7 @@ export class Settings {
     }
     if (g.planet) g.planet.lodScale = v.terrainDetail;
     if (g.fx) g.fx.density = v.particles;
-    for (const post of [g.post, g.highlights && g.highlights.post]) {
+    for (const post of [g.post]) {
       if (!post) continue;
       const u = post.material.uniforms;
       if (u.halftone) u.halftone.value = v.halftone ? 1 : 0;
@@ -394,6 +396,9 @@ export class Settings {
     this.el.classList.remove('hidden');
     this.render();
     const g = this.game;
+    // (the PlayStation link row follows the pad coming and going while this is open)
+    const gy = g && g.pad && g.pad.gyro;
+    if (gy) gy.onStatus = () => { if (this.open && this.tab === 'gameplay') this.render(); };
     if (g && g.audio && g.audio.click) g.audio.click();
   }
 
@@ -401,6 +406,8 @@ export class Settings {
     if (!this.open) return;
     this.open = false;
     this.rebinding = null;
+    const gy = this.game && this.game.pad && this.game.pad.gyro;
+    if (gy) gy.onStatus = null;
     this.el.classList.add('hidden');
     this.save();
     const g = this.game;
@@ -463,6 +470,9 @@ export class Settings {
     } else if (act === 'bind') {
       this.rebinding = this.rebinding === t.dataset.code ? null : t.dataset.code;
       this.render();
+    } else if (act === 'gyro-connect') {
+      const gy = g && g.pad && g.pad.gyro;
+      if (gy) gy.request().then(() => this.render());
     }
   }
 
@@ -498,6 +508,12 @@ export class Settings {
         }
         return `<div class="set-row"><span class="set-label">${s.label}${s.hint ? `<small>${s.hint}</small>` : ''}</span><span class="set-ctl">${ctl}</span></div>`;
       }).join('');
+      if (this.tab === 'gameplay') {
+        // the gyro is read straight from the pad (WebHID): it may need a one-time CONNECT
+        const gy = this.game && this.game.pad && this.game.pad.gyro;
+        const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;');
+        if (gy) body += `<div class="set-row"><span class="set-label">PlayStation controller link<small>${esc(gy.status)}</small></span><span class="set-ctl">${gyroSupported() ? '<button class="set-btn" data-act="gyro-connect">CONNECT</button>' : ''}</span></div>`;
+      }
     }
     this.el.innerHTML = `<div class="panel set-card">
       <h1>SETTINGS</h1>

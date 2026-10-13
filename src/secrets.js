@@ -582,7 +582,6 @@ export class Secrets {
       S.landedOnce = true;
       g.style(200, 'ORBITAL LANDING');
       g.fx.pop('YOU LANDED ON A SATELLITE?!', null, { color: '#ffd23f', size: 60 });
-      g.actionPanel('launch', null, 'ONE SMALL STEP FOR A RUNNER…');
     }
     if (!this.loc) return;
     const G = this.gate;

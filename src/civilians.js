@@ -262,7 +262,7 @@ export class Civilians {
     if (!fresh) return;
     g.hud.alert('RUSTMOON PIRATES ALERTED!', '#7dff3a', 3);
     if (g.tutorial && g.tutorial.quiet()) return;
-    if (!E.lairActive(l) || E.pirateCount() >= 8) return;
+    if (!E.lairActive(l) || E.denFull(2)) return; // (the den pool is full)
     for (let i = 0; i < 2; i++) {
       const a = Math.random() * Math.PI * 2;
       const e = E.spawnPirate(Math.random() < 0.5 ? 'skater' : 'rover', g.world.toWorld(l, Math.cos(a) * 50, 0, Math.sin(a) * 50), l);

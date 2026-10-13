@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { toon, ink, glow, textSprite, nameTag } from './toon.js';
 import { makeFigure } from './models.js';
 import { pixelFont } from './fonts.js';
+import { faceInfo, glyphState } from './glyphs.js';
 import { PEGS, SEGS, SLOTS, MULTS, SPACING, DROP_Y, DIVIDER_TOP, slotEdge, slotCentre } from './plinko.js';
 
 // The Lucky Crater Casino: a neon box in the sun with a spinning sign, a giant tumbling die, a
@@ -61,8 +62,29 @@ export function fitText(x, text, maxW, px) {
   return s;
 }
 
-// A neon sign board: dark panel, glowing border, big text.
-export function neonTex(text, { w = 1024, h = 256, color = '#ffd23f', edge = '#ff2e88', bg = '#120a1e', sub = null } = {}) {
+// A controller face button drawn on a canvas, the way the pad's own family shows it (Xbox: dark button,
+// coloured letter; PlayStation: dark button, coloured symbol; Switch: dark button, white letter)
+const PAD_COL = { g: '#8ad63a', r: '#ff4a4a', b: '#3a8fe8', y: '#f0b020', p: '#ff7ad9' };
+function drawFaceGlyph(x, token, kind, cx, cy, r) {
+  const [txt, col] = faceInfo(token, kind);
+  x.save();
+  x.shadowBlur = 0;
+  x.fillStyle = '#26232e'; x.strokeStyle = '#0a0810'; x.lineWidth = r * 0.16;
+  x.beginPath(); x.arc(cx, cy, r, 0, Math.PI * 2); x.fill(); x.stroke();
+  const c = kind === 'switch' ? '#fff4e0' : PAD_COL[col === 'b' && kind === 'ps' ? 'b' : col] || '#fff4e0';
+  x.strokeStyle = c; x.fillStyle = c; x.lineWidth = r * 0.2; x.lineCap = 'round'; x.lineJoin = 'round';
+  const s = r * 0.5;
+  if (txt === '✕') { x.beginPath(); x.moveTo(cx - s, cy - s); x.lineTo(cx + s, cy + s); x.moveTo(cx + s, cy - s); x.lineTo(cx - s, cy + s); x.stroke(); }
+  else if (txt === '○') { x.beginPath(); x.arc(cx, cy, s * 1.05, 0, Math.PI * 2); x.stroke(); }
+  else if (txt === '□') { x.strokeRect(cx - s, cy - s, s * 2, s * 2); }
+  else if (txt === '△') { x.beginPath(); x.moveTo(cx, cy - s * 1.1); x.lineTo(cx + s * 1.1, cy + s * 0.8); x.lineTo(cx - s * 1.1, cy + s * 0.8); x.closePath(); x.stroke(); }
+  else { x.textAlign = 'center'; x.textBaseline = 'middle'; x.font = FONT(r * 1.3); x.fillText(txt, cx, cy + r * 0.06); }
+  x.restore();
+}
+
+// A neon sign board: dark panel, glowing border, big text. `pad` (a pad family, or null for the keyboard)
+// picks how a "{F}" in the sub line is drawn: the letter F, or that family's button for the same action.
+export function neonTex(text, { w = 1024, h = 256, color = '#ffd23f', edge = '#ff2e88', bg = '#120a1e', sub = null, pad = null } = {}) {
   return canvasTex(w, h, (x) => {
     x.fillStyle = bg; x.fillRect(0, 0, w, h);
     x.strokeStyle = edge; x.lineWidth = 14; x.strokeRect(12, 12, w - 24, h - 24);
@@ -75,8 +97,19 @@ export function neonTex(text, { w = 1024, h = 256, color = '#ffd23f', edge = '#f
     x.fillStyle = color; x.fillText(text, w / 2, y);
     if (sub) {
       x.shadowBlur = 0;
-      fitText(x, sub, w - 80, h * 0.2);
-      x.fillStyle = '#fff4e0'; x.fillText(sub, w / 2, h * 0.76);
+      const plain = sub.replace('{F}', pad ? 'XX' : 'F');
+      const px = fitText(x, plain, w - 80, h * 0.2);
+      x.fillStyle = '#fff4e0';
+      if (pad && sub.includes('{F}')) {
+        const [a, b] = sub.split('{F}');
+        const gr = px * 0.62, gap = px * 0.35;
+        const wa = x.measureText(a).width, wb = x.measureText(b).width, total = wa + gr * 2 + gap * 2 + wb;
+        let cx = w / 2 - total / 2;
+        x.textAlign = 'left'; x.fillText(a, cx, h * 0.76); cx += wa + gap;
+        drawFaceGlyph(x, 'X', pad, cx + gr, h * 0.76, gr); cx += gr * 2 + gap;
+        x.fillStyle = '#fff4e0'; x.fillText(b, cx, h * 0.76);
+        x.textAlign = 'center';
+      } else x.fillText(plain, w / 2, h * 0.76);
     }
   });
 }
@@ -293,6 +326,9 @@ export const CLASSIC = { x: 22.4, zs: [-1.5, 2.5, 6.5] };
 export const PRIZE = { x: 22, z: -13 };
 
 export function buildCasino(w, loc) {
+  // signs that name a button: redrawn with the pad's own glyph whenever a controller is in use
+  const padSigns = [];
+  const padSign = (mesh, text, opts) => padSigns.push({ mesh, text, opts, key: 'kb', cache: { kb: mesh.material.map } });
   const { W, FRONT: D, BACK, H, DOOR, DOOR_H } = HALL;
   const CZ = (D + BACK) / 2, DEP = D - BACK;
   const put = (o, x, z, y = 0, yaw = 0, dyn = false) => w.put(o, loc, x, z, y, yaw, dyn);
@@ -596,8 +632,9 @@ export function buildCasino(w, loc) {
   put(bj, BJ.x, BJ.z, 0, 0, true);
   col({ type: 'box', x: BJ.x, y: 0.7, z: BJ.z + R / 2, hx: R + 0.2, hy: 0.7, hz: R / 2 + 0.2 });
   col({ type: 'cyl', x: BJ.x, z: BJ.z - 0.9, y0: -1, y1: 2.4, r: 0.6 });
-  const bjSign = new THREE.Mesh(new THREE.PlaneGeometry(7, 1.75), new THREE.MeshBasicMaterial({ map: neonTex('BLACKJACK', { color: '#7dff6a', edge: '#ffd23f', sub: 'PAYS 3 TO 2 · F AT THE STOOL TO PLAY' }) }));
+  const bjSign = new THREE.Mesh(new THREE.PlaneGeometry(7, 1.75), new THREE.MeshBasicMaterial({ map: neonTex('BLACKJACK', { color: '#7dff6a', edge: '#ffd23f', sub: 'PAYS 3 TO 2 · {F} AT THE STOOL TO PLAY' }) }));
   put(bjSign, BJ.x, BJ.z - 0.3, 7.5);
+  padSign(bjSign, 'BLACKJACK', { color: '#7dff6a', edge: '#ffd23f', sub: 'PAYS 3 TO 2 · {F} AT THE STOOL TO PLAY' });
   for (const sx of [-1, 1]) put(new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, H - 8.4, 4), toon(0xffd23f)), BJ.x + sx * 3, BJ.z - 0.3, 8.4 + (H - 8.4) / 2);
 
   // ---------- DUCK DERBY TRACK ----------
@@ -660,7 +697,8 @@ export function buildCasino(w, loc) {
   kb.position.y = 0.65;
   const kt = mesh(new THREE.BoxGeometry(2.8, 0.18, 1.4), toon(0xff2e88), 0.04);
   kt.position.y = 1.38;
-  const kscr = new THREE.Mesh(new THREE.PlaneGeometry(2.4, 1.2), new THREE.MeshBasicMaterial({ map: neonTex('DUCK DERBY', { w: 512, h: 256, color: '#ffd23f', edge: '#2ee6ff', sub: 'F · PICK A DUCK' }) }));
+  const kscr = new THREE.Mesh(new THREE.PlaneGeometry(2.4, 1.2), new THREE.MeshBasicMaterial({ map: neonTex('DUCK DERBY', { w: 512, h: 256, color: '#ffd23f', edge: '#2ee6ff', sub: '{F} · PICK A DUCK' }) }));
+  padSign(kscr, 'DUCK DERBY', { w: 512, h: 256, color: '#ffd23f', edge: '#2ee6ff', sub: '{F} · PICK A DUCK' });
   kscr.position.set(0, 2.35, -0.25);
   kscr.rotation.x = -0.25;
   const kpost = mesh(new THREE.BoxGeometry(2.6, 1.5, 0.2), toon(0x2a1450), 0.04);
@@ -869,6 +907,13 @@ export function buildCasino(w, loc) {
     crowd,
     onUpdate: null, // set by the game logic (casinoGames.js)
     update(dt, time) {
+      const gm = globalThis.game;
+      const want = gm && gm.input && gm.input.padActive ? glyphState.kind : 'kb';
+      for (const s of padSigns) {
+        if (s.key === want) continue;
+        s.key = want;
+        s.mesh.material.map = s.cache[want] || (s.cache[want] = neonTex(s.text, { ...s.opts, pad: want === 'kb' ? null : want }));
+      }
       sign.rotation.y += dt * 0.45;
       die.rotation.x += dt * 0.7; die.rotation.y += dt * 1.1;
       die.position.y = 10 + Math.sin(time * 1.6) * 0.8;

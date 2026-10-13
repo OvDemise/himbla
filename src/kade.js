@@ -158,7 +158,7 @@ export function kadeDefeated(story, e) {
   } else {
     g.fx.pop(pick(['"MY TRUCK!"', '"THIS AIN\'T OVER, RUNNER!"', '"YOU\'LL PAY FOR THE PAINT JOB!"']), e.center.clone().addScaledVector(up, 6), { color: '#ff2a3a', size: 44, life: 2.2 });
     story.kade.beaten++;
-    story.kade.nextAt = g.time + 900;
+    story.kade.nextAt = g.time + 300;
   }
   g.addCredits(800, 'Kade bounty');
   g.style(150, 'GUN TRUCK DOWN');

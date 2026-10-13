@@ -289,7 +289,6 @@ export class Missions {
     g.hud.alert('CARGO STOLEN! TAKE IT BACK!', '#7dff3a', 3.5);
     g.fx.pop('YOINK!', thief.center.clone(), { color: '#7dff3a', size: 84 });
     g.audio.alarm();
-    g.actionPanel('stolen', thief);
   }
 
   onCargoDropped(pos) {
@@ -369,7 +368,6 @@ export class Missions {
     }
     g.audio.cash();
     g.hud.delivered({ a, integ, timeBonus, style, styleCapped: styleRaw > base, condition, late, total, integrity, faction: FACTIONS[a.faction].name, repGain });
-    g.actionPanel('delivered');
     // the contract's clearance ends with it: don't let the base you're standing in open up on you
     if (a.clearance) { const L = this.game.locations.find((l) => l.id === a.clearance); if (L) g.enemies.grantGrace(L); }
   }

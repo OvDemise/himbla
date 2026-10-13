@@ -248,8 +248,6 @@ export class Trailer {
     clearEchoes(g);
     g.slowmo = 0;
     g.cam.shake = 0;
-    g.panel = null;
-    document.getElementById('action-panel').classList.add('hidden');
     document.getElementById('popups').innerHTML = '';
     if (g.fx.pops) g.fx.pops.length = 0;
     P.setCargo(null);
@@ -276,7 +274,6 @@ export class Trailer {
     if (g.player) g.player.weapon = 0;
     this.anchor = null;
     g.lampForce = null; // the lamp back on automatic
-    if (g.settings) g.settings.v.panels = 'off';
   }
 
   // floating text (place names, signs, name tags) reads as HUD: the trailer goes without it

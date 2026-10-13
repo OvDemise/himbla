@@ -8,7 +8,10 @@ import { frameQuat, greatCircle, arcDist, darkness, tangent } from './geo.js';
 import { FOES, BOSS_MODELS } from './storyAssets.js';
 
 const PIRATE_SKATER = { ...PHYS, skatePushMax: 34, thrustAccel: 13, maxEnergy: 120, handling: 2.2 };
-const MAX_PIRATES = 6;
+// two separate pirate pools: roaming hunters (squads that chase you) and den guards (which keep to
+// their lair). Event raiders (spawnWave) belong to neither. Each pool always has a rover in it.
+const MAX_ROAMERS = 6;
+const MAX_DEN = 8;
 // roaming hunters (squads, not den guards or event raiders) are capped per kind, and give up once
 // you're further than THREAT_RANGE away (a clean escape at speed loses them)
 const MAX_HUNTERS = { skater: 4, rover: 2 };
@@ -373,6 +376,7 @@ export class Enemies {
       }
     }
     if (e.detourT > 0) { e.detourT -= dt; goal = e.detour; }
+    this.dbgGoal(e, goal);
     if (e.sub === 'rover') {
       stepRover(e, dt, g.planet, g.colliders, goal.clone().sub(b.pos), e.target ? 42 : 28, { engine: 20, grip: 12, turn: 2.2, radius: 3.4, stick: 60 });
       this.poseVehicle(e, dt);
@@ -426,7 +430,24 @@ export class Enemies {
     return t.base && t.base.hostile;
   }
 
-  pirateCount() { return this.list.filter((e) => e.faction === 'pirate' && e.kind !== 'core' && !e.dead).length; }
+  // roaming hunters alive (the roaming pool), and den guards alive (the den pool)
+  // dev overlay (aipaths.js): remember where an AI is steering, only while the overlay is on
+  dbgGoal(e, p, from = null) {
+    const g = this.game;
+    if (!g.cheats.aiPaths) return;
+    (e.dbgGoal ||= new THREE.Vector3()).copy(p);
+    if (from) { // (a steering direction rather than a point: show at least 30 m of it)
+      const len = p.length();
+      e.dbgGoal.copy(from).addScaledVector(p, len < 5 ? 30 / Math.max(len, 1e-3) : 1);
+    }
+    e.dbgT = g.time;
+  }
+
+  maxRoamers() { return MAX_ROAMERS; }
+  maxDen() { return MAX_DEN; }
+  roamCount() { return this.hunters(); }
+  denFull(extra = 0) { return this.denCount() + extra > MAX_DEN; }
+  denCount() { return this.list.filter((e) => e.faction === 'pirate' && e.home && e.kind !== 'core' && !e.dead).length; }
 
   // The settlement you're standing in, within job-board range (its own radius, not its faction's
   // territory), if it isn't hostile to you: pirate squads don't spawn on you there. Everywhere else
@@ -439,10 +460,15 @@ export class Enemies {
   }
 
   // roaming hunters of a kind (not den guards, not event raiders)
-  hunters(kind) { return this.list.filter((e) => e.faction === 'pirate' && !e.dead && !e.home && !e.targetObj && (!kind || e.kind === kind)).length; }
+  // (only skaters and rovers: lair cores also have no home or target, and used to be counted here,
+  // which kept the dark-side spawn gate shut whenever 3+ dens existed)
+  hunterList(kind) { return this.list.filter((e) => e.faction === 'pirate' && !e.dead && !e.home && !e.targetObj && (kind ? e.kind === kind : e.kind === 'skater' || e.kind === 'rover')); }
+  hunters(kind) { return this.hunterList(kind).length; }
 
   // what the next hunter should be: a coin flip between whatever is still under its cap
-  huntKind() {
+  // (a squad's first hunter is a rover whenever the rover cap has room: at least one per squad)
+  huntKind(first = false) {
+    if (first && this.hunters('rover') < MAX_HUNTERS.rover) return 'rover';
     const open = ['skater', 'rover'].filter((k) => this.hunters(k) < MAX_HUNTERS[k]);
     return open.length ? open[Math.floor(Math.random() * open.length)] : null;
   }
@@ -454,22 +480,32 @@ export class Enemies {
     const dir = tangent(P.vel, up);
     if (dir.lengthSq() < 4) dir.copy(g.cam.fwd);
     dir.normalize();
-    n = Math.min(n, MAX_PIRATES - this.pirateCount());
-    let spawned = 0;
-    for (let i = 0; i < n * 3 && spawned < n; i++) {
-      const t = dir.clone().applyAxisAngle(up, (Math.random() - 0.5) * 2.2);
+    n = Math.min(n, MAX_ROAMERS - this.roamCount());
+    let spawned = 0, tries = 0, zoned = 0;
+    // (a few tries ahead of you first, then anywhere round you: settlements near a dark-side den can
+    // cover the whole forward arc)
+    for (let i = 0; i < Math.max(8, n * 4) && spawned < n; i++) {
+      tries++;
+      const spread = i < n * 3 ? 2.2 : Math.PI * 2;
+      const t = dir.clone().applyAxisAngle(up, (Math.random() - 0.5) * spread);
       const d = greatCircle(up, t, randRange(320, 520));
-      if (g.zoneAt(d, 1.4)) continue;
-      const kind = this.huntKind();
+      if (g.zoneAt(d, 1.4)) { zoned++; continue; }
+      const kind = this.huntKind(spawned === 0);
       if (!kind) break;
       this.spawnPirate(kind, d, null, opts);
       spawned++;
     }
+    this.dbgSpawn = { at: g.time, want: n, tries, zoned, spawned, roam: this.roamCount() }; // (dev overlay)
     if (spawned) {
       g.hud.alert(opts.rogue ? 'RENEGADE RAIDERS INBOUND!' : 'PIRATE INTERCEPT INBOUND!', '#7dff3a', 3);
       g.audio.alarm();
-      // now and then the King of Rustmoon comes along for the ride
-      if (!opts.rogue && g.story) g.story.maybeKade();
+      // now and then the King of Rustmoon comes along for the ride (likelier with every squad that
+      // doesn't bring him, until you reach the light)
+      if (!opts.rogue && g.story) {
+        const k = g.story.maybeKade();
+        const pc = (v) => `${Math.round(v * 100)}%`;
+        g.cheats.alertNote(k.rolled ? (k.hit ? `KADE SPAWNED (${pc(k.chance)} chance) · odds reset to ${pc(k.next)}` : `Kade chance ${pc(k.chance)}: missed · next squad ${pc(k.next)}`) : `Kade not rolled: ${k.why} (chance ${pc(k.chance)})`, 3);
+      }
     }
     return spawned;
   }
@@ -633,6 +669,7 @@ export class Enemies {
     const P = g.player;
     const ms = g.missions;
     const dark = darkness(P.up);
+    if (dark < 0.5 && g.story && g.story.kadeChance != null) g.story.kadeChance = null; // (back in the light: Kade's odds reset)
     const aligned = g.rep.aligned();
     const shadow = 1 + (g.upgrades.shadow || 0) * 0.35;
     // pirate blood (a lab mutation) makes the hunters mostly lose interest in you
@@ -647,12 +684,14 @@ export class Enemies {
     const home = this.shelterAt(P.pos);
     // (and none at all once SPACECOM has dismantled the clans)
     const storyFight = g.story && g.story.engaged(); // (a chapter's objective is close: its own enemies only)
-    if (!P.dead && !inSafe && !riding && !home && !aligned && !FACTIONS.rustmoon.gone && !storyFight && !(g.tutorial && g.tutorial.quiet())) {
+    const squadsOn = !P.dead && !inSafe && !riding && !home && !aligned && !FACTIONS.rustmoon.gone && !storyFight && !(g.tutorial && g.tutorial.quiet());
+    this.dbg = { squadsOn, carrying: !!carrying, dark: dark > 0.5, why: P.dead ? 'dead' : inSafe ? 'safe zone' : riding ? 'on a ship' : home ? 'sheltered' : aligned ? 'riding with Rustmoon' : FACTIONS.rustmoon.gone ? 'clans gone' : storyFight ? 'story fight' : 'tutorial' }; // (dev overlay)
+    if (squadsOn) {
       if (carrying) {
         this.pirateTimer -= dt * (1 + dark) * blood;
         if (this.pirateTimer <= 0) {
           const hot = ms.active.cargo.hot;
-          if ((hot > 0 || Math.random() < 0.35 + dark * 0.5) && this.pirateCount() < MAX_PIRATES) this.spawnSquad(Math.min(4, 1 + Math.floor(Math.max(1, hot) * 0.8 + Math.random() + dark)));
+          if ((hot > 0 || Math.random() < 0.35 + dark * 0.5) && this.roamCount() < MAX_ROAMERS) this.spawnSquad(Math.min(4, 1 + Math.floor(Math.max(1, hot) * 0.8 + Math.random() + dark)));
           this.pirateTimer = randRange(30, 50) / Math.max(1, hot * 0.8);
           this.darkTimer = Math.max(this.darkTimer, 14);
         }
@@ -660,8 +699,10 @@ export class Enemies {
       if (dark > 0.5) {
         this.darkTimer -= dt * blood;
         if (this.darkTimer <= 0) {
-          if (this.hunters() < 3) this.spawnSquad(1 + Math.floor(Math.random() * 2));
-          this.darkTimer = randRange(20, 34);
+          const nh = this.hunters(), skip = nh >= 3;
+          const got = skip ? 1 : this.spawnSquad(1 + Math.floor(Math.random() * 2));
+          this.dbgDarkTry = { at: g.time, n: (this.dbgDarkTry ? this.dbgDarkTry.n : 0) + 1, skip, got, hunters: nh }; // (dev overlay)
+          this.darkTimer = got ? randRange(20, 34) : 4; // (a failed attempt tries again soon)
           this.pirateTimer = Math.max(this.pirateTimer, 14);
         }
       }
@@ -673,9 +714,11 @@ export class Enemies {
       for (const l of this.lairs) {
         if (!this.lairActive(l, time) || arcDist(P.pos, l.dir) > 650) continue;
         const guards = this.list.filter((e) => e.home === l && e.kind !== 'core' && !e.dead).length;
-        if (guards < (l.camp ? 2 : l.hq ? 4 : 3) && this.pirateCount() < MAX_PIRATES + 2) {
+        if (guards < (l.camp ? 2 : l.hq ? 4 : 3) && this.denCount() < MAX_DEN) {
           const a = Math.random() * Math.PI * 2;
-          this.spawnPirate(Math.random() < 0.5 ? 'skater' : 'rover', g.world.toWorld(l, Math.cos(a) * 50, 0, Math.sin(a) * 50), l);
+          // (every den keeps at least one rover among its guards)
+          const hasRover = this.list.some((e) => e.home === l && e.kind === 'rover' && !e.dead);
+          this.spawnPirate(!hasRover || Math.random() < 0.5 ? 'rover' : 'skater', g.world.toWorld(l, Math.cos(a) * 50, 0, Math.sin(a) * 50), l);
         }
       }
     }
@@ -725,7 +768,7 @@ export class Enemies {
           const rel = _v.copy(P.vel).sub(e.body.vel);
           const rs = rel.length();
           const closing = e.body.vel.dot(n) - P.vel.dot(n);
-          if (rs > 22 && P.body.skating && P.vel.dot(n) < 0 && e.faction !== 'ally') {
+          if (rs > 22 && P.body.skating && P.vel.dot(n) < 0 && e.faction !== 'ally' && this.isHostileTarget(e)) {
             this.damage(e, (rs - 15) * 4);
             g.fx.pop('SMASH!', e.center.clone().addScaledVector(P.up, 3), { color: '#ffd23f', size: 70 });
             g.damagePlayer(4, 'ram');
@@ -741,6 +784,7 @@ export class Enemies {
             P.body.sinceContact = 1;
           }
           const vn = P.vel.dot(n) - e.body.vel.dot(n);
+          if (vn < 0 && g.grind) g.grind.knockOff(P, n);
           if (vn < 0) P.vel.addScaledVector(n, -vn * 1.4);
           P.body.pos.addScaledVector(n, (e.radius + 1.2 - d) * 0.8);
         }
@@ -1021,6 +1065,7 @@ export class Enemies {
         e.orbiting = true;
       }
     }
+    this.dbgGoal(e, target);
     const to = target.clone().sub(b.pos);
     const wish = tangent(to, up);
     const dist = wish.length();
@@ -1119,6 +1164,7 @@ export class Enemies {
         if ((R.t > 1.6 && d > 30) || R.t > 4) { R.phase = 'line'; R.t = 0; R.side = 0; }
       }
     } else e.ram = null;
+    this.dbgGoal(e, aim, b.pos);
     stepRover(e, dt, g.planet, g.colliders, aim, max, { engine, grip: 14, turn: e.ram && e.ram.phase === 'line' ? 2.8 : 2.2, radius: 3.6, stick: 62 });
     this.poseVehicle(e, dt);
     if (e.state === 'chase' && !friendly) {
@@ -1177,6 +1223,7 @@ export class Enemies {
         if (from.distanceTo(P.pos) < 300) g.fx.pop('*BLINK*', from, { color: '#c77dff', size: 50, life: 0.7 });
       }
     }
+    this.dbgGoal(e, aim, b.pos);
     this.poseVehicle(e, dt);
     if (e.hover) e.model.chassis.position.y = 0.6 + Math.sin(g.time * 2.2) * 0.25;
     e.fireCd -= dt;
@@ -1205,6 +1252,7 @@ export class Enemies {
       target = g.world.toWorld(loc, Math.cos(a) * e.patrolR, 0, Math.sin(a) * e.patrolR);
       maxSp = 16;
     }
+    this.dbgGoal(e, target);
     stepRover(e, dt, g.planet, g.colliders, target.sub(b.pos), maxSp, { engine: 16, grip: 8, turn: 2, stick: Infinity });
     this.poseVehicle(e, dt);
     if (base.hostile) {

@@ -1,8 +1,10 @@
 import * as THREE from 'three';
+import { glyphHtml } from './glyphs.js';
 import { NAME_TAGS } from './toon.js';
 import { FACTIONS } from './locations.js';
 import { arcDist, darkness, upAt } from './geo.js';
 import { WEAPONS } from './weapons.js';
+import { EVENT_RANGE } from './config.js';
 import { pixelFont } from './fonts.js';
 
 const $ = (id) => document.getElementById(id);
@@ -33,46 +35,55 @@ export class HUD {
     if (!this.logEl) {
       this.logEl = document.createElement('div');
       this.logEl.id = 'distresslog';
-      $('hud').appendChild(this.logEl);
+      $('speedo').appendChild(this.logEl); // (a child of the speed tracker, so CSS keeps it glued above it)
       this.logRows = new Map();
       this.logT = 0;
     }
     this.logT -= dt;
-    if (this.logT > 0) return;
-    this.logT = 0.1;
     const P = g.player, up = P.up, cam = g.cam;
-    const evs = g.events.list.filter((e) => e.state === 'open' || e.state === 'active');
-    // keep it above the speed tracker whatever its scale
-    const sp = $('speedo').getBoundingClientRect();
-    this.logEl.style.bottom = `${Math.round(window.innerHeight - sp.top + 8)}px`;
-    this.logEl.style.left = `${Math.round(sp.left)}px`;
-    this.logEl.classList.toggle('hidden', !evs.length || g.state === 'title');
-    const seen = new Set();
-    for (const ev of evs) {
-      seen.add(ev.id);
-      let row = this.logRows.get(ev.id);
-      if (!row) {
-        row = document.createElement('div');
-        row.className = 'dl-row dl-new';
-        row.innerHTML = '<svg class="dl-arrow" viewBox="-10 -10 20 20"><path class="dl-shaft" d="M0 8V-1"/><path class="dl-tip" d="M0 -9.5L6.5 0H-6.5Z"/></svg><span class="dl-name"></span><span class="dl-dist"></span>';
-        this.logEl.prepend(row);
-        this.logRows.set(ev.id, row);
-        setTimeout(() => row.classList.remove('dl-new'), 1200);
+    // rows, layout and text refresh ten times a second; the arrows turn every frame so they track
+    // your view smoothly instead of stepping
+    if (this.logT <= 0) {
+      this.logT = 0.1;
+      // (open events farther than EVENT_RANGE stay off the log; the one you're running always shows)
+      const evs = g.events.list.filter((e) => e.state === 'active' || (e.state === 'open' && this.logTarget(e).distanceTo(P.pos) <= EVENT_RANGE));
+      this.logEl.classList.toggle('hidden', !evs.length || g.state === 'title');
+      const seen = new Set();
+      for (const ev of evs) {
+        seen.add(ev.id);
+        let row = this.logRows.get(ev.id);
+        if (!row) {
+          row = document.createElement('div');
+          row.className = 'dl-row dl-new';
+          row.innerHTML = '<svg class="dl-arrow" viewBox="-10 -10 20 20"><path class="dl-shaft" d="M0 8V-1"/><path class="dl-tip" d="M0 -9.5L6.5 0H-6.5Z"/></svg><span class="dl-name"></span><span class="dl-dist"></span>';
+          row.arrow = row.querySelector('.dl-arrow');
+          this.logEl.prepend(row);
+          this.logRows.set(ev.id, row);
+          setTimeout(() => row.classList.remove('dl-new'), 1200);
+        }
+        row.ev = ev;
+        const col = (FACTIONS[ev.faction] && FACTIONS[ev.faction].color) || '#ffffff';
+        row.style.setProperty('--c', col);
+        row.classList.toggle('dl-active', ev.state === 'active');
+        row.querySelector('.dl-name').textContent = `${ev.icon || ''}${ev.short || ev.title}`.toUpperCase();
+        const dist = this.logTarget(ev).distanceTo(P.pos);
+        row.querySelector('.dl-dist').textContent = dist > 999 ? `${(dist / 1000).toFixed(1)}KM` : `${Math.round(dist / 10) * 10}M`;
       }
-      const col = (FACTIONS[ev.faction] && FACTIONS[ev.faction].color) || '#ffffff';
-      const obj = ev.state === 'active' && g.events.objective();
-      const target = obj ? obj.pos : ev.stage || ev.start;
-      const v = this.v.copy(target).sub(P.pos);
-      const dist = v.length();
+      for (const [id, row] of this.logRows) if (!seen.has(id)) { row.remove(); this.logRows.delete(id); }
+    }
+    for (const row of this.logRows.values()) {
+      const v = this.v.copy(this.logTarget(row.ev)).sub(P.pos);
       v.addScaledVector(up, -v.dot(up));
       const ang = Math.atan2(v.dot(cam.right), v.dot(cam.fwd));
-      row.style.setProperty('--c', col);
-      row.classList.toggle('dl-active', ev.state === 'active');
-      row.querySelector('.dl-arrow').style.transform = `rotate(${ang.toFixed(2)}rad)`;
-      row.querySelector('.dl-name').textContent = `${ev.icon || ''}${ev.short || ev.title}`.toUpperCase();
-      row.querySelector('.dl-dist').textContent = dist > 999 ? `${(dist / 1000).toFixed(1)}KM` : `${Math.round(dist / 10) * 10}M`;
+      const t = `rotate(${ang.toFixed(3)}rad)`;
+      if (row.lastT !== t) { row.lastT = t; row.arrow.style.transform = t; }
     }
-    for (const [id, row] of this.logRows) if (!seen.has(id)) { row.remove(); this.logRows.delete(id); }
+  }
+
+  logTarget(ev) {
+    const g = this.game;
+    const obj = ev.state === 'active' && g.events.objective();
+    return obj ? obj.pos : ev.stage || ev.start;
   }
 
   alert(text, color = '#ff2a4a', dur = 2.5) {
@@ -131,6 +142,32 @@ export class HUD {
     this.bannerT = 4;
   }
 
+  // New-event pop-up: slides in from the right under the territory chip (below the minimap),
+  // holds for 3 s, slides back out to the right. They queue, one at a time.
+  eventPopup(text, color = '#ffd23f') {
+    if (!this.evQ) this.evQ = [];
+    this.evQ.push({ text, color });
+  }
+
+  updateEventPopup(dt) {
+    const el = $('evpop');
+    if (!el) return;
+    if (!this.evCur) {
+      if (!this.evQ || !this.evQ.length) return;
+      this.evCur = this.evQ.shift();
+      this.evT = 0;
+      el.textContent = this.evCur.text;
+      el.style.setProperty('--c', this.evCur.color);
+      el.className = 'pre'; // (parked off the right edge, no transition)
+      el.classList.remove('hidden');
+      void el.offsetWidth;
+      el.className = 'in';
+    }
+    this.evT += dt;
+    if (this.evT >= 0.45 + 3 && el.className === 'in') el.className = 'out';
+    if (this.evT >= 0.45 + 3 + 0.5) { el.className = 'hidden'; this.evCur = null; }
+  }
+
   delivered(info) {
     const el = $('result');
     el.className = 'panel result win';
@@ -161,13 +198,14 @@ export class HUD {
   }
 
   // ---- Job board / shop ----
-  openBoard(loc, offers, { onAccept, onClose, shop, onBuy, upgrades, credits, active, extra, canTake, onAbandon, highlights, rep, event, onEventAbandon }) {
+  openBoard(loc, offers, { onAccept, onClose, shop, onBuy, upgrades, credits, active, extra, canTake, onAbandon, rep, event, onEventAbandon }) {
     const el = $('board');
     const f = FACTIONS[loc.faction];
     const tier = rep.tier(loc.faction);
     // a terminal: a title bar, a strip of little status screens, then one bezelled screen per section
     const node = `${loc.short || loc.id}`.toUpperCase().replace(/[^A-Z0-9]/g, '');
     let html = `<div class="board-head" style="--fc:${f.color}"><span class="term-title">◢ ${loc.name.toUpperCase()} <span class="term-dim">// JOB TERMINAL · NODE ${node}-${String(loc.r).padStart(3, '0')}</span><span class="term-cursor">█</span></span><span class="board-right"><button class="board-close" data-close="1">✕ LOG OFF</button></span></div>`;
+    html += `<div class="board-scroll">`; // (only this part scrolls, so the scroll bar stays between the header and the footer)
     html += `<div class="term-status">
       <div class="term-mini"><label>CREDITS</label><b class="board-credits">₵${credits}</b></div>
       <div class="term-mini"><label>${f.name.toUpperCase()} STANDING</label><b><span class="tierchip" style="background:${tier.color}">${tier.name}</span></b></div>
@@ -213,12 +251,9 @@ export class HUD {
       html += `</div>`;
     }
     html += `</div>`;
-    if (highlights && highlights.length) {
-      html += `<div class="board-hl screen"><h3><span>SCR-03 · HALL OF HIGHLIGHTS</span><span class="term-dim">${highlights.length} FRAME${highlights.length === 1 ? '' : 'S'}</span></h3><div class="hl-strip">`;
-      for (const h of highlights) html += `<figure><img src="${h.url}" alt=""><figcaption>${h.caption}</figcaption></figure>`;
-      html += `</div></div>`;
-    }
-    html += `<div class="board-foot">&gt; Click a contract or press 1-${Math.max(1, offers.length)} · F / ESC to log off<span class="term-cursor">_</span></div>`;
+    html += `</div>`;
+    // (the footer stays on screen while the board scrolls; with a controller in use it names the pad's buttons)
+    html += `<div class="board-foot"><span class="foot-kb">&gt; Click a contract or press 1-${Math.max(1, offers.length)} · F / ESC to log off</span><span class="foot-pad">&gt; Press ${glyphHtml(['A'])} on a contract · ${glyphHtml(['B'])} to log off</span><span class="term-cursor">_</span></div>`;
     el.innerHTML = html;
     el.classList.add('term');
     el.style.setProperty('--fc', f.color);
@@ -293,17 +328,37 @@ export class HUD {
     if (this.toastT > 0 && (this.toastT -= dt) <= 0) $('toast').classList.add('hidden');
     if (this.grabT > 0 && (this.grabT -= dt) <= 0) $('grab').classList.add('hidden');
     if (this.bannerT > 0 && (this.bannerT -= dt) <= 0) $('banner').classList.add('hidden');
+    this.updateEventPopup(dt);
     if (this.resultT > 0) { $('result').classList.remove('hidden'); if ((this.resultT -= dt) <= 0) $('result').classList.add('hidden'); }
 
     this.drawSpeedo(P.speed * 3.6);
     this.distressLog(dt);
     $('hp-fill').style.width = (P.health / P.maxHealth) * 100 + '%';
     $('en-fill').style.width = (P.body.energy / P.body.maxEnergy) * 100 + '%';
+    $('en-fill').style.opacity = P.body.jetLocked ? 0.45 : ''; // dimmed while the thrusters are locked out
     const sk = $('skates');
     const on = P.body.skating;
     sk.textContent = on ? 'Q-LOCK: ENGAGED' : 'Q-LOCK: OFF (BOOTS)';
     sk.classList.toggle('on', on);
-    $('credits').textContent = `₵${g.credits}`;
+    // the cash chip appears for five seconds whenever credits change, with a green + (earned) or a red − (spent)
+    const crEl = $('credits');
+    crEl.querySelector('.cr-amt').textContent = `₵${g.credits}`;
+    if (this.lastCr === undefined) this.lastCr = g.credits;
+    else if (g.credits !== this.lastCr) {
+      const delta = g.credits - this.lastCr, up = delta > 0;
+      this.lastCr = g.credits;
+      const sign = crEl.querySelector('.cr-delta');
+      sign.textContent = `${up ? '+' : '−'}₵${Math.abs(delta)}`;
+      sign.className = `cr-delta ${up ? 'plus' : 'minus'}`;
+      void sign.offsetWidth; // (restarts the slide-in)
+      sign.classList.add('cr-in');
+      crEl.classList.add('cr-show');
+      this.crT = 5;
+    }
+    // (and it stays up while a job board is open, so you can see what you have to spend)
+    if (g.state === 'board') this.crT = Math.max(this.crT || 0, 2); // (lingers two seconds after you log off)
+    else if (this.crT > 0) this.crT -= dt;
+    crEl.classList.toggle('cr-show', this.crT > 0 || g.state === 'board');
     const wi = P.weapon || 0;
     const wtxt = WEAPONS.map((w, i) => `<span class="${i === wi ? 'on' : ''} ${(!w.unlock || g.upgrades[w.unlock]) ? '' : 'locked'}">${i + 1}</span>`).join('') + ` ${WEAPONS[wi].name.toUpperCase()}`;
     if (wtxt !== this.lastW) { $('weaponchip').innerHTML = wtxt; this.lastW = wtxt; }

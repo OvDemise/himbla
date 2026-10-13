@@ -20,7 +20,6 @@ import { HUD } from './hud.js';
 import { Input } from './input.js';
 import { Audio } from './audio.js';
 import { ComicPost } from './post.js';
-import { Highlights } from './highlights.js';
 import { LOCATIONS, SHOPS, FACTIONS } from './locations.js';
 import { Reputation } from './reputation.js';
 import { Events } from './events.js';
@@ -150,7 +149,6 @@ class Game {
     this.scene = new THREE.Scene();
     this.scene.background = new THREE.Color(0x05030c);
     this.camera = new THREE.PerspectiveCamera(72, window.innerWidth / window.innerHeight, 0.5, 9000);
-    this.panelCam = new THREE.PerspectiveCamera(50, 1.6, 0.3, 9000);
 
     this.sun = new THREE.DirectionalLight(0xfff1d6, 1.6);
     this.sun.castShadow = true;
@@ -207,7 +205,6 @@ class Game {
     this.alchemy = new Alchemy(this);
     this.civilians = this.world.civilians = new Civilians(this); // civilians can be hurt (blast hook + ragdolls)
     this.post = new ComicPost(this.renderer, this.camera);
-    this.highlights = new Highlights(this);
 
     this.credits = 250;
     this.stats = { deliveries: 0, bestTrick: 0 };
@@ -266,12 +263,10 @@ class Game {
     window.addEventListener('keydown', wake, true);
     this.damageFlash = 0;
     this.currentZone = null;
-    this.panel = null;
     this.tipIndex = 0;
     this.tipTimer = 2;
     this.hurtCd = 0;
     this.boardCooldown = 0;
-    this.lastCapture = -999;
     this.wasDark = false;
 
     this.settings.autoDetect(this.renderer); // settings: first launch picks a quality preset
@@ -621,9 +616,13 @@ class Game {
     const loc = town && (f === 'kepler' || (this.town && this.town.has('pad'))) ? town
       : f && f !== 'spacecom' ? this.locations.find((l) => l.hq && l.faction === f) : null;
     if (!loc) return { point: this.spawnPoint, facing: this.spawnFacing, loc: this.hub };
+    return this.spotNear(loc);
+  }
+
+  // A clear patch of ground (no buildings) just inside a place, and the way to face from it (cached)
+  spotNear(loc) {
     this._homes = this._homes || {};
     if (!this._homes[loc.id]) {
-      // first clear patch of ground (no buildings) around the HQ
       let point = null;
       for (let rad = loc.r * 0.45; rad < loc.r * 0.9 && !point; rad += 8) {
         for (let k = 0; k < 16 && !point; k++) {
@@ -637,6 +636,26 @@ class Game {
       this._homes[loc.id] = { point, facing, loc };
     }
     return this._homes[loc.id];
+  }
+
+  // The settlement closest to the player that would let them in (null on the Spindle, or with nothing safe)
+  nearestSettlement() {
+    if (!this.player || (this.spindle && this.spindle.active)) return null;
+    const d = this.player.pos.clone().normalize();
+    let best = null, bd = Infinity;
+    for (const l of this.locations) {
+      if (!this.isSafe(l)) continue;
+      const a = arcDist(d, l.dir);
+      if (a < bd) { bd = a; best = l; }
+    }
+    return best;
+  }
+
+  // Where a loaded save puts you: beside the closest settlement to where you were when it was saved
+  // (home when nothing is saved, or the place is no longer open to you)
+  resumeSpot() {
+    const l = this.savedNear && this.locations.find((x) => x.id === this.savedNear);
+    return l && this.isSafe(l) ? this.spotNear(l) : this.home();
   }
 
   objective() {
@@ -665,15 +684,17 @@ class Game {
   }
 
   style(points, label) {
+    // style only pays during a delivery (it pools into the job's bonus); outside one it's just for show
     if (this.missions.active) this.missions.stylePool += points;
-    else this.credits += Math.round(points * 0.15);
-    if (label) this.fx.pop(`${label}! +${points}`, null, { color: '#ff7ad9', size: 44, life: 1.3 });
+    // (and the +points only shows when they count)
+    if (label) this.fx.pop(this.missions.active ? `${label}! +${points}` : `${label}!`, null, { color: '#ff7ad9', size: 44, life: 1.3 });
   }
 
   damagePlayer(amount, cause, from = null) {
     const P = this.player;
     if (P.dead || amount <= 0 || this.cheats.god) return;
     if (this.story.absorb(from)) return;
+    if (cause === 'ram' && this.grind) this.grind.knockOff(P);
     // the vehicle soaks hits (and can be wrecked); a sniper round goes straight through the glass
     if (P.vehicle && cause !== 'sniper') { amount = this.garage.hit(amount); if (amount <= 0) return; }
     P.health -= amount;
@@ -798,27 +819,6 @@ class Game {
     }
   }
 
-  actionPanel(kind, subject, caption) {
-    if (this.panel && this.panel.t > 0.5 && kind === 'launch') return;
-    const pf = this.settings ? this.settings.v.panels : 'normal'; // settings: pop-up frequency
-    if (pf === 'off' || (pf === 'rare' && (kind === 'launch' || kind === 'trick') && this.time - (this.lastPanelAt ?? -999) < 25)) return; // settings
-    this.lastPanelAt = this.time; // settings
-    const captions = {
-      launch: ['MEANWHILE, FORTY METRES UP…', 'NO BRAKES. NO REGRETS.', 'GRAVITY? NEVER HEARD OF IT.', 'THE CRATER COULDN\'T HOLD HER!'],
-      stolen: ['THE SCRAPJAW GANG STRIKES!', 'HEY! THAT\'S MY PACKAGE!'],
-      delivered: ['SIGNED, SEALED, DELIVERED!', 'ANOTHER HAPPY CUSTOMER!'],
-      trick: ['STYLE FOR MILES!'],
-    };
-    const text = caption || pick(captions[kind]);
-    // big moments get pinned to the Hall of Highlights
-    const worthy = kind === 'trick' || kind === 'delivered' || kind === 'stolen' || (kind === 'launch' && this.player.speed > 55);
-    this.panel = { kind, subject, t: 2.6, text, capture: worthy && this.time - this.lastCapture > (this.settings ? this.settings.photoGap() : 15) ? 0.45 : -1 }; // settings
-    document.getElementById('panel-caption').textContent = text;
-    const el = document.getElementById('action-panel');
-    el.classList.remove('hidden');
-    el.classList.remove('slam'); void el.offsetWidth; el.classList.add('slam');
-  }
-
   // ---------- job board ----------
   openBoard(loc) {
     this.tutorial.on('board');
@@ -843,7 +843,6 @@ class Game {
       extra: this.missions.extra && this.missions.extra.a,
       canTake: this.missions.canTake(),
       onAbandon: () => { this.missions.abandon(); this.refreshBoard(); },
-      highlights: loc.id === 'ilmb' ? this.highlights.items : null,
     });
   }
 
@@ -876,7 +875,9 @@ class Game {
 
   save() {
     try {
-      localStorage.setItem(SAVE_KEY, JSON.stringify({ credits: this.credits, stats: this.stats, upgrades: this.upgrades }));
+      // (near: the settlement closest to you, so a load puts you beside it and not back at base)
+      if (this.started && this.state !== 'title') { const n = this.nearestSettlement(); if (n) this.savedNear = n.id; }
+      localStorage.setItem(SAVE_KEY, JSON.stringify({ credits: this.credits, stats: this.stats, upgrades: this.upgrades, near: this.savedNear || null }));
     } catch { /* storage unavailable */ }
     if (this.started && this.saves) this.saves.snapshot(this.slotMeta()); // save slots
   }
@@ -985,7 +986,7 @@ class Game {
     // back from the title tour: put the runner home and the camera behind them
     if (this.tour) {
       if (this.tour.fade) this.tour.fade.style.opacity = '0';
-      const h = this.home();
+      const h = this.ws.bulletin ? this.home() : this.resumeSpot(); // (a finale's new dawn starts at home)
       this.player.respawn(h.point, h.facing);
       this.player.model.root.visible = true;
       this.cam.fwd.copy(h.facing);
@@ -993,6 +994,13 @@ class Game {
       this.camera.fov = 72; this.camera.updateProjectionMatrix();
       this.updateCamera(0.016, true);
       this.tour = null;
+    } else if (this.savedNear && !this.ws.bulletin) {
+      // (no title tour first, e.g. straight back into play after a reload)
+      const h = this.resumeSpot();
+      this.player.respawn(h.point, h.facing);
+      this.cam.fwd.copy(h.facing);
+      this.cam.pitch = -0.1;
+      this.updateCamera(0.016, true);
     }
     document.getElementById('title').classList.add('hidden');
     this.state = 'play';
@@ -1039,6 +1047,7 @@ class Game {
       this.stats = { ...this.stats, ...(d.stats || {}) };
       if (this.stats.smuggled && !this.stats.blackMarket) this.stats.blackMarket = (SHOPS.rustmoon || []).filter((u) => u.unlock && u.unlock.smuggle && u.unlock.n <= this.stats.smuggled).map((u) => u.key);
       this.upgrades = { ...this.upgrades, ...(d.upgrades || {}) };
+      this.savedNear = d.near || null;
     } catch { /* corrupt or unavailable */ }
   }
 
@@ -1097,7 +1106,6 @@ class Game {
     if (this.trailer) this.trailer.post(u);
     this.renderer.setViewport(0, 0, window.innerWidth, window.innerHeight);
     this.post.render(this.scene, this.camera);
-    this.renderPanel(dt);
     this.input.endFrame();
   }
 
@@ -1202,7 +1210,7 @@ class Game {
       if (isDark) this.hud.alert('☾ ENTERING THE DARK SIDE ☾', '#3a2b6f', 3.5);
       else this.hud.alert('☀ BACK IN THE LIGHT', '#ff9f1c', 2.5);
     }
-    document.getElementById('darkchip').classList.toggle('hidden', !isDark);
+    document.getElementById('minimap').classList.toggle('dark', isDark); document.body.classList.toggle('dark-side', isDark); // (the minimap glows purple on the dark side, faint white in the light)
   }
 
   updatePlay(dt) {
@@ -1393,6 +1401,7 @@ class Game {
     const n = P.center.clone().sub(pos).normalize();
     const rel = P.vel.clone().sub(vel).dot(n);
     P.body.pos.addScaledVector(n, r + 1 - d);
+    if (rel < 0 && this.grind) this.grind.knockOff(P, n);
     if (rel < 0) {
       P.vel.addScaledVector(n, -rel * 1.5);
       if (-rel > 12) {
@@ -1424,7 +1433,7 @@ class Game {
     const want = target.clone().addScaledVector(place, -c.dist).addScaledVector(up, scoped ? 0 : 0.8 + (sv ? sv.camHeight : 0)); // settings
     if (sv && sv.shoulder && !scoped) want.addScaledVector(c.right, sv.shoulder); // settings
     // Rail Lance scope: first-person, narrow field of view, runner hidden
-    if (!P.dead && this.state !== 'cutscene') P.model.root.visible = c.dist > 1.2 && !(P.seat && P.seat.hidden);
+    if (!P.dead && this.state !== 'cutscene') P.model.root.visible = c.dist > 1.2 && !(P.seat && P.seat.hidden) && !(P.vehicle && P.vehicle.def.hideRider); // (hideRider: crewed inside, like the BTR-M)
     const scopeEl = document.getElementById('scope');
     if (scopeEl) scopeEl.classList.toggle('hidden', !scoped || c.dist > 1.2);
     const alt = this.planet.altitude(want);
@@ -1480,67 +1489,6 @@ class Game {
     }
   }
 
-  renderPanel(dt) {
-    const p = this.panel;
-    const el = document.getElementById('action-panel');
-    if (!p) return;
-    p.t -= dt;
-    if (p.t <= 0) {
-      el.classList.add('hidden');
-      this.panel = null;
-      return;
-    }
-    const P = this.player;
-    const up = P.up;
-    const side = (f) => new THREE.Vector3().crossVectors(f, up).normalize();
-    let focus, from;
-    if (p.kind === 'villain' && p.subject && p.subject.model) {
-      // close-up on the villain's face
-      focus = p.subject.center.clone().addScaledVector(up, 0.5);
-      const f = p.subject.heading.clone();
-      from = focus.clone().addScaledVector(f, 3.2).addScaledVector(side(f), 1.2).addScaledVector(up, 0.2);
-    } else if (p.kind === 'stolen' && p.subject && !p.subject.dead) {
-      focus = p.subject.center.clone();
-      const hv = tangent(p.subject.body.vel, up);
-      if (hv.lengthSq() < 1) hv.copy(this.cam.fwd);
-      from = focus.clone().addScaledVector(side(hv.normalize()), 9).addScaledVector(up, 3);
-    } else if (p.kind === 'delivered' || p.kind === 'trick') {
-      focus = P.center.clone().addScaledVector(up, 0.4);
-      const fwd = P.heading;
-      from = focus.clone().addScaledVector(fwd, p.kind === 'trick' ? 7 : 4.5).addScaledVector(up, p.kind === 'trick' ? 1.5 : -0.3).addScaledVector(side(fwd), 2);
-    } else {
-      focus = P.center.clone();
-      const hv = tangent(P.vel, up);
-      if (hv.lengthSq() < 1) hv.copy(P.heading);
-      hv.normalize();
-      from = focus.clone().addScaledVector(hv, 10).addScaledVector(up, -5).addScaledVector(side(hv), 5);
-    }
-    const alt = this.planet.altitude(from);
-    if (alt < 0.8) from.addScaledVector(upAt(from), 0.8 - alt);
-    this.panelCam.position.copy(from);
-    this.panelCam.up.copy(up);
-    this.panelCam.lookAt(focus);
-    if (p.capture > 0) {
-      p.capture -= dt;
-      if (p.capture <= 0) {
-        this.lastCapture = this.time;
-        this.highlights.capture(this.panelCam, p.text);
-      }
-    }
-    const r = el.getBoundingClientRect();
-    const inset = 6;
-    const x = r.left + inset, w = r.width - inset * 2, h = r.height - inset * 2;
-    const y = window.innerHeight - r.bottom + inset;
-    this.panelCam.aspect = w / h;
-    this.panelCam.updateProjectionMatrix();
-    const R = this.renderer;
-    R.setScissorTest(true);
-    R.setScissor(x, y, w, h);
-    R.setViewport(x, y, w, h);
-    R.render(this.scene, this.panelCam);
-    R.setScissorTest(false);
-    R.setViewport(0, 0, window.innerWidth, window.innerHeight);
-  }
 }
 
 const game = new Game();
