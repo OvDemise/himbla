@@ -16,6 +16,7 @@ export class Cheats {
     this.game = game;
     this.god = false; // unlimited health
     this.infJet = false; // unlimited jet (thruster energy)
+    this.showFps = false; // frame-rate readout under the minimap
     this.spawnDebug = false; // bottom-right pirate counts + spawn timers overlay
     this.speed = 1; // player speed multiplier, 1 to 10 (player.js)
     // once the dev menu has been opened (F8 / controller combo) it gets a button on the pause card, remembered across launches
@@ -42,8 +43,9 @@ export class Cheats {
       { label: this.speedLabel(), fn: () => { this.setSpeed(this.speed >= 10 ? 1 : this.speed + 1); this.dev(); } },
       { label: '4 · TELEPORT TO RUSTMOON HOLD', fn: () => { const l = g.locations.find((x) => x.id === 'rustmoon'); if (l) this.teleport(l); } },
       { label: `5 · PIRATE SPAWN DEBUG: ${this.spawnDebug ? 'ON' : 'OFF'}`, fn: () => { this.spawnDebug = !this.spawnDebug; this.tick(); this.dev(); } },
-      { label: '6 · FULL CHEAT MENU…', fn: () => this.open() },
-      { label: '7 · CLOSE' },
+      { label: `6 · SHOW FPS: ${this.showFps ? 'ON' : 'OFF'}`, fn: () => { this.showFps = !this.showFps; this.tick(); this.dev(); } },
+      { label: '7 · FULL CHEAT MENU…', fn: () => this.open() },
+      { label: '8 · CLOSE' },
     ]);
     g.dialogButtons.dev = true;
     // the speed row adjusts in place: click / A = +1 (wraps), left / right on a controller (d-pad or stick) = -1 / +1
@@ -66,6 +68,29 @@ export class Cheats {
     if (this.infJet) P.body.energy = P.body.maxEnergy;
     if (this.god && !P.dead) P.health = P.maxHealth;
     this.updateSpawnDebug();
+    this.updateFps();
+  }
+
+  // Frame rate under the minimap, averaged over half a second
+  updateFps() {
+    let el = this.fpsEl;
+    if (!this.showFps) { if (el) el.classList.add('hidden'); this.fpsN = 0; return; }
+    if (!el) {
+      el = this.fpsEl = document.createElement('div');
+      el.id = 'fps-readout';
+      const map = document.getElementById('minimap');
+      (map && map.parentNode ? map.parentNode : document.body).appendChild(el);
+    }
+    el.classList.remove('hidden');
+    const now = performance.now();
+    if (!this.fpsN) { this.fpsN = 0; this.fpsT = now; }
+    this.fpsN++;
+    if (now - this.fpsT >= 500) {
+      const fps = (this.fpsN * 1000) / (now - this.fpsT);
+      el.textContent = `${Math.round(fps)} FPS`;
+      el.style.color = fps >= 55 ? '#7dff3a' : fps >= 30 ? '#ffd23f' : '#ff4a4a';
+      this.fpsN = 0; this.fpsT = now;
+    }
   }
 
   // Dev overlay (bottom right): pirates alive per pool and when the next patrol spawn is attempted
