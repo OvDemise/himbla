@@ -178,7 +178,7 @@ export class Player {
     }
 
     const wish = new THREE.Vector3();
-    const trickHeld = input.down('KeyQ') && !b.grounded && b.airTime > 0.12;
+    const trickHeld = input.down('KeyQ') && !b.grounded && b.airTime > 0.12 && !this.rag;
     if (!trickHeld && input.padMove && input.padMove.on) {
       // a controller's left stick: analog (a gentle push, a gentle carve)
       wish.addScaledVector(cam.fwd, -input.padMove.y).addScaledVector(cam.right, input.padMove.x);
@@ -215,6 +215,12 @@ export class Player {
       dive: this.diveLatch = !b.grounded && !jumpNow && (this.diveLatch || (jumpKey && b.airTime > 0.15)) && (input.down('ShiftLeft') || input.down('ShiftRight')),
       thrustDir,
     };
+    // ragdolling: limp, so no skating, jets, jumping, diving or steering until you're back on your feet
+    if (this.rag) {
+      wish.set(0, 0, 0);
+      ctrl.skates = ctrl.thrust = ctrl.jump = ctrl.dive = false;
+      this.jumpBuf = 0; this.diveLatch = false;
+    }
 
     // driving a faction vehicle: the garage does the physics, you can still shoot
     if (this.vehicle) {
