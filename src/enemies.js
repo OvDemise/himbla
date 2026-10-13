@@ -499,8 +499,13 @@ export class Enemies {
     if (spawned) {
       g.hud.alert(opts.rogue ? 'RENEGADE RAIDERS INBOUND!' : 'PIRATE INTERCEPT INBOUND!', '#7dff3a', 3);
       g.audio.alarm();
-      // now and then the King of Rustmoon comes along for the ride
-      if (!opts.rogue && g.story) g.story.maybeKade();
+      // now and then the King of Rustmoon comes along for the ride (likelier with every squad that
+      // doesn't bring him, until you reach the light)
+      if (!opts.rogue && g.story) {
+        const k = g.story.maybeKade();
+        const pc = (v) => `${Math.round(v * 100)}%`;
+        g.cheats.alertNote(k.rolled ? (k.hit ? `KADE SPAWNED (${pc(k.chance)} chance) · odds reset to ${pc(k.next)}` : `Kade chance ${pc(k.chance)}: missed · next squad ${pc(k.next)}`) : `Kade not rolled: ${k.why} (chance ${pc(k.chance)})`, 3);
+      }
     }
     return spawned;
   }
@@ -664,6 +669,7 @@ export class Enemies {
     const P = g.player;
     const ms = g.missions;
     const dark = darkness(P.up);
+    if (dark < 0.5 && g.story && g.story.kadeChance != null) g.story.kadeChance = null; // (back in the light: Kade's odds reset)
     const aligned = g.rep.aligned();
     const shadow = 1 + (g.upgrades.shadow || 0) * 0.35;
     // pirate blood (a lab mutation) makes the hunters mostly lose interest in you

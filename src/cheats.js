@@ -98,6 +98,24 @@ export class Cheats {
     }
   }
 
+  // Spawn-debug note under the big alert banner (only while the pirate spawn debug is on)
+  alertNote(text, secs) {
+    if (!this.spawnDebug) return;
+    let el = this.noteEl;
+    if (!el) {
+      el = this.noteEl = document.createElement('div');
+      el.id = 'alert-note';
+      document.body.appendChild(el);
+    }
+    const a = document.getElementById('alert');
+    const r = a ? a.getBoundingClientRect() : null;
+    el.style.top = `${r ? r.bottom + 8 : 120}px`;
+    el.textContent = text;
+    el.classList.remove('hidden');
+    clearTimeout(this.noteT);
+    this.noteT = setTimeout(() => el.classList.add('hidden'), secs * 1000);
+  }
+
   // Dev overlay (bottom right): pirates alive per pool and when the next patrol spawn is attempted
   updateSpawnDebug() {
     let el = this.dbgEl;
@@ -121,6 +139,8 @@ export class Cheats {
       `roaming ${roam.length}/${E.maxRoamers()}  (${kinds(roam)})`,
       `dens ${den.length}/${E.maxDen()}  (${kinds(den)})`];
     if (raid.length) rows.push(`event raiders ${raid.length}`);
+    const S = this.game.story;
+    if (S) rows.push(`Kade chance next squad ${Math.round((S.kadeChance ?? 0.08) * 100)}%`);
     rows.push(`total hunters ${roam.length} (dark-side spawns skip at 3+)`);
     rows.push(`<b>NEXT PATROL</b>`);
     if (!d.squadsOn) rows.push(`blocked: ${d.why || '?'}`);
