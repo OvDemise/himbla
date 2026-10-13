@@ -177,6 +177,7 @@ export class HUD {
     // a terminal: a title bar, a strip of little status screens, then one bezelled screen per section
     const node = `${loc.short || loc.id}`.toUpperCase().replace(/[^A-Z0-9]/g, '');
     let html = `<div class="board-head" style="--fc:${f.color}"><span class="term-title">◢ ${loc.name.toUpperCase()} <span class="term-dim">// JOB TERMINAL · NODE ${node}-${String(loc.r).padStart(3, '0')}</span><span class="term-cursor">█</span></span><span class="board-right"><button class="board-close" data-close="1">✕ LOG OFF</button></span></div>`;
+    html += `<div class="board-scroll">`; // (only this part scrolls, so the scroll bar stays between the header and the footer)
     html += `<div class="term-status">
       <div class="term-mini"><label>CREDITS</label><b class="board-credits">₵${credits}</b></div>
       <div class="term-mini"><label>${f.name.toUpperCase()} STANDING</label><b><span class="tierchip" style="background:${tier.color}">${tier.name}</span></b></div>
@@ -221,6 +222,7 @@ export class HUD {
       }
       html += `</div>`;
     }
+    html += `</div>`;
     html += `</div>`;
     // (the footer stays on screen while the board scrolls; with a controller in use it names the pad's buttons)
     html += `<div class="board-foot"><span class="foot-kb">&gt; Click a contract or press 1-${Math.max(1, offers.length)} · F / ESC to log off</span><span class="foot-pad">&gt; Press ${glyphHtml(['A'])} on a contract · ${glyphHtml(['B'])} to log off</span><span class="term-cursor">_</span></div>`;
