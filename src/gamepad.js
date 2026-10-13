@@ -55,12 +55,12 @@ const HOLD = { [B.A]: 'ShiftLeft', [B.B]: 'KeyQ', [B.X]: 'KeyF', [B.Y]: 'KeyV', 
 // the radial menu on d-pad down: everything that has no button of its own, clockwise from the top.
 // `has`: is it yours yet (the wedge stays in place, dimmed, until it is); `code`: the key it presses
 const RADIAL = [
-  { id: 'vehicles', name: 'VEHICLES', has: (g) => g.garage && g.garage.owned().length > 0 },
+  { id: 'vehicles', name: 'VEHICLES', has: (g) => g.garage && (g.garage.owned().length > 0 || !!g.player.vehicle), state: (g) => (g.player.vehicle ? 'GET OUT' : '') },
   { code: 'KeyC', name: 'WARDROBE' },
   { code: 'KeyJ', name: 'REP LOG' },
   { code: 'KeyN', name: 'MUSIC', state: (g) => (g.audio.musicOn === false ? 'OFF' : 'ON') },
   { code: 'KeyH', name: 'HELP' },
-  { code: 'KeyX', name: 'EMPTY JAR', has: (g) => (g.upgrades.jar || 0) > 0 },
+  { id: 'jar', code: 'KeyX', name: 'EMPTY JAR', has: (g) => (g.upgrades.jar || 0) > 0 },
   { code: 'KeyP', name: 'PEN LINK', has: (g) => (g.upgrades.penlink || 0) > 0 },
   { code: 'KeyT', name: 'TELEPORTER', has: (g) => g.story && g.story.tech.includes('teleport') },
 ];
@@ -195,12 +195,19 @@ export class Gamepad {
     // (the right stick picks a wedge while the radial menu is open, so it doesn't look round; A and B
     // are the radial's own buttons then, and aren't a jump or a trick)
     if (!this.radial) this.look(rx, ry, dt);
-    for (const [i, code] of Object.entries(HOLD)) this.set(code, btn[i] && !(this.radial && (i == B.A || i == B.B)));
+    // (A, B and Y are held back while the wheel is open and until they're let go after it closes, so the press that
+    // used or cancelled it isn't also a jump, a trick or the vehicle key a frame later)
+    const hold = !!(this.radial || this.radialMask);
+    if (this.radialMask && !this.radial && !btn[B.A] && !btn[B.B] && !btn[B.Y]) this.radialMask = false;
+    for (const [i, code] of Object.entries(HOLD)) this.set(code, btn[i] && !(hold && (i == B.A || i == B.B || i == B.Y)));
     I.mouse[0] = trig(B.RT) > 0.35;
     I.mouse[2] = trig(B.LT) > 0.35;
-    if (pressed(B.LEFT)) this.cycleWeapon(-1);
-    if (pressed(B.RIGHT)) this.cycleWeapon(1);
-    if (pressed(B.UP)) I.wheelSteps += 1;
+    // (not while the wheel is open or d-pad down is down: a diagonal press on the way to ↓ isn't a weapon swap)
+    if (!this.radial && !btn[B.DOWN]) {
+      if (pressed(B.LEFT)) this.cycleWeapon(-1);
+      if (pressed(B.RIGHT)) this.cycleWeapon(1);
+      if (pressed(B.UP)) I.wheelSteps += 1;
+    }
     // View: a tap opens the map, holding it is the emergency recall (R, held)
     if (btn[B.VIEW]) { this.viewT = this.viewT < 0 ? 0 : this.viewT + dt; this.set('KeyR', this.viewT > 0.35); }
     else if (this.viewT >= 0) { if (this.viewT <= 0.35) this.tap('KeyM'); this.set('KeyR', false); this.viewT = -1; }
@@ -230,9 +237,13 @@ export class Gamepad {
     }
     if (pressed(B.B) || pressed(B.START)) { this.closeRadial(); return; }
     if (pressed(B.A) || pressed(B.DOWN)) {
-      const q = R.sel >= 0 ? RADIAL[R.sel] : null;
-      if (q && q.has && !q.has(g)) { if (g.audio && g.audio.tone) g.audio.tone(180, 0.1, 'sawtooth', 0.05); return; } // (not yours yet: stays open)
+      let q = R.sel >= 0 ? RADIAL[R.sel] : null;
+      const locked = !!(q && q.has && !q.has(g));
+      if (locked && pressed(B.A)) { if (g.audio && g.audio.tone) g.audio.tone(180, 0.1, 'sawtooth', 0.05); return; } // (A on a wedge that isn't yours yet: stays open)
+      if (locked) q = null; // (d-pad ↓ on one just closes the wheel)
       this.closeRadial();
+      // (a held d-pad ↓ must not also step the highlight in whatever screen this opens)
+      if (pressed(B.DOWN)) { this.navDir = 'down'; this.navT = 0.38; }
       if (q) this.useRadial(q);
       return;
     }
@@ -241,17 +252,23 @@ export class Gamepad {
 
   useRadial(q) {
     const g = this.game;
-    if (q.id === 'vehicles') g.garage.pick();
+    if (q.id === 'vehicles') {
+      // (the same guards as the V key: nothing on a transit ride or right after a screen closes; inside a vehicle it gets you out)
+      if (g.rides.ride || g.boardCooldown > 0) return;
+      if (g.player.vehicle) g.garage.exit(); else g.garage.pick();
+    } else if (q.id === 'jar') g.alchemy.empty(false); // (the X key needs a one-second hold: this is already a deliberate pick)
     else this.pulse(q.code);
   }
 
   openRadial() {
-    this.radial = { sel: -1 };
+    if (this.game.garage && this.game.garage.radial) return; // (the hold-Y vehicle picker is up)
+    this.radial = { sel: -1, hub: '' };
     this.drawRadial(true);
     if (this.game.audio && this.game.audio.tone) this.game.audio.tone(520, 0.08, 'triangle', 0.12);
   }
 
   closeRadial() {
+    if (this.radial) this.radialMask = true;
     this.radial = null;
     const el = document.getElementById('padradial');
     if (el) el.classList.add('hidden');
@@ -273,15 +290,14 @@ export class Gamepad {
         const a = (i / n) * Math.PI * 2 - Math.PI / 2;
         const locked = q.has && !q.has(g);
         const st = q.state ? ` <small>${q.state(g)}</small>` : '';
-        return `<div class="pr-item${locked ? ' locked' : ''}" data-i="${i}" style="left:${50 + Math.cos(a) * 36}%;top:${50 + Math.sin(a) * 36}%"><b>${q.name}</b>${locked ? '<small>LOCKED</small>' : st}</div>`;
+        return `<div class="pr-item${locked ? ' locked' : ''}" data-i="${i}" style="left:${50 + Math.cos(a) * 38}%;top:${50 + Math.sin(a) * 38}%"><b>${q.name}</b>${locked ? '<small>LOCKED</small>' : st}</div>`;
       }).join('');
       el.classList.remove('hidden');
     }
     el.querySelectorAll('.pr-item').forEach((it) => it.classList.toggle('on', +it.dataset.i === R.sel));
     const q = R.sel >= 0 ? RADIAL[R.sel] : null;
-    const hub = `${q ? `<b>${q.name}</b>` : 'MENU'}<small>${glyphHtml(['RS'])} pick · ${glyphHtml(['A'])} use · ${glyphHtml(['B'])} cancel</small>`;
-    const h = el.querySelector('.pr-hub');
-    if (h.innerHTML !== hub) h.innerHTML = hub;
+    const hub = `${q ? `<b>${q.name}</b>` : 'MENU'}<small><span>${glyphHtml(['RS'])} pick</span><span>${glyphHtml(['A'])} use</span><span>${glyphHtml(['B'])} cancel</span></small>`;
+    if (R.hub !== hub) { R.hub = hub; el.querySelector('.pr-hub').innerHTML = hub; }
   }
   // a key held for a couple of frames (some actions read it held, some on the press)
   pulse(code) {
