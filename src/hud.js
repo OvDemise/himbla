@@ -326,7 +326,10 @@ export class HUD {
       crEl.classList.add('cr-show');
       this.crT = 5;
     }
-    if (this.crT > 0 && (this.crT -= dt) <= 0) crEl.classList.remove('cr-show');
+    // (and it stays up while a job board is open, so you can see what you have to spend)
+    if (g.state === 'board') this.crT = Math.max(this.crT || 0, 2); // (lingers two seconds after you log off)
+    else if (this.crT > 0) this.crT -= dt;
+    crEl.classList.toggle('cr-show', this.crT > 0 || g.state === 'board');
     const wi = P.weapon || 0;
     const wtxt = WEAPONS.map((w, i) => `<span class="${i === wi ? 'on' : ''} ${(!w.unlock || g.upgrades[w.unlock]) ? '' : 'locked'}">${i + 1}</span>`).join('') + ` ${WEAPONS[wi].name.toUpperCase()}`;
     if (wtxt !== this.lastW) { $('weaponchip').innerHTML = wtxt; this.lastW = wtxt; }
