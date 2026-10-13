@@ -58,7 +58,7 @@ const RADIAL = [
   { id: 'vehicles', name: 'VEHICLES', has: (g) => g.garage && (g.garage.owned().length > 0 || !!g.player.vehicle), state: (g) => (g.player.vehicle ? 'GET OUT' : '') },
   { code: 'KeyC', name: 'WARDROBE' },
   { code: 'KeyJ', name: 'REP LOG' },
-  { code: 'KeyN', name: 'MUSIC', state: (g) => (g.audio.musicOn === false ? 'OFF' : 'ON') },
+  { code: 'KeyN', name: 'MUSIC', keep: true, state: (g) => (g.audio.musicOn === false ? 'OFF' : 'ON') },
   { code: 'KeyH', name: 'HELP' },
   { id: 'jar', code: 'KeyX', name: 'EMPTY JAR', has: (g) => (g.upgrades.jar || 0) > 0 },
   { code: 'KeyP', name: 'PEN LINK', has: (g) => (g.upgrades.penlink || 0) > 0 },
@@ -241,6 +241,11 @@ export class Gamepad {
       const locked = !!(q && q.has && !q.has(g));
       if (locked && pressed(B.A)) { if (g.audio && g.audio.tone) g.audio.tone(180, 0.1, 'sawtooth', 0.05); return; } // (A on a wedge that isn't yours yet: stays open)
       if (locked) q = null; // (d-pad ↓ on one just closes the wheel)
+      if (q && q.keep) {
+        // (a toggle, like music: A flips it and the wheel stays up; d-pad ↓ closes it)
+        if (pressed(B.A)) { this.useRadial(q); this.drawRadial(); return; }
+        q = null;
+      }
       this.closeRadial();
       // (a held d-pad ↓ must not also step the highlight in whatever screen this opens)
       if (pressed(B.DOWN)) { this.navDir = 'down'; this.navT = 0.38; }
@@ -289,12 +294,17 @@ export class Gamepad {
       el.innerHTML = '<div class="pr-ring"></div><div class="pr-hub"></div>' + RADIAL.map((q, i) => {
         const a = (i / n) * Math.PI * 2 - Math.PI / 2;
         const locked = q.has && !q.has(g);
-        const st = q.state ? ` <small>${q.state(g)}</small>` : '';
+        const st = q.state ? `<small>${q.state(g)}</small>` : '';
         return `<div class="pr-item${locked ? ' locked' : ''}" data-i="${i}" style="left:${50 + Math.cos(a) * 38}%;top:${50 + Math.sin(a) * 38}%"><b>${q.name}</b>${locked ? '<small>LOCKED</small>' : st}</div>`;
       }).join('');
       el.classList.remove('hidden');
     }
-    el.querySelectorAll('.pr-item').forEach((it) => it.classList.toggle('on', +it.dataset.i === R.sel));
+    el.querySelectorAll('.pr-item').forEach((it) => {
+      const i = +it.dataset.i, q = RADIAL[i];
+      it.classList.toggle('on', i === R.sel);
+      // (labels that show a state, like music ON / OFF, follow it while the wheel is up)
+      if (q.state && !it.classList.contains('locked')) { const s = it.querySelector('small'), t = q.state(g); if (s && s.textContent !== t) s.textContent = t; }
+    });
     const q = R.sel >= 0 ? RADIAL[R.sel] : null;
     const hub = `${q ? `<b>${q.name}</b>` : 'MENU'}<small><span>${glyphHtml(['RS'])} pick</span><span>${glyphHtml(['A'])} use</span><span>${glyphHtml(['B'])} cancel</span></small>`;
     if (R.hub !== hub) { R.hub = hub; el.querySelector('.pr-hub').innerHTML = hub; }
