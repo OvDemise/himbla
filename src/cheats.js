@@ -120,6 +120,7 @@ export class Cheats {
       `roaming ${roam.length}/${E.maxRoamers()}  (${kinds(roam)})`,
       `dens ${den.length}/${E.maxDen()}  (${kinds(den)})`];
     if (raid.length) rows.push(`event raiders ${raid.length}`);
+    rows.push(`total hunters ${roam.length} (dark-side spawns skip at 3+)`);
     rows.push(`<b>NEXT PATROL</b>`);
     if (!d.squadsOn) rows.push(`blocked: ${d.why || '?'}`);
     else {
@@ -129,7 +130,7 @@ export class Cheats {
     rows.push(`den check ${t(E.lairTimer)}`);
     const dt = E.dbgDarkTry, s = E.dbgSpawn;
     rows.push(`<b>LAST SQUAD ATTEMPT</b>`);
-    rows.push(dt ? `dark-side timer fired ×${dt.n}, last ${t(this.game.time - dt.at)} ago${dt.skip ? ' (skipped: 3+ hunters out)' : ''}` : 'dark-side timer has not fired yet');
+    rows.push(dt ? `dark-side timer fired ×${dt.n}, last ${t(this.game.time - dt.at)} ago${dt.skip ? ` (skipped: ${dt.hunters} hunters out, needs <3)` : ` (${dt.hunters} hunters out)`}` : 'dark-side timer has not fired yet');
     rows.push(s ? `spawner ${t(this.game.time - s.at)} ago: wanted ${s.want} · tries ${s.tries} · in a settlement zone ${s.zoned} · spawned ${s.spawned}` : 'spawner has not run yet');
     el.innerHTML = rows.join('<br>');
   }

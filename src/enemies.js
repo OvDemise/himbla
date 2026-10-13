@@ -690,9 +690,9 @@ export class Enemies {
       if (dark > 0.5) {
         this.darkTimer -= dt * blood;
         if (this.darkTimer <= 0) {
-          const skip = this.hunters() >= 3;
+          const nh = this.hunters(), skip = nh >= 3;
           const got = skip ? 1 : this.spawnSquad(1 + Math.floor(Math.random() * 2));
-          this.dbgDarkTry = { at: g.time, n: (this.dbgDarkTry ? this.dbgDarkTry.n : 0) + 1, skip, got }; // (dev overlay)
+          this.dbgDarkTry = { at: g.time, n: (this.dbgDarkTry ? this.dbgDarkTry.n : 0) + 1, skip, got, hunters: nh }; // (dev overlay)
           this.darkTimer = got ? randRange(20, 34) : 4; // (a failed attempt tries again soon)
           this.pirateTimer = Math.max(this.pirateTimer, 14);
         }
