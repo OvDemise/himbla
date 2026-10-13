@@ -1120,7 +1120,10 @@ body.trailer #vehbar { display: none !important; }
 #board.term .bubble { background: #0f1c16; border-color: #2f4a3c; }
 #board.term .bubble::before { border-right-color: #2f4a3c; }
 #board.term .job.premium { border-left-color: var(--yellow); background: #18170f; }
-#board.term .board-foot { color: var(--ph-dim); font-family: var(--comic); font-size: 8px; }
+#board.term .board-foot { color: var(--ph-dim); font-family: var(--comic); font-size: 8px; position: sticky; bottom: 0; z-index: 5; background: #07060d; border-top: 2px solid #23302a; padding: 8px 14px 10px; display: flex; align-items: center; gap: 3px; flex-wrap: wrap; }
+#board .foot-pad { display: none; align-items: center; gap: 5px; }
+body.pad-on #board .foot-pad { display: inline-flex; }
+body.pad-on #board .foot-kb { display: none; }
 @media (max-width: 700px) { #board.term .term-status { grid-template-columns: 1fr; } }
 /* the Monolith's time dilation: a cold, slow-shutter edge round the screen */
 #dilate {

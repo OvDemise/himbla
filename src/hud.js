@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { glyphHtml } from './glyphs.js';
 import { NAME_TAGS } from './toon.js';
 import { FACTIONS } from './locations.js';
 import { arcDist, darkness, upAt } from './geo.js';
@@ -221,7 +222,8 @@ export class HUD {
       html += `</div>`;
     }
     html += `</div>`;
-    html += `<div class="board-foot">&gt; Click a contract or press 1-${Math.max(1, offers.length)} · F / ESC to log off<span class="term-cursor">_</span></div>`;
+    // (the footer stays on screen while the board scrolls; with a controller in use it names the pad's buttons)
+    html += `<div class="board-foot"><span class="foot-kb">&gt; Click a contract or press 1-${Math.max(1, offers.length)} · F / ESC to log off</span><span class="foot-pad">&gt; Press ${glyphHtml(['A'])} on a contract · ${glyphHtml(['B'])} to log off</span><span class="term-cursor">_</span></div>`;
     el.innerHTML = html;
     el.classList.add('term');
     el.style.setProperty('--fc', f.color);
