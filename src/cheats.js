@@ -127,6 +127,8 @@ export class Cheats {
       rows.push(`cargo run ${d.carrying ? t(E.pirateTimer) : 'idle (no cargo)'}`);
     }
     rows.push(`den check ${t(E.lairTimer)}`);
+    const s = E.dbgSpawn;
+    if (s) rows.push(`<b>LAST SQUAD ATTEMPT</b> ${t(this.game.time - s.at)} ago`, `wanted ${s.want} · tries ${s.tries} · in a settlement zone ${s.zoned} · spawned ${s.spawned}`);
     el.innerHTML = rows.join('<br>');
   }
 

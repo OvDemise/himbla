@@ -478,16 +478,21 @@ export class Enemies {
     if (dir.lengthSq() < 4) dir.copy(g.cam.fwd);
     dir.normalize();
     n = Math.min(n, MAX_ROAMERS - this.roamCount());
-    let spawned = 0;
-    for (let i = 0; i < n * 3 && spawned < n; i++) {
-      const t = dir.clone().applyAxisAngle(up, (Math.random() - 0.5) * 2.2);
+    let spawned = 0, tries = 0, zoned = 0;
+    // (a few tries ahead of you first, then anywhere round you: settlements near a dark-side den can
+    // cover the whole forward arc)
+    for (let i = 0; i < Math.max(8, n * 4) && spawned < n; i++) {
+      tries++;
+      const spread = i < n * 3 ? 2.2 : Math.PI * 2;
+      const t = dir.clone().applyAxisAngle(up, (Math.random() - 0.5) * spread);
       const d = greatCircle(up, t, randRange(320, 520));
-      if (g.zoneAt(d, 1.4)) continue;
+      if (g.zoneAt(d, 1.4)) { zoned++; continue; }
       const kind = this.huntKind(spawned === 0);
       if (!kind) break;
       this.spawnPirate(kind, d, null, opts);
       spawned++;
     }
+    this.dbgSpawn = { at: g.time, want: n, tries, zoned, spawned, roam: this.roamCount() }; // (dev overlay)
     if (spawned) {
       g.hud.alert(opts.rogue ? 'RENEGADE RAIDERS INBOUND!' : 'PIRATE INTERCEPT INBOUND!', '#7dff3a', 3);
       g.audio.alarm();
@@ -685,8 +690,8 @@ export class Enemies {
       if (dark > 0.5) {
         this.darkTimer -= dt * blood;
         if (this.darkTimer <= 0) {
-          if (this.hunters() < 3) this.spawnSquad(1 + Math.floor(Math.random() * 2));
-          this.darkTimer = randRange(20, 34);
+          const got = this.hunters() < 3 ? this.spawnSquad(1 + Math.floor(Math.random() * 2)) : 1;
+          this.darkTimer = got ? randRange(20, 34) : 4; // (a failed attempt tries again soon)
           this.pirateTimer = Math.max(this.pirateTimer, 14);
         }
       }
