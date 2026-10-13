@@ -114,6 +114,56 @@ export class Player {
     t.flip = t.spin = 0;
     t.active = false;
     this.model.trick.rotation.set(0, 0, 0);
+    this.model.trick.position.y = 1.2;
+    this.rag = null;
+  }
+
+  // A wipeout: the runner goes limp. A tumble (flipping on the way down, limbs flailing), a sprawl
+  // flat on the ground, then getting back up. Purely the model's pose (you keep your momentum and
+  // your controls); animate() paints it over the usual pose.
+  startRagdoll(flip = 0, spin = 0) {
+    const dir = flip < 0 ? -1 : 1;
+    this.rag = {
+      t: 0, dur: 2.2, flip, spin,
+      fv: dir * (7 + 5 * Math.min(1, this.speed / 40)), // tumble rate, rad/s
+      sv: (Math.random() - 0.5) * 6,
+      lie: 0, face: Math.random() < 0.5 ? 1 : -1, ph: Math.random() * 6,
+    };
+  }
+
+  updateRagdoll(dt) {
+    const R = this.rag;
+    const m = this.model;
+    R.t += dt;
+    const TUMBLE = 0.9, UP = 1.7; // (end of the tumble, start of getting up)
+    const k = Math.exp(-2.2 * dt);
+    if (R.t < TUMBLE) { R.fv *= k; R.sv *= k; R.flip += R.fv * dt; R.spin += R.sv * dt; }
+    // where it ends up lying: on its back or its front, (nearly) flat
+    const lieFlip = Math.round((R.flip - R.face * Math.PI / 2) / Math.PI) * Math.PI + R.face * Math.PI / 2;
+    let lie = 0, getUp = 0; // lie: how flat on the ground; getUp: how far through standing back up
+    if (R.t >= TUMBLE) {
+      lie = Math.min(1, (R.t - TUMBLE) / 0.35);
+      R.flip += (lieFlip - R.flip) * Math.min(1, dt * 9);
+      R.spin *= Math.exp(-4 * dt);
+    }
+    if (R.t >= UP) getUp = Math.min(1, (R.t - UP) / (R.dur - UP));
+    const s = getUp * getUp * (3 - 2 * getUp);
+    const full = Math.PI * 2;
+    const flip = R.flip * (1 - s) + Math.round(R.flip / full) * full * s;
+    m.trick.rotation.set(flip, R.spin * (1 - s), 0, 'YXZ');
+    m.trick.position.y = 1.2 - 0.85 * lie * (1 - s); // (flat on the ground, not hovering at standing height)
+    // limbs: flail while tumbling, loll when down, and come back to the stance as it gets up
+    const fl = (1 - lie) * (1 - s), t = R.t * 14 + R.ph;
+    const rest = (1 - s);
+    m.legL.rotation.x = (Math.sin(t) * 1.1 * fl + 0.5 * lie) * rest;
+    m.legR.rotation.x = (Math.sin(t + 2.3) * 1.1 * fl - 0.25 * lie) * rest;
+    m.armL.rotation.x = Math.sin(t * 0.9 + 1) * 1.4 * fl * rest;
+    m.armR.rotation.x = Math.sin(t * 0.9 + 3) * 1.4 * fl * rest;
+    m.armL.rotation.z = (-0.6 - Math.sin(t * 1.2) * 0.8 * fl - 0.7 * lie) * rest;
+    m.armR.rotation.z = (0.6 + Math.sin(t * 1.2 + 2) * 0.8 * fl + 0.7 * lie) * rest;
+    m.torso.rotation.x = Math.sin(t * 0.7) * 0.35 * fl * rest;
+    m.head.rotation.x = Math.sin(t * 1.1 + 1) * 0.4 * (1 - s);
+    if (R.t >= R.dur) { this.rag = null; m.trick.position.y = 1.2; m.trick.rotation.set(0, 0, 0); m.head.rotation.x = 0; }
   }
 
   update(dt, input, cam) {
@@ -384,6 +434,7 @@ export class Player {
       }
       this.model.trick.rotation.set(t.flip, t.spin, 0, 'YXZ');
     }
+    let wiped = false;
     if (landedAfter >= 0 && t.active) {
       const flips = Math.round(Math.abs(t.flip) / TAU);
       const spins = Math.round(Math.abs(t.spin) / TAU);
@@ -409,8 +460,11 @@ export class Player {
         g.missions.jostle(18, true);
         g.audio.thud(30);
         this.trickLanding = true;
+        wiped = true;
       }
+      const ragFlip = t.flip, ragSpin = t.spin;
       this.resetTrick();
+      if (wiped) this.startRagdoll(ragFlip, ragSpin);
     } else if (b.grounded && !t.active) {
       this.model.trick.rotation.set(0, 0, 0);
     }
@@ -505,6 +559,7 @@ export class Player {
       m.armL.rotation.x = -s * 0.8 * run; m.armR.rotation.x = s * 0.8 * run;
       m.armL.rotation.z = -0.15; m.armR.rotation.z = 0.15;
     }
+    if (this.rag) this.updateRagdoll(dt);
     // physics scarf: hangs at rest, streams with speed, drapes over whatever is on your back
     if (!this.scarfSim) this.scarfSim = new ScarfSim(m);
     // (a crate on your back, or the Kepler twin stack, is taller and wider than the pack)
