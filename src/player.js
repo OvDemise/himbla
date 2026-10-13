@@ -489,6 +489,7 @@ export class Player {
       g.damagePlayer(dmg, 'impact');
       g.fx.pop(it.speed - safe > 12 ? 'KRA-KOOM!' : 'KRAK!', this.body.pos.clone().addScaledVector(this.up, 2), { color: '#ff4f2e', size: 54 });
       g.fx.dust(this.body.pos, this.body.vel, 14, this.up);
+      if (!this.rag && !this.vehicle && !this.dead) this.startRagdoll(it.kind === 'ground' ? 0 : -1); // (a wall throws you back-first)
     } else if (it.speed > 9) {
       g.fx.dust(this.body.pos, this.body.vel, 5, this.up);
     }
