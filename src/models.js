@@ -999,6 +999,42 @@ export function rWheel(r, w, hub = VMETAL) {
   });
 }
 
+// A flag that waves in the wind: a small cloth hung from the top of its pole, streaming back (-z)
+// from the hoist. update(t, speed) ripples it; faster means it flies out flatter and flaps harder.
+// ragged: a torn bottom edge (the Rustmoon rag).
+function makeWaveFlag({ w, h, mat, ragged = false }) {
+  const NX = 10, NY = 4;
+  const geo = new THREE.PlaneGeometry(w, h, NX, NY).translate(-w / 2, -h / 2, 0).rotateY(-Math.PI / 2); // z in [-w, 0], y in [-h, 0]
+  const pos = geo.attributes.position;
+  const base = Float32Array.from(pos.array);
+  if (ragged) {
+    for (let i = 0; i < pos.count; i++) {
+      const u = -base[i * 3 + 2] / w;
+      base[i * 3 + 1] *= 1 - 0.55 * u * (0.5 + 0.5 * Math.abs(Math.sin(u * 14)));
+    }
+  }
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.castShadow = true;
+  mesh.frustumCulled = false;
+  const phase = Math.random() * 10;
+  const update = (t, speed = 0) => {
+    const k = Math.min(1, speed / 28);
+    for (let i = 0; i < pos.count; i++) {
+      const z0 = base[i * 3 + 2], y0 = base[i * 3 + 1];
+      const u = -z0 / w, v = -y0 / h;
+      const wave = Math.sin(t * (5 + 8 * k) - u * 6 + v * 0.9 + phase);
+      pos.setXYZ(i,
+        wave * (0.05 + 0.3 * k) * w * u,                                  // sideways ripple, bigger toward the tip
+        y0 - (1 - 0.85 * k) * 0.3 * h * u * u + Math.cos(t * (4 + 6 * k) - u * 5 + phase) * 0.04 * h * u * (0.4 + k), // droops at rest, flies level at speed
+        z0 * (1 - (1 - k) * 0.18 * u));                                   // (a limp flag hangs a little shorter)
+    }
+    pos.needsUpdate = true;
+    geo.computeVertexNormals();
+  };
+  update(0, 0);
+  return { mesh, update };
+}
+
 // Rovers: pirate war-rigs, military patrol cars and civilian buggies share one layout (body 3.2
 // x 5.2, wheels at (±1.85, 0.85, ±1.8), gun mount at (0, 3, 0.8), loot slot on the chassis) so the
 // AI, traffic and faction-vehicle code drive them all the same way. style: pirate | military | civil.
@@ -1105,8 +1141,10 @@ export function makeRover({ color = 0x7b2ff7, trim = 0xffd23f, pirate = true, fl
   // flag on a whip pole at the back
   const flagM = toon(flag, { side: THREE.DoubleSide });
   chassis.add(part(new THREE.CylinderGeometry(0.05, 0.05, 3), toon(VDARK), -1.2, 3.6, -2.2, 0.02));
-  chassis.add(part(new THREE.PlaneGeometry(1.4, 0.9), flagM, -1.9, 4.6, -2.2, 0));
-  if (style === 'pirate') chassis.add(part(new THREE.SphereGeometry(0.22, 8, 6), toon(0xffffff), -1.9, 4.65, -2.17, 0));
+  // (the cloth hangs from the pole's top and streams back; the vehicle code drives it through anim)
+  const cloth = makeWaveFlag({ w: 1.4, h: 0.9, mat: flagM });
+  cloth.mesh.position.set(-1.2, 5.05, -2.2);
+  chassis.add(cloth.mesh);
   const wheels = [];
   for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
     const w = rWheel(0.85, 0.7);
@@ -1114,7 +1152,7 @@ export function makeRover({ color = 0x7b2ff7, trim = 0xffd23f, pirate = true, fl
     root.add(w);
     wheels.push(w);
   }
-  return { root, chassis, gun, wheels };
+  return { root, chassis, gun, wheels, anim: cloth.update };
 }
 
 // ---- transit ships: tools/blender/build_ships.py exports src/assets/ships.glb ----
@@ -1380,6 +1418,7 @@ export function makeWarRig({ color = 0x7b2ff7, trim = 0x7dff3a } = {}) {
     g.position.copy(node.pos);
     g.quaternion.copy(node.quat);
     for (const { slot, geo } of node.parts) {
+      if (slot === 'flag') continue; // (the rag is cloth now: below)
       const m = new THREE.Mesh(geo, matFor(slot));
       m.castShadow = RIG_GLOW[slot] === undefined;
       g.add(m);
@@ -1390,6 +1429,12 @@ export function makeWarRig({ color = 0x7b2ff7, trim = 0x7dff3a } = {}) {
       h.userData.isInk = true;
       g.add(h);
     }
+    if (node.role === 'chassis') {
+      // the tattered rag on its whip pole waves in the wind
+      out.cloth = makeWaveFlag({ w: 1.3, h: 0.9, mat: matFor('flag'), ragged: true });
+      out.cloth.mesh.position.set(-1.2, 4.55, -2.25);
+      g.add(out.cloth.mesh);
+    }
     if (node.role === 'chassis') out.chassis = g;
     else if (node.role === 'gun') out.gun = g;
     else if (node.role === 'wheel') out.wheels.push(g);
@@ -1399,7 +1444,7 @@ export function makeWarRig({ color = 0x7b2ff7, trim = 0x7dff3a } = {}) {
   const root = build(B);
   root.position.set(0, 0, 0);
   root.quaternion.identity();
-  return { root, chassis: out.chassis, gun: out.gun, wheels: out.wheels };
+  return { root, chassis: out.chassis, gun: out.gun, wheels: out.wheels, anim: out.cloth.update };
 }
 
 // Shuttle-bus: a fat lifting-body hopper with a wraparound windscreen, porthole windows, two
