@@ -311,7 +311,22 @@ export class HUD {
     const on = P.body.skating;
     sk.textContent = on ? 'Q-LOCK: ENGAGED' : 'Q-LOCK: OFF (BOOTS)';
     sk.classList.toggle('on', on);
-    $('credits').textContent = `₵${g.credits}`;
+    // the cash chip appears for five seconds whenever credits change, with a green + (earned) or a red − (spent)
+    const crEl = $('credits');
+    crEl.querySelector('.cr-amt').textContent = `₵${g.credits}`;
+    if (this.lastCr === undefined) this.lastCr = g.credits;
+    else if (g.credits !== this.lastCr) {
+      const up = g.credits > this.lastCr;
+      this.lastCr = g.credits;
+      const sign = crEl.querySelector('.cr-sign');
+      sign.textContent = up ? '+' : '−';
+      sign.className = `cr-sign ${up ? 'plus' : 'minus'}`;
+      void sign.offsetWidth; // (restarts the pop)
+      sign.classList.add('pop');
+      crEl.classList.add('cr-show');
+      this.crT = 5;
+    }
+    if (this.crT > 0 && (this.crT -= dt) <= 0) crEl.classList.remove('cr-show');
     const wi = P.weapon || 0;
     const wtxt = WEAPONS.map((w, i) => `<span class="${i === wi ? 'on' : ''} ${(!w.unlock || g.upgrades[w.unlock]) ? '' : 'locked'}">${i + 1}</span>`).join('') + ` ${WEAPONS[wi].name.toUpperCase()}`;
     if (wtxt !== this.lastW) { $('weaponchip').innerHTML = wtxt; this.lastW = wtxt; }
