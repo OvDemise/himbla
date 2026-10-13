@@ -660,8 +660,8 @@ class Game {
   }
 
   style(points, label) {
+    // style only pays during a delivery (it pools into the job's bonus); outside one it's just for show
     if (this.missions.active) this.missions.stylePool += points;
-    else this.credits += Math.round(points * 0.15);
     if (label) this.fx.pop(`${label}! +${points}`, null, { color: '#ff7ad9', size: 44, life: 1.3 });
   }
 
