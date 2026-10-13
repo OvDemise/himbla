@@ -69,7 +69,7 @@ button { font-family: var(--comic); }
 }
 #fps-readout { align-self: stretch; text-align: center; font: 13px/1.2 monospace; padding: 3px 0; background: rgba(5, 3, 12, 0.78); border: 1px solid var(--ui-edge); pointer-events: none; }
 #fps-readout.hidden { display: none; }
-#undermap #terrchip.chip { max-width: 100%; width: auto; }
+#undermap #terrchip.chip { width: 100%; max-width: 100%; box-sizing: border-box; text-align: center; text-wrap: balance; overflow-wrap: anywhere; }
 #undermap { position: absolute; top: 242px; right: 16px; width: 210px; display: flex; flex-direction: column; gap: 6px; align-items: flex-end; }
 #minimap.big { width: min(560px, 80vmin); height: min(560px, 80vmin); top: 50%; right: 50%; transform: translate(50%, -50%); border-radius: 0; }
 
