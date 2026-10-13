@@ -83,8 +83,7 @@ export class Cheats {
     if (!el) {
       el = this.fpsEl = document.createElement('div');
       el.id = 'fps-readout';
-      const map = document.getElementById('minimap');
-      (map && map.parentNode ? map.parentNode : document.body).appendChild(el);
+      (document.getElementById('undermap') || document.body).appendChild(el);
     }
     el.classList.remove('hidden');
     const now = performance.now();

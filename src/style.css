@@ -67,8 +67,10 @@ button { font-family: var(--comic); }
   position: absolute; top: 16px; right: 16px; width: 210px; height: 210px;
   border: 2px solid var(--ui-edge); box-shadow: 0 0 0 2px #05030c, var(--ui-shadow); border-radius: 50%; background: #1a1530;
 }
-#fps-readout { position: absolute; top: 242px; right: 16px; width: 210px; text-align: center; font: 13px/1.2 monospace; padding: 3px 0; background: rgba(5, 3, 12, 0.78); border: 1px solid var(--ui-edge); pointer-events: none; }
+#fps-readout { align-self: stretch; text-align: center; font: 13px/1.2 monospace; padding: 3px 0; background: rgba(5, 3, 12, 0.78); border: 1px solid var(--ui-edge); pointer-events: none; }
 #fps-readout.hidden { display: none; }
+#undermap #terrchip.chip { max-width: 100%; width: auto; }
+#undermap { position: absolute; top: 242px; right: 16px; width: 210px; display: flex; flex-direction: column; gap: 6px; align-items: flex-end; }
 #minimap.big { width: min(560px, 80vmin); height: min(560px, 80vmin); top: 50%; right: 50%; transform: translate(50%, -50%); border-radius: 0; }
 
 /* ---------- speedometer / instrument panel (bottom-left) ---------- */
@@ -266,7 +268,7 @@ body:has(#title:not(.hidden)) #hud { visibility: hidden; }
 @media (max-width: 800px) {
   #speedo { transform: scale(0.8); transform-origin: bottom left; }
   #minimap { width: 140px; height: 140px; }
-  #fps-readout { top: 172px; width: 140px; }
+  #undermap { top: 172px; width: 140px; }
   #mission, #eventpanel { width: 260px; }
   .b-name { font-size: 20px; }
   #alert { font-size: 13px; white-space: normal; max-width: calc(100vw - 32px); text-align: center; }

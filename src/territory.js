@@ -63,8 +63,7 @@ export class Territory {
     this.chip = document.createElement('div');
     this.chip.id = 'terrchip';
     this.chip.className = 'chip terr hidden';
-    const tl = document.getElementById('topleft');
-    tl.insertBefore(this.chip, tl.children[2] || null);
+    document.getElementById('undermap').appendChild(this.chip); // (the territory chip sits under the minimap)
     this.genOutposts();
     this.flatten();
     this.prebake();
