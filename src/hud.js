@@ -4,6 +4,7 @@ import { NAME_TAGS } from './toon.js';
 import { FACTIONS } from './locations.js';
 import { arcDist, darkness, upAt } from './geo.js';
 import { WEAPONS } from './weapons.js';
+import { EVENT_RANGE } from './config.js';
 import { pixelFont } from './fonts.js';
 
 const $ = (id) => document.getElementById(id);
@@ -44,7 +45,8 @@ export class HUD {
     // your view smoothly instead of stepping
     if (this.logT <= 0) {
       this.logT = 0.1;
-      const evs = g.events.list.filter((e) => e.state === 'open' || e.state === 'active');
+      // (open events farther than EVENT_RANGE stay off the log; the one you're running always shows)
+      const evs = g.events.list.filter((e) => e.state === 'active' || (e.state === 'open' && this.logTarget(e).distanceTo(P.pos) <= EVENT_RANGE));
       this.logEl.classList.toggle('hidden', !evs.length || g.state === 'title');
       const seen = new Set();
       for (const ev of evs) {

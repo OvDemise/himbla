@@ -3,6 +3,7 @@ import { FACTIONS } from './locations.js';
 import { makeSeismo, makeTube, makeCrate, makeRover, makeFreighter, makeFigure } from './models.js';
 import { frameQuat, greatCircle, arcDist, darkness, tangent, R } from './geo.js';
 import { pick, randRange } from './rng.js';
+import { EVENT_RANGE } from './config.js';
 import { textSprite, toon, glow, ink } from './toon.js';
 
 // Which kinds of events each faction posts. One open event per faction at a time.
@@ -191,7 +192,7 @@ export class Events {
     }
     this.list.push(ev);
     const g = this.game;
-    g.hud.toast(`📡 ${FACTIONS[faction].name.toUpperCase()}: ${ev.title}`, 4);
+    if (ev.stage.distanceTo(g.player.pos) <= EVENT_RANGE) g.hud.toast(`📡 ${FACTIONS[faction].name.toUpperCase()}: ${ev.title}`, 4); // (a far-off one starts quietly)
     return ev;
   }
 
@@ -315,7 +316,7 @@ export class Events {
     ev.marker = this.marker(pos, 'rustmoon', '✖ SOS');
     ev.marker.add(this.startProp(ev));
     this.list.push(ev);
-    g.hud.toast('📡 WEAK DISTRESS SIGNAL FROM THE DARK SIDE…', 5);
+    if (pos.distanceTo(g.player.pos) <= EVENT_RANGE) g.hud.toast('📡 WEAK DISTRESS SIGNAL FROM THE DARK SIDE…', 5);
     return ev;
   }
 
