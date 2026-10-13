@@ -142,8 +142,8 @@ export class HUD {
     this.bannerT = 4;
   }
 
-  // New-event pop-up: slides in from the left under the location banner, holds for 3 s, slides out to
-  // the right. They queue, one at a time.
+  // New-event pop-up: slides in from the right under the territory chip (below the minimap),
+  // holds for 3 s, slides back out to the right. They queue, one at a time.
   eventPopup(text, color = '#ffd23f') {
     if (!this.evQ) this.evQ = [];
     this.evQ.push({ text, color });
@@ -158,16 +158,12 @@ export class HUD {
       this.evT = 0;
       el.textContent = this.evCur.text;
       el.style.setProperty('--c', this.evCur.color);
-      el.className = 'pre'; // (parked off the left edge, no transition)
+      el.className = 'pre'; // (parked off the right edge, no transition)
       el.classList.remove('hidden');
       void el.offsetWidth;
       el.className = 'in';
     }
     this.evT += dt;
-    // sit just under the location banner while it's up, otherwise where the banner would be
-    const b = $('banner');
-    const top = b && !b.classList.contains('hidden') ? b.getBoundingClientRect().bottom + 10 : window.innerHeight * 0.22;
-    el.style.top = `${Math.round(top)}px`;
     if (this.evT >= 0.45 + 3 && el.className === 'in') el.className = 'out';
     if (this.evT >= 0.45 + 3 + 0.5) { el.className = 'hidden'; this.evCur = null; }
   }
