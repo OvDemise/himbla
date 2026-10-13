@@ -43,6 +43,12 @@ const SYMS = {
 };
 
 // '#text' in a token list is plain text between glyphs
+// [label, colour token] of a face button for a pad family (for the in-world signs, which draw their own glyphs)
+export function faceInfo(token, kind = glyphState.kind) {
+  const f = (FACE[kind] || FACE.xbox)[token] || token;
+  return Array.isArray(f) ? f : [f, ''];
+}
+
 export function glyphHtml(tokens, kind = glyphState.kind) {
   const face = FACE[kind] || FACE.xbox;
   return tokens.map((t) => {
