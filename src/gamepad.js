@@ -341,7 +341,9 @@ export class Gamepad {
   roulette(btn, pressed, trig, lx, ly, dt) {
     this.releaseAll();
     const root = this.game.casino.root;
-    const r = root.getBoundingClientRect();
+    // (the cursor stays inside the table itself: the tabs, header and leave button are out of its reach, LB / RB change tab and B leaves)
+    const area = root.querySelector('.roul') || root;
+    const r = area.getBoundingClientRect();
     let c = this.cur;
     if (!c) {
       c = this.cur = { el: document.createElement('div'), x: 0, y: 0, on: false, down: false };
@@ -361,7 +363,8 @@ export class Gamepad {
     c.y = Math.max(Math.max(0, r.top), Math.min(Math.min(window.innerHeight, r.bottom), c.y + ly * sp));
     c.el.style.left = c.x + 'px'; c.el.style.top = c.y + 'px';
     const under = document.elementFromPoint(c.x, c.y);
-    let hit = under && root.contains(under) ? under.closest('[data-rb], button, [data-act], [data-tab]') : null;
+    let hit = under && area.contains(under) ? under.closest('[data-rb], button, [data-act], [data-tab]') : null;
+    if (hit && !area.contains(hit)) hit = null;
     if (hit && hit.disabled) hit = null;
     this.setFocus(hit);
     const down = btn[B.A] || trig(B.RT) > 0.35;
