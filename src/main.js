@@ -616,9 +616,13 @@ class Game {
     const loc = town && (f === 'kepler' || (this.town && this.town.has('pad'))) ? town
       : f && f !== 'spacecom' ? this.locations.find((l) => l.hq && l.faction === f) : null;
     if (!loc) return { point: this.spawnPoint, facing: this.spawnFacing, loc: this.hub };
+    return this.spotNear(loc);
+  }
+
+  // A clear patch of ground (no buildings) just inside a place, and the way to face from it (cached)
+  spotNear(loc) {
     this._homes = this._homes || {};
     if (!this._homes[loc.id]) {
-      // first clear patch of ground (no buildings) around the HQ
       let point = null;
       for (let rad = loc.r * 0.45; rad < loc.r * 0.9 && !point; rad += 8) {
         for (let k = 0; k < 16 && !point; k++) {
@@ -632,6 +636,26 @@ class Game {
       this._homes[loc.id] = { point, facing, loc };
     }
     return this._homes[loc.id];
+  }
+
+  // The settlement closest to the player that would let them in (null on the Spindle, or with nothing safe)
+  nearestSettlement() {
+    if (!this.player || (this.spindle && this.spindle.active)) return null;
+    const d = this.player.pos.clone().normalize();
+    let best = null, bd = Infinity;
+    for (const l of this.locations) {
+      if (!this.isSafe(l)) continue;
+      const a = arcDist(d, l.dir);
+      if (a < bd) { bd = a; best = l; }
+    }
+    return best;
+  }
+
+  // Where a loaded save puts you: beside the closest settlement to where you were when it was saved
+  // (home when nothing is saved, or the place is no longer open to you)
+  resumeSpot() {
+    const l = this.savedNear && this.locations.find((x) => x.id === this.savedNear);
+    return l && this.isSafe(l) ? this.spotNear(l) : this.home();
   }
 
   objective() {
@@ -851,7 +875,9 @@ class Game {
 
   save() {
     try {
-      localStorage.setItem(SAVE_KEY, JSON.stringify({ credits: this.credits, stats: this.stats, upgrades: this.upgrades }));
+      // (near: the settlement closest to you, so a load puts you beside it and not back at base)
+      if (this.started && this.state !== 'title') { const n = this.nearestSettlement(); if (n) this.savedNear = n.id; }
+      localStorage.setItem(SAVE_KEY, JSON.stringify({ credits: this.credits, stats: this.stats, upgrades: this.upgrades, near: this.savedNear || null }));
     } catch { /* storage unavailable */ }
     if (this.started && this.saves) this.saves.snapshot(this.slotMeta()); // save slots
   }
@@ -960,7 +986,7 @@ class Game {
     // back from the title tour: put the runner home and the camera behind them
     if (this.tour) {
       if (this.tour.fade) this.tour.fade.style.opacity = '0';
-      const h = this.home();
+      const h = this.ws.bulletin ? this.home() : this.resumeSpot(); // (a finale's new dawn starts at home)
       this.player.respawn(h.point, h.facing);
       this.player.model.root.visible = true;
       this.cam.fwd.copy(h.facing);
@@ -968,6 +994,13 @@ class Game {
       this.camera.fov = 72; this.camera.updateProjectionMatrix();
       this.updateCamera(0.016, true);
       this.tour = null;
+    } else if (this.savedNear && !this.ws.bulletin) {
+      // (no title tour first, e.g. straight back into play after a reload)
+      const h = this.resumeSpot();
+      this.player.respawn(h.point, h.facing);
+      this.cam.fwd.copy(h.facing);
+      this.cam.pitch = -0.1;
+      this.updateCamera(0.016, true);
     }
     document.getElementById('title').classList.add('hidden');
     this.state = 'play';
@@ -1014,6 +1047,7 @@ class Game {
       this.stats = { ...this.stats, ...(d.stats || {}) };
       if (this.stats.smuggled && !this.stats.blackMarket) this.stats.blackMarket = (SHOPS.rustmoon || []).filter((u) => u.unlock && u.unlock.smuggle && u.unlock.n <= this.stats.smuggled).map((u) => u.key);
       this.upgrades = { ...this.upgrades, ...(d.upgrades || {}) };
+      this.savedNear = d.near || null;
     } catch { /* corrupt or unavailable */ }
   }
 
