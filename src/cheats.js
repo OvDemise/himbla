@@ -166,8 +166,27 @@ export class Cheats {
       { label: '6 · UNLOCK ALL GEAR, WEAPONS & COSMETICS', fn: () => { this.unlockAll(); this.open(); } },
       { label: '7 · LAB KIT (big jar, items, 3 chimeras)', fn: () => { this.labKit(); this.open(); } },
       { label: '8 · MORE…', fn: () => this.moreMenu() },
-      { label: '9 · CLOSE' },
+      { label: '9 · SPAWN A VEHICLE…', fn: () => this.vehicleMenu() },
+      { label: 'CLOSE' },
     ]);
+  }
+
+  // Drops any faction vehicle next to you and puts you in it (owned or not; doesn't unlock it, so V
+  // still only calls the ones the story has given you)
+  vehicleMenu() {
+    const g = this.game;
+    const ids = Object.keys(VEHICLES);
+    g.dialog('SPAWN A VEHICLE', '<small>Drops it beside you and hops you in. Replaces any vehicle already out.</small>', ids.map((k, i) => ({
+      label: `${i + 1} · ${VEHICLES[k].name}`,
+      fn: () => {
+        if (g.player.vehicle) g.garage.exit();
+        g.garage.hp[k] = g.garage.maxHp(k); // (fresh hull, and not stuck in a rebuild)
+        g.garage.wreckedUntil[k] = 0;
+        g.garage.choice = k;
+        g.garage.summon(k);
+        g.garage.enter();
+      },
+    })).concat([{ label: `${ids.length + 1} · BACK`, fn: () => this.open() }]));
   }
 
   moreMenu() {
