@@ -376,6 +376,7 @@ export class Enemies {
       }
     }
     if (e.detourT > 0) { e.detourT -= dt; goal = e.detour; }
+    this.dbgGoal(e, goal);
     if (e.sub === 'rover') {
       stepRover(e, dt, g.planet, g.colliders, goal.clone().sub(b.pos), e.target ? 42 : 28, { engine: 20, grip: 12, turn: 2.2, radius: 3.4, stick: 60 });
       this.poseVehicle(e, dt);
@@ -430,6 +431,18 @@ export class Enemies {
   }
 
   // roaming hunters alive (the roaming pool), and den guards alive (the den pool)
+  // dev overlay (aipaths.js): remember where an AI is steering, only while the overlay is on
+  dbgGoal(e, p, from = null) {
+    const g = this.game;
+    if (!g.cheats.aiPaths) return;
+    (e.dbgGoal ||= new THREE.Vector3()).copy(p);
+    if (from) { // (a steering direction rather than a point: show at least 30 m of it)
+      const len = p.length();
+      e.dbgGoal.copy(from).addScaledVector(p, len < 5 ? 30 / Math.max(len, 1e-3) : 1);
+    }
+    e.dbgT = g.time;
+  }
+
   maxRoamers() { return MAX_ROAMERS; }
   maxDen() { return MAX_DEN; }
   roamCount() { return this.hunters(); }
@@ -1036,6 +1049,7 @@ export class Enemies {
         e.orbiting = true;
       }
     }
+    this.dbgGoal(e, target);
     const to = target.clone().sub(b.pos);
     const wish = tangent(to, up);
     const dist = wish.length();
@@ -1134,6 +1148,7 @@ export class Enemies {
         if ((R.t > 1.6 && d > 30) || R.t > 4) { R.phase = 'line'; R.t = 0; R.side = 0; }
       }
     } else e.ram = null;
+    this.dbgGoal(e, aim, b.pos);
     stepRover(e, dt, g.planet, g.colliders, aim, max, { engine, grip: 14, turn: e.ram && e.ram.phase === 'line' ? 2.8 : 2.2, radius: 3.6, stick: 62 });
     this.poseVehicle(e, dt);
     if (e.state === 'chase' && !friendly) {
@@ -1192,6 +1207,7 @@ export class Enemies {
         if (from.distanceTo(P.pos) < 300) g.fx.pop('*BLINK*', from, { color: '#c77dff', size: 50, life: 0.7 });
       }
     }
+    this.dbgGoal(e, aim, b.pos);
     this.poseVehicle(e, dt);
     if (e.hover) e.model.chassis.position.y = 0.6 + Math.sin(g.time * 2.2) * 0.25;
     e.fireCd -= dt;
@@ -1220,6 +1236,7 @@ export class Enemies {
       target = g.world.toWorld(loc, Math.cos(a) * e.patrolR, 0, Math.sin(a) * e.patrolR);
       maxSp = 16;
     }
+    this.dbgGoal(e, target);
     stepRover(e, dt, g.planet, g.colliders, target.sub(b.pos), maxSp, { engine: 16, grip: 8, turn: 2, stick: Infinity });
     this.poseVehicle(e, dt);
     if (base.hostile) {

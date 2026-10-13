@@ -6,6 +6,7 @@ import { VEHICLES } from './vehicles.js';
 import { TECH } from './story.js';
 import * as THREE from 'three';
 import { greatCircle } from './geo.js';
+import { AIPaths } from './aipaths.js';
 
 const DEV_KEY = 'mr-dev-unlocked';
 
@@ -16,6 +17,7 @@ export class Cheats {
     this.game = game;
     this.god = false; // unlimited health
     this.infJet = false; // unlimited jet (thruster energy)
+    this.aiPaths = false; // draw every AI's current path / steering goal
     this.showFps = false; // frame-rate readout under the minimap
     this.spawnDebug = false; // bottom-right pirate counts + spawn timers overlay
     this.speed = 1; // player speed multiplier, 1 to 10 (player.js)
@@ -44,8 +46,9 @@ export class Cheats {
       { label: '4 · TELEPORT TO RUSTMOON HOLD', fn: () => { const l = g.locations.find((x) => x.id === 'rustmoon'); if (l) this.teleport(l); } },
       { label: `5 · PIRATE SPAWN DEBUG: ${this.spawnDebug ? 'ON' : 'OFF'}`, fn: () => { this.spawnDebug = !this.spawnDebug; this.tick(); this.dev(); } },
       { label: `6 · SHOW FPS: ${this.showFps ? 'ON' : 'OFF'}`, fn: () => { this.showFps = !this.showFps; this.tick(); this.dev(); } },
-      { label: '7 · FULL CHEAT MENU…', fn: () => this.open() },
-      { label: '8 · CLOSE' },
+      { label: `7 · SHOW AI PATHS: ${this.aiPaths ? 'ON' : 'OFF'}`, fn: () => { this.aiPaths = !this.aiPaths; this.tick(); this.dev(); } },
+      { label: '8 · FULL CHEAT MENU…', fn: () => this.open() },
+      { label: '9 · CLOSE' },
     ]);
     g.dialogButtons.dev = true;
     // the speed row adjusts in place: click / A = +1 (wraps), left / right on a controller (d-pad or stick) = -1 / +1
@@ -69,6 +72,8 @@ export class Cheats {
     if (this.god && !P.dead) P.health = P.maxHealth;
     this.updateSpawnDebug();
     this.updateFps();
+    if (this.aiPaths) (this.paths ||= new AIPaths(this.game)).update();
+    else if (this.paths) this.paths.hide();
   }
 
   // Frame rate under the minimap, averaged over half a second
