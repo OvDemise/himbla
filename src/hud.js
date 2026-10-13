@@ -316,12 +316,12 @@ export class HUD {
     crEl.querySelector('.cr-amt').textContent = `₵${g.credits}`;
     if (this.lastCr === undefined) this.lastCr = g.credits;
     else if (g.credits !== this.lastCr) {
-      const up = g.credits > this.lastCr;
+      const delta = g.credits - this.lastCr, up = delta > 0;
       this.lastCr = g.credits;
-      const sign = crEl.querySelector('.cr-sign');
-      sign.textContent = up ? '+' : '−';
-      sign.className = `cr-sign ${up ? 'plus' : 'minus'}`;
-      void sign.offsetWidth; // (restarts the pop)
+      const sign = crEl.querySelector('.cr-delta');
+      sign.textContent = `${up ? '+' : '−'}₵${Math.abs(delta)}`;
+      sign.className = `cr-delta ${up ? 'plus' : 'minus'}`;
+      void sign.offsetWidth; // (restarts the slide-in)
       sign.classList.add('pop');
       crEl.classList.add('cr-show');
       this.crT = 5;
