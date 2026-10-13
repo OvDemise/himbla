@@ -114,7 +114,7 @@ export class Cheats {
     const t = (v) => `${Math.max(0, v).toFixed(1)}s`;
     const kinds = (list) => `${list.filter((e) => e.kind === 'rover').length} rover · ${list.filter((e) => e.kind !== 'rover').length} skater`;
     const alive = E.list.filter((e) => e.faction === 'pirate' && e.kind !== 'core' && !e.dead);
-    const roam = alive.filter((e) => !e.home && !e.targetObj);
+    const roam = E.hunterList();
     const den = alive.filter((e) => e.home);
     const raid = alive.filter((e) => !e.home && e.targetObj);
     const rows = [`<b>PIRATES</b>`,

@@ -460,7 +460,10 @@ export class Enemies {
   }
 
   // roaming hunters of a kind (not den guards, not event raiders)
-  hunters(kind) { return this.list.filter((e) => e.faction === 'pirate' && !e.dead && !e.home && !e.targetObj && (!kind || e.kind === kind)).length; }
+  // (only skaters and rovers: lair cores also have no home or target, and used to be counted here,
+  // which kept the dark-side spawn gate shut whenever 3+ dens existed)
+  hunterList(kind) { return this.list.filter((e) => e.faction === 'pirate' && !e.dead && !e.home && !e.targetObj && (kind ? e.kind === kind : e.kind === 'skater' || e.kind === 'rover')); }
+  hunters(kind) { return this.hunterList(kind).length; }
 
   // what the next hunter should be: a coin flip between whatever is still under its cap
   // (a squad's first hunter is a rover whenever the rover cap has room: at least one per squad)
