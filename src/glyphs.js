@@ -47,7 +47,7 @@ export function glyphHtml(tokens, kind = glyphState.kind) {
   const face = FACE[kind] || FACE.xbox;
   return tokens.map((t) => {
     if (t[0] === '#') return `<span class="pg-txt">${t.slice(1)}</span>`;
-    if (kind === 'xbox' && XBOX_ART[t]) return `<i class="pg pg-img pg-${SHAPE[t] || 'face'}"><img src="${XBOX_ART[t]}" alt="${t}" draggable="false"></i>`;
+    if (kind === 'xbox' && XBOX_ART[t]) return `<i class="pg pg-img pg-${SHAPE[t] || 'face'} xb-${t.toLowerCase()}"><img src="${XBOX_ART[t]}" alt="${t}" draggable="false"></i>`;
     const f = face[t] || MISC[t] || t;
     const [txt, col] = Array.isArray(f) ? f : [f, ''];
     if (SYMS[txt]) return `<i class="pg pg-face pg-sym pg-${col}"><svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round">${SYMS[txt]}</svg></i>`;
