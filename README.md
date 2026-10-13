@@ -37,7 +37,7 @@ pitch black, lit only by your helmet lamp, and full of pirate dens.
 Grab the latest build from the repo's **Releases** page:
 - **Windows:** `Moon-Runner-…-windows-portable.exe` — double-click to play (SmartScreen may warn because the
   build isn't code-signed: *More info → Run anyway*). Or the `win-x64.zip` — unzip, run `Moon-Runner.exe`.
-- **Linux:** `…-linux-x86_64.AppImage` — `chmod +x`, then run it.
+- **Linux:** `…-linux-x86_64.AppImage` — `chmod +x`, then run it. (For the PlayStation gyro the pad's `/dev/hidraw*` node has to be readable: Steam's `steam-devices` udev rules do it, or add `KERNEL=="hidraw*", ATTRS{idVendor}=="054c", MODE="0660", TAG+="uaccess"` to a file in `/etc/udev/rules.d/`.)
 - **macOS:** `…-mac-universal.zip` — unzip, right-click the app → Open (if it says "damaged", run
   `xattr -cr Moon-Runner.app` once; the build isn't notarized).
 
