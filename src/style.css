@@ -1120,7 +1120,10 @@ body.trailer #vehbar { display: none !important; }
 #board.term .bubble { background: #0f1c16; border-color: #2f4a3c; }
 #board.term .bubble::before { border-right-color: #2f4a3c; }
 #board.term .job.premium { border-left-color: var(--yellow); background: #18170f; }
-#board.term .board-foot { color: var(--ph-dim); font-family: var(--comic); font-size: 8px; position: sticky; bottom: 0; z-index: 5; background: #07060d; border-top: 2px solid #23302a; padding: 8px 14px 10px; display: flex; align-items: center; gap: 3px; flex-wrap: wrap; }
+#board.term { display: flex; flex-direction: column; overflow: hidden; padding-bottom: 0; }
+#board.term .board-head { position: static; flex: none; }
+#board.term .board-scroll { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
+#board.term .board-foot { flex: none; color: var(--ph-dim); font-family: var(--comic); font-size: 8px; background: #07060d; border-top: 2px solid #23302a; padding: 8px 14px 10px; display: flex; align-items: center; gap: 3px; flex-wrap: wrap; }
 #board .foot-pad { display: none; align-items: center; gap: 5px; }
 body.pad-on #board .foot-pad { display: inline-flex; }
 body.pad-on #board .foot-kb { display: none; }
