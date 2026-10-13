@@ -138,6 +138,11 @@ button { font-family: var(--comic); }
 
 #banner { position: absolute; top: 22%; left: 50%; transform: translateX(-50%); text-align: center; width: min(760px, calc(100vw - 32px)); }
 #banner.slam { animation: slam 0.45s cubic-bezier(.2,1.4,.4,1); }
+/* new-event pop-up: sits under the location banner, slides in from the left, holds, slides out to the right (hud.js eventPopup) */
+#evpop { position: absolute; top: 40%; left: 50%; max-width: min(640px, calc(100vw - 32px)); text-align: center; font-family: var(--comic); font-size: 12px; line-height: 1.5; background: var(--ui-bg); color: #fff; padding: 8px 14px 6px; border: 2px solid var(--c, var(--yellow)); box-shadow: 0 0 0 2px #05030c, var(--ui-shadow); transform: translateX(calc(-50% - 70vw)); transition: transform 0.45s cubic-bezier(.2,.9,.3,1); pointer-events: none; z-index: 5; }
+#evpop.in { transform: translateX(-50%); }
+#evpop.out { transform: translateX(calc(-50% + 70vw)); transition-timing-function: cubic-bezier(.6,0,.9,.4); }
+#evpop.pre { transition: none; }
 .b-kind { display: inline-block; font-family: var(--comic); font-size: 10px; line-height: 1; color: #05030c; padding: 5px 10px 4px; border: 2px solid #05030c; }
 .b-name { font-family: var(--comic); font-size: clamp(18px, 3vw, 32px); color: var(--paper); text-shadow: 4px 4px 0 #05030c, -2px -2px 0 #05030c, 2px -2px 0 #05030c, -2px 2px 0 #05030c; line-height: 1.25; margin: 10px 0 8px; }
 .b-blurb { display: inline-block; background: var(--ui-bg); color: var(--ui-text); font-size: 17px; padding: 6px 12px; border: 2px solid var(--ui-edge); box-shadow: 0 0 0 2px #05030c; }
