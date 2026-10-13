@@ -39,7 +39,7 @@ export class Cheats {
       { label: `1 · UNLIMITED JET: ${this.infJet ? 'ON' : 'OFF'}`, fn: () => { this.infJet = !this.infJet; this.tick(); this.dev(); } },
       { label: `2 · UNLIMITED HEALTH: ${this.god ? 'ON' : 'OFF'}`, fn: () => { this.god = !this.god; this.tick(); this.dev(); } },
       { label: this.speedLabel(), fn: () => { this.setSpeed(this.speed >= 10 ? 1 : this.speed + 1); this.dev(); } },
-      { label: '4 · TELEPORT TO CASINO', fn: () => { const l = g.locations.find((x) => x.id === 'casino'); if (l) this.teleport(l); } },
+      { label: '4 · TELEPORT TO RUSTMOON HOLD', fn: () => { const l = g.locations.find((x) => x.id === 'rustmoon'); if (l) this.teleport(l); } },
       { label: '5 · FULL CHEAT MENU…', fn: () => this.open() },
       { label: '6 · CLOSE' },
     ]);
