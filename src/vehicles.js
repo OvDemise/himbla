@@ -16,17 +16,6 @@ export const VEHICLES = {
   warrig: { hp: 340, name: 'Rustmoon Scrapjaw War-Rig', faction: 'rustmoon', max: 78, engine: 32, turn: 2.4, grip: 14, armor: 0.6, color: 0x7b2ff7, trim: 0x7dff3a, scale: 1.35, pirate: true, desc: 'Stolen, welded, painted green. Rams for damage.' },
 };
 
-// side-on line icons for the hull gauge (24 x 24)
-const WHEEL = (x) => `<circle cx="${x}" cy="17" r="2.6"/>`;
-const VEH_ICONS = {
-  interceptor: `<svg viewBox="0 0 24 24"><path d="M2 16v-3l4-1 3-4h6l3 4 4 1v3z"/>${WHEEL(7)}${WHEEL(17)}</svg>`,
-  apc: `<svg viewBox="0 0 24 24"><path d="M2 16V9h17l3 4v3z"/><path d="M7 9V6h8v3"/>${WHEEL(6)}${WHEEL(12)}${WHEEL(18)}</svg>`,
-  skimmer: `<svg viewBox="0 0 24 24"><path d="M3 14c0-3 4-5 9-5s9 2 9 5-4 3-9 3-9 0-9-3z"/><path d="M9 11c0-2 1.5-3 3-3s3 1 3 3"/><path d="M6 20h3M11 20h3M16 20h3"/></svg>`,
-  mule: `<svg viewBox="0 0 24 24"><path d="M2 16v-5h6l2-3h4v8z"/><path d="M14 11h8v5h-8"/>${WHEEL(6)}${WHEEL(18)}</svg>`,
-  van: `<svg viewBox="0 0 24 24"><circle cx="5.5" cy="16" r="3.2"/><circle cx="18.5" cy="16" r="3.2"/><path d="M5.5 16l4-6h5l4 6M9.5 10l-1-3h3M14.5 10l1-2h3"/></svg>`,
-  warrig: `<svg viewBox="0 0 24 24"><path d="M2 16V8l5-1 3 4h12v5z"/><path d="M4 8V5M7 7V4"/>${WHEEL(6)}${WHEEL(12)}${WHEEL(18)}</svg>`,
-};
-
 const _v = new THREE.Vector3(), _mu = new THREE.Vector3(), _mf = new THREE.Vector3();
 const REBUILD = 90; // seconds the orbital crane needs to replace a wrecked vehicle
 
@@ -37,11 +26,17 @@ export class Garage {
     this.choice = null;
     this.hp = {}; // hull left on each vehicle (repairs slowly while you're not driving it)
     this.wreckedUntil = {}; // id -> game time it's rebuilt
-    this.bar = document.createElement('div');
-    this.bar.id = 'vehbar';
-    this.bar.className = 'hidden';
-    this.bar.innerHTML = '<div class="vb-icon"></div><div class="vb-track"><div class="vb-fill"></div></div><span class="vb-num"></span>';
-    document.getElementById('speedo').appendChild(this.bar); // (to the right of the speed tracker)
+    // While you drive, two rows replace the HULL and JET bars in the speed tracker: the vehicle's name,
+    // then HP and its hull bar.
+    this.hullRow = document.getElementById('hp-fill').closest('.bar');
+    this.jetRow = document.getElementById('en-fill').closest('.bar');
+    this.nameRow = document.createElement('div');
+    this.nameRow.className = 'bar veh-row hidden';
+    this.nameRow.innerHTML = '<label class="veh-name"></label>';
+    this.hpRow = document.createElement('div');
+    this.hpRow.className = 'bar veh-row veh-hp hidden';
+    this.hpRow.innerHTML = '<label>HP:</label><div class="track"><div class="fill vb-fill"></div></div><span class="vb-num"></span>';
+    this.jetRow.after(this.nameRow, this.hpRow);
   }
 
   maxHp(id) { return Math.round(VEHICLES[id].hp * (1 + 0.15 * (this.game.upgrades.plating || 0))); }
@@ -325,21 +320,22 @@ export class Garage {
     // field repairs: hull creeps back while you're not behind the wheel
     for (const id of Object.keys(this.hp)) if (!(g.player.vehicle && g.player.vehicle.id === id)) this.hp[id] = Math.min(this.maxHp(id), this.hp[id] + dt * 2);
     const pv = g.player.vehicle;
-    this.bar.classList.toggle('hidden', !pv || g.state !== 'play');
+    const show = !!pv && g.state === 'play';
+    if (show !== this.rowsShown) {
+      this.rowsShown = show;
+      this.nameRow.classList.toggle('hidden', !show);
+      this.hpRow.classList.toggle('hidden', !show);
+      this.hullRow.classList.toggle('hidden', show);
+      this.jetRow.classList.toggle('hidden', show);
+    }
     if (pv) {
       const max = this.maxHp(pv.id), hp = Math.max(0, this.hp[pv.id] ?? max);
       const k = hp / max;
-      if (this.iconId !== pv.id) {
-        this.iconId = pv.id;
-        const ic = this.bar.querySelector('.vb-icon');
-        ic.innerHTML = VEH_ICONS[pv.id] || VEH_ICONS.interceptor;
-        ic.style.color = '#' + new THREE.Color(pv.def.trim).getHexString();
-        ic.title = pv.def.name;
-      }
-      const fill = this.bar.querySelector('.vb-fill');
-      fill.style.height = `${k * 100}%`;
+      this.nameRow.firstChild.textContent = pv.def.name.toUpperCase();
+      const fill = this.hpRow.querySelector('.vb-fill');
+      fill.style.width = `${k * 100}%`;
       fill.style.background = k > 0.5 ? '#2ee6ff' : k > 0.25 ? '#ffd23f' : '#ff2a4a';
-      this.bar.querySelector('.vb-num').textContent = `${Math.ceil(hp)}/${max}`;
+      this.hpRow.querySelector('.vb-num').textContent = `${Math.ceil(hp)}/${max}`;
       // smoke when it's hurting
       if (k < 0.35 && Math.random() < dt * 20) g.fx.spawn(pv.model.root.position.clone().addScaledVector(pv.e.body.pos.clone().normalize(), 3), pv.e.body.pos.clone().normalize().multiplyScalar(4), { color: k < 0.15 ? 0xff6a2a : 0x3a3550, size: 0.9, life: 0.9, count: 1, spread: 1 });
     }

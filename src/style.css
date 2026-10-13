@@ -853,14 +853,12 @@ body.seated #hud > :not(#popups) { display: none !important; }
 @media (max-width: 800px) { .cas-logo { font-size: 13px; } }
 
 /* ---- vehicle hull ---- */
-/* vehicle hull gauge: a vertical bar on the right of the speed tracker (a child of #speedo, so it follows its size and scale) */
-#vehbar { position: absolute; left: calc(100% + 10px); bottom: 0; width: 52px; padding: 8px 4px 6px; background: rgba(5, 3, 12, 0.82); border: 2px solid var(--ui-edge, #3a3550); box-shadow: 4px 4px 0 rgba(0,0,0,0.5); font-family: var(--comic); font-size: 7px; line-height: 1; color: var(--ui-muted, #c9c3d9); display: flex; flex-direction: column; align-items: center; gap: 6px; pointer-events: none; }
-#vehbar.hidden { display: none; }
-#vehbar .vb-icon { width: 30px; height: 30px; color: #fff; }
-#vehbar .vb-icon svg { width: 100%; height: 100%; display: block; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
-#vehbar .vb-track { width: 14px; height: 120px; background: #120a1e; border: 2px solid #05030c; display: flex; align-items: flex-end; }
-#vehbar .vb-fill { width: 100%; height: 100%; background: #2ee6ff; transition: height 0.15s steps(4); }
-#vehbar .vb-num { text-align: center; white-space: nowrap; }
+/* vehicle hull gauge: while you drive, these two rows replace the HULL and JET bars in the speed tracker */
+#speedo .veh-row.hidden { display: none; }
+#speedo .veh-name { height: 16px; line-height: 16px; flex: 1; min-width: 0; width: auto; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#speedo .veh-hp .vb-fill { transition: width 0.15s steps(4); background: #2ee6ff; }
+#speedo .veh-hp .vb-num { font-family: var(--comic); font-size: 8px; color: var(--ui-muted); min-width: 52px; text-align: right; }
+body.trailer #vehbar { display: none !important; }
 
 /* ---- wardrobe ---- */
 #wardrobe { z-index: 40; cursor: default; background: rgba(5, 3, 12, 0.72); }
