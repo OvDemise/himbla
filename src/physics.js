@@ -305,7 +305,7 @@ export function stepSkater(b, input, dt, planet, colliders, params = PHYS, impac
 
   // an emptied tank locks the thrusters out until it has recharged to 10%
   if (b.energy <= 0) b.jetLocked = true;
-  else if (b.jetLocked && b.energy >= b.maxEnergy * 0.1) b.jetLocked = false;
+  else if (b.jetLocked && b.energy >= b.maxEnergy * 0.25) b.jetLocked = false;
   b.thrusting = false;
   if (input.thrust && b.energy > 0 && !b.jetLocked) {
     v.addScaledVector(input.thrustDir, params.thrustAccel * dt);
