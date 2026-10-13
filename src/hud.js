@@ -38,41 +38,53 @@ export class HUD {
       this.logT = 0;
     }
     this.logT -= dt;
-    if (this.logT > 0) return;
-    this.logT = 0.1;
     const P = g.player, up = P.up, cam = g.cam;
-    const evs = g.events.list.filter((e) => e.state === 'open' || e.state === 'active');
-    // keep it above the speed tracker whatever its scale
-    const sp = $('speedo').getBoundingClientRect();
-    this.logEl.style.bottom = `${Math.round(window.innerHeight - sp.top + 8)}px`;
-    this.logEl.style.left = `${Math.round(sp.left)}px`;
-    this.logEl.classList.toggle('hidden', !evs.length || g.state === 'title');
-    const seen = new Set();
-    for (const ev of evs) {
-      seen.add(ev.id);
-      let row = this.logRows.get(ev.id);
-      if (!row) {
-        row = document.createElement('div');
-        row.className = 'dl-row dl-new';
-        row.innerHTML = '<svg class="dl-arrow" viewBox="-10 -10 20 20"><path class="dl-shaft" d="M0 8V-1"/><path class="dl-tip" d="M0 -9.5L6.5 0H-6.5Z"/></svg><span class="dl-name"></span><span class="dl-dist"></span>';
-        this.logEl.prepend(row);
-        this.logRows.set(ev.id, row);
-        setTimeout(() => row.classList.remove('dl-new'), 1200);
+    // rows, layout and text refresh ten times a second; the arrows turn every frame so they track
+    // your view smoothly instead of stepping
+    if (this.logT <= 0) {
+      this.logT = 0.1;
+      const evs = g.events.list.filter((e) => e.state === 'open' || e.state === 'active');
+      // keep it above the speed tracker whatever its scale
+      const sp = $('speedo').getBoundingClientRect();
+      this.logEl.style.bottom = `${Math.round(window.innerHeight - sp.top + 8)}px`;
+      this.logEl.style.left = `${Math.round(sp.left)}px`;
+      this.logEl.classList.toggle('hidden', !evs.length || g.state === 'title');
+      const seen = new Set();
+      for (const ev of evs) {
+        seen.add(ev.id);
+        let row = this.logRows.get(ev.id);
+        if (!row) {
+          row = document.createElement('div');
+          row.className = 'dl-row dl-new';
+          row.innerHTML = '<svg class="dl-arrow" viewBox="-10 -10 20 20"><path class="dl-shaft" d="M0 8V-1"/><path class="dl-tip" d="M0 -9.5L6.5 0H-6.5Z"/></svg><span class="dl-name"></span><span class="dl-dist"></span>';
+          row.arrow = row.querySelector('.dl-arrow');
+          this.logEl.prepend(row);
+          this.logRows.set(ev.id, row);
+          setTimeout(() => row.classList.remove('dl-new'), 1200);
+        }
+        row.ev = ev;
+        const col = (FACTIONS[ev.faction] && FACTIONS[ev.faction].color) || '#ffffff';
+        row.style.setProperty('--c', col);
+        row.classList.toggle('dl-active', ev.state === 'active');
+        row.querySelector('.dl-name').textContent = `${ev.icon || ''}${ev.short || ev.title}`.toUpperCase();
+        const dist = this.logTarget(ev).distanceTo(P.pos);
+        row.querySelector('.dl-dist').textContent = dist > 999 ? `${(dist / 1000).toFixed(1)}KM` : `${Math.round(dist / 10) * 10}M`;
       }
-      const col = (FACTIONS[ev.faction] && FACTIONS[ev.faction].color) || '#ffffff';
-      const obj = ev.state === 'active' && g.events.objective();
-      const target = obj ? obj.pos : ev.stage || ev.start;
-      const v = this.v.copy(target).sub(P.pos);
-      const dist = v.length();
+      for (const [id, row] of this.logRows) if (!seen.has(id)) { row.remove(); this.logRows.delete(id); }
+    }
+    for (const row of this.logRows.values()) {
+      const v = this.v.copy(this.logTarget(row.ev)).sub(P.pos);
       v.addScaledVector(up, -v.dot(up));
       const ang = Math.atan2(v.dot(cam.right), v.dot(cam.fwd));
-      row.style.setProperty('--c', col);
-      row.classList.toggle('dl-active', ev.state === 'active');
-      row.querySelector('.dl-arrow').style.transform = `rotate(${ang.toFixed(2)}rad)`;
-      row.querySelector('.dl-name').textContent = `${ev.icon || ''}${ev.short || ev.title}`.toUpperCase();
-      row.querySelector('.dl-dist').textContent = dist > 999 ? `${(dist / 1000).toFixed(1)}KM` : `${Math.round(dist / 10) * 10}M`;
+      const t = `rotate(${ang.toFixed(3)}rad)`;
+      if (row.lastT !== t) { row.lastT = t; row.arrow.style.transform = t; }
     }
-    for (const [id, row] of this.logRows) if (!seen.has(id)) { row.remove(); this.logRows.delete(id); }
+  }
+
+  logTarget(ev) {
+    const g = this.game;
+    const obj = ev.state === 'active' && g.events.objective();
+    return obj ? obj.pos : ev.stage || ev.start;
   }
 
   alert(text, color = '#ff2a4a', dur = 2.5) {
