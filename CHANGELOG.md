@@ -5,6 +5,8 @@ contains `[release]` (see the README's Download section). Newest first.
 
 ## Unreleased
 
+- **Controller radial menu (d-pad down):** replaces the quick-slot chip under the weapons. Tap d-pad down to open a wheel of everything without a button of its own (vehicles, wardrobe, reputation log, music, help, empty jar, pen link, Teleporter); the right stick picks a wedge, `A` (or d-pad down again) uses it, `B` / `Start` cancels. The picked wedge glows like the minimap: faint white in the light, purple on the dark side. Wedges you don't own yet stay in place, dimmed.
+- **Impact damage:** a soft-capped curve (up to half your max health per hit) instead of a flat cap of 22, so faster crashes keep hurting more. Style points no longer pay credits outside a delivery.
 - **Scarf:** the wind, flutter and acceleration swing on the scarf are capped, so at speed it streams a little but stays close to the runner.
 - **Jet cooldown:** emptying the jet tank locks the thrusters out until it has recharged to 10%; the JET bar dims while locked.
 - **Removed the action panel and Hall of Highlights:** no more picture-in-picture comic panels, highlight photos, their settings, or the highlights screen on the ILMB job terminal.

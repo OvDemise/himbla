@@ -426,10 +426,12 @@ export class Player {
       return;
     }
     if (it.speed > safe) {
-      // half what it used to be, capped so one bad landing rarely kills outright; and a landing with
-      // lots of speed along the ground is a glancing blow (30 m/s of glide halves it again)
+      // a soft-capped curve: damage keeps rising with every m/s over your safe speed but flattens out,
+      // topping out at half your max health, so a fast crash always hurts more than a slow one yet one
+      // bad landing can't kill outright. A landing with lots of speed along the ground is a glancing
+      // blow (30 m/s of glide halves it). impactDamage (1.3) is the tuning knob around that.
       const glancing = it.kind === 'ground' ? 1 / (1 + (it.glide || 0) / 30) : 1;
-      const dmg = Math.min(22, (it.speed - safe) * this.params.impactDamage * 0.5 * glancing);
+      const dmg = 0.5 * this.maxHealth * (1 - Math.exp(-(it.speed - safe) / 60)) * (this.params.impactDamage / 1.3) * glancing;
       g.damagePlayer(dmg, 'impact');
       g.fx.pop(it.speed - safe > 12 ? 'KRA-KOOM!' : 'KRAK!', this.body.pos.clone().addScaledVector(this.up, 2), { color: '#ff4f2e', size: 54 });
       g.fx.dust(this.body.pos, this.body.vel, 14, this.up);
