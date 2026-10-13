@@ -574,17 +574,9 @@ export class Events {
     if (near) {
       const step = Math.min(left, 13 * dt);
       const t = tangent(ev.dest.dir.clone().sub(ev.dir), ev.dir).normalize();
-      const before = ev.model.root.position.clone();
+      const before = pos.clone();
       ev.dir = greatCircle(ev.dir, t, step);
-      // Ride height: the terrain under the convoy sampled along its length (so a single bump or rock
-      // lip doesn't toss it), then eased, so it glides over rough ground instead of jittering.
-      const hF = this.game.planet.surface(greatCircle(ev.dir, t, 4)), hR = this.game.planet.surface(greatCircle(ev.dir, t, -4));
-      const hC = this.game.planet.surface(ev.dir);
-      const want = (hF + hC * 2 + hR) / 4;
-      if (ev.rideR === undefined) ev.rideR = want;
-      ev.rideR += (want - ev.rideR) * Math.min(1, dt * 6);
-      ev.rideR = Math.max(ev.rideR, Math.min(hF, hC, hR) - 0.2); // (never sink into the ground)
-      const after = ev.dir.clone().normalize().multiplyScalar(ev.rideR);
+      const after = this.ground(ev.dir);
       o.vel.copy(after).sub(before).divideScalar(Math.max(dt, 1e-3));
       ev.model.root.position.copy(after);
       frameQuat(ev.dir, t, ev.model.root.quaternion);
@@ -592,7 +584,6 @@ export class Events {
     } else {
       o.vel.set(0, 0, 0);
       ev.model.root.position.copy(pos);
-      ev.rideR = pos.length();
     }
     o.center.copy(ev.model.root.position).addScaledVector(ev.dir, 2);
     ev.waveT -= dt;
