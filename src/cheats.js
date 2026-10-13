@@ -17,6 +17,7 @@ export class Cheats {
     this.game = game;
     this.god = false; // unlimited health
     this.infJet = false; // unlimited jet (thruster energy)
+    this.mapTeleport = false; // click a location (or press A with the controller cursor on it) in the full map to go there
     this.aiPaths = false; // draw every AI's current path / steering goal
     this.showFps = false; // frame-rate readout under the minimap
     this.spawnDebug = false; // bottom-right pirate counts + spawn timers overlay
@@ -48,7 +49,8 @@ export class Cheats {
       { label: `6 · SHOW FPS: ${this.showFps ? 'ON' : 'OFF'}`, fn: () => { this.showFps = !this.showFps; this.tick(); this.dev(); } },
       { label: `7 · SHOW AI PATHS: ${this.aiPaths ? 'ON' : 'OFF'}`, fn: () => { this.aiPaths = !this.aiPaths; this.tick(); this.dev(); } },
       { label: '8 · FULL CHEAT MENU…', fn: () => this.open() },
-      { label: '9 · CLOSE' },
+      { label: `9 · CLICK MAP TO TELEPORT: ${this.mapTeleport ? 'ON' : 'OFF'}`, fn: () => { this.mapTeleport = !this.mapTeleport; this.dev(); } },
+      { label: 'CLOSE' },
     ]);
     g.dialogButtons.dev = true;
     // the speed row adjusts in place: click / A = +1 (wraps), left / right on a controller (d-pad or stick) = -1 / +1

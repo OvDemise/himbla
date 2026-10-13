@@ -298,6 +298,7 @@ export class Gamepad {
     this.game.globe.padUpdate(lx, ly, trig(B.RT) > 0.35, ry, (btn[B.RB] ? 1 : 0) - (btn[B.LB] ? 1 : 0), dt);
     // (View closes on the release, so letting go of it can't be read as the tap that opens the map)
     if (pressed(B.B) || pressed(B.START)) this.key('Escape');
+    else if (pressed(B.A)) this.game.globe.padClick(); // (the dev menu's click-to-teleport)
     else if (released(B.VIEW)) this.tap('KeyM');
   }
 
