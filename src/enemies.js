@@ -8,7 +8,10 @@ import { frameQuat, greatCircle, arcDist, darkness, tangent } from './geo.js';
 import { FOES, BOSS_MODELS } from './storyAssets.js';
 
 const PIRATE_SKATER = { ...PHYS, skatePushMax: 34, thrustAccel: 13, maxEnergy: 120, handling: 2.2 };
-const MAX_PIRATES = 6;
+// two separate pirate pools: roaming hunters (squads that chase you) and den guards (which keep to
+// their lair). Event raiders (spawnWave) belong to neither. Each pool always has a rover in it.
+const MAX_ROAMERS = 6;
+const MAX_DEN = 8;
 // roaming hunters (squads, not den guards or event raiders) are capped per kind, and give up once
 // you're further than THREAT_RANGE away (a clean escape at speed loses them)
 const MAX_HUNTERS = { skater: 4, rover: 2 };
@@ -426,7 +429,10 @@ export class Enemies {
     return t.base && t.base.hostile;
   }
 
-  pirateCount() { return this.list.filter((e) => e.faction === 'pirate' && e.kind !== 'core' && !e.dead).length; }
+  // roaming hunters alive (the roaming pool), and den guards alive (the den pool)
+  roamCount() { return this.hunters(); }
+  denFull(extra = 0) { return this.denCount() + extra > MAX_DEN; }
+  denCount() { return this.list.filter((e) => e.faction === 'pirate' && e.home && e.kind !== 'core' && !e.dead).length; }
 
   // The settlement you're standing in, within job-board range (its own radius, not its faction's
   // territory), if it isn't hostile to you: pirate squads don't spawn on you there. Everywhere else
@@ -442,7 +448,9 @@ export class Enemies {
   hunters(kind) { return this.list.filter((e) => e.faction === 'pirate' && !e.dead && !e.home && !e.targetObj && (!kind || e.kind === kind)).length; }
 
   // what the next hunter should be: a coin flip between whatever is still under its cap
-  huntKind() {
+  // (a squad's first hunter is a rover whenever the rover cap has room: at least one per squad)
+  huntKind(first = false) {
+    if (first && this.hunters('rover') < MAX_HUNTERS.rover) return 'rover';
     const open = ['skater', 'rover'].filter((k) => this.hunters(k) < MAX_HUNTERS[k]);
     return open.length ? open[Math.floor(Math.random() * open.length)] : null;
   }
@@ -454,13 +462,13 @@ export class Enemies {
     const dir = tangent(P.vel, up);
     if (dir.lengthSq() < 4) dir.copy(g.cam.fwd);
     dir.normalize();
-    n = Math.min(n, MAX_PIRATES - this.pirateCount());
+    n = Math.min(n, MAX_ROAMERS - this.roamCount());
     let spawned = 0;
     for (let i = 0; i < n * 3 && spawned < n; i++) {
       const t = dir.clone().applyAxisAngle(up, (Math.random() - 0.5) * 2.2);
       const d = greatCircle(up, t, randRange(320, 520));
       if (g.zoneAt(d, 1.4)) continue;
-      const kind = this.huntKind();
+      const kind = this.huntKind(spawned === 0);
       if (!kind) break;
       this.spawnPirate(kind, d, null, opts);
       spawned++;
@@ -652,7 +660,7 @@ export class Enemies {
         this.pirateTimer -= dt * (1 + dark) * blood;
         if (this.pirateTimer <= 0) {
           const hot = ms.active.cargo.hot;
-          if ((hot > 0 || Math.random() < 0.35 + dark * 0.5) && this.pirateCount() < MAX_PIRATES) this.spawnSquad(Math.min(4, 1 + Math.floor(Math.max(1, hot) * 0.8 + Math.random() + dark)));
+          if ((hot > 0 || Math.random() < 0.35 + dark * 0.5) && this.roamCount() < MAX_ROAMERS) this.spawnSquad(Math.min(4, 1 + Math.floor(Math.max(1, hot) * 0.8 + Math.random() + dark)));
           this.pirateTimer = randRange(30, 50) / Math.max(1, hot * 0.8);
           this.darkTimer = Math.max(this.darkTimer, 14);
         }
@@ -673,9 +681,11 @@ export class Enemies {
       for (const l of this.lairs) {
         if (!this.lairActive(l, time) || arcDist(P.pos, l.dir) > 650) continue;
         const guards = this.list.filter((e) => e.home === l && e.kind !== 'core' && !e.dead).length;
-        if (guards < (l.camp ? 2 : l.hq ? 4 : 3) && this.pirateCount() < MAX_PIRATES + 2) {
+        if (guards < (l.camp ? 2 : l.hq ? 4 : 3) && this.denCount() < MAX_DEN) {
           const a = Math.random() * Math.PI * 2;
-          this.spawnPirate(Math.random() < 0.5 ? 'skater' : 'rover', g.world.toWorld(l, Math.cos(a) * 50, 0, Math.sin(a) * 50), l);
+          // (every den keeps at least one rover among its guards)
+          const hasRover = this.list.some((e) => e.home === l && e.kind === 'rover' && !e.dead);
+          this.spawnPirate(!hasRover || Math.random() < 0.5 ? 'rover' : 'skater', g.world.toWorld(l, Math.cos(a) * 50, 0, Math.sin(a) * 50), l);
         }
       }
     }
