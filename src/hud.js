@@ -33,7 +33,7 @@ export class HUD {
     if (!this.logEl) {
       this.logEl = document.createElement('div');
       this.logEl.id = 'distresslog';
-      $('hud').appendChild(this.logEl);
+      $('speedo').appendChild(this.logEl); // (a child of the speed tracker, so CSS keeps it glued above it)
       this.logRows = new Map();
       this.logT = 0;
     }
@@ -44,10 +44,6 @@ export class HUD {
     if (this.logT <= 0) {
       this.logT = 0.1;
       const evs = g.events.list.filter((e) => e.state === 'open' || e.state === 'active');
-      // keep it above the speed tracker whatever its scale
-      const sp = $('speedo').getBoundingClientRect();
-      this.logEl.style.bottom = `${Math.round(window.innerHeight - sp.top + 8)}px`;
-      this.logEl.style.left = `${Math.round(sp.left)}px`;
       this.logEl.classList.toggle('hidden', !evs.length || g.state === 'title');
       const seen = new Set();
       for (const ev of evs) {
