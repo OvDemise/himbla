@@ -322,7 +322,7 @@ export class HUD {
       sign.textContent = `${up ? '+' : '−'}₵${Math.abs(delta)}`;
       sign.className = `cr-delta ${up ? 'plus' : 'minus'}`;
       void sign.offsetWidth; // (restarts the slide-in)
-      sign.classList.add('pop');
+      sign.classList.add('cr-in');
       crEl.classList.add('cr-show');
       this.crT = 5;
     }
