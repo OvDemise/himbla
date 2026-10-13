@@ -6,7 +6,7 @@ import { VEHICLES } from './vehicles.js';
 import { TECH } from './story.js';
 import * as THREE from 'three';
 import { greatCircle } from './geo.js';
-import { AIPaths } from './aipaths.js';
+import { AIPaths, EnemyMarkers } from './aipaths.js';
 
 const DEV_KEY = 'mr-dev-unlocked';
 
@@ -101,7 +101,8 @@ export class Cheats {
   // Dev overlay (bottom right): pirates alive per pool and when the next patrol spawn is attempted
   updateSpawnDebug() {
     let el = this.dbgEl;
-    if (!this.spawnDebug) { if (el) el.classList.add('hidden'); return; }
+    if (!this.spawnDebug) { if (el) el.classList.add('hidden'); if (this.marks) this.marks.hide(); return; }
+    (this.marks ||= new EnemyMarkers(this.game)).update(); // (rings + beacons on every enemy)
     const E = this.game.enemies;
     if (!el) {
       el = this.dbgEl = document.createElement('div');
