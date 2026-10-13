@@ -375,7 +375,7 @@ export class Alchemy {
   // X: into the reactor if you're beside it, otherwise tip it out. Shift+X always tips it out.
   empty(forceDump = false) {
     const g = this.game;
-    if (!this.jar.length) { g.hud.toast(this.owned ? (this.artifact ? 'Only the alien artifact is left, and its compartment is sealed.' : 'The jar is empty. Scoop something with G.') : 'You don\'t have a jar yet.', 1.8); return; }
+    if (!this.jar.length) { g.hud.toast(this.owned ? (this.artifact ? 'Only the alien artifact is left, and its compartment is sealed.' : 'The jar is empty. Press G to scoop something.') : 'You don\'t have a jar yet.', 1.8); return; }
     const lab = g.world.lab;
     if (!forceDump && lab && g.player.pos.distanceTo(lab.reactor) < 11) this.feedReactor();
     else this.dump();

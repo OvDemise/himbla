@@ -142,6 +142,8 @@ export class Cheats {
     if (raid.length) rows.push(`event raiders ${raid.length}`);
     const S = this.game.story;
     if (S) rows.push(`Kade chance next squad ${Math.round((S.kadeChance ?? 0.08) * 100)}%`);
+    const gp = this.game.pad && this.game.pad.gyro;
+    if (gp && gp.dev) rows.push(gp.debug());
     rows.push(`total hunters ${roam.length} (dark-side spawns skip at 3+)`);
     rows.push(`<b>NEXT PATROL</b>`);
     if (!d.squadsOn) rows.push(`blocked: ${d.why || '?'}`);

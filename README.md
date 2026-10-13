@@ -121,6 +121,7 @@ back. Prompts show the pad's buttons while it's in use.
 | `L3` · `R3` | Thrusters · scoop into the jar |
 | D-pad ← → · ↑ | Previous / next weapon · next power |
 | D-pad ↓ (tap) · right stick · `A` / `B` | Open the radial menu (tap again to use the highlighted wedge, or to close it if none is picked): vehicles, wardrobe, reputation log, music, help, empty jar, pen link, Teleporter · pick a wedge (it glows like the minimap: white in the light, purple on the dark side) · use it / cancel |
+| `Circle` held + tilt the pad (PlayStation) | **Gyro:** how far you turn the pad since Circle went down acts like the left stick: pitch it forward / back and turn it like a steering wheel to move on the ground, or to flip and spin in the air. Settings → Gameplay: on / off, how far is a full push, flip either axis |
 | `View` (tap · hold) · `Start` | Globe map · emergency recall · pause |
 
 In menus, dialogs, the board, the wardrobe and the casino, the d-pad (or left stick) moves a
