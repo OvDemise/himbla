@@ -127,8 +127,10 @@ export class Cheats {
       rows.push(`cargo run ${d.carrying ? t(E.pirateTimer) : 'idle (no cargo)'}`);
     }
     rows.push(`den check ${t(E.lairTimer)}`);
-    const s = E.dbgSpawn;
-    if (s) rows.push(`<b>LAST SQUAD ATTEMPT</b> ${t(this.game.time - s.at)} ago`, `wanted ${s.want} · tries ${s.tries} · in a settlement zone ${s.zoned} · spawned ${s.spawned}`);
+    const dt = E.dbgDarkTry, s = E.dbgSpawn;
+    rows.push(`<b>LAST SQUAD ATTEMPT</b>`);
+    rows.push(dt ? `dark-side timer fired ×${dt.n}, last ${t(this.game.time - dt.at)} ago${dt.skip ? ' (skipped: 3+ hunters out)' : ''}` : 'dark-side timer has not fired yet');
+    rows.push(s ? `spawner ${t(this.game.time - s.at)} ago: wanted ${s.want} · tries ${s.tries} · in a settlement zone ${s.zoned} · spawned ${s.spawned}` : 'spawner has not run yet');
     el.innerHTML = rows.join('<br>');
   }
 
