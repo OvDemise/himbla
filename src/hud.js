@@ -6,6 +6,7 @@ import { arcDist, darkness, upAt } from './geo.js';
 import { WEAPONS } from './weapons.js';
 import { EVENT_RANGE } from './config.js';
 import { pixelFont } from './fonts.js';
+import { mulberry32 } from './rng.js';
 
 const $ = (id) => document.getElementById(id);
 const MM_RANGE = 700; // metres from the centre to the edge of the minimap when standing still
@@ -23,6 +24,90 @@ export class HUD {
     this.bannerT = 0;
     this.v = new THREE.Vector3();
     this.lastSpeedTxt = '';
+    this.buildCracks();
+  }
+
+  // Cracked visor: glass cracks spread over the screen (behind the rest of the HUD) as hull drops. Five
+  // impact points, each a star of jagged rays with a few branches; an impact wakes up at its hull
+  // level and its rays then grow out over the next 10% or so, so the damage creeps in.
+  buildCracks() {
+    const NS = 'http://www.w3.org/2000/svg';
+    const svg = document.createElementNS(NS, 'svg');
+    svg.id = 'cracks';
+    svg.setAttribute('viewBox', '0 0 160 90');
+    svg.setAttribute('preserveAspectRatio', 'xMidYMid slice');
+    const rnd = mulberry32(7731);
+    const IMPACTS = [[128, 22, 0.72], [24, 70, 0.58], [100, 78, 0.44], [34, 20, 0.3], [80, 46, 0.16]]; // x, y, hull fraction it starts at
+    this.cracks = [];
+    const mk = (d, w, thr) => {
+      const p = document.createElementNS(NS, 'path');
+      p.setAttribute('d', d);
+      p.setAttribute('pathLength', '1');
+      p.setAttribute('stroke-width', w);
+      p.setAttribute('stroke-dasharray', '1');
+      p.setAttribute('stroke-dashoffset', '1');
+      svg.appendChild(p);
+      this.cracks.push({ p, thr, last: 1 });
+    };
+    // a jagged line from (x, y) heading `a`, `n` segments long; returns its points
+    const walk = (x, y, a, n, seg) => {
+      const pts = [[x, y]];
+      for (let i = 0; i < n; i++) {
+        a += (rnd() - 0.5) * 0.7;
+        const s = seg * (0.6 + rnd() * 0.8);
+        x += Math.cos(a) * s; y += Math.sin(a) * s;
+        pts.push([x, y]);
+      }
+      return pts;
+    };
+    const path = (pts) => 'M' + pts.map((q) => q[0].toFixed(1) + ' ' + q[1].toFixed(1)).join('L');
+    for (const [cx, cy, thr] of IMPACTS) {
+      const rays = 6 + Math.floor(rnd() * 3);
+      const a0 = rnd() * Math.PI * 2;
+      for (let r = 0; r < rays; r++) {
+        const a = a0 + (r / rays) * Math.PI * 2 + (rnd() - 0.5) * 0.5;
+        const pts = walk(cx, cy, a, 5 + Math.floor(rnd() * 4), 5 + rnd() * 3);
+        const t = thr - rnd() * 0.05; // (rays of one impact don't all start together)
+        mk(path(pts), 0.3, t);
+        // a branch or two off the middle of the ray
+        for (let b = 0; b < 2; b++) {
+          if (rnd() < 0.35) continue;
+          const i = 1 + Math.floor(rnd() * (pts.length - 2));
+          const from = pts[i];
+          const ba = a + (rnd() < 0.5 ? -1 : 1) * (0.5 + rnd() * 0.6);
+          mk(path(walk(from[0], from[1], ba, 2 + Math.floor(rnd() * 3), 3 + rnd() * 2)), 0.17, t - 0.03);
+        }
+      }
+      // a few short rings of hairline cracks round the impact point
+      for (let k = 0; k < 2; k++) {
+        const rad = 3.5 + k * 4.5;
+        const pts = [];
+        const n = 7 + k * 3;
+        for (let i = 0; i <= n; i++) {
+          const a = a0 + (i / n) * Math.PI * 1.7 + k;
+          const rr = rad * (0.85 + rnd() * 0.3);
+          pts.push([cx + Math.cos(a) * rr, cy + Math.sin(a) * rr]);
+        }
+        mk(path(pts), 0.14, thr - 0.04 - k * 0.03);
+      }
+    }
+    $('hud').prepend(svg);
+    this.crackEl = svg;
+    this.crackKey = -1;
+  }
+
+  // hull fraction 0-1
+  updateCracks(frac) {
+    const key = Math.round(frac * 400);
+    if (key === this.crackKey) return;
+    this.crackKey = key;
+    let any = false;
+    for (const c of this.cracks) {
+      const p = Math.max(0, Math.min(1, (c.thr - frac) / 0.1));
+      if (p !== c.last) { c.p.setAttribute('stroke-dashoffset', String(1 - p)); c.last = p; }
+      if (p > 0) any = true;
+    }
+    this.crackEl.style.opacity = any ? String(0.6 + 0.4 * (1 - frac)) : '0';
   }
 
   show(id, on = true) { $(id).classList.toggle('hidden', !on); }
@@ -334,6 +419,7 @@ export class HUD {
     this.drawSpeedo(P.speed * 3.6);
     this.distressLog(dt);
     $('hp-fill').style.width = (P.health / P.maxHealth) * 100 + '%';
+    this.updateCracks(Math.max(0, P.health / P.maxHealth));
     $('en-fill').style.width = (P.body.energy / P.body.maxEnergy) * 100 + '%';
     $('en-fill').style.opacity = P.body.jetLocked ? 0.45 : ''; // dimmed while the thrusters are locked out
     const sk = $('skates');

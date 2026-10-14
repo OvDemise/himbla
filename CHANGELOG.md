@@ -5,6 +5,7 @@ contains `[release]` (see the README's Download section). Newest first.
 
 ## Unreleased
 
+- **Cracked visor:** as your hull drops, cracks spread across the screen behind the HUD: the first impact appears around 70% hull and more (and longer) cracks creep in until the screen is webbed at the bottom.
 - **Grind popup:** like tricks, the `+points` on the grind popup only shows during a delivery, when the points actually count.
 - **Settlement banners:** the big name banner now shows only the first time you walk into a settlement (remembered in your save). After that, the settlement's name sits centred under the territory line in the territory chip while you're inside.
 - **Vehicle controls popup:** with a controller in use, the popup when you get into a vehicle shows the pad's buttons (left stick to drive and steer, A hop, Y get out, in your pad's own glyphs) instead of the keyboard keys.
