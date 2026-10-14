@@ -132,6 +132,10 @@ export class Grinder {
     A.s += A.dir * A.speed * dt;
     if (r.loop) A.s = ((A.s % r.len) + r.len) % r.len;
     A.t += dt;
+    // the player's physics (where the tank refills) is skipped while grinding, so recharge here
+    b.thrusting = false;
+    b.energy = Math.min(b.maxEnergy, b.energy + P.params.energyRegen * dt);
+    if (b.jetLocked && b.energy >= b.maxEnergy * 0.25) b.jetLocked = false;
     railAt(r, A.s, _p, _t);
     _u.copy(_p).normalize();
     const left = r.loop ? Infinity : A.dir > 0 ? r.len - A.s : A.s;

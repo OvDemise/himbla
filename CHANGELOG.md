@@ -5,6 +5,7 @@ contains `[release]` (see the README's Download section). Newest first.
 
 ## Unreleased
 
+- **Grinding recharges the jets:** the thruster tank now refills while you ride a rail (it used to freeze, because the normal physics step that recharges it is skipped on a grind), and a locked-out tank unlocks at 25% as usual.
 - **Vehicle wheel:** the boxy "YOUR VEHICLES" list is gone. The controller menu's VEHICLES wedge now opens the vehicle wheel (the same one you get holding `V` / `Y`), restyled to match the controller menu: the right stick picks, `A` calls it, `B` / `Start` cancels, and the pick glows white in the light and purple on the dark side.
 
 ## 0.9.99-1 — 2026-10-13
