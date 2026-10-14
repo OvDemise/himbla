@@ -94,8 +94,8 @@ export class FX {
     }
   }
 
-  dust(pos, vel, amount = 4, up = upAt(pos), color = 0xd8d0c4) {
-    this.spawn(pos, vel.clone().multiplyScalar(0.25).addScaledVector(up, 2), { color, size: 0.5, life: 1.2, gravity: 1.62, drag: 0.6, count: amount, spread: 4 });
+  dust(pos, vel, amount = 4, up = upAt(pos), color = 0xd8d0c4, size = 0.5) {
+    this.spawn(pos, vel.clone().multiplyScalar(0.25).addScaledVector(up, 2), { color, size, life: 1.2, gravity: 1.62, drag: 0.6, count: amount, spread: 4 });
   }
 
   explosion(pos, radius = 6, big = false) {

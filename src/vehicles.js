@@ -383,22 +383,27 @@ export class Garage {
     }
   }
 
-  // dust thrown up behind the rear wheels (the same puff as the skate's, which kicks in at 25 m/s) once
-  // you're moving fast over the ground; the hover ones scatter it from under their rear pads
+  // dust kicked up by the wheels (the same puff as the skate's, which kicks in at 25 m/s) once you're
+  // moving fast over the ground. The rear wheels throw the most: bigger puffs and more of them the
+  // faster you go. The front wheels kick up a steady lighter puff. The hover ones scatter it from
+  // under their pads.
   kickDust(v, dt, sp, up) {
     if (sp < 18 || !v.e.body.grounded) return;
     const { def, model } = v;
     const sc = def.scale || 1;
-    const spots = model.wheels.length ? model.wheels.filter((w) => w.position.z < 0).map((w) => [w.position.x * sc, w.position.z * sc]) : [[-1.1, -1.6], [1.1, -1.6]];
-    const rate = dt * 30 * Math.min(2, sp / 40);
+    const spots = model.wheels.length ? model.wheels.map((w) => [w.position.x * sc, w.position.z * sc]) : [[-1.1, -1.6], [1.1, -1.6], [-1.1, 1.6], [1.1, 1.6]];
+    const k = Math.min(1, (sp - 18) / 60); // 0 at the dust threshold, 1 at 78 m/s
     const back = _mf.copy(v.e.body.vel).multiplyScalar(-0.2);
     for (const [x, z] of spots) {
-      if (Math.random() >= rate) continue;
+      const rear = z < 0;
+      const rate = rear ? dt * 30 * (1 + 3 * k) : dt * 30 * Math.min(2, sp / 40); // puffs this frame
+      const n = Math.floor(rate + Math.random());
+      if (!n) continue;
       // (dropped onto the ground plane under the body: a hover vehicle floats, a tilted one would
       // otherwise puff from its wheel hubs)
       const p = model.root.localToWorld(_mu.set(x, 0, z));
       p.addScaledVector(up, -p.clone().sub(v.e.body.pos).dot(up));
-      this.game.fx.dust(p, back, 1, up, 0xe8e2d8);
+      this.game.fx.dust(p, back, n, up, 0xe8e2d8, rear ? 0.5 + 1.1 * k : 0.5);
     }
   }
 
