@@ -5,6 +5,15 @@ contains `[release]` (see the README's Download section). Newest first.
 
 ## Unreleased
 
+- **Debug views:** DISPLAY & DEBUG in the dev menu gets SHOW EACH POLYGON (every triangle outlined over a dark fill) and SHOW EACH DRAW CALL (every draw call in its own flat colour, so you can see what batches and what doesn't). Both draw the bare scene without the comic post pass; they're mutually exclusive and last until you turn them off or reload.
+- **Shadow pass:** the shadow map (the heaviest single render pass) now refreshes every other frame while frames are quick and you're moving slowly (standing, walking, in a settlement), and every frame when you skate fast, teleport, or the frame rate is low. Shadows look the same; the saving shows up in busy places.
+- **Cracked visor, faster and in front:** the cracks are now painted once onto a single canvas (repainted only when your hull moves by a percent) instead of a few hundred live SVG paths under a screen-wide filter, which tanked the frame rate near death. They also draw in front of the rest of the HUD now.
+- **Dev menu, DISPLAY & DEBUG:** item 6 of the dev menu (F8) opens a new submenu with the FPS readout (moved here from item 6), a DRAW CALLS & POLYGONS readout under the minimap, and a CRACKED VISOR toggle.
+- **Cracked visor:** as your hull drops, cracks spread across the screen behind the HUD: the first impact appears around 70% hull and more (and longer) cracks creep in until the screen is webbed at the bottom.
+- **Grind popup:** like tricks, the `+points` on the grind popup only shows during a delivery, when the points actually count.
+- **Settlement banners:** the big name banner now shows only the first time you walk into a settlement (remembered in your save). After that, the settlement's name sits centred under the territory line in the territory chip while you're inside.
+- **Vehicle controls popup:** with a controller in use, the popup when you get into a vehicle shows the pad's buttons (left stick to drive and steer, A hop, Y get out, in your pad's own glyphs) instead of the keyboard keys.
+- **Ragdoll lockout:** while you're limp in a ragdoll you can't fire your weapon or scope in, and can't use powers (Phase Dash, the Teleporter, the Kepler winch, the pen link).
 - **Freighter camera:** hopping onto a freighter (or shuttle, or a funpark ride) while you were still ragdolling no longer leaves the camera behind at the boarding spot; the tumble ends as you take your seat and the camera follows the ride.
 - **Casino and lab interiors:** stepping inside the Lucky Crater Casino hides the HUD (interaction prompts, toasts and pop-ups stay), and wipeouts and hard crashes no longer ragdoll you inside the casino or Dr. Zbornak's lab.
 - **Jar toggle in the wardrobe:** once you own a containment jar, a JAR ON / OFF button (or `J`) sits in the top-right corner of the wardrobe preview; the preview turns to show your back. Hiding it is cosmetic only, it still works.

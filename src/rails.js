@@ -229,7 +229,7 @@ export class Grinder {
     if (!knocked) {
       const pts = Math.round(15 + A.t * 30);
       g.style(pts, 'GRIND');
-      g.fx.pop(`GRIND +${pts}`, null, { color: '#ffd23f', size: 40 });
+      if (g.missions.active) g.fx.pop(`GRIND +${pts}`, null, { color: '#ffd23f', size: 40 }); // (the +points only shows when they count: g.style already pops the plain GRIND!)
     }
     if (jumped) g.audio.jump();
     this.active = null;

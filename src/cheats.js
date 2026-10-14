@@ -20,6 +20,9 @@ export class Cheats {
     this.mapTeleport = false; // click a location (or press A with the controller cursor on it) in the full map to go there
     this.aiPaths = false; // draw every AI's current path / steering goal
     this.showFps = false; // frame-rate readout under the minimap
+    this.showStats = false; // draw calls + polygons rendered per frame, under the minimap
+    this.debugView = null; // 'poly' (every polygon outlined) | 'draw' (every draw call its own flat colour): the scene drawn bare, without the comic post pass
+    this.crackedVisor = true; // the cracks that spread over the screen as hull drops (hud.js)
     this.spawnDebug = false; // bottom-right pirate counts + spawn timers overlay
     this.speed = 1; // player speed multiplier, 1 to 10 (player.js)
     // once the dev menu has been opened (F8 / controller combo) it gets a button on the pause card, remembered across launches
@@ -46,7 +49,7 @@ export class Cheats {
       { label: this.speedLabel(), fn: () => { this.setSpeed(this.speed >= 10 ? 1 : this.speed + 1); this.dev(); } },
       { label: '4 · TELEPORT TO RUSTMOON HOLD', fn: () => { const l = g.locations.find((x) => x.id === 'rustmoon'); if (l) this.teleport(l); } },
       { label: `5 · PIRATE SPAWN DEBUG: ${this.spawnDebug ? 'ON' : 'OFF'}`, fn: () => { this.spawnDebug = !this.spawnDebug; this.tick(); this.dev(); } },
-      { label: `6 · SHOW FPS: ${this.showFps ? 'ON' : 'OFF'}`, fn: () => { this.showFps = !this.showFps; this.tick(); this.dev(); } },
+      { label: '6 · DISPLAY & DEBUG…', fn: () => this.displayMenu() },
       { label: `7 · SHOW AI PATHS: ${this.aiPaths ? 'ON' : 'OFF'}`, fn: () => { this.aiPaths = !this.aiPaths; this.tick(); this.dev(); } },
       { label: '8 · FULL CHEAT MENU…', fn: () => this.open() },
       { label: `9 · CLICK MAP TO TELEPORT: ${this.mapTeleport ? 'ON' : 'OFF'}`, fn: () => { this.mapTeleport = !this.mapTeleport; this.dev(); } },
@@ -61,6 +64,103 @@ export class Cheats {
       row.addEventListener('adj', (e) => bump(e.detail));
       row.onclick = (e) => { e.stopPropagation(); bump(this.speed >= 10 ? -9 : 1); };
     }
+  }
+
+  // On-screen readouts and effects: frame rate, draw calls and polygons, the cracked visor
+  displayMenu() {
+    const g = this.game;
+    const on = (v) => (v ? 'ON' : 'OFF');
+    g.dialog('DISPLAY & DEBUG', '<small>Toggles last until you reload.</small>', [
+      { label: `1 · SHOW FPS: ${on(this.showFps)}`, fn: () => { this.showFps = !this.showFps; this.tick(); this.displayMenu(); } },
+      { label: `2 · DRAW CALLS & POLYGONS: ${on(this.showStats)}`, fn: () => { this.setStats(!this.showStats); this.displayMenu(); } },
+      { label: `3 · CRACKED VISOR: ${on(this.crackedVisor)}`, fn: () => { this.crackedVisor = !this.crackedVisor; g.hud.crackKey = -1; this.displayMenu(); } },
+      { label: `4 · SHOW EACH POLYGON: ${on(this.debugView === 'poly')}`, fn: () => { this.setDebugView(this.debugView === 'poly' ? null : 'poly'); this.displayMenu(); } },
+      { label: `5 · SHOW EACH DRAW CALL: ${on(this.debugView === 'draw')}`, fn: () => { this.setDebugView(this.debugView === 'draw' ? null : 'draw'); this.displayMenu(); } },
+      { label: '6 · BACK', fn: () => this.dev() },
+      { label: 'CLOSE' },
+    ]);
+  }
+
+  // Debug views. The scene is drawn bare (no comic post pass) with one flat-colour material standing in
+  // for every material (scene.overrideMaterial): 'draw' fills each draw call with a colour of its own
+  // (stable per object, so batching shows: a merged chunk is one colour, a pile of loose props a
+  // confetti), 'poly' fills dark and draws every triangle's edges on top. The colour is set per draw call
+  // by wrapping renderBufferDirect, which three calls once per draw.
+  setDebugView(mode) {
+    const r = this.game.renderer;
+    this.debugView = mode;
+    if (mode && !this._rbd) {
+      const orig = this._rbd = r.renderBufferDirect;
+      r.renderBufferDirect = (camera, scene, geometry, material, object, group) => {
+        const m = this.dbg;
+        if (m && (material === m.fill || material === m.wire)) {
+          const u = material.uniforms.c.value;
+          if (material === m.wire) u.setHex(0x7fd8ff);
+          else if (this.debugView === 'poly') u.setHex(0x0a0818);
+          else u.setHSL((((object.id * 0.6180339 + (group ? group.materialIndex || 0 : 0) * 0.37) % 1) + 1) % 1, 0.75, 0.55);
+          material.uniformsNeedUpdate = true;
+        }
+        return orig.call(r, camera, scene, geometry, material, object, group);
+      };
+    } else if (!mode && this._rbd) {
+      r.renderBufferDirect = this._rbd;
+      this._rbd = null;
+      this.game.scene.overrideMaterial = null;
+    }
+  }
+
+  renderDebug() {
+    const g = this.game, r = g.renderer;
+    if (!this.dbg) {
+      const make = (extra) => new THREE.ShaderMaterial({
+        uniforms: { c: { value: new THREE.Color() } },
+        vertexShader: '#include <common>\n#include <skinning_pars_vertex>\nvoid main() {\n#include <skinbase_vertex>\n#include <begin_vertex>\n#include <skinning_vertex>\n#include <project_vertex>\n}',
+        fragmentShader: 'uniform vec3 c;\nvoid main() { gl_FragColor = vec4( c, 1.0 ); }',
+        side: THREE.DoubleSide,
+        ...extra,
+      });
+      // (the fill sits a touch behind, so the outlines drawn over it aren't z-fought away)
+      this.dbg = { fill: make({ polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1 }), wire: make({ wireframe: true }) };
+    }
+    r.setRenderTarget(null);
+    g.scene.overrideMaterial = this.dbg.fill;
+    r.render(g.scene, g.camera);
+    if (this.debugView === 'poly') {
+      g.scene.overrideMaterial = this.dbg.wire;
+      const ac = r.autoClear;
+      r.autoClear = false;
+      r.render(g.scene, g.camera);
+      r.autoClear = ac;
+    }
+    g.scene.overrideMaterial = null;
+  }
+
+  // three.js resets its counters on every render call, and a frame renders twice (the scene, then the
+  // post-processing quad), so while the readout is up the game resets them once per frame instead
+  setStats(on) {
+    this.showStats = on;
+    this.game.renderer.info.autoReset = !on;
+    if (!on && this.statsEl) this.statsEl.classList.add('hidden');
+  }
+
+  beforeRender() { if (this.showStats) this.game.renderer.info.reset(); }
+
+  // after the frame is drawn: draw calls and triangles for the scene (the post quad's one call and two triangles left out)
+  drawStats() {
+    if (!this.showStats) return;
+    let el = this.statsEl;
+    if (!el) {
+      el = this.statsEl = document.createElement('div');
+      el.id = 'render-readout';
+      (document.getElementById('undermap') || document.body).appendChild(el);
+    }
+    el.classList.remove('hidden');
+    const now = performance.now();
+    if (now - (this.statsT || 0) < 250) return; // (a few times a second is plenty to read)
+    this.statsT = now;
+    const r = this.game.renderer.info.render;
+    const tris = Math.max(0, r.triangles - (this.debugView ? 0 : 2));
+    el.textContent = `${Math.max(0, r.calls - (this.debugView ? 0 : 1)).toLocaleString('en-US')} DRAWS · ${tris >= 1e6 ? (tris / 1e6).toFixed(2) + 'M' : tris.toLocaleString('en-US')} POLYS`;
   }
 
   speedLabel() { return `3 · SPEED: ×${this.speed}  (◄ ►)`; }

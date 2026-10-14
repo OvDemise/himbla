@@ -144,6 +144,7 @@ class Game {
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     this.renderer.setSize(window.innerWidth, window.innerHeight);
     this.renderer.shadowMap.enabled = true;
+    this._frameMs = 16; // (smoothed frame time: updateLighting throttles the shadow map while frames are quick)
     this.renderer.shadowMap.type = THREE.PCFShadowMap;
     document.getElementById('game').appendChild(this.renderer.domElement);
 
@@ -1007,7 +1008,7 @@ class Game {
     document.getElementById('title').classList.add('hidden');
     this.state = 'play';
     this.input.lock();
-    this.hud.banner(this.hub);
+    this.enterPlace(this.hub);
     // the first load after a story finale: what changed on the Moon
     if (this.ws.bulletin) {
       const news = this.ws.bulletin;
@@ -1108,7 +1109,10 @@ class Game {
 
     if (this.trailer) this.trailer.post(u);
     this.renderer.setViewport(0, 0, window.innerWidth, window.innerHeight);
-    this.post.render(this.scene, this.camera);
+    this.cheats.beforeRender();
+    if (this.cheats.debugView) this.cheats.renderDebug(); // (dev menu: polygons / draw calls laid bare)
+    else this.post.render(this.scene, this.camera);
+    this.cheats.drawStats();
     this.input.endFrame();
   }
 
@@ -1148,6 +1152,15 @@ class Game {
       if (arcDist(P.pos, l.dir) < l.r * 1.5) return l.id === 'antimatter' || l.id === 'monolith' ? 'lab' : l.id;
     }
     return darkness(P.up) > 0.6 ? 'dark' : 'free';
+  }
+
+  // Walking into a settlement: its big banner shows only the first time (remembered in the save);
+  // after that the name just sits under the territory chip (territory.js setPlace).
+  enterPlace(loc) {
+    const seen = this.stats.seenPlaces || (this.stats.seenPlaces = []);
+    if (seen.includes(loc.id)) return;
+    seen.push(loc.id);
+    this.hud.banner(loc);
   }
 
   // 'casino' or 'lab' while you're standing inside the Lucky Crater Casino's hall or Dr. Zbornak's lab,
@@ -1197,8 +1210,21 @@ class Game {
     this.hemi.position.copy(up);
     this.hemi.intensity = 0.06 + 0.8 * THREE.MathUtils.smoothstep(e, -0.25, 0.15);
     this.earthLight.intensity = 0.3 * THREE.MathUtils.smoothstep(up.dot(this.world.earthDir), -0.1, 0.3);
-    // shadows only matter where the sun is up
-    this.renderer.shadowMap.autoUpdate = day > 0.01;
+    // shadows only matter where the sun is up. The shadow map is the heaviest single pass (every caster
+    // within 160 m redrawn into a 2048² map), so while frames are quick (50+ fps) and you're moving
+    // slowly (standing, walking, a settlement: where the scenes are heaviest) it's refreshed every other
+    // frame: the old map stays valid (its matrix only changes with it) and a frame-old shadow is invisible
+    // at that speed. Fast skating, a teleport or a slow frame rate redraw it every frame.
+    const sm = this.renderer.shadowMap;
+    const now = performance.now();
+    if (this._shT) this._frameMs += (Math.min(100, now - this._shT) - this._frameMs) * 0.1;
+    this._shT = now;
+    const moved = this._shPos ? P.pos.distanceTo(this._shPos) : 1e9;
+    const calm = this._frameMs < 20 && P.speed < 25 && moved < 6;
+    const refresh = !calm || (this._shFlip = !this._shFlip);
+    sm.autoUpdate = false;
+    sm.needsUpdate = day > 0.01 && refresh;
+    if (day > 0.01 && refresh) { if (!this._shPos) this._shPos = new THREE.Vector3(); this._shPos.copy(P.pos); }
     // The shadow box follows you, moved in whole shadow-map texels along the light's own axes (the
     // ones the shadow camera's lookAt builds: z toward the sun, x = worldUp x z, y = z x x), so the
     // texel grid never slides across the ground and shadows hold still as you move. (Snapping on the
@@ -1293,7 +1319,7 @@ class Game {
     if (!this.input.down('KeyX')) this.jarHoldDone = false;
     if (this.input.pressed('KeyX') && !A.jar.length) A.empty();
     if (this.input.pressed('KeyC') && this.boardCooldown <= 0) this.cosmetics.wardrobe();
-    if (this.input.pressed('KeyP') && this.boardCooldown <= 0) {
+    if (this.input.pressed('KeyP') && this.boardCooldown <= 0 && !this.player.rag) {
       if (this.upgrades.penlink) this.alchemy.penMenu();
       else this.hud.toast('No pen link. Dr. Zbornak sells a remote holding-pen link at the Antimatter Lab.', 3);
     }
@@ -1331,7 +1357,8 @@ class Game {
 
     const z = this.zoneAt(P.pos);
     if (z !== this.currentZone) {
-      if (z) this.hud.banner(z);
+      if (z) this.enterPlace(z);
+      this.territory.setPlace(z ? z.name : null); // (the name sits under the territory chip while you're inside)
       this.currentZone = z;
     }
     const zw = document.getElementById('zonewarn');

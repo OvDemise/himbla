@@ -6,6 +6,7 @@ import { arcDist, darkness, upAt } from './geo.js';
 import { WEAPONS } from './weapons.js';
 import { EVENT_RANGE } from './config.js';
 import { pixelFont } from './fonts.js';
+import { mulberry32 } from './rng.js';
 
 const $ = (id) => document.getElementById(id);
 const MM_RANGE = 700; // metres from the centre to the edge of the minimap when standing still
@@ -23,6 +24,115 @@ export class HUD {
     this.bannerT = 0;
     this.v = new THREE.Vector3();
     this.lastSpeedTxt = '';
+    this.buildCracks();
+  }
+
+  // Cracked visor: glass cracks spread over the screen (in front of the rest of the HUD) as hull drops.
+  // Five impact points, each a star of jagged rays with a few branches; an impact wakes up at its hull
+  // level and its rays then grow out over the next 10% or so, so the damage creeps in. The geometry is
+  // built once; the cracks are painted onto one canvas, and only repainted when the hull moves by a
+  // whole percent (a canvas the browser just composites costs nothing per frame, unlike a few hundred
+  // live SVG paths under a CSS filter, which it redrew over the whole game every frame).
+  buildCracks() {
+    const W = 1280, H = 720, K = W / 160; // (the canvas is 16:9 and cover-fitted to the screen; points are in a 160 x 90 box)
+    const cv = document.createElement('canvas');
+    cv.id = 'cracks';
+    cv.width = W; cv.height = H;
+    const rnd = mulberry32(7731);
+    const IMPACTS = [[128, 22, 0.72], [24, 70, 0.58], [100, 78, 0.44], [34, 20, 0.3], [80, 46, 0.16]]; // x, y, hull fraction it starts at
+    this.cracks = [];
+    const mk = (pts, w, thr) => {
+      const cum = [0];
+      for (let i = 1; i < pts.length; i++) cum.push(cum[i - 1] + Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]));
+      this.cracks.push({ pts, cum, total: cum[cum.length - 1], w, thr });
+    };
+    // a jagged line from (x, y) heading `a`, `n` segments long; returns its points
+    const walk = (x, y, a, n, seg) => {
+      const pts = [[x, y]];
+      for (let i = 0; i < n; i++) {
+        a += (rnd() - 0.5) * 0.7;
+        const s = seg * (0.6 + rnd() * 0.8);
+        x += Math.cos(a) * s; y += Math.sin(a) * s;
+        pts.push([x, y]);
+      }
+      return pts;
+    };
+    for (const [cx, cy, thr] of IMPACTS) {
+      const rays = 6 + Math.floor(rnd() * 3);
+      const a0 = rnd() * Math.PI * 2;
+      for (let r = 0; r < rays; r++) {
+        const a = a0 + (r / rays) * Math.PI * 2 + (rnd() - 0.5) * 0.5;
+        const pts = walk(cx, cy, a, 5 + Math.floor(rnd() * 4), 5 + rnd() * 3);
+        const t = thr - rnd() * 0.05; // (rays of one impact don't all start together)
+        mk(pts, 0.3, t);
+        // a branch or two off the middle of the ray
+        for (let b = 0; b < 2; b++) {
+          if (rnd() < 0.35) continue;
+          const i = 1 + Math.floor(rnd() * (pts.length - 2));
+          const from = pts[i];
+          const ba = a + (rnd() < 0.5 ? -1 : 1) * (0.5 + rnd() * 0.6);
+          mk(walk(from[0], from[1], ba, 2 + Math.floor(rnd() * 3), 3 + rnd() * 2), 0.17, t - 0.03);
+        }
+      }
+      // a few short rings of hairline cracks round the impact point
+      for (let k = 0; k < 2; k++) {
+        const rad = 3.5 + k * 4.5;
+        const pts = [];
+        const n = 7 + k * 3;
+        for (let i = 0; i <= n; i++) {
+          const a = a0 + (i / n) * Math.PI * 1.7 + k;
+          const rr = rad * (0.85 + rnd() * 0.3);
+          pts.push([cx + Math.cos(a) * rr, cy + Math.sin(a) * rr]);
+        }
+        mk(pts, 0.14, thr - 0.04 - k * 0.03);
+      }
+    }
+    this.crackCtx = cv.getContext('2d');
+    this.crackK = K;
+    cv.style.display = 'none';
+    $('hud').appendChild(cv);
+    this.crackEl = cv;
+    this.crackKey = -1;
+  }
+
+  // paint the cracks for a hull fraction (0-1): each crack grows from nothing to full length over the 10% of hull after its threshold
+  paintCracks(frac) {
+    const ctx = this.crackCtx, K = this.crackK;
+    ctx.clearRect(0, 0, 1280, 720);
+    ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    const strokes = [];
+    for (const c of this.cracks) {
+      const p = Math.max(0, Math.min(1, (c.thr - frac) / 0.1));
+      if (p > 0) strokes.push([c, p * c.total]);
+    }
+    const trace = (c, len) => {
+      ctx.beginPath();
+      ctx.moveTo(c.pts[0][0] * K, c.pts[0][1] * K);
+      for (let i = 1; i < c.pts.length; i++) {
+        if (c.cum[i] <= len) { ctx.lineTo(c.pts[i][0] * K, c.pts[i][1] * K); continue; }
+        const f = (len - c.cum[i - 1]) / (c.cum[i] - c.cum[i - 1]); // (the segment the crack has reached: partway along it)
+        ctx.lineTo((c.pts[i - 1][0] + (c.pts[i][0] - c.pts[i - 1][0]) * f) * K, (c.pts[i - 1][1] + (c.pts[i][1] - c.pts[i - 1][1]) * f) * K);
+        break;
+      }
+    };
+    // a dark under-stroke for body, then the bright glass line on top (instead of a blurred shadow)
+    ctx.strokeStyle = 'rgba(5, 3, 12, 0.7)';
+    for (const [c, len] of strokes) { ctx.lineWidth = c.w * K + 2; trace(c, len); ctx.stroke(); }
+    ctx.strokeStyle = '#e8f4ff';
+    for (const [c, len] of strokes) { ctx.lineWidth = c.w * K; trace(c, len); ctx.stroke(); }
+    return strokes.length > 0;
+  }
+
+  // hull fraction 0-1
+  updateCracks(frac) {
+    const off = this.game.cheats && !this.game.cheats.crackedVisor; // (dev menu: DISPLAY & DEBUG)
+    const key = off ? -2 : Math.round(frac * 100); // (repainted at most once per percent of hull)
+    if (key === this.crackKey) return;
+    this.crackKey = key;
+    if (off) { this.crackEl.style.display = 'none'; return; }
+    const any = this.paintCracks(frac);
+    this.crackEl.style.display = any ? '' : 'none'; // (nothing to composite while the hull is healthy)
+    this.crackEl.style.opacity = String(0.6 + 0.4 * (1 - frac));
   }
 
   show(id, on = true) { $(id).classList.toggle('hidden', !on); }
@@ -111,9 +221,9 @@ export class HUD {
     this.recallEl.querySelector('.rh-fill').style.width = `${Math.min(1, k) * 100}%`;
   }
 
-  toast(text, dur = 2.5) {
+  toast(text, dur = 2.5, html = false) {
     const el = $('toast');
-    el.textContent = text;
+    if (html) el.innerHTML = text; else el.textContent = text; // (html: the caller has escaped it, or built it from glyphHtml)
     el.classList.remove('hidden');
     this.toastT = dur;
   }
@@ -334,6 +444,7 @@ export class HUD {
     this.drawSpeedo(P.speed * 3.6);
     this.distressLog(dt);
     $('hp-fill').style.width = (P.health / P.maxHealth) * 100 + '%';
+    this.updateCracks(Math.max(0, P.health / P.maxHealth));
     $('en-fill').style.width = (P.body.energy / P.body.maxEnergy) * 100 + '%';
     $('en-fill').style.opacity = P.body.jetLocked ? 0.45 : ''; // dimmed while the thrusters are locked out
     const sk = $('skates');
