@@ -288,7 +288,7 @@ export class Gamepad {
       const sel = ((Math.round((a / (Math.PI * 2)) * n) % n) + n) % n;
       if (sel !== R.sel) {
         R.sel = sel;
-        if (g.audio && g.audio.tone) g.audio.tone(700 + sel * 40, 0.04, 'square', 0.04);
+        if (g.audio && g.audio.tone) g.audio.tone(700 + sel * 40, 0.04, 'square', 0.06);
       }
     }
     if (pressed(B.B) || pressed(B.START)) { this.closeRadial(); return; }
@@ -630,7 +630,7 @@ export class Gamepad {
     const r = el.getBoundingClientRect();
     el.dispatchEvent(new MouseEvent('mouseover', { bubbles: true, clientX: r.left + r.width / 2, clientY: r.top + r.height / 2 }));
     el.dispatchEvent(new MouseEvent('mouseenter', { bubbles: false }));
-    if (this.game.audio && this.game.audio.tone) this.game.audio.tone(900, 0.03, 'square', 0.03);
+    if (this.game.audio && this.game.audio.tone) this.game.audio.tone(900, 0.03, 'square', 0.06);
   }
 
   clearFocus() { if (this.focus) { this.focus.classList.remove('pad-focus'); this.focus = null; } }
