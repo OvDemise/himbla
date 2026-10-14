@@ -75,7 +75,7 @@ export function tokensFor(text) {
   return null;
 }
 
-const SKIP = '#settings, #help, .controls-mini, #padradial, .pgx, script, style, textarea, input, select, canvas';
+const SKIP = '#settings, #help, .controls-mini, #padradial, #vradial, .pgx, script, style, textarea, input, select, canvas';
 const KEY_IN_TEXT = /\b(Press|press|PRESS|Hold|hold|HOLD) (ENTER|SPACE|SHIFT|[A-Z])(?![A-Za-z0-9'’])/g;
 const esc = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;');
 

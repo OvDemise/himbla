@@ -5,6 +5,8 @@ contains `[release]` (see the README's Download section). Newest first.
 
 ## Unreleased
 
+- **Vehicle wheel:** the boxy "YOUR VEHICLES" list is gone. The controller menu's VEHICLES wedge now opens the vehicle wheel (the same one you get holding `V` / `Y`), restyled to match the controller menu: the right stick picks, `A` calls it, `B` / `Start` cancels, and the pick glows white in the light and purple on the dark side.
+
 ## 0.9.99-1 — 2026-10-13
 
 - **PlayStation gyro:** with a DualShock 4 or DualSense, hold Circle and tilt the pad: how far you've turned it since Circle went down is added to the left stick, so it moves you on the ground and flips / spins you in the air. The browser's gamepad interface can't see a PlayStation gyro, so it's read over WebHID (Chrome, Edge and the desktop app; the desktop app allows Sony pads up front, a browser asks once under Settings → Gameplay → CONNECT). Settings → Gameplay has an on / off toggle, how much tilt is a full push, and flips for left / right and forward / back. With the spawn debug on, the bottom-right overlay shows the live gyro readout.

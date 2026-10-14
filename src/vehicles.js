@@ -4,6 +4,7 @@ import { makeBody } from './physics.js';
 import { stepRover } from './enemies.js';
 import { frameQuat, tangent } from './geo.js';
 import { toon, glow, ink } from './toon.js';
+import { glyphHtml } from './glyphs.js';
 
 // Faction vehicles unlocked through the story. V calls yours in (or hops out).
 export const VEHICLES = {
@@ -128,44 +129,75 @@ export class Garage {
     this.enter();
   }
 
-  // ---- hold V: a radial picker (mouse movement chooses a wedge, releasing V calls it) ----
-  openRadial() {
+  // ---- the vehicle wheel (the same wheel as the controller's menu: gamepad.js) ----
+  // Hold V and move the mouse (or push the right stick) to a vehicle, release V to call it. From the
+  // controller's wheel it stays up instead (sticky): the right stick picks, A calls, B cancels.
+  openRadial(sticky = false) {
     const owned = this.owned();
+    if (!owned.length) return;
     if (!this.radialEl) {
       this.radialEl = document.createElement('div');
       this.radialEl.id = 'vradial';
       document.getElementById('hud').appendChild(this.radialEl);
     }
-    this.radial = { ax: 0, ay: 0, sel: -1, items: owned };
+    this.radial = { ax: 0, ay: 0, sel: -1, items: owned, sticky, hub: '' };
     const n = owned.length;
-    this.radialEl.innerHTML = `<div class="vr-ring"></div><div class="vr-hub">HOLD V<br><small>move to pick · release to call</small></div>` + owned.map((k, i) => {
+    this.radialEl.innerHTML = '<div class="pr-ring"></div><div class="pr-hub"></div>' + owned.map((k, i) => {
       const a = (i / n) * Math.PI * 2 - Math.PI / 2;
       const cd = this.cooldown(k);
       const hull = `${Math.ceil(this.hp[k] ?? this.maxHp(k))}/${this.maxHp(k)}`;
-      return `<div class="vr-item${cd > 0 ? ' cd' : ''}" data-i="${i}" style="left:${50 + Math.cos(a) * 36}%;top:${50 + Math.sin(a) * 36}%">` +
+      return `<div class="pr-item${cd > 0 ? ' locked cd' : ''}" data-i="${i}" style="left:${50 + Math.cos(a) * 38}%;top:${50 + Math.sin(a) * 38}%">` +
         `<b>${VEHICLES[k].name}</b><small>${cd > 0 ? `REBUILDING ${Math.ceil(cd)}s` : `HULL ${hull}`}</small></div>`;
     }).join('');
     this.radialEl.classList.remove('hidden');
+    this.radialHub();
     this.game.audio.tone(520, 0.08, 'triangle', 0.12);
   }
 
+  // the middle of the wheel: the picked vehicle (or the title) and what the buttons do
+  radialHub() {
+    const R = this.radial;
+    if (!R) return;
+    const pad = this.game.input.padActive;
+    const k = R.sel >= 0 ? R.items[R.sel] : null;
+    const hint = pad
+      ? `<span>${glyphHtml(['RS'])} pick</span><span>${R.sticky ? glyphHtml(['A']) + ' call' : 'release ' + glyphHtml(['Y']) + ' call'}</span>` + (R.sticky ? `<span>${glyphHtml(['B'])} cancel</span>` : '')
+      : '<span>move to pick</span><span>release V to call</span>';
+    const hub = `<b>${k ? VEHICLES[k].name : 'VEHICLES'}</b><small>${hint}</small>`;
+    if (R.hub !== hub) { R.hub = hub; this.radialEl.querySelector('.pr-hub').innerHTML = hub; }
+  }
+
+  // the wheel's highlight: -1 for none
+  radialSelect(sel) {
+    const R = this.radial;
+    if (!R || sel === R.sel) return;
+    R.sel = sel;
+    for (const el of this.radialEl.querySelectorAll('.pr-item')) el.classList.toggle('on', +el.dataset.i === sel);
+    if (sel >= 0) this.game.audio.tone(700 + sel * 60, 0.04, 'square', 0.05);
+    this.radialHub();
+  }
+
+  // the mouse (pushed round while V is held)
   radialMove(dx, dy) {
     const R = this.radial;
     if (!R) return;
     R.ax += dx; R.ay += dy;
     const len = Math.hypot(R.ax, R.ay);
     if (len > 140) { R.ax *= 140 / len; R.ay *= 140 / len; }
-    let sel = -1;
-    if (len > 28) {
-      const n = R.items.length;
-      const a = Math.atan2(R.ay, R.ax) + Math.PI / 2; // 0 at the top, clockwise
-      sel = ((Math.round((a / (Math.PI * 2)) * n) % n) + n) % n;
-    }
-    if (sel !== R.sel) {
-      R.sel = sel;
-      for (const el of this.radialEl.querySelectorAll('.vr-item')) el.classList.toggle('on', +el.dataset.i === sel);
-      if (sel >= 0) this.game.audio.tone(700 + sel * 60, 0.04, 'square', 0.05);
-    }
+    if (len > 28) this.radialSelect(this.wedge(Math.atan2(R.ay, R.ax) + Math.PI / 2));
+    else this.radialSelect(-1);
+  }
+
+  // the right stick: pushing it picks a wedge, and the pick stays until you push to another
+  radialStick(rx, ry) {
+    if (!this.radial || Math.hypot(rx, ry) <= 0.55) return;
+    this.radialSelect(this.wedge(Math.atan2(rx, -ry)));
+  }
+
+  // the wedge at an angle (0 at the top, clockwise)
+  wedge(a) {
+    const n = this.radial.items.length;
+    return ((Math.round((a / (Math.PI * 2)) * n) % n) + n) % n;
   }
 
   closeRadial(commit) {
@@ -180,18 +212,6 @@ export class Garage {
     if (this.active && this.active.id === k && this.active.e.body.pos.distanceTo(g.player.pos) < 12) { this.enter(); return; }
     this.summon(k);
     this.enter();
-  }
-
-  pick() {
-    const g = this.game;
-    const owned = this.owned();
-    g.dialog('YOUR VEHICLES', 'Which one should the orbital crane drop?', owned.map((k, i) => ({
-      label: `${i + 1} · ${VEHICLES[k].name}${this.cooldown(k) > 0 ? ` (REBUILDING ${Math.ceil(this.cooldown(k))}s)` : ` (${Math.ceil(this.hp[k] ?? this.maxHp(k))}/${this.maxHp(k)} HULL)`}`,
-      fn: () => {
-        if (this.cooldown(k) > 0) { g.hud.toast(`Still being rebuilt: ready in ${Math.ceil(this.cooldown(k))}s.`, 2.5); return; }
-        this.choice = k; this.summon(k); this.enter();
-      },
-    })).concat([{ label: `${owned.length + 1} · CANCEL` }]));
   }
 
   summon(id) {

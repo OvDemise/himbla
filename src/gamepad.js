@@ -41,7 +41,8 @@
 //                                               left stick / d-pad  pick a duck   A  race · new race
 //                                               LB / RB     lower / raise the bet   B  stand up
 //   d-pad ↓      the radial menu (tap to open, tap again to close): vehicles, wardrobe, reputation log,
-//                music, help, empty the jar, pen link, Teleporter. The right stick picks a wedge (the
+//                music, help, empty the jar, pen link, Teleporter (vehicles opens its own wheel of the ones you
+//                own: same controls). The right stick picks a wedge (the
 //                highlight glows like the minimap: purple on the dark side, white in the light), A or
 //                d-pad ↓ again uses it, B / Start cancels.
 import { WEAPONS, weaponUnlocked } from './weapons.js';
@@ -110,7 +111,7 @@ export class Gamepad {
     I.padActive = on;
     document.body.classList.toggle('pad-on', on);
     if (on) this.game.hud.show('clickhint', false);
-    else { this.clearFocus(); this.hideCursor(); this.closeRadial(); this.releaseAll(); I.padMove.on = false; this.gyroOn = false; this.gyro.end(); }
+    else { this.clearFocus(); this.hideCursor(); this.closeRadial(); const gr = this.game.garage && this.game.garage.radial; if (gr && gr.sticky) this.game.garage.closeRadial(false); this.releaseAll(); I.padMove.on = false; this.gyroOn = false; this.gyro.end(); }
     // key names across the UI become this pad's buttons (and back), and so do the help tables
     this.glyphs.set(on, this.kind);
     const s = this.game.settings;
@@ -150,6 +151,7 @@ export class Gamepad {
     if (st === 'play' && !menu && !(g.settings && g.settings.open)) this.devCombo(pressed, dt);
     const setOpen = g.settings && g.settings.open;
     if (this.radial && (st !== 'play' || menu || setOpen)) this.closeRadial(); // (a dialog or screen opened over it)
+    if (g.garage && g.garage.radial && g.garage.radial.sticky && (st !== 'play' || menu || setOpen)) g.garage.closeRadial(false);
     if (this.gyroOn && (st !== 'play' || menu || setOpen)) { this.gyroOn = false; this.gyro.end(); }
     const roul = st === 'casino' && !g.casino.mode && g.casino.tab === 'roulette' && !setOpen && !menu;
     if (!roul) this.hideCursor();
@@ -208,12 +210,23 @@ export class Gamepad {
     this.set('KeyW', ly < -0.45); this.set('KeyS', ly > 0.45); this.set('KeyA', lx < -0.45); this.set('KeyD', lx > 0.45);
     // (the right stick picks a wedge while the radial menu is open, so it doesn't look round; A and B
     // are the radial's own buttons then, and aren't a jump or a trick)
-    if (!this.radial) this.look(rx, ry, dt);
+    // the vehicle wheel (garage: from this menu's VEHICLES wedge, or hold Y): the stick picks, and when it came from
+    // the menu A calls the pick and B / Start cancels. (Done before the menu below, which may be what opens it.)
+    const gw = g.garage && g.garage.radial;
+    if (gw) {
+      g.garage.radialStick(rx, ry);
+      if (gw.sticky) {
+        if (pressed(B.B) || pressed(B.START)) { g.garage.closeRadial(false); this.radialMask = true; }
+        else if (pressed(B.A)) { g.garage.closeRadial(true); this.radialMask = true; }
+      }
+    }
+    if (!this.radial && !gw) this.look(rx, ry, dt);
     // (A, B and Y are held back while the wheel is open and until they're let go after it closes, so the press that
     // used or cancelled it isn't also a jump, a trick or the vehicle key a frame later)
     const hold = !!(this.radial || this.radialMask);
+    const gwOpen = !!(g.garage && g.garage.radial);
     if (this.radialMask && !this.radial && !btn[B.A] && !btn[B.B] && !btn[B.Y]) this.radialMask = false;
-    for (const [i, code] of Object.entries(HOLD)) this.set(code, btn[i] && !(hold && (i == B.A || i == B.B || i == B.Y)));
+    for (const [i, code] of Object.entries(HOLD)) this.set(code, btn[i] && !((hold || gwOpen) && (i == B.A || i == B.B)) && !(hold && i == B.Y));
     I.mouse[0] = trig(B.RT) > 0.35;
     I.mouse[2] = trig(B.LT) > 0.35;
     // (not while the wheel is open or d-pad down is down: a diagonal press on the way to ↓ isn't a weapon swap)
@@ -225,7 +238,7 @@ export class Gamepad {
     // View: a tap opens the map, holding it is the emergency recall (R, held)
     if (btn[B.VIEW]) { this.viewT = this.viewT < 0 ? 0 : this.viewT + dt; this.set('KeyR', this.viewT > 0.35); }
     else if (this.viewT >= 0) { if (this.viewT <= 0.35) this.tap('KeyM'); this.set('KeyR', false); this.viewT = -1; }
-    const wasOpen = !!this.radial; // (Start cancels the wheel without also pausing)
+    const wasOpen = !!this.radial || !!(gw && gw.sticky); // (Start cancels the wheel without also pausing)
     this.radialMenu(btn, pressed, rx, ry);
     if (pressed(B.START) && !wasOpen) this.pause();
   }
@@ -284,7 +297,7 @@ export class Gamepad {
     if (q.id === 'vehicles') {
       // (the same guards as the V key: nothing on a transit ride or right after a screen closes; inside a vehicle it gets you out)
       if (g.rides.ride || g.boardCooldown > 0) return;
-      if (g.player.vehicle) g.garage.exit(); else g.garage.pick();
+      if (g.player.vehicle) g.garage.exit(); else g.garage.openRadial(true); // (the vehicle wheel, which then takes the stick, A and B)
     } else if (q.id === 'jar') g.alchemy.empty(false); // (the X key needs a one-second hold: this is already a deliberate pick)
     else this.pulse(q.code);
   }

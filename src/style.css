@@ -1202,18 +1202,6 @@ body.trailer #tutorial, body.trailer #racepanel, body.trailer #vehbar, body.trai
 /* BOLT's passing remarks under the current training step */
 #tutorial .tut-say { margin-top: 8px; padding-top: 6px; border-top: 1px dashed var(--ui-edge); font-family: var(--body); font-size: 15px; line-height: 1.3; color: var(--cyan); }
 
-/* hold-V vehicle radial */
-#vradial { position: fixed; left: 50%; top: 50%; width: 380px; height: 380px; margin: -190px 0 0 -190px; pointer-events: none; z-index: 40; }
-#vradial.hidden { display: none; }
-#vradial .vr-ring { position: absolute; inset: 40px; border-radius: 50%; border: 3px solid #2ee6ff; background: radial-gradient(circle, rgba(18,10,30,.25) 0 30%, rgba(18,10,30,.72) 31% 100%); box-shadow: 0 0 24px rgba(46,230,255,.35); }
-#vradial .vr-hub { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); text-align: center; color: #2ee6ff; font: 14px/1.2 var(--comic); }
-#vradial .vr-hub small { color: #9be7ff; font-size: 10px; }
-#vradial .vr-item { position: absolute; transform: translate(-50%, -50%); width: 138px; padding: 6px 8px; text-align: center; color: #fff; background: #241a3a; border: 2px solid #5b5870; border-radius: 6px; font: 12px/1.25 var(--comic); transition: transform .08s, border-color .08s; }
-#vradial .vr-item small { display: block; color: #9be7ff; font-size: 10px; }
-#vradial .vr-item.on { border-color: #ffd23f; background: #3a2b10; transform: translate(-50%, -50%) scale(1.12); }
-#vradial .vr-item.cd { opacity: .55; }
-#vradial .vr-item.cd small { color: #ff7a8a; }
-
 /* story finale time-skip card */
 #dawn { position: fixed; inset: 0; z-index: 200; background: #05030c; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px; animation: dawn-in 1.2s ease-out both; }
 #dawn .dw-t { font-family: var(--comic); font-size: 34px; color: #ffd23f; text-align: center; text-shadow: 4px 4px 0 #ff2e88; padding: 0 16px; }
@@ -1278,17 +1266,20 @@ body:not(.pad-on) .rl-pd, body.pad-on .rl-kb { display: none; }
 
 /* the controller's radial menu (gamepad.js): d-pad down, only while a controller is in use. The picked wedge
    glows the way the minimap does: faint white in the light, purple on the dark side */
-#padradial { position: fixed; left: 50%; top: 50%; width: 440px; height: 440px; margin: -220px 0 0 -220px; pointer-events: none; z-index: 40; }
-#padradial.hidden { display: none; }
-#padradial .pr-ring { position: absolute; inset: 40px; border-radius: 50%; border: 3px solid #5b5870; background: radial-gradient(circle, rgba(18,10,30,.7) 0 30%, rgba(18,10,30,.8) 31% 100%); }
-#padradial .pr-hub { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: 150px; text-align: center; color: #fff; font: 13px/1.3 var(--comic); text-shadow: 2px 2px 0 #05030c; }
-#padradial .pr-hub small { display: flex; flex-direction: column; align-items: center; gap: 4px; margin-top: 8px; color: #c9c3d9; font-size: 8px; }
-#padradial .pr-hub small span { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
-#padradial .pr-item { position: absolute; transform: translate(-50%, -50%); box-sizing: border-box; width: 124px; height: 44px; padding: 0 4px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; color: #fff; background: #241a3a; border: 2px solid #5b5870; border-radius: 6px; font: 10px/1.25 var(--comic); white-space: nowrap; transition: transform .08s, border-color .08s, box-shadow .08s; }
-#padradial .pr-item small { display: block; margin-top: 2px; color: #9be7ff; font-size: 8px; }
-#padradial .pr-item.locked { opacity: .45; }
-#padradial .pr-item.on { z-index: 1; transform: translate(-50%, -50%) scale(1.12); border-color: #fff; box-shadow: 0 0 0 2px #05030c, 0 0 14px 3px rgba(255, 255, 255, 0.28); }
-body.dark-side #padradial .pr-item.on { border-color: #8f7bff; box-shadow: 0 0 0 2px #05030c, 0 0 22px 6px rgba(143, 100, 255, 0.75); }
+#padradial, #vradial { position: fixed; left: 50%; top: 50%; width: 440px; height: 440px; margin: -220px 0 0 -220px; pointer-events: none; z-index: 40; }
+#padradial.hidden, #vradial.hidden { display: none; }
+#padradial .pr-ring, #vradial .pr-ring { position: absolute; inset: 40px; border-radius: 50%; border: 3px solid #5b5870; background: radial-gradient(circle, rgba(18,10,30,.7) 0 30%, rgba(18,10,30,.8) 31% 100%); }
+#padradial .pr-hub, #vradial .pr-hub { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: 150px; text-align: center; color: #fff; font: 13px/1.3 var(--comic); text-shadow: 2px 2px 0 #05030c; }
+#padradial .pr-hub small, #vradial .pr-hub small { display: flex; flex-direction: column; align-items: center; gap: 4px; margin-top: 8px; color: #c9c3d9; font-size: 8px; }
+#padradial .pr-hub small span, #vradial .pr-hub small span { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
+#padradial .pr-item, #vradial .pr-item { position: absolute; transform: translate(-50%, -50%); box-sizing: border-box; width: 124px; height: 44px; padding: 0 4px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; color: #fff; background: #241a3a; border: 2px solid #5b5870; border-radius: 6px; font: 10px/1.25 var(--comic); white-space: nowrap; transition: transform .08s, border-color .08s, box-shadow .08s; }
+#padradial .pr-item small, #vradial .pr-item small { display: block; margin-top: 2px; color: #9be7ff; font-size: 8px; }
+#padradial .pr-item.locked, #vradial .pr-item.locked { opacity: .45; }
+#padradial .pr-item.on, #vradial .pr-item.on { z-index: 1; transform: translate(-50%, -50%) scale(1.12); border-color: #fff; box-shadow: 0 0 0 2px #05030c, 0 0 14px 3px rgba(255, 255, 255, 0.28); }
+body.dark-side #padradial .pr-item.on, body.dark-side #vradial .pr-item.on { border-color: #8f7bff; box-shadow: 0 0 0 2px #05030c, 0 0 22px 6px rgba(143, 100, 255, 0.75); }
+/* (the vehicle wheel's names are longer: its wedges are a little wider and wrap) */
+#vradial .pr-item { width: 150px; height: auto; min-height: 46px; padding: 4px 6px; white-space: normal; }
+#vradial .pr-item.cd small { color: #ff7a8a; }
 
 /* map legend: a comic panel to the left of the globe; folds into a slim tab */
 .globe-row { display: flex; align-items: flex-start; gap: 12px; max-width: 100vw; }
