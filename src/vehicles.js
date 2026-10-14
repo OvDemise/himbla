@@ -266,7 +266,11 @@ export class Garage {
     if (!this.active) return;
     P.vehicle = this.active;
     P.resetTrick();
-    g.hud.toast(`${this.active.def.name}: W/S drive · A/D steer · SHIFT hop · V to get out`, 3.5);
+    // the controls, as the pad's own buttons when one is in use (left stick drives and steers, A hops, Y gets out)
+    const name = this.active.def.name.replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+    g.hud.toast(g.input.padActive
+      ? `${name}: ${glyphHtml(['LS'])} drive / steer · ${glyphHtml(['A'])} hop · ${glyphHtml(['Y'])} get out`
+      : `${name}: W/S drive · A/D steer · SHIFT hop · V to get out`, 3.5, g.input.padActive);
   }
 
   exit() {

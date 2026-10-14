@@ -5,6 +5,7 @@ contains `[release]` (see the README's Download section). Newest first.
 
 ## Unreleased
 
+- **Vehicle controls popup:** with a controller in use, the popup when you get into a vehicle shows the pad's buttons (left stick to drive and steer, A hop, Y get out, in your pad's own glyphs) instead of the keyboard keys.
 - **Ragdoll lockout:** while you're limp in a ragdoll you can't fire your weapon or scope in, and can't use powers (Phase Dash, the Teleporter, the Kepler winch, the pen link).
 - **Freighter camera:** hopping onto a freighter (or shuttle, or a funpark ride) while you were still ragdolling no longer leaves the camera behind at the boarding spot; the tumble ends as you take your seat and the camera follows the ride.
 - **Casino and lab interiors:** stepping inside the Lucky Crater Casino hides the HUD (interaction prompts, toasts and pop-ups stay), and wipeouts and hard crashes no longer ragdoll you inside the casino or Dr. Zbornak's lab.

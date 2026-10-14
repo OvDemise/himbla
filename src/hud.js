@@ -111,9 +111,9 @@ export class HUD {
     this.recallEl.querySelector('.rh-fill').style.width = `${Math.min(1, k) * 100}%`;
   }
 
-  toast(text, dur = 2.5) {
+  toast(text, dur = 2.5, html = false) {
     const el = $('toast');
-    el.textContent = text;
+    if (html) el.innerHTML = text; else el.textContent = text; // (html: the caller has escaped it, or built it from glyphHtml)
     el.classList.remove('hidden');
     this.toastT = dur;
   }
