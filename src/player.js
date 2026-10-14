@@ -122,7 +122,7 @@ export class Player {
   // A wipeout or a hard crash: the runner goes limp and falls as a physics ragdoll (ragdoll.js).
   // Only the model's pose: you keep your momentum and your controls. sign: +1 tumbles forward, -1 back.
   startRagdoll(sign = 1) {
-    if (this.rag || this.vehicle || this.dead) return;
+    if (this.rag || this.vehicle || this.dead || this.game.indoors) return; // (no tumbling inside the casino or Dr. Zbornak's lab)
     this.rag = new Ragdoll(this.game, this.model, this.body, sign);
   }
 
@@ -153,6 +153,7 @@ export class Player {
     // seat carries you, no physics; the ride decides where you get off
     if (this.seat) {
       const s = this.seat;
+      if (this.rag) { this.rag.release(); this.rag = null; } // (a ragdoll that was still tumbling when you hopped on: its camera focus would stay behind, and it only updates in the physics step below)
       s.obj.updateMatrixWorld(true);
       const p = s.obj.localToWorld(_sp.copy(s.local));
       if (dt > 0) b.vel.copy(p).sub(b.pos).divideScalar(dt);
@@ -372,7 +373,8 @@ export class Player {
     const b = this.body;
     const up = b.up;
     const wasScoped = this.scoped;
-    this.scoped = WEAPONS[this.weapon || 0].key === 'rail' && input.mouse[2] && input.locked && !this.dead;
+    // (limp in a ragdoll: no scope, no shooting)
+    this.scoped = WEAPONS[this.weapon || 0].key === 'rail' && input.mouse[2] && input.locked && !this.dead && !this.rag;
     if (this.scoped !== wasScoped) g.audio.tone(this.scoped ? 1200 : 800, 0.06, 'square', 0.06);
     for (let i = 0; i < WEAPONS.length; i++) {
       if (!input.pressed('Digit' + (i + 1))) continue;
@@ -381,7 +383,7 @@ export class Player {
     }
     const w = WEAPONS[this.weapon || 0];
     this.fireCd -= dt;
-    if (input.mouse[0] && this.fireCd <= 0 && input.locked) {
+    if (input.mouse[0] && this.fireCd <= 0 && input.locked && !this.rag) {
       this.fireCd = w.delay * (1 - 0.15 * (g.upgrades.overcharge || 0)) * (this.mutFire || 1);
       const muzzle = this.center.clone().addScaledVector(cam.right, 0.5).addScaledVector(up, 0.3);
       const aim = cam.position.clone().addScaledVector(cam.look, 350);

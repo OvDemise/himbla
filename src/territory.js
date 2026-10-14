@@ -60,6 +60,7 @@ export class Territory {
     this.outposts = [];
     this.patrols = [];
     this.current = null;
+    this.placeName = null; // the settlement you're standing in (its name goes under the territory line in the chip)
     this.chip = document.createElement('div');
     this.chip.id = 'terrchip';
     this.chip.className = 'chip terr hidden';
@@ -534,12 +535,26 @@ export class Territory {
         const first = this.current === null;
         this.current = f;
         const F = FACTIONS[f];
-        this.chip.textContent = `◆ ${F.name.toUpperCase()} TERRITORY`;
         this.chip.style.background = F.color;
+        this.drawChip();
         this.chip.classList.remove('hidden');
         if (!first && g.state === 'play') g.hud.toast(`Entering ${F.name} territory`, 2);
       }
     }
+  }
+
+  // the chip: the territory line, and under it (centred, same box) the settlement you're in
+  drawChip() {
+    const F = FACTIONS[this.current];
+    if (!F) return;
+    const esc = (s) => String(s).replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+    this.chip.innerHTML = `◆ ${esc(F.name.toUpperCase())} TERRITORY${this.placeName ? `<div class="terr-place">${esc(this.placeName.toUpperCase())}</div>` : ''}`;
+  }
+
+  setPlace(name) {
+    if (name === this.placeName) return;
+    this.placeName = name;
+    this.drawChip();
   }
 
   // ---------- raiding minor structures ----------

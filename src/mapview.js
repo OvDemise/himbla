@@ -65,6 +65,7 @@ export class GlobeMap {
         [icon((c) => dot(c, '#7dff3a', 4.5)), 'Pirate camp'],
         [icon((c) => { dot(c, '#ff3b5c', 4); c.strokeStyle = '#ff2a4a'; c.lineWidth = 1.5; c.beginPath(); c.arc(0, 0, 9.5, 0, Math.PI * 2); c.stroke(); }), 'Restricted airspace'],
         [icon((c) => { diamond(c, '#ff9f1c', ink, 4.5); }), 'Outpost'],
+        [icon((c) => { c.lineCap = 'round'; c.beginPath(); c.moveTo(-12, 3); c.quadraticCurveTo(0, -7, 12, 3); c.strokeStyle = 'rgba(18,10,30,0.8)'; c.lineWidth = 5; c.stroke(); c.strokeStyle = '#e9cf94'; c.lineWidth = 2.4; c.stroke(); }), 'Road'],
       ]],
       ['MARKERS', [
         [icon((c) => { c.rotate(Math.PI / 4); c.fillStyle = '#ff4f2e'; c.strokeStyle = '#fff'; c.lineWidth = 2; c.beginPath(); c.moveTo(0, -9); c.lineTo(7, 7); c.lineTo(0, 3); c.lineTo(-7, 7); c.closePath(); c.fill(); c.stroke(); }), 'You'],
@@ -306,6 +307,26 @@ export class GlobeMap {
     }
     // craters & black lakes you've seen
     const seen = (d) => this.explored[this.cellOf(d)];
+    // the road network over ground you've charted (a dark casing under a pale line, so it reads on
+    // lit and shadowed ground alike)
+    const tr = g.world.traffic;
+    if (tr && tr.mapChunks) {
+      const road = new Path2D();
+      for (const ch of tr.mapChunks()) {
+        if (!seen(ch.c)) continue;
+        let pen = false;
+        for (const d of ch.pts) {
+          const p = this.project(d, v);
+          if (p.z <= 0) { pen = false; continue; }
+          if (pen) road.lineTo(p.x, p.y); else road.moveTo(p.x, p.y);
+          pen = true;
+        }
+      }
+      c.lineJoin = c.lineCap = 'round';
+      c.strokeStyle = 'rgba(18,10,30,0.8)'; c.lineWidth = 2.6 + this.zoom * 0.5; c.stroke(road);
+      c.strokeStyle = '#e9cf94'; c.lineWidth = 1.2 + this.zoom * 0.4; c.stroke(road);
+      c.lineJoin = 'miter'; c.lineCap = 'butt';
+    }
     c.strokeStyle = 'rgba(20,10,30,0.55)';
     c.lineWidth = 1.2;
     for (const cr of g.planet.craters) {

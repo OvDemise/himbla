@@ -107,7 +107,7 @@ export class Winch {
   fire() {
     const g = this.game;
     const P = g.player;
-    if (this.on || this.cd > 0 || P.dead || P.vehicle || P.seat) return;
+    if (this.on || this.cd > 0 || P.dead || P.vehicle || P.seat || P.rag) return;
     const t = this.pick();
     if (!t) {
       g.hud.toast('Hitch-Line: nothing in reach. Aim at a vehicle within 85 m.', 1.6);
@@ -144,7 +144,7 @@ export class Winch {
     if (!o) return;
     o.t += dt;
     const T = o.target;
-    if (!held || o.t > HOLD || P.dead || P.vehicle || P.seat || !T.alive() || g.state !== 'play') { this.release(); return; }
+    if (!held || o.t > HOLD || P.dead || P.vehicle || P.seat || P.rag || !T.alive() || g.state !== 'play') { this.release(); return; }
     const anchor = T.pos();
     const hand = this.hand(_a);
     _d.copy(hand).sub(anchor);
