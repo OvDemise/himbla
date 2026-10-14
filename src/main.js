@@ -509,7 +509,7 @@ class Game {
     const look = this.cam.look;
     let inbound = 0;
     for (const e of this.enemies.list) {
-      const threat = !e.dead && e.model && e.center && (e.kind === 'megamite' || (e.faction === 'pirate' && e.kind !== 'core' && !this.enemies.friendly(e)) || (e.base && e.base.hostile));
+      const threat = !e.dead && e.model && e.center && (e.kind === 'megamite' || (e.faction === 'pirate' && e.kind !== 'core' && !this.enemies.friendly(e)) || (e.base && e.base.hostile) || (e.roam && this.enemies.isHostileTarget(e)));
       let seen = false;
       if (threat) {
         const d = e.center.distanceTo(P.pos);

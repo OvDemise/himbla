@@ -223,6 +223,86 @@ export class Enemies {
     return e;
   }
 
+  // A patrol on the open road between two outposts (territory.js routes): the same armoured car as a
+  // base patrol, but it belongs to no base. It keeps its faction's roads clear of pirates, shoots
+  // you only while that faction counts you an enemy (or you've shot it), and is a real, solid
+  // vehicle: it can be rammed, shot, hooked and wrecked. Territory owns spawning and despawning.
+  spawnRoamer(route, t, dir = 1) {
+    const g = this.game;
+    const fc = new THREE.Color(FACTIONS[route.faction].color).getHex();
+    const dirAt = g.territory.routePoint(route, t, new THREE.Vector3());
+    const p = this.ground(dirAt);
+    const ahead = g.territory.routePoint(route, Math.min(1, Math.max(0, t + dir * 0.01)), new THREE.Vector3());
+    const up = p.clone().normalize();
+    const heading = tangent(ahead.sub(dirAt), up);
+    if (heading.lengthSq() < 1e-10) heading.copy(tangent(new THREE.Vector3(1, 0, 0), up));
+    heading.normalize();
+    const m = makeRover({ color: 0x55607a, trim: fc, pirate: false, flag: fc, style: 'military' });
+    m.root.scale.setScalar(1.15);
+    g.scene.add(m.root);
+    const e = {
+      kind: 'milrover', faction: 'mil', model: m, hp: 160, maxHp: 160, fireCd: 1 + Math.random() * 2,
+      heading, body: makeBody(p), center: p.clone().addScaledVector(up, 1.8), radius: 3.2, dead: false,
+      roam: { route, faction: route.faction, t, dir, stuck: 0, lastPos: p.clone(), provoked: 0 },
+    };
+    this.list.push(e);
+    return e;
+  }
+
+  removeRoamer(e) {
+    e.dead = true;
+    e.respawn = 0;
+    e.model.root.removeFromParent();
+  }
+
+  updateRoamRover(e, dt) {
+    const g = this.game;
+    const P = g.player;
+    const b = e.body;
+    const R = e.roam;
+    const r = R.route;
+    const T = g.territory;
+    // follow the route: pick the next point a little way along it, flip at the ends (or turn round
+    // if the car has been wedged against something for a while)
+    const here = _sv.copy(b.pos).normalize();
+    const cur = T.routePoint(r, R.t, _sn);
+    if (here.distanceTo(cur) * b.pos.length() < 40) R.t += (R.dir * 70) / Math.max(50, r.len);
+    if (r.b) { if (R.t > 1 || R.t < 0) { R.t = Math.min(1, Math.max(0, R.t)); R.dir *= -1; } }
+    else R.t = (R.t + 1) % 1;
+    R.stuck = b.pos.distanceToSquared(R.lastPos) < 0.25 * dt ? R.stuck + dt : 0;
+    R.lastPos.copy(b.pos);
+    if (R.stuck > 5) { R.stuck = 0; R.dir *= -1; b.vel.multiplyScalar(0); }
+    const lead = T.routePoint(r, Math.min(1, Math.max(0, R.t + R.dir * 70 / Math.max(50, r.len))), new THREE.Vector3());
+    const goal = this.ground(lead);
+    this.dbgGoal(e, goal);
+    stepRover(e, dt, g.planet, g.colliders, goal.sub(b.pos), 16, { engine: 16, grip: 8, turn: 2, stick: Infinity });
+    this.poseVehicle(e, dt);
+    // keep the roads clear of pirates, and shoot you if their faction counts you an enemy
+    if (R.provoked > 0) R.provoked -= dt;
+    e.fireCd -= dt;
+    if (e.fireCd <= 0) {
+      e.fireCd = 1.6;
+      const from = e.center.clone().addScaledVector(b.up, 2.5);
+      let target = null, bd = 260;
+      for (const x of this.list) {
+        if (x.dead || x.faction !== 'pirate' || x.kind === 'core' || !x.center || this.friendly(x)) continue;
+        const dd = x.center.distanceTo(from);
+        if (dd < bd && g.planet.visible(from, x.center)) { bd = dd; target = x; }
+      }
+      if (this.isHostileTarget(e) && !P.dead) {
+        const dd = P.center.distanceTo(from);
+        if (dd < bd && g.planet.visible(from, P.center)) { bd = dd; target = { center: P.center, player: true }; }
+      }
+      if (target) {
+        const dir = target.center.clone().sub(from).normalize();
+        g.projectiles.fire('mil', from, dir.multiplyScalar(130), { damage: target.player ? 10 : 22, splash: 4, color: 0xffb02e, size: 0.45, knock: 0.5, spare: !target.player });
+        e.model.root.updateMatrixWorld();
+        const local = e.model.root.worldToLocal(target.center.clone());
+        e.model.gun.rotation.y = Math.atan2(local.x, local.z);
+      }
+    }
+  }
+
   // Every pirate den has a signal pylon: destroy it to shut the den down for a while.
   setupCore(l) {
     const g = this.game;
@@ -436,6 +516,7 @@ export class Enemies {
     if (t.dead) return false;
     if (t.faction === 'beast') return true;
     if (t.faction === 'pirate') return !this.friendly(t) && !(t.kind === 'core' && this.game.rep.aligned());
+    if (t.roam) return t.roam.provoked > 0 || this.game.rep.hostile(t.roam.faction);
     return t.base && t.base.hostile;
   }
 
@@ -562,6 +643,11 @@ export class Enemies {
         e.aggro = true;
         if (e.kind !== 'core') g.rep.add('rustmoon', -2, 'Shot a Rustmoon pirate');
       }
+      if (e.roam) {
+        // shooting a patrol makes it (and only it) fight back for a while
+        if (!(e.roam.provoked > 0)) g.hud.alert(`${FACTIONS[e.roam.faction].name.toUpperCase()} PATROL ENGAGING!`, '#ff2a4a', 2);
+        e.roam.provoked = 30;
+      }
       if (e.base) {
         const base = e.base;
         base.grace = false;
@@ -601,6 +687,11 @@ export class Enemies {
           if (this.pirateKills % 3 === 0) g.rep.add('spacecom', 1, 'Pirate bounties', { silent: true });
         }
       }
+      if (e.roam) {
+        g.rep.add(e.roam.faction, -2, `Destroyed a ${FACTIONS[e.roam.faction].name} patrol`);
+        const enemy = FACTIONS[e.roam.faction].enemy;
+        if (enemy) g.rep.add(enemy, 1, `Hit ${FACTIONS[e.roam.faction].name}`, { silent: true, war: false });
+      }
       if (e.base) {
         const ordered = g.events.active && g.events.active.target === e.base.loc;
         g.rep.add(e.base.faction, ordered ? -1 : e.kind === 'turret' ? -3 : -2, `Destroyed ${FACTIONS[e.base.faction].name} defenses`, { silent: ordered });
@@ -630,7 +721,7 @@ export class Enemies {
       e.respawn = 60;
     } else if (e.kind !== 'core') {
       e.model.root.removeFromParent();
-      if (e.kind === 'milrover') e.respawn = 60;
+      if (e.kind === 'milrover' && e.base) e.respawn = 60; // (road patrols are not re-manned: territory.js sends a new one later)
     }
     g.events.onKill(e, byPlayer);
     g.story.onKill(e);
@@ -750,7 +841,7 @@ export class Enemies {
       if (e.kind === 'kade') { g.story.updateKade(e, dt); if (e.dead) continue; }
       if (e.kind === 'skater') this.updateSkater(e, dt, time);
       else if (e.kind === 'rover') this.updateRover(e, dt);
-      else if (e.kind === 'milrover') this.updateMilRover(e, dt);
+      else if (e.kind === 'milrover') { if (e.roam) this.updateRoamRover(e, dt); else this.updateMilRover(e, dt); }
       else if (e.kind === 'ally') this.updateAlly(e, dt);
       else if (e.kind === 'turret') this.updateTurret(e, dt, shadow);
       if (e.flash > 0) e.flash -= dt;

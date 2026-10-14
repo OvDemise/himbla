@@ -3,7 +3,6 @@ import { FACTIONS } from './locations.js';
 import { toon, glow, ink } from './toon.js';
 import { arcDist, tangent, frameQuat, greatCircle, SUN } from './geo.js';
 import { mulberry32 } from './rng.js';
-import { makeRover } from './models.js';
 import { ITEMS } from './alchemy.js';
 import { outpostTemplate, SMALL_KINDS, FLAT_R } from './outpostModels.js';
 import { foundedTemplate, TERMINAL_Z } from './storyAssets.js';
@@ -432,19 +431,23 @@ export class Territory {
       // lone outposts still get a little loop of their own
       else if (!best) this.routes.push({ a, b: null, faction: a.faction, len: 300, unit: null });
     }
-    for (const p of this.patrols) p.model.root.removeFromParent();
+    for (const p of this.patrols) this.game.enemies.removeRoamer(p);
     this.patrols = [];
   }
 
+  // (the patrols themselves are real armoured cars in enemies.js: spawnRoamer)
   spawnPatrol(r) {
     const g = this.game;
-    const fc = hex(r.faction);
-    const m = makeRover({ color: 0x55607a, trim: fc, pirate: false, flag: fc });
-    m.root.scale.setScalar(1.15);
-    g.scene.add(m.root);
-    const unit = { route: r, model: m, t: Math.random(), dir: 1, pos: new THREE.Vector3(), heading: new THREE.Vector3(), fireCd: 1 + Math.random() * 2, speed: 16 };
-    r.unit = unit;
-    this.patrols.push(unit);
+    const P = g.player;
+    // start somewhere along the route out of sight of the player
+    let t = Math.random();
+    for (let i = 0; i < 8; i++) {
+      const c = Math.random();
+      const d = this.routePoint(r, c, new THREE.Vector3());
+      t = c;
+      if (arcDist(d, P.pos) > 450) break;
+    }
+    r.unit = g.enemies.spawnRoamer(r, t, Math.random() < 0.5 ? 1 : -1);
   }
 
   routePoint(r, t, out) {
@@ -456,55 +459,19 @@ export class Territory {
     return out.copy(r.a.dir).addScaledVector(tA, Math.cos(a) * 0.024).addScaledVector(tB, Math.sin(a) * 0.024).normalize();
   }
 
+  // A route gets one patrol car while you're about. It is an ordinary enemy entity (solid, shootable,
+  // rammable) that drives itself; here we only send it out, call it off once you've left it far
+  // behind, and give a wrecked route a breather before the next car.
   updatePatrols(dt) {
     const g = this.game;
     const P = g.player;
+    this.patrols = [];
     for (const r of this.routes) {
+      if (r.unit && r.unit.dead) { r.unit = null; r.cool = g.time + 150; }
       const near = arcDist(P.pos, r.a.dir) < 1000;
-      if (near && !r.unit && this.patrols.length < 4) this.spawnPatrol(r);
-      else if (!near && r.unit) { r.unit.model.root.removeFromParent(); this.patrols = this.patrols.filter((u) => u !== r.unit); r.unit = null; }
-    }
-    for (const u of this.patrols) {
-      const r = u.route;
-      u.t += (u.dir * u.speed * dt) / Math.max(50, r.len);
-      if (r.b) { if (u.t > 1 || u.t < 0) { u.t = Math.min(1, Math.max(0, u.t)); u.dir *= -1; } }
-      else u.t = (u.t + 1) % 1;
-      const d = this.routePoint(r, u.t, new THREE.Vector3());
-      const ahead = this.routePoint(r, Math.min(1, Math.max(0, u.t + u.dir * 0.01)), new THREE.Vector3());
-      const prev = u.pos.clone();
-      g.planet.ground(d, u.pos);
-      const fwd = tangent(ahead.sub(d), d);
-      if (fwd.lengthSq() > 1e-10) u.heading.copy(fwd.normalize());
-      const m = u.model;
-      m.root.position.copy(u.pos);
-      frameQuat(d, u.heading, _q);
-      m.root.quaternion.slerp(_q, Math.min(1, dt * 5));
-      const sp = prev.lengthSq() ? prev.distanceTo(u.pos) / Math.max(dt, 1e-3) : 0;
-      for (const w of m.wheels) w.rotation.x += sp * dt / 0.85;
-      // they keep the roads clear of pirates
-      u.fireCd -= dt;
-      if (u.fireCd <= 0) {
-        u.fireCd = 1.6;
-        const from = u.pos.clone().addScaledVector(d, 4);
-        let target = null, bd = 260;
-        for (const e of g.enemies.list) {
-          if (e.dead || e.faction !== 'pirate' || e.kind === 'core' || !e.center) continue;
-          if (g.enemies.friendly(e)) continue;
-          const dd = e.center.distanceTo(from);
-          if (dd < bd && g.planet.visible(from, e.center)) { bd = dd; target = e; }
-        }
-        // ...and you, if their faction counts you an enemy (an outlaw riding with Rustmoon)
-        const fac = u.faction || (u.route && u.route.faction);
-        if (fac && g.rep.hostile(fac) && !g.player.dead) {
-          const dd = g.player.center.distanceTo(from);
-          if (dd < bd && g.planet.visible(from, g.player.center)) { bd = dd; target = { center: g.player.center, player: true }; }
-        }
-        if (target) {
-          const dir = target.center.clone().sub(from).normalize();
-          g.projectiles.fire('mil', from, dir.multiplyScalar(130), { damage: target.player ? 10 : 22, splash: 4, color: 0xffb02e, size: 0.45, knock: 0.5, spare: !target.player });
-          m.gun.lookAt(target.center);
-        }
-      }
+      if (near && !r.unit && !(r.cool > g.time) && g.enemies.list.filter((e) => e.roam && !e.dead).length < 4) this.spawnPatrol(r);
+      else if (r.unit && r.unit.body.pos.distanceTo(P.pos) > 1500 && arcDist(P.pos, r.a.dir) > 1000) { g.enemies.removeRoamer(r.unit); r.unit = null; }
+      if (r.unit) this.patrols.push(r.unit);
     }
   }
 
