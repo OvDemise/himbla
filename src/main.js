@@ -1007,7 +1007,7 @@ class Game {
     document.getElementById('title').classList.add('hidden');
     this.state = 'play';
     this.input.lock();
-    this.hud.banner(this.hub);
+    this.enterPlace(this.hub);
     // the first load after a story finale: what changed on the Moon
     if (this.ws.bulletin) {
       const news = this.ws.bulletin;
@@ -1148,6 +1148,15 @@ class Game {
       if (arcDist(P.pos, l.dir) < l.r * 1.5) return l.id === 'antimatter' || l.id === 'monolith' ? 'lab' : l.id;
     }
     return darkness(P.up) > 0.6 ? 'dark' : 'free';
+  }
+
+  // Walking into a settlement: its big banner shows only the first time (remembered in the save);
+  // after that the name just sits under the territory chip (territory.js setPlace).
+  enterPlace(loc) {
+    const seen = this.stats.seenPlaces || (this.stats.seenPlaces = []);
+    if (seen.includes(loc.id)) return;
+    seen.push(loc.id);
+    this.hud.banner(loc);
   }
 
   // 'casino' or 'lab' while you're standing inside the Lucky Crater Casino's hall or Dr. Zbornak's lab,
@@ -1331,7 +1340,8 @@ class Game {
 
     const z = this.zoneAt(P.pos);
     if (z !== this.currentZone) {
-      if (z) this.hud.banner(z);
+      if (z) this.enterPlace(z);
+      this.territory.setPlace(z ? z.name : null); // (the name sits under the territory chip while you're inside)
       this.currentZone = z;
     }
     const zw = document.getElementById('zonewarn');
