@@ -351,24 +351,25 @@ export class GlobeMap {
     const hot = this.termHover;
     this.termPts = [];
     let best = null;
-    c.strokeStyle = hot ? '#d9b8ff' : '#a070ff';
-    c.shadowColor = '#a070ff'; c.shadowBlur = hot ? 14 : 0;
     c.setLineDash(hot ? [] : [10, 5]);
-    c.lineWidth = hot ? 4 : 2.2;
-    c.beginPath();
+    const term = new Path2D();
     let pen = false;
     for (let i = 0; i <= 180; i++) {
       const t = (i / 180) * Math.PI * 2;
       tmp.copy(E1).multiplyScalar(Math.cos(t)).addScaledVector(E2, Math.sin(t));
       const p = this.project(tmp, v);
       if (p.z > 0) {
-        if (pen) c.lineTo(p.x, p.y); else c.moveTo(p.x, p.y);
+        if (pen) term.lineTo(p.x, p.y); else term.moveTo(p.x, p.y);
         pen = true;
         this.termPts.push({ x: p.x, y: p.y, brk: false });
         if (!best || p.z > best.z) best = { ...p, d: tmp.clone() };
       } else { pen = false; if (this.termPts.length) this.termPts[this.termPts.length - 1].brk = true; }
     }
-    c.stroke();
+    // a deep indigo casing under the violet line, so it holds up on lit ground as well as in the fog
+    c.strokeStyle = '#180c33'; c.lineWidth = hot ? 7 : 5; c.stroke(term);
+    c.strokeStyle = hot ? '#d9b8ff' : '#a070ff'; c.lineWidth = hot ? 4 : 2.2;
+    c.shadowColor = '#a070ff'; c.shadowBlur = hot ? 14 : 0;
+    c.stroke(term);
     c.setLineDash([]); c.shadowBlur = 0;
     // label on the dark side of the line, with a little pointer into the dark
     if (best) {
