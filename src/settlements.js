@@ -19,6 +19,7 @@ const hex = (c) => new THREE.Color(c).getHex();
 export function settle(world, loc, seed, fn) {
   const fc = hex((FACTIONS[loc.faction] || FACTIONS.spacecom).color || 0xffd23f);
   const k = new Kit(fc, seed, false);
+  k.onGround = true; // (a settlement's own dressing: toon.dropFloorFaces)
   const ctx = { world, loc, k, fc, rr: k.rr, moving: [] };
   fn(k, ctx);
   k.at();

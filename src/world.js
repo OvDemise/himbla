@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
-import { toon, ink, inkMat, glow, textSprite, nameTag, setMask, vcMaterial, vcable, paintVertices } from './toon.js';
+import { toon, ink, inkMat, glow, textSprite, nameTag, setMask, vcMaterial, vcable, paintVertices, dropFloorFaces } from './toon.js';
 import { makeDish, makeFigure, makeRover, makeRocket, makeShuttle, makePlanets, makeHoverCar } from './models.js';
 import { mulberry32 } from './rng.js';
 import { FACTIONS } from './locations.js';
@@ -32,6 +32,13 @@ const ACTIVE_DIST = 2600;
 // (setMask), so game code toggling .visible never fights it.
 const SHOW_NEAR = 300;   // closer than loc.r + this: always drawn
 const DETAIL_DIST = 260; // a detail cell further than this: its props off
+// Ink outlines (the black back-face shells) are 6-12 cm thick: under a pixel from ~110 m out, where the
+// post pass's own depth outlines carry the silhouette. A place's merged ink is cut into INK_CELL chunks
+// (by triangle, so a huge hull is split too; the small-prop ink already sits in small cells) and a chunk is
+// switched off beyond INK_DIST of the camera.
+const INK_CELL = 60;
+const INK_DIST = 110;
+const FIG_INK_DIST = 50; // a resident's outline hull is only a few cm thick: gone past this (a skinned hull is a second copy of the whole body)
 let NO_MERGE = false; try { NO_MERGE = localStorage.getItem('mr-nomerge') === '1'; } catch { /* unavailable */ } // (debug: compare with the originals)
 const MERGE_CELL = 80;   // merged static geometry is chunked on this grid (so frustum culling still bites)
 const MERGE_BIG = 36;    // pieces wider than this go in the place's one "big" chunk per material
@@ -46,6 +53,33 @@ const _los = new THREE.Vector3(), _lp = new THREE.Vector3();
 const _bm = new THREE.Matrix4(), _bh = new THREE.Matrix4(), _bt = new THREE.Matrix4();
 const _bp = new THREE.Vector3(), _bs = new THREE.Vector3(), _bc = new THREE.Vector3(), _bz = new THREE.Vector3();
 const _bq = new THREE.Quaternion(), _be = new THREE.Euler();
+// A non-indexed geometry cut into one per `cell`-metre grid cell, by each triangle's centre (a triangle
+// bigger than a cell lives whole in the cell its middle is in). One cell: the geometry itself.
+function splitByCell(geo, cell) {
+  const g = geo.index ? geo.toNonIndexed() : geo;
+  const pos = g.attributes.position.array, tris = g.attributes.position.count / 3;
+  const buckets = new Map();
+  for (let t = 0; t < tris; t++) {
+    const i = t * 9;
+    const key = `${Math.round((pos[i] + pos[i + 3] + pos[i + 6]) / 3 / cell)},${Math.round((pos[i + 1] + pos[i + 4] + pos[i + 7]) / 3 / cell)},${Math.round((pos[i + 2] + pos[i + 5] + pos[i + 8]) / 3 / cell)}`;
+    let b = buckets.get(key);
+    if (!b) buckets.set(key, (b = []));
+    b.push(t);
+  }
+  if (buckets.size === 1) return [g];
+  const out = [];
+  for (const list of buckets.values()) {
+    const part = new THREE.BufferGeometry();
+    for (const k of Object.keys(g.attributes)) {
+      const at = g.attributes[k], s = at.itemSize, arr = new at.array.constructor(list.length * 3 * s);
+      for (let j = 0; j < list.length; j++) arr.set(at.array.subarray(list[j] * 3 * s, list[j] * 3 * s + 3 * s), j * 3 * s);
+      part.setAttribute(k, new THREE.BufferAttribute(arr, s));
+    }
+    out.push(part);
+  }
+  g.dispose();
+  return out;
+}
 function prepGeo(geo) {
   const g = geo.index ? geo.toNonIndexed() : geo.clone();
   for (const k of Object.keys(g.attributes)) if (k !== 'position' && k !== 'normal') g.deleteAttribute(k);
@@ -69,7 +103,8 @@ class Batch {
     _bm.compose(_bp.set(x, y, z), _bq.setFromEuler(_be.set(rx, ry, rz, order)), _bs.set(sx, sy, sz)).premultiply(this.base);
     let list = this.byMat.get(mat);
     if (!list) this.byMat.set(mat, (list = []));
-    list.push(prepGeo(geo).applyMatrix4(_bm));
+    const placed = prepGeo(geo).applyMatrix4(_bm);
+    list.push(mat.side === THREE.FrontSide ? dropFloorFaces(placed) : placed); // (a double-sided piece shows its underside from above: only plain one-sided ones lose their floors)
     if (outline) {
       if (!geo.boundingBox) geo.computeBoundingBox();
       geo.boundingBox.getSize(_bz);
@@ -77,7 +112,7 @@ class Batch {
       // same inflated-hull rule as toon.ink(), sized in post-scale units
       const kx = 1 + (2 * outline) / Math.max(_bz.x * sx, 0.02), ky = 1 + (2 * outline) / Math.max(_bz.y * sy, 0.02), kz = 1 + (2 * outline) / Math.max(_bz.z * sz, 0.02);
       _bh.makeTranslation(_bc.x, _bc.y, _bc.z).multiply(_bt.makeScale(kx, ky, kz)).multiply(_bt.makeTranslation(-_bc.x, -_bc.y, -_bc.z)).premultiply(_bm);
-      this.ink.push(prepGeo(geo).applyMatrix4(_bh));
+      this.ink.push(dropFloorFaces(prepGeo(geo).applyMatrix4(_bh)));
     }
     return this;
   }
@@ -187,6 +222,7 @@ export class World {
     // (any detail cell switched off: back on first, so nothing is merged with its mask off)
     if (loc.cells) for (const c of loc.cells) if (!c.on) { c.on = true; setMask(c.objs, true); }
     G.updateMatrixWorld(true);
+    loc.inkChunks = [];
     const inv = new THREE.Matrix4().copy(G.matrixWorld).invert();
     const skip = new Set();
     const mark = (o) => { if (o && o.traverse) o.traverse((c) => skip.add(c)); };
@@ -261,13 +297,18 @@ export class World {
       const geo = gr.list.length === 1 ? gr.list[0] : mergeGeometries(gr.list);
       if (!geo) continue; // (incompatible pieces: leave those in place)
       if (gr.list.length > 1) for (const g of gr.list) g.dispose();
-      const m = new THREE.Mesh(geo, gr.mat);
-      m.castShadow = gr.cast; m.receiveShadow = gr.recv; m.renderOrder = gr.order;
-      if (gr.mat === inkMat) { m.userData.isInk = true; m.castShadow = m.receiveShadow = false; }
-      if (gr.small) m.userData.mergedDetail = true;
-      m.matrixAutoUpdate = false;
-      root.add(m);
-      made++;
+      // (the detail chunks already sit in small cells of their own; the rest of the ink is cut up here)
+      const parts = gr.mat === inkMat && !gr.small ? splitByCell(geo, INK_CELL) : [geo];
+      for (const pg of parts) {
+        const m = new THREE.Mesh(pg, gr.mat);
+        m.castShadow = gr.cast; m.receiveShadow = gr.recv; m.renderOrder = gr.order;
+        if (gr.mat === inkMat) { m.userData.isInk = true; m.castShadow = m.receiveShadow = false; }
+        if (gr.small) m.userData.mergedDetail = true;
+        m.matrixAutoUpdate = false;
+        root.add(m);
+        made++;
+        if (gr.mat === inkMat) loc.inkChunks.push({ m, c: new THREE.Vector3(), r: 0, on: true });
+      }
       gr.done = true;
     }
     // only take out what made it into a merged mesh
@@ -276,6 +317,11 @@ export class World {
     root.matrixAutoUpdate = false;
     G.add(root);
     root.updateMatrixWorld(true);
+    for (const ch of loc.inkChunks) { // (each chunk's bounding sphere, in the world: what the distance switch measures to)
+      ch.m.geometry.computeBoundingSphere();
+      ch.c.copy(ch.m.geometry.boundingSphere.center).applyMatrix4(root.matrixWorld);
+      ch.r = ch.m.geometry.boundingSphere.radius;
+    }
     loc.mergeStats = { removed, made, ms: Math.round(performance.now() - t0) };
     this.prepCulling(loc);
   }
@@ -796,7 +842,7 @@ export class World {
     if (entry.area) entry.area(f.root.position, entry);
     else { const a = Math.random() * Math.PI * 2, d = (0.3 + Math.random() * 0.55) * loc.r; f.root.position.set(Math.cos(a) * d, 0, Math.sin(a) * d); }
     loc.group.add(f.root);
-    Object.assign(entry, f, { target: f.root.position.clone(), wait: Math.random() * 3, vy: 0, hop: 0, hp: undefined });
+    Object.assign(entry, f, { target: f.root.position.clone(), wait: Math.random() * 3, vy: 0, hop: 0, hp: undefined, inks: null, inkOn: undefined });
     delete entry.civ;
   }
 
@@ -1605,6 +1651,7 @@ export class World {
 
   // ---------- per-frame ----------
   update(dt, time, camPos) {
+    this._camPos = camPos;
     this.sky.position.copy(camPos);
     if (this.spindle) this.spindle.rotation.y += dt * 0.05; // the roll
     this.earth.rotation.y += dt * 0.01;
@@ -1622,6 +1669,14 @@ export class World {
       if (show !== loc.shown) {
         loc.shown = show;
         if (show) this.scene.add(loc.group); else this.scene.remove(loc.group);
+      }
+      if (show && loc.inkChunks) {
+        for (const ch of loc.inkChunks) {
+          const d = ch.c.distanceTo(camPos) - ch.r;
+          // (.visible, not the layer mask: the small-prop cells below switch those chunks by mask too, and the two must not undo each other)
+          if (ch.on && d > INK_DIST + 20) { ch.on = false; ch.m.visible = false; }
+          else if (!ch.on && d < INK_DIST) { ch.on = true; ch.m.visible = true; }
+        }
       }
       if (show && loc.cells) {
         for (const c of loc.cells) {
@@ -1956,6 +2011,13 @@ export class World {
       const loc = f.loc;
       f.root.visible = !f.captured && loc.active && loc.camDist < 450;
       if (!f.root.visible) continue;
+      if (this._camPos) {
+        const hulls = f.inks || (f.inks = []);
+        if (!hulls.length) f.root.traverse((o) => { if (o.userData.isInk) hulls.push(o); });
+        const e = f.root.matrixWorld.elements, cp = this._camPos;
+        const near = Math.hypot(e[12] - cp.x, e[13] - cp.y, e[14] - cp.z) < (f.inkOn === false ? FIG_INK_DIST : FIG_INK_DIST + 10);
+        if (near !== f.inkOn) { f.inkOn = near; for (const o of hulls) o.visible = near; }
+      }
       const p = f.root.position;
       if (f.kind === 'kid') {
         f.hop -= dt;

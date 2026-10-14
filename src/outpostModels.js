@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
-import { toon, glow, inkMat, textSprite, vcMaterial, vcable, paintVertices } from './toon.js';
+import { toon, glow, inkMat, textSprite, vcMaterial, vcable, paintVertices, dropFloorFaces } from './toon.js';
 import { mulberry32 } from './rng.js';
 
 // The small faction structures that dot the countryside (watchtowers, depots, farm domes, relay
@@ -63,6 +63,7 @@ class Kit {
     // stands: rr for the yard, mr for the intact main building, wr for its wreckage
     this.rr = mulberry32(seed); this.mr = mulberry32(seed + 1); this.wr = mulberry32(seed + 2);
     this.wreck = wreck;
+    this.onGround = false; // a settlement's kit (y = 0 is the ground): the undersides of what stands on it are never seen, and are left out (toon.dropFloorFaces)
     this.drop = null; // open apron spot where loot can be thrown to
     this.byMat = new Map();
     this.ink = [];
@@ -100,9 +101,11 @@ class Kit {
       const hg = new THREE.BufferGeometry();
       hg.setAttribute('position', geo.attributes.position.clone());
       hg.setIndex(geo.index);
-      this.ink.push(hg.applyMatrix4(_h));
+      hg.applyMatrix4(_h);
+      this.ink.push(this.onGround ? dropFloorFaces(hg) : hg);
     }
-    list.push(geo.applyMatrix4(_m));
+    geo.applyMatrix4(_m);
+    list.push(mat.side === THREE.FrontSide && this.onGround ? dropFloorFaces(geo) : geo);
     return this;
   }
 
@@ -1204,6 +1207,7 @@ export function outpostTemplate(kind, color, variant = 0, wreck = false) {
   let t = templates.get(key);
   if (!t) {
     const k = new Kit(color, KIND_SEED[kind] * 977 + variant * 131, wreck);
+    k.onGround = true;
     BUILD[kind](k, wreck);
     t = k.finish();
     templates.set(key, t);
