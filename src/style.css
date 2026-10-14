@@ -82,9 +82,21 @@ button { font-family: var(--comic); }
 #minimap.dark { border-color: #8f7bff; box-shadow: 0 0 0 2px #05030c, 0 0 22px 6px rgba(143, 100, 255, 0.75), var(--ui-shadow); }
 #render-readout { align-self: stretch; text-align: center; font: 13px/1.2 monospace; padding: 3px 0; background: rgba(5, 3, 12, 0.78); border: 1px solid var(--ui-edge); color: #7fd8ff; pointer-events: none; }
 #render-readout.hidden { display: none; }
-#fps-readout { align-self: stretch; text-align: center; font: 13px/1.2 monospace; padding: 3px 0; background: rgba(5, 3, 12, 0.78); border: 1px solid var(--ui-edge); pointer-events: none; }
+#perf-wrap { align-self: stretch; display: flex; flex-direction: column; gap: 6px; pointer-events: none; }
+#perf-wrap.hidden, #perf-bars.hidden { display: none; }
+#fps-readout { position: relative; text-align: center; font: 13px/1.2 monospace; padding: 3px 0; background: rgba(5, 3, 12, 0.78); border: 1px solid var(--ui-edge); }
 #fps-readout.hidden { display: none; }
-#terrchip .terr-place { margin-top: 4px; padding-top: 4px; border-top: 2px solid rgba(5, 3, 12, 0.35); font-size: 10px; line-height: 1.25; text-align: center; }
+#fps-readout canvas { display: none; position: absolute; inset: 0; width: 100%; height: 100%; }
+#fps-readout.graph { height: 46px; padding: 0; display: flex; align-items: center; justify-content: center; }
+#fps-readout.graph canvas { display: block; }
+/* the value sits on top of the graph: white with a dark outline so it reads over any line colour */
+#fps-readout.graph .fps-val { position: relative; z-index: 1; font-size: 17px; font-weight: bold; text-shadow: -1px -1px 0 #05030c, 1px -1px 0 #05030c, -1px 1px 0 #05030c, 1px 1px 0 #05030c, 0 0 6px #05030c; }
+#perf-bars { display: flex; flex-direction: column; gap: 6px; }
+.perf-row { position: relative; height: 32px; font: 11px/1 monospace; background: rgba(5, 3, 12, 0.78); border: 1px solid var(--ui-edge); color: #fff; }
+.perf-row canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+.perf-row span { position: absolute; top: 4px; text-shadow: -1px -1px 0 #05030c, 1px -1px 0 #05030c, -1px 1px 0 #05030c, 1px 1px 0 #05030c; }
+.perf-lab { left: 5px; }
+.perf-val { right: 5px; }
 #undermap #terrchip.chip { width: 100%; max-width: 100%; box-sizing: border-box; text-align: center; text-wrap: balance; overflow-wrap: anywhere; }
 #undermap { position: absolute; top: 242px; right: 16px; width: 210px; display: flex; flex-direction: column; gap: 6px; align-items: flex-end; }
 #minimap.big { width: min(560px, 80vmin); height: min(560px, 80vmin); top: 50%; right: 50%; transform: translate(50%, -50%); border-radius: 0; }

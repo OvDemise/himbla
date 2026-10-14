@@ -7,6 +7,7 @@ import { TECH } from './story.js';
 import * as THREE from 'three';
 import { greatCircle } from './geo.js';
 import { AIPaths, EnemyMarkers } from './aipaths.js';
+import { TimeGraph, GpuTimer } from './perfgraph.js';
 import { MUTATIONS } from './alchemy.js';
 
 const DEV_KEY = 'mr-dev-unlocked';
@@ -21,6 +22,8 @@ export class Cheats {
     this.mapTeleport = false; // click a location (or press A with the controller cursor on it) in the full map to go there
     this.aiPaths = false; // draw every AI's current path / steering goal
     this.showFps = false; // frame-rate readout under the minimap
+    this.fpsGraph = false; // 30 s log graph behind the FPS readout
+    this.perfGraphs = false; // CPU + GPU load graphs under the FPS chip
     this.showStats = false; // draw calls + polygons rendered per frame, under the minimap
     this.debugView = null; // 'poly' (every polygon outlined) | 'draw' (every draw call its own flat colour): the scene drawn bare, without the comic post pass
     this.crackedVisor = true; // the cracks that spread over the screen as hull drops (hud.js)
@@ -73,12 +76,14 @@ export class Cheats {
     const on = (v) => (v ? 'ON' : 'OFF');
     g.dialog('DISPLAY & DEBUG', '<small>Toggles last until you reload.</small>', [
       { label: `1 · SHOW FPS: ${on(this.showFps)}`, fn: () => { this.showFps = !this.showFps; this.tick(); this.displayMenu(); } },
-      { label: `2 · DRAW CALLS & POLYGONS: ${on(this.showStats)}`, fn: () => { this.setStats(!this.showStats); this.displayMenu(); } },
-      { label: `3 · CRACKED VISOR: ${on(this.crackedVisor)}`, fn: () => { this.crackedVisor = !this.crackedVisor; g.hud.crackKey = -1; this.displayMenu(); } },
-      { label: `4 · SHOW EACH POLYGON: ${on(this.debugView === 'poly')}`, fn: () => { this.setDebugView(this.debugView === 'poly' ? null : 'poly'); this.displayMenu(); } },
-      { label: `5 · SHOW EACH DRAW CALL: ${on(this.debugView === 'draw')}`, fn: () => { this.setDebugView(this.debugView === 'draw' ? null : 'draw'); this.displayMenu(); } },
-      { label: `6 · STATIC SHADOW CACHE: ${g.shadowCache.failed ? 'FAILED (see console)' : on(g.shadowCache.enabled)}`, fn: () => { g.shadowCache.enabled = !g.shadowCache.enabled; g.shadowCache.failed = false; g.shadowCache.invalidate(); this.displayMenu(); } },
-      { label: '7 · BACK', fn: () => this.dev() },
+      { label: `2 · FPS LOG GRAPH (30 s): ${on(this.fpsGraph)}`, fn: () => { this.fpsGraph = !this.fpsGraph; this.tick(); this.displayMenu(); } },
+      { label: `3 · CPU & GPU GRAPHS: ${on(this.perfGraphs)}`, fn: () => { this.perfGraphs = !this.perfGraphs; this.tick(); this.displayMenu(); } },
+      { label: `4 · DRAW CALLS & POLYGONS: ${on(this.showStats)}`, fn: () => { this.setStats(!this.showStats); this.displayMenu(); } },
+      { label: `5 · CRACKED VISOR: ${on(this.crackedVisor)}`, fn: () => { this.crackedVisor = !this.crackedVisor; g.hud.crackKey = -1; this.displayMenu(); } },
+      { label: `6 · SHOW EACH POLYGON: ${on(this.debugView === 'poly')}`, fn: () => { this.setDebugView(this.debugView === 'poly' ? null : 'poly'); this.displayMenu(); } },
+      { label: `7 · SHOW EACH DRAW CALL: ${on(this.debugView === 'draw')}`, fn: () => { this.setDebugView(this.debugView === 'draw' ? null : 'draw'); this.displayMenu(); } },
+      { label: `8 · STATIC SHADOW CACHE: ${g.shadowCache.failed ? 'FAILED (see console)' : on(g.shadowCache.enabled)}`, fn: () => { g.shadowCache.enabled = !g.shadowCache.enabled; g.shadowCache.failed = false; g.shadowCache.invalidate(); this.displayMenu(); } },
+      { label: '9 · BACK', fn: () => this.dev() },
       { label: 'CLOSE' },
     ]);
   }
@@ -180,24 +185,93 @@ export class Cheats {
     else if (this.paths) this.paths.hide();
   }
 
-  // Frame rate under the minimap, averaged over half a second
-  updateFps() {
-    let el = this.fpsEl;
-    if (!this.showFps) { if (el) el.classList.add('hidden'); this.fpsN = 0; return; }
-    if (!el) {
-      el = this.fpsEl = document.createElement('div');
-      el.id = 'fps-readout';
-      (document.getElementById('undermap') || document.body).appendChild(el);
+  // --- frame timing, called from Game.frame() (main.js) ---
+  frameStart(now) { this.cpuT0 = now; }
+
+  renderStart() {
+    if (!this.perfGraphs) return;
+    if (!this.gpuT) this.gpuT = new GpuTimer(this.game.renderer);
+    this.gpuT.begin();
+  }
+
+  // CPU load = main-thread time spent on this frame (update + submitting the draw calls)
+  renderEnd() {
+    if (this.gpuT) this.gpuT.end();
+    if (!this.perfGraphs) return;
+    this.cpuSum = (this.cpuSum || 0) + (performance.now() - this.cpuT0);
+    this.cpuN = (this.cpuN || 0) + 1;
+  }
+
+  perfEls() {
+    if (this.perfWrap) return;
+    const w = this.perfWrap = document.createElement('div');
+    w.id = 'perf-wrap';
+    const el = this.fpsEl = document.createElement('div');
+    el.id = 'fps-readout';
+    el.innerHTML = '<canvas></canvas><span class="fps-val"></span>';
+    this.fpsVal = el.querySelector('.fps-val');
+    this.fpsG = new TimeGraph(el.querySelector('canvas'));
+    w.appendChild(el);
+    const bars = this.perfBars = document.createElement('div');
+    bars.id = 'perf-bars';
+    this.perfRows = {};
+    for (const k of ['cpu', 'gpu']) {
+      const r = document.createElement('div');
+      r.className = 'perf-row';
+      r.innerHTML = `<canvas></canvas><span class="perf-lab">${k.toUpperCase()}</span><span class="perf-val">--</span>`;
+      bars.appendChild(r);
+      this.perfRows[k] = { val: r.querySelector('.perf-val'), g: new TimeGraph(r.querySelector('canvas'), 420, 56) };
     }
-    el.classList.remove('hidden');
+    w.appendChild(bars);
+    (document.getElementById('undermap') || document.body).appendChild(w);
+  }
+
+  // Frame rate (and the optional graphs) under the minimap; sampled every quarter second
+  updateFps() {
+    const show = this.showFps || this.perfGraphs;
+    if (!show) { if (this.perfWrap) this.perfWrap.classList.add('hidden'); this.fpsN = 0; return; }
+    this.perfEls();
+    this.perfWrap.classList.remove('hidden');
+    this.fpsEl.classList.toggle('hidden', !this.showFps);
+    this.fpsEl.classList.toggle('graph', this.fpsGraph);
+    this.perfBars.classList.toggle('hidden', !this.perfGraphs);
     const now = performance.now();
     if (!this.fpsN) { this.fpsN = 0; this.fpsT = now; }
     this.fpsN++;
-    if (now - this.fpsT >= 500) {
-      const fps = (this.fpsN * 1000) / (now - this.fpsT);
-      el.textContent = `${Math.round(fps)} FPS`;
-      el.style.color = fps >= 55 ? '#7dff3a' : fps >= 30 ? '#ffd23f' : '#ff4a4a';
-      this.fpsN = 0; this.fpsT = now;
+    const dt = now - this.fpsT;
+    if (dt < 250) return;
+    const frames = this.fpsN;
+    this.fpsN = 0; this.fpsT = now;
+    const cpuMs = this.cpuN ? this.cpuSum / this.cpuN : null;
+    this.cpuSum = this.cpuN = 0;
+    if (dt > 1000) return; // a pause / menu gap: don't log a bogus sample (the graphs show it as a break)
+    const fps = (frames * 1000) / dt;
+    const frameMs = 1000 / fps;
+    const gpuMs = this.gpuT ? this.gpuT.take() : null;
+    this.fpsG.push(now, fps);
+    // text refreshes every other sample (about twice a second) from the last two
+    this.sampleN = (this.sampleN || 0) + 1;
+    const prev = this.lastFps ?? fps;
+    this.lastFps = fps;
+    if (this.sampleN % 2 === 0) {
+      const f = (fps + prev) / 2;
+      this.fpsVal.textContent = `${Math.round(f)} FPS`;
+      // plain, no graph: colour says how healthy it is. Over the graph: white with a dark outline, which stays readable on any line colour
+      this.fpsVal.style.color = this.fpsGraph ? '#ffffff' : f >= 55 ? '#7dff3a' : f >= 30 ? '#ffd23f' : '#ff4a4a';
+    }
+    if (this.fpsGraph) {
+      const peak = Math.max(60, ...this.fpsG.pts.map((p) => p[1]));
+      this.fpsG.draw(now, Math.ceil(peak / 30) * 30, [30, 60, 120], fps >= 55 ? '#7dff3a' : fps >= 30 ? '#ffd23f' : '#ff4a4a');
+    }
+    if (this.perfGraphs) {
+      const load = (ms) => Math.min(100, (ms / frameMs) * 100);
+      const rows = [['cpu', cpuMs == null ? null : load(cpuMs), cpuMs], ['gpu', gpuMs == null ? null : load(gpuMs), gpuMs]];
+      for (const [k, pct, ms] of rows) {
+        const r = this.perfRows[k];
+        if (pct != null) r.g.push(now, pct);
+        r.val.textContent = pct == null ? (k === 'gpu' && this.gpuT && !this.gpuT.ok ? 'N/A' : '--') : `${Math.round(pct)}% · ${ms.toFixed(1)}ms`;
+        r.g.draw(now, 100, [50], pct == null || pct < 70 ? '#4fd8ff' : pct < 90 ? '#ffd23f' : '#ff4a4a');
+      }
     }
   }
 

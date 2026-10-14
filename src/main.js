@@ -1100,6 +1100,7 @@ class Game {
   frame() {
     const now = performance.now();
     if (this.settings && this.settings.skip(now)) return; // settings: frame-rate cap
+    this.cheats.frameStart(now); // (dev overlay: CPU / GPU timing)
     if (this.settings) this.settings.perfSample(now - this.last, this.state === 'play'); // (first launch: is the preset too much?)
     let rdt = Math.min(0.05, (now - this.last) / 1000);
     this.last = now;
@@ -1154,8 +1155,10 @@ class Game {
     this.renderer.setViewport(0, 0, window.innerWidth, window.innerHeight);
     this.syncLocalLights();
     this.cheats.beforeRender();
+    this.cheats.renderStart();
     if (this.cheats.debugView) this.cheats.renderDebug(); // (dev menu: polygons / draw calls laid bare)
     else this.post.render(this.scene, this.camera);
+    this.cheats.renderEnd();
     this.cheats.drawStats();
     this.input.endFrame();
   }
