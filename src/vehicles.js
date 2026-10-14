@@ -161,10 +161,28 @@ export class Garage {
     const pad = this.game.input.padActive;
     const k = R.sel >= 0 ? R.items[R.sel] : null;
     const hint = pad
-      ? `<span>${glyphHtml(['RS'])} pick</span><span>${R.sticky ? glyphHtml(['A']) + ' call' : 'release ' + glyphHtml(['Y']) + ' call'}</span>` + (R.sticky ? `<span>${glyphHtml(['B'])} cancel</span>` : '')
+      ? `<span>${glyphHtml(['RS'])} pick</span><span>${R.sticky ? glyphHtml(['A']) + ' call' : 'release ' + glyphHtml(['Y']) + ' call'}</span><span>${glyphHtml(['B'])} cancel</span>`
       : '<span>move to pick</span><span>release V to call</span>';
     const hub = `<b>${k ? VEHICLES[k].name : 'VEHICLES'}</b><small>${hint}</small>`;
     if (R.hub !== hub) { R.hub = hub; this.radialEl.querySelector('.pr-hub').innerHTML = hub; }
+  }
+
+  // the labels follow the game while the wheel is up (a rebuild finishing, hull mending, a pad picked up or put down)
+  radialRefresh() {
+    const R = this.radial;
+    if (!R) return;
+    const els = this.radialEl.querySelectorAll('.pr-item');
+    R.items.forEach((k, i) => {
+      const el = els[i];
+      if (!el) return;
+      const cd = this.cooldown(k);
+      const txt = cd > 0 ? `REBUILDING ${Math.ceil(cd)}s` : `HULL ${Math.ceil(this.hp[k] ?? this.maxHp(k))}/${this.maxHp(k)}`;
+      el.classList.toggle('locked', cd > 0);
+      el.classList.toggle('cd', cd > 0);
+      const s = el.querySelector('small');
+      if (s && s.textContent !== txt) s.textContent = txt;
+    });
+    this.radialHub();
   }
 
   // the wheel's highlight: -1 for none
@@ -173,15 +191,17 @@ export class Garage {
     if (!R || sel === R.sel) return;
     R.sel = sel;
     for (const el of this.radialEl.querySelectorAll('.pr-item')) el.classList.toggle('on', +el.dataset.i === sel);
-    if (sel >= 0) this.game.audio.tone(700 + sel * 60, 0.04, 'square', 0.05);
+    const au = this.game.audio;
+    if (sel >= 0 && au && au.tone) au.tone(700 + sel * 40, 0.04, 'square', 0.04);
     this.radialHub();
   }
 
   // the mouse (pushed round while V is held). Called every frame the wheel is up, with nothing when the mouse is
-  // still: that must leave the pick alone, or it would wipe the one the right stick just made.
+  // still: that must leave the pick alone, or it would wipe the one the right stick just made. While a pad is the
+  // device in use the mouse is ignored altogether (the pointer can still be captured and a bump would clear the pick).
   radialMove(dx, dy) {
     const R = this.radial;
-    if (!R || (!dx && !dy)) return;
+    if (!R || (!dx && !dy) || this.game.input.padActive) return;
     R.ax += dx; R.ay += dy;
     const len = Math.hypot(R.ax, R.ay);
     if (len > 140) { R.ax *= 140 / len; R.ay *= 140 / len; }
@@ -337,6 +357,7 @@ export class Garage {
   }
 
   update(dt) {
+    if (this.radial) this.radialRefresh();
     const g = this.game;
     // field repairs: hull creeps back while you're not behind the wheel
     for (const id of Object.keys(this.hp)) if (!(g.player.vehicle && g.player.vehicle.id === id)) this.hp[id] = Math.min(this.maxHp(id), this.hp[id] + dt * 2);

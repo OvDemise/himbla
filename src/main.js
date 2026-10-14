@@ -1066,6 +1066,7 @@ class Game {
     this.time += dt;
 
     const playing = this.state === 'play';
+    if (!playing && this.garage && this.garage.radial) { this.garage.closeRadial(false); this.vHold = 0; } // (the vehicle wheel doesn't outlive the play screen: a pause, the map, a dialog, a death)
     if (playing && !this.world.mergeDone) this.world.finishMerges(); // (static geometry: see world.mergeLocation)
     if (playing) this.updatePlay(dt);
     else if (this.state === 'derby') this.race.watch(dt); // watching your chimera race: the race drives the camera
