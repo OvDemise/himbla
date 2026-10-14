@@ -5,7 +5,7 @@ contains `[release]` (see the README's Download section). Newest first.
 
 ## Unreleased
 
-- **Wardrobe accessories:** a new ACCESSORIES tab next to LASERS. The containment jar is an item you can show or hide on your pack (click or Enter); the preview turns to show your back. Hiding the jar is cosmetic only, it still works. The tabs are now `1`–`4`.
+- **Jar toggle in the wardrobe:** once you own a containment jar, a JAR ON / OFF button (or `J`) sits in the top-right corner of the wardrobe preview; the preview turns to show your back. Hiding it is cosmetic only, it still works.
 - **Grinds are harder to snag:** skating or flying across a crest at an angle no longer clamps you to it. You grab a rail by heading along it, dropping onto it, skating into a tip, or hitting a snake rock's side at speed.
 - **Grinding recharges the jets:** the thruster tank now refills while you ride a rail (it used to freeze, because the normal physics step that recharges it is skipped on a grind), and a locked-out tank unlocks at 25% as usual.
 - **Vehicle wheel:** the boxy "YOUR VEHICLES" list is gone. The controller menu's VEHICLES wedge now opens the vehicle wheel (the same one you get holding `V` / `Y`), restyled to match the controller menu: the right stick picks, `A` calls it, `B` / `Start` cancels, and the pick glows white in the light and purple on the dark side.

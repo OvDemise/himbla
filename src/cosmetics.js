@@ -43,11 +43,6 @@ export const LASERS = [
   { name: 'Pure White', color: 0xffffff },
 ];
 
-// Things worn that you show or hide rather than swap (the wardrobe's Accessories tab).
-export const ACCESSORIES = {
-  jar: { name: 'Containment Jar', color: 0x9be7ff },
-};
-
 // Shop entries for the job boards (bought once, then equipped from the wardrobe with C).
 export function cosmeticShopItems(locId) {
   const out = [];
@@ -188,16 +183,13 @@ export class Cosmetics {
   }
 
   owned(kind, id) {
-    if (kind === 'acc') return this.owns(id);
     if (kind === 'outfit') return id === 'courier' || (this.game.upgrades['outfit_' + id] || 0) > 0;
     return id === 'stock' || (this.game.upgrades['skates_' + id] || 0) > 0;
   }
 
-  // accessories: the jar is only there to show once Dr. Zbornak has sold you one
-  owns(id) { return id === 'jar' ? !!(this.game.alchemy && this.game.alchemy.owned) : false; }
-  accShown(id) { return id === 'jar' ? this.jarShown : false; }
-  setAcc(id, on) {
-    if (id !== 'jar') return;
+  // the jar on your pack: only there to show once Dr. Zbornak has sold you one
+  get hasJar() { return !!(this.game.alchemy && this.game.alchemy.owned); }
+  setJarShown(on) {
     this.jarShown = on;
     this.save();
     if (this.game.alchemy) this.game.alchemy.refreshJarMesh();

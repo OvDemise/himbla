@@ -1,12 +1,12 @@
 import * as THREE from 'three';
 import { makeRunner, ScarfSim } from './models.js';
 import { toon, glow } from './toon.js';
-import { OUTFITS, SKATES, LASERS, ACCESSORIES, dressRunner, dressSkates } from './cosmetics.js';
+import { OUTFITS, SKATES, LASERS, dressRunner, dressSkates } from './cosmetics.js';
 import { makeJarMesh } from './alchemy.js';
 import { FACTIONS, LOCATIONS, TIERS } from './locations.js';
 
 // The wardrobe screen (C): a live turntable preview of the runner on the left, click-to-equip
-// grids for outfits / skate finishes / pulse-disc colours / accessories on the right. Hovering or arrowing
+// grids for outfits / skate finishes / pulse-disc colours on the right. Hovering or arrowing
 // onto any tile (locked ones too) dresses the preview, clicking or Enter equips what you own.
 // The preview is its own little Scene drawn by a dedicated WebGLRenderer bound to the overlay's
 // canvas; it only runs while the screen is open and is reused between openings.
@@ -15,7 +15,6 @@ const TABS = [
   { id: 'outfit', label: 'OUTFITS' },
   { id: 'skates', label: 'SKATES' },
   { id: 'laser', label: 'LASERS' },
-  { id: 'acc', label: 'ACCESSORIES' },
 ];
 // Casino prize counter prices (mirrors casino.js SHOP): chips, minimum VIP tier
 const CASINO = {
@@ -33,7 +32,7 @@ export class Wardrobe {
     this.game = game;
     this.cos = cosmetics;
     this.tab = 'outfit';
-    this.sel = { outfit: 0, skates: 0, laser: 0, acc: 0 };
+    this.sel = { outfit: 0, skates: 0, laser: 0 };
     this.hover = null;
     this.yaw = 0;
     this.spinHold = 0;
@@ -46,19 +45,14 @@ export class Wardrobe {
   // ---------- catalogue ----------
   items(tab = this.tab) {
     if (tab === 'laser') return LASERS.map((l, i) => ({ kind: 'laser', id: i, d: l }));
-    if (tab === 'acc') return Object.keys(ACCESSORIES).map((id) => ({ kind: 'acc', id, d: ACCESSORIES[id] }));
     const src = tab === 'outfit' ? OUTFITS : SKATES;
     return Object.keys(src).map((id) => ({ kind: tab, id, d: src[id] }));
   }
 
   owned(it) { return it.kind === 'laser' || this.cos.owned(it.kind, it.id); }
 
-  // accessories are shown or hidden, not swapped for one another
-  isToggle(it) { return it.kind === 'acc'; }
-
   equipped(it) {
     const c = this.cos;
-    if (it.kind === 'acc') return c.accShown(it.id);
     return it.kind === 'outfit' ? c.outfit === it.id : it.kind === 'skates' ? c.skates === it.id : c.laser === it.id;
   }
 
@@ -66,7 +60,6 @@ export class Wardrobe {
   source(it) {
     const g = this.game, d = it.d;
     if (it.kind === 'laser') return { tag: 'FREE', lines: ['Every pulse spinner can be tuned to any colour.'] };
-    if (it.kind === 'acc') return { tag: 'DR. ZBORNAK', lines: ['Sold by Dr. Zbornak at the Antimatter Lab for ₵400.'] };
     if (it.id === 'courier' || it.id === 'stock') return { tag: 'STANDARD ISSUE', lines: ['Standard courier issue.'] };
     const repLine = (f, req) => {
       const F = FACTIONS[f];
@@ -113,6 +106,7 @@ export class Wardrobe {
           <div class="wd-stage">
             <canvas class="wd-canvas"></canvas>
             <div class="wd-tag"></div>
+            <button class="wd-jar-toggle hidden" type="button"></button>
             <div class="wd-drag">DRAG TO ROTATE</div>
           </div>
           <div class="wd-side">
@@ -121,7 +115,7 @@ export class Wardrobe {
             <div class="wd-info"></div>
           </div>
         </div>
-        <div class="wd-foot">CLICK: EQUIP · HOVER: TRY ON · Q/E or 1-4: TABS · ENTER ON AN ACCESSORY: SHOW / HIDE · ARROWS + ENTER · C/ESC: CLOSE</div>
+        <div class="wd-foot">CLICK: EQUIP · HOVER: TRY ON · J: JAR ON / OFF · Q/E or 1-3: TABS · ARROWS + ENTER · C/ESC: CLOSE</div>
       </div>`;
     document.body.appendChild(el);
     this.el = el;
@@ -130,6 +124,8 @@ export class Wardrobe {
     this.gridEl = el.querySelector('.wd-grid');
     this.infoEl = el.querySelector('.wd-info');
     this.tagEl = el.querySelector('.wd-tag');
+    this.jarBtn = el.querySelector('.wd-jar-toggle');
+    this.jarBtn.addEventListener('click', () => this.toggleJar());
     el.querySelector('.wd-close').addEventListener('click', () => this.close(false));
     el.addEventListener('click', (e) => { if (e.target === el) this.close(false); });
     this.tabsEl.addEventListener('click', (e) => {
@@ -258,7 +254,6 @@ export class Wardrobe {
 
   setTab(id) {
     if (!TABS.some((t) => t.id === id) || id === this.tab) return;
-    if (id === 'acc' || this.tab === 'acc') { this.faceFront = true; this.spinHold = 2.5; } // (accessories hang on the back: swing round to show them, and back again)
     this.tab = id;
     this.hover = null;
     this.game.audio.click();
@@ -269,10 +264,7 @@ export class Wardrobe {
     if (!it) return;
     const c = this.cos;
     if (!this.owned(it)) { this.flashLocked(); this.refresh(false); return; }
-    if (this.isToggle(it)) {
-      c.setAcc(it.id, !c.accShown(it.id));
-      this.game.audio.click();
-    } else if (!this.equipped(it)) {
+    if (!this.equipped(it)) {
       if (it.kind === 'outfit') c.outfit = it.id;
       else if (it.kind === 'skates') c.skates = it.id;
       else c.laser = it.id;
@@ -280,6 +272,26 @@ export class Wardrobe {
       this.game.audio.click();
     }
     this.refresh(true);
+  }
+
+  // the jar on the pack: shown or hidden (only offered once you own one). The preview turns to show
+  // the back, where it hangs
+  toggleJar() {
+    const c = this.cos;
+    if (!c.hasJar) return;
+    c.setJarShown(!c.jarShown);
+    this.game.audio.click();
+    this.faceFront = true;
+    this.faceOff = Math.PI;
+    this.spinHold = 2.5;
+    this.refresh(false);
+  }
+
+  renderJarBtn() {
+    const c = this.cos;
+    this.jarBtn.classList.toggle('hidden', !c.hasJar);
+    this.jarBtn.classList.toggle('on', c.jarShown);
+    this.jarBtn.innerHTML = `<span class="wd-key">J</span>JAR <b>${c.jarShown ? 'ON' : 'OFF'}</b>`;
   }
 
   flashLocked() {
@@ -295,9 +307,10 @@ export class Wardrobe {
     let i = this.sel[this.tab];
     const cols = Math.max(1, getComputedStyle(this.gridEl).gridTemplateColumns.split(' ').length);
     const tabIdx = TABS.findIndex((t) => t.id === this.tab);
-    if (code === 'KeyQ') this.setTab(TABS[(tabIdx + TABS.length - 1) % TABS.length].id);
+    if (code === 'KeyJ') this.toggleJar();
+    else if (code === 'KeyQ') this.setTab(TABS[(tabIdx + TABS.length - 1) % TABS.length].id);
     else if (code === 'KeyE' || code === 'Tab') this.setTab(TABS[(tabIdx + 1) % TABS.length].id);
-    else if (/^Digit[1-9]$/.test(code) && TABS[+code.slice(5) - 1]) this.setTab(TABS[+code.slice(5) - 1].id);
+    else if (code === 'Digit1' || code === 'Digit2' || code === 'Digit3') this.setTab(TABS[+code.slice(5) - 1].id);
     else if (code === 'Enter' || code === 'Space') this.equip(list[i]);
     else {
       if (code === 'ArrowRight' || code === 'KeyD') i++;
@@ -326,10 +339,10 @@ export class Wardrobe {
     } else for (const t of this.gridEl.querySelectorAll('.wd-tile')) t.classList.toggle('sel', +t.dataset.i === this.sel[this.tab]);
     const it = this.focus();
     this.renderInfo(it);
+    this.renderJarBtn();
     const c = this.cos;
-    const look = { outfit: c.outfit, skates: c.skates, laser: c.laser, jar: c.accShown('jar') };
-    if (it.kind === 'acc') look.jar = c.accShown('jar') || !this.owned(it); // (a jar you don't own yet is shown to try on)
-    else look[it.kind] = it.id;
+    const look = { outfit: c.outfit, skates: c.skates, laser: c.laser, jar: c.jarShown };
+    look[it.kind] = it.id;
     this.setLook(look);
   }
 
@@ -350,7 +363,6 @@ export class Wardrobe {
       return `<span class="wd-fig" style="--s:${hex(d.suit)};--a:${hex(d.accent)};--h:${hex(d.helmet)};--v:${hex(d.visor)};--c:${hex(d.scarf)}"><i class="fh"></i><i class="fb"></i></span>`;
     }
     if (it.kind === 'skates') return `<span class="wd-skate${d.rainbow ? ' rainbow' : ''}${d.flame ? ' flame' : ''}" style="--k:${hex(d.color)}"><i class="sb"></i><i class="sr"></i></span>`;
-    if (it.kind === 'acc') return '<span class="wd-jar"><i></i></span>';
     return `<span class="wd-disc" style="--k:${hex(d.color)}"><i></i></span>`;
   }
 
@@ -359,11 +371,10 @@ export class Wardrobe {
     this.gridEl.className = `wd-grid wd-${this.tab}`;
     this.gridEl.innerHTML = list.map((it, i) => {
       const own = this.owned(it), on = this.equipped(it);
-      const tog = this.isToggle(it);
-      const state = tog ? (own ? (on ? 'SHOWN' : 'HIDDEN') : 'LOCKED') : on ? 'EQUIPPED' : own ? 'OWNED' : 'LOCKED';
+      const state = on ? 'EQUIPPED' : own ? 'OWNED' : 'LOCKED';
       const d = it.d;
       const badge = d.elite ? '<b class="wd-badge elite">ELITE</b>' : d.casino ? '<b class="wd-badge casino">CASINO</b>' : d.alien ? '<b class="wd-badge legend">LEGEND</b>' : '';
-      const hint = own ? (tog ? (on ? 'CLICK TO HIDE' : 'CLICK TO SHOW') : on ? 'WEARING' : 'CLICK TO EQUIP') : this.source(it).tag;
+      const hint = own ? (on ? 'WEARING' : 'CLICK TO EQUIP') : this.source(it).tag;
       return `<button type="button" class="wd-tile ${on ? 'is-on' : own ? 'is-own' : 'is-locked'}${i === this.sel[this.tab] ? ' sel' : ''}" data-i="${i}">
         ${badge}${this.tileArt(it)}
         <span class="wd-tname">${esc(d.name)}</span>
@@ -385,19 +396,16 @@ export class Wardrobe {
       if (d.alien) facts.push('Unrivalled handling; your jet burns antimatter.');
     }
     if (it.kind === 'laser') facts.push('Colour of your pulse-spinner discs.');
-    if (it.kind === 'acc') facts.push('Clipped to your pack, showing what is inside. Hiding it only hides it: the jar works the same.');
-    const tog = this.isToggle(it);
-    const state = on ? `<span class="wd-pill on">${tog ? 'SHOWN' : 'EQUIPPED'}</span>` : own ? `<span class="wd-pill own">${tog ? 'HIDDEN' : 'OWNED'}</span>` : '<span class="wd-pill lock">LOCKED</span>';
+    const state = on ? '<span class="wd-pill on">EQUIPPED</span>' : own ? '<span class="wd-pill own">OWNED</span>' : '<span class="wd-pill lock">LOCKED</span>';
     const how = own ? '' : `<div class="wd-how"><b>HOW TO GET IT</b>${src.lines.map((l) => `<p>${esc(l)}</p>`).join('')}</div>`;
-    const btn = tog && own ? `<button type="button" class="wd-equip">${on ? 'ENTER · HIDE IT' : 'ENTER · SHOW IT'}</button>`
-      : on ? '<button type="button" class="wd-equip" disabled>WEARING IT</button>'
+    const btn = on ? '<button type="button" class="wd-equip" disabled>WEARING IT</button>'
       : own ? '<button type="button" class="wd-equip">ENTER · EQUIP</button>'
         : '<button type="button" class="wd-equip" disabled>LOCKED</button>';
     this.infoEl.innerHTML = `
       <div class="wd-info-top"><span class="wd-iname">${esc(d.name)}</span>${state}</div>
       <div class="wd-chips">${chips.map((c) => `<i style="background:${hex(c)}"></i>`).join('')}<span>${facts.map(esc).join(' ')}</span></div>
       ${how}${btn}`;
-    this.tagEl.textContent = tog && own ? (on ? 'SHOWN' : 'HIDDEN') : on ? 'WEARING' : own ? 'PREVIEW · OWNED' : 'PREVIEW · LOCKED';
+    this.tagEl.textContent = on ? 'WEARING' : own ? 'PREVIEW · OWNED' : 'PREVIEW · LOCKED';
     this.tagEl.className = `wd-tag ${on ? 'on' : own ? 'own' : 'lock'}`;
   }
 
@@ -445,7 +453,7 @@ export class Wardrobe {
     T.clones = [];
     const P = g.player.model, M = T.model;
     const muts = new Set((g.alchemy && g.alchemy.mutMeshes) || []);
-    // the pack's jar is rebuilt below so it can be shown or hidden here whatever the player is wearing
+    // the pack's jar is rebuilt here so the toggle can show or hide it on the preview straight away
     if (T.jar) T.jar.removeFromParent();
     T.jar = makeJarMesh(g.alchemy ? g.alchemy.jar : [], g.alchemy && g.alchemy.artifact);
     M.cargoSlot.add(T.jar);
@@ -476,7 +484,7 @@ export class Wardrobe {
     T.discM.color.setHex(l.color);
     T.halo.material.color.setHex(l.color);
     // swing round to face the camera whenever the item being shown changes
-    if (prev && (prev.outfit !== look.outfit || prev.skates !== look.skates || prev.laser !== look.laser || prev.jar !== look.jar)) { this.faceFront = true; this.spinHold = 2.5; }
+    if (prev && (prev.outfit !== look.outfit || prev.skates !== look.skates || prev.laser !== look.laser)) { this.faceFront = true; this.faceOff = 0; this.spinHold = 2.5; }
   }
 
   tick() {
@@ -503,7 +511,7 @@ export class Wardrobe {
     }
     // turntable: slow spin, paused while dragging and after a change (when it turns to face you)
     if (this.dragging) { /* the pointer drives the yaw */ } else if (this.faceFront) {
-      const off = this.tab === 'acc' ? Math.PI : 0;
+      const off = this.faceOff || 0;
       const target = Math.round((this.yaw - off) / (Math.PI * 2)) * Math.PI * 2 + off;
       this.yaw += (target - this.yaw) * Math.min(1, dt * 6);
       if (Math.abs(target - this.yaw) < 0.01) this.faceFront = false;
