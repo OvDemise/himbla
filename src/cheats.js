@@ -7,6 +7,7 @@ import { TECH } from './story.js';
 import * as THREE from 'three';
 import { greatCircle } from './geo.js';
 import { AIPaths, EnemyMarkers } from './aipaths.js';
+import { MUTATIONS } from './alchemy.js';
 
 const DEV_KEY = 'mr-dev-unlocked';
 
@@ -301,12 +302,39 @@ export class Cheats {
       { label: '3 · SPAWN MEGA MITE', fn: () => { g.alchemy.spawnMegaMite(); } },
       { label: '4 · SPAWN AN EVENT… (or a meteor shower)', fn: () => this.eventMenu() },
       { label: '5 · UNLOCK-STAT COUNTERS (events, deliveries, wins)', fn: () => { Object.assign(g.stats, { meridianEvents: Math.max(3, g.stats.meridianEvents || 0), darkDeliveries: Math.max(5, g.stats.darkDeliveries || 0), raceWins: Math.max(1, g.stats.raceWins || 0) }); g.save(); this.moreMenu(); } },
-      { label: '6 · CURE MUTATIONS', fn: () => { g.alchemy.cure(); this.moreMenu(); } },
+      { label: `6 · SPLICE MUTATIONS… (${g.alchemy.mutations.length} active)`, fn: () => this.spliceMenu(0) },
       { label: '7 · RESET THIS SAVE SLOT (back to menu)', fn: () => this.confirmReset() },
       { label: '8 · STORY…', fn: () => this.storyMenu() },
       { label: '9 · BACK', fn: () => this.open() },
       { label: 'CLOSE' },
     ]);
+  }
+
+  // Every splice-pod mutation as a toggle (ignores the pod's 3-mutation cap), plus a reset that
+  // cures them all. Paged because the dialog only has number keys 1-9.
+  spliceMenu(page) {
+    const g = this.game;
+    const A = g.alchemy;
+    const keys = Object.keys(MUTATIONS);
+    const per = 6;
+    const pages = Math.ceil(keys.length / per);
+    const rows = keys.slice(page * per, page * per + per).map((k, i) => {
+      const on = A.mutations.includes(k);
+      return {
+        label: `${i + 1} · ${MUTATIONS[k].name}: ${on ? 'ON' : 'OFF'}`,
+        fn: () => {
+          A.mutations = on ? A.mutations.filter((m) => m !== k) : A.mutations.concat(k);
+          A.save();
+          A.applyMutations();
+          this.spliceMenu(page);
+        },
+      };
+    });
+    rows.push({ label: `${rows.length + 1} · NEXT PAGE (${page + 1}/${pages})`, fn: () => this.spliceMenu((page + 1) % pages) });
+    rows.push({ label: `${rows.length + 1} · RESET ALL (cure)`, fn: () => { A.cure(); this.spliceMenu(page); } });
+    rows.push({ label: `${rows.length + 1} · BACK`, fn: () => this.moreMenu() });
+    const active = A.mutations.map((k) => MUTATIONS[k].name).join(', ') || 'none';
+    g.dialog('CHEAT MENU · SPLICE', `<small>Toggles each pod mutation without the jar or the 3-mutation cap.<br>Active: ${active}</small>`, rows);
   }
 
   storyMenu() {

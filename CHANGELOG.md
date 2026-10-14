@@ -5,6 +5,8 @@ contains `[release]` (see the README's Download section). Newest first.
 
 ## Unreleased
 
+- **Vehicle flag:** no more wild flapping at around 30-45 km/h. The ripple's phase was recomputed from the game clock times a speed-dependent frequency, so every small change in speed threw the wave forward by radians; it now advances frame by frame and the speed it reacts to is eased.
+- **Cheat menu splice submenu:** MORE → SPLICE MUTATIONS… toggles each of the ten splice-pod mutations on or off (no jar needed, ignores the 3-mutation cap) and has a RESET ALL button. It replaces the old CURE MUTATIONS button.
 - **Fewer triangles in settlements:** outline (ink) shells are now cut into 60 m chunks and switched off beyond ~110 m (and on resident characters beyond 50 m), where they're thinner than a pixel and the post pass's own outlines carry the silhouette; and the never-seen undersides of boxes, cylinders and aprons standing on the ground (and their outline shells') are no longer built. In the hub the ink drawn per frame drops by roughly 40%; nothing changes up close.
 - **Debug views:** DISPLAY & DEBUG in the dev menu gets SHOW EACH POLYGON (every triangle outlined over a dark fill) and SHOW EACH DRAW CALL (every draw call in its own flat colour, so you can see what batches and what doesn't). Both draw the bare scene without the comic post pass; they're mutually exclusive and last until you turn them off or reload.
 - **Shadow pass:** the shadow map (the heaviest single render pass) now refreshes every other frame while frames are quick and you're moving slowly (standing, walking, in a settlement), and every frame when you skate fast, teleport, or the frame rate is low. Shadows look the same; the saving shows up in busy places.

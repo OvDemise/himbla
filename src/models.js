@@ -1017,15 +1017,25 @@ function makeWaveFlag({ w, h, mat, ragged = false }) {
   mesh.castShadow = true;
   mesh.frustumCulled = false;
   const phase = Math.random() * 10;
+  // The ripple phases are integrated frame by frame (and the speed eased), not computed as
+  // t * frequency(speed): with t the global clock, a tiny change in speed shifted the phase by
+  // radians per frame, so the flag flapped wildly wherever speed wobbled (around 30-45 km/h).
+  let lastT = null, kS = 0, p1 = 0, p2 = 0;
   const update = (t, speed = 0) => {
-    const k = Math.min(1, speed / 28);
+    const dt = lastT === null ? 0 : Math.min(0.1, Math.max(0, t - lastT));
+    lastT = t;
+    const kTarget = Math.min(1, speed / 28);
+    kS += (kTarget - kS) * (dt > 0 ? 1 - Math.exp(-dt * 4) : 1);
+    const k = kS;
+    p1 += dt * (5 + 8 * k);
+    p2 += dt * (4 + 6 * k);
     for (let i = 0; i < pos.count; i++) {
       const z0 = base[i * 3 + 2], y0 = base[i * 3 + 1];
       const u = -z0 / w, v = -y0 / h;
-      const wave = Math.sin(t * (5 + 8 * k) - u * 6 + v * 0.9 + phase);
+      const wave = Math.sin(p1 - u * 6 + v * 0.9 + phase);
       pos.setXYZ(i,
         wave * (0.05 + 0.3 * k) * w * u,                                  // sideways ripple, bigger toward the tip
-        y0 - (1 - 0.85 * k) * 0.3 * h * u * u + Math.cos(t * (4 + 6 * k) - u * 5 + phase) * 0.04 * h * u * (0.4 + k), // droops at rest, flies level at speed
+        y0 - (1 - 0.85 * k) * 0.3 * h * u * u + Math.cos(p2 - u * 5 + phase) * 0.04 * h * u * (0.4 + k), // droops at rest, flies level at speed
         z0 * (1 - (1 - k) * 0.18 * u));                                   // (a limp flag hangs a little shorter)
     }
     pos.needsUpdate = true;
