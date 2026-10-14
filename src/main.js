@@ -1293,7 +1293,7 @@ class Game {
     if (!this.input.down('KeyX')) this.jarHoldDone = false;
     if (this.input.pressed('KeyX') && !A.jar.length) A.empty();
     if (this.input.pressed('KeyC') && this.boardCooldown <= 0) this.cosmetics.wardrobe();
-    if (this.input.pressed('KeyP') && this.boardCooldown <= 0) {
+    if (this.input.pressed('KeyP') && this.boardCooldown <= 0 && !this.player.rag) {
       if (this.upgrades.penlink) this.alchemy.penMenu();
       else this.hud.toast('No pen link. Dr. Zbornak sells a remote holding-pen link at the Antimatter Lab.', 3);
     }
