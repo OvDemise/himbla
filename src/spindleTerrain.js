@@ -8,7 +8,7 @@ import { mulberry32 } from './rng.js';
 export const RC = 420;         // the rock's girth (radius round its long axis)
 export const L = 5400;         // its length along the axis (x)
 export const CIRC = Math.PI * 2 * RC;
-export const CHECK = [330, 1300, 2300, 3300, 4300];
+export const START_S = 290; // where the rocket puts you down (the lander stands on this levelled site)
 export const CORE_S = L - 420, PAD_S = L - 650;
 export const ROCK_S0 = -130, ROCK_S1 = L + 130; // the rock mesh runs a little past both ends
 
@@ -22,7 +22,7 @@ const softAbs = (x, k = 0.18) => Math.sqrt(x * x + k * k) - k;
 
 // Craters like the Moon's: simple bowls, big complex ones with central peaks, terraced walls, and a few
 // bright rayed ones. Kept off the start, the shrine and the pad (those sites are levelled below).
-const KEEP = [[CHECK[0] - 40, 0, 130], [CORE_S, 0, 120], [PAD_S, 0, 150]];
+const KEEP = [[START_S, 0, 130], [CORE_S, 0, 120], [PAD_S, 0, 150]];
 const CRATERS = (() => {
   const rr = mulberry32(91);
   const out = [];
@@ -93,7 +93,7 @@ const SCARPS = [
   { s: 3900, w: -900, r: 240, hh: 5, a0: -0.4, a1: 1.4 },
 ];
 // levelled sites: the start, the shrine, the launch pad
-const FLATS = [{ s: CHECK[0] - 40, w: 0, r: 38 }, { s: CORE_S, w: 0, r: 30 }, { s: PAD_S, w: 0, r: 42 }];
+const FLATS = [{ s: START_S, w: 0, r: 38 }, { s: CORE_S, w: 0, r: 30 }, { s: PAD_S, w: 0, r: 42 }];
 
 // what the last heightAt call found there (for the colouring)
 const TA = { mare: 0, ray: 0, floor: 0, wall: 0, rim: 0, rille: 0 };

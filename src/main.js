@@ -734,7 +734,7 @@ class Game {
       alien: 'Vaporised by the mothership. It does not want you to have that core.',
       void: 'You fell off the Spindle into the dark.',
     };
-    this.hud.death(`${causes[cause] || 'Knocked out.'} Med-evac fee: ₵${fee}`);
+    this.hud.death(`${causes[cause] || 'Knocked out.'} Med-evac fee: ₵${fee}`, this.spindle && this.spindle.active ? 'Click or press ENTER to call the recovery transit.' : null);
     this.state = 'dead';
     this.releasing = true;
     this.input.unlock();
@@ -744,12 +744,11 @@ class Game {
   respawn() {
     if (this.state !== 'dead') return;
     if (this.spindle && this.spindle.active) {
-      // on the Spindle you're back at the last beacon you reached
+      // on the Spindle a recovery transit picks you up and carries you home to the Monolith (a cutscene)
       this.hud.show('death', false);
       this.projectiles.clear();
-      this.spindle.respawn();
-      this.state = 'play';
-      this.input.lock();
+      this.input.lock(); // (now, on the click: the pointer lock needs a gesture, and the scene runs for ten seconds)
+      this.spindle.recover();
       return;
     }
     this.hud.show('death', false);
@@ -1080,6 +1079,7 @@ class Game {
     }
 
     this.recall.update(dt);
+    this.spindle.updateRecovery(dt);
     if (this.state === 'title') this.updateTitleTour(rdt);
     else if (this.state !== 'cutscene' && this.state !== 'derby') this.updateCamera(dt);
     if (this.trailer) this.trailer.camera(rdt); // trailer: the shot owns the camera

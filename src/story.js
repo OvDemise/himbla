@@ -1559,7 +1559,7 @@ export class Story {
     G.save();
   }
 
-  teleportTo(dir) {
+  teleportTo(dir, quiet = false) {
     const g = this.game;
     const P = g.player;
     if (P.vehicle) g.garage.exit();
@@ -1570,9 +1570,23 @@ export class Story {
     const fwd = tangent(dir.clone().sub(d), d).normalize();
     P.respawn(pos, fwd);
     g.cam.fwd.copy(fwd);
+    if (quiet) return; // (arrived some other way: a recovery shuttle)
     g.fx.explosion(pos, 4, false);
     g.fx.pop('*VWORP*', null, { color: '#c77dff', size: 56 });
     g.audio.tone(200, 0.5, 'sine', 0.25, 4);
+  }
+
+  // You were carried off the Spindle (a K.O.: spindle.recover): the chapter isn't failed, but the Spindle
+  // has to be done again, so it steps back to the step before it ("get to the launch complex").
+  retrySpindle() {
+    const A = this.active;
+    if (!A) return;
+    const i = A.steps.findIndex((st) => st.t === 'spindle');
+    if (i < 0) return;
+    delete A.steps[i].started;
+    delete A.steps[i].done;
+    A.si = Math.max(-1, i - 2); // (next() steps on from here)
+    this.next();
   }
 
   // nearest clinic for redeploying after a K.O.

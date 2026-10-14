@@ -302,8 +302,9 @@ export class HUD {
     this.resultT = 4;
   }
 
-  death(cause) {
+  death(cause, hint = null) {
     $('death-cause').textContent = cause;
+    $('death-hint').textContent = hint || 'Click or press ENTER to redeploy at your home base.';
     this.show('death', true);
   }
 
