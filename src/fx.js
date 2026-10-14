@@ -3,6 +3,8 @@ import { upAt } from './geo.js';
 import { glow, toon } from './toon.js';
 
 const MAX_P = 1200;
+// skate trail ribbons: a point every 1/60 s, the usual tail 40 points (2/3 s) long, up to 2 s while grinding
+const TRAIL_STEP = 1 / 60, TRAIL_LIFE = 40 * TRAIL_STEP, TRAIL_MAX = 2, TRAIL_N = Math.ceil(TRAIL_MAX / TRAIL_STEP) + 10;
 
 // Particles, explosions, warning rings, skate trails and comic onomatopoeia.
 export class FX {
@@ -33,11 +35,10 @@ export class FX {
   }
 
   makeTrail(color) {
-    const N = 40;
+    const N = TRAIL_N;
     const geo = new THREE.BufferGeometry();
     const pos = new Float32Array(N * 2 * 3);
     const alpha = new Float32Array(N * 2);
-    for (let i = 0; i < N; i++) { alpha[i * 2] = alpha[i * 2 + 1] = 1 - i / N; }
     geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
     geo.setAttribute('alpha', new THREE.BufferAttribute(alpha, 1));
     const idx = [];
@@ -52,22 +53,30 @@ export class FX {
     const mesh = new THREE.Mesh(geo, mat);
     mesh.frustumCulled = false;
     this.scene.add(mesh);
-    return { mesh, pts: [], N, mat };
+    return { mesh, pts: [], N, mat, life: TRAIL_LIFE };
   }
 
-  updateTrail(i, footPos, side, strength, up) {
+  // The ribbon is a history of the foot (the last 2 s of it), aged in seconds: each stretch fades out
+  // over `life` and is invisible after that. A grind asks for a longer life so the tail streams
+  // further behind; the life eases between the two, so the tail grows and shrinks without popping.
+  updateTrail(i, footPos, side, strength, up, dt = TRAIL_STEP, life = TRAIL_LIFE) {
     const t = this.trails[i];
-    t.pts.unshift(footPos.clone().addScaledVector(up, 0.05), side.clone());
-    if (t.pts.length > t.N * 2) t.pts.length = t.N * 2;
-    const pos = t.mesh.geometry.attributes.position.array;
+    t.life += Math.max(-dt, Math.min(2 * dt, life - t.life));
+    for (const q of t.pts) q.age += dt;
+    const head = t.pts[0];
+    if (head && head.age < TRAIL_STEP) { head.p.copy(footPos).addScaledVector(up, 0.05); head.s.copy(side); } // (a fast frame rate: the newest point just follows the foot)
+    else t.pts.unshift({ p: footPos.clone().addScaledVector(up, 0.05), s: side.clone(), age: 0 });
+    while (t.pts.length > t.N || (t.pts.length > 1 && t.pts[t.pts.length - 1].age > TRAIL_MAX)) t.pts.pop();
+    const pos = t.mesh.geometry.attributes.position.array, alpha = t.mesh.geometry.attributes.alpha.array;
     for (let k = 0; k < t.N; k++) {
-      const j = Math.min(k, t.pts.length / 2 - 1) * 2;
-      const p = t.pts[j], s = t.pts[j + 1];
+      const q = t.pts[Math.min(k, t.pts.length - 1)];
       const w = 0.18;
-      pos[k * 6] = p.x - s.x * w; pos[k * 6 + 1] = p.y - s.y * w; pos[k * 6 + 2] = p.z - s.z * w;
-      pos[k * 6 + 3] = p.x + s.x * w; pos[k * 6 + 4] = p.y + s.y * w; pos[k * 6 + 5] = p.z + s.z * w;
+      pos[k * 6] = q.p.x - q.s.x * w; pos[k * 6 + 1] = q.p.y - q.s.y * w; pos[k * 6 + 2] = q.p.z - q.s.z * w;
+      pos[k * 6 + 3] = q.p.x + q.s.x * w; pos[k * 6 + 4] = q.p.y + q.s.y * w; pos[k * 6 + 5] = q.p.z + q.s.z * w;
+      alpha[k * 2] = alpha[k * 2 + 1] = Math.max(0, 1 - q.age / t.life);
     }
     t.mesh.geometry.attributes.position.needsUpdate = true;
+    t.mesh.geometry.attributes.alpha.needsUpdate = true;
     t.mat.uniforms.strength.value += (strength - t.mat.uniforms.strength.value) * 0.2;
   }
 

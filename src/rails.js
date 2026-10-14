@@ -9,6 +9,10 @@ import { frameQuat } from './geo.js';
 const GRAV = 6;
 const _p = new THREE.Vector3(), _t = new THREE.Vector3(), _u = new THREE.Vector3(), _a = new THREE.Vector3(), _b = new THREE.Vector3();
 const _q = new THREE.Quaternion(), _z = new THREE.Vector3(0, 0, 1), _r = new THREE.Vector3(), _v = new THREE.Vector3();
+const _hp = new THREE.Vector3(), _ht = new THREE.Vector3(), _hu = new THREE.Vector3(), _hn = new THREE.Vector3(), _ts = new THREE.Vector3(), _tf = new THREE.Vector3();
+const _near = [];
+const BODY = 0.45, BODY_UP = 0.5; // the rider's shins and waist, as a ball: what a rock on the crest has to clear
+const TRAIL_LIFE = 2; // s: how long a grind's skate trail streams behind before it's gone
 
 // point and unit tangent at arc length s along a rail (crater rims are closed loops)
 function railAt(r, s, outP, outT) {
@@ -48,6 +52,24 @@ export class Grinder {
       }
     }
     return best;
+  }
+
+  // The first solid thing the rider runs into between here and ds further along the rail (a boulder
+  // or rock sitting on the crest): the push-out normal, or null. The rail's own rock doesn't count.
+  hit(A, ds) {
+    const cols = this.game.colliders;
+    if (!cols) return null;
+    const steps = Math.max(1, Math.ceil(Math.abs(ds) / 0.5));
+    for (let i = 1; i <= steps; i++) {
+      railAt(A.r, A.s + ds * (i / steps), _hp, _ht);
+      _hu.copy(_hp).normalize();
+      _hp.addScaledVector(_hu, BODY_UP);
+      for (const c of cols.query(_hp, BODY + 2, _near)) {
+        if (c.platform || c.rail === A.r.pts) continue;
+        if (cols.contact(c, _hp, BODY, _hn) > 0) return _hn;
+      }
+    }
+    return null;
   }
 
   // Called at the top of Player.update. Returns true while grinding (the player skips its physics).
@@ -104,6 +126,9 @@ export class Grinder {
     // gravity along the rail, and a little friction
     A.speed += -GRAV * _t.dot(_u) * A.dir * dt;
     A.speed = Math.max(3, Math.min(85, A.speed - 0.5 * dt));
+    // a rock on the crest: you hit it and you're thrown off
+    const bump = this.hit(A, A.dir * A.speed * dt);
+    if (bump) { this.knockOff(P, bump); return true; }
     A.s += A.dir * A.speed * dt;
     if (r.loop) A.s = ((A.s % r.len) + r.len) % r.len;
     A.t += dt;
@@ -140,6 +165,11 @@ export class Grinder {
     if (m.armL) { m.armL.rotation.z = -1.2 + 0.18 * w2 + 0.1 * fast; m.armL.rotation.x = 0.25 * w3 - 0.2 * fast; }
     if (m.armR) { m.armR.rotation.z = 1.2 + 0.18 * w1 - 0.1 * fast; m.armR.rotation.x = -0.25 * w3 - 0.2 * fast; }
     P.upSmooth.copy(_u);
+    // the skate trail keeps streaming from the skates along the rail (it fades out over a couple of seconds)
+    _ts.crossVectors(_u, _t).normalize();
+    const tr = b.skating ? Math.min(1, A.speed / 30) : 0;
+    g.fx.updateTrail(0, _tf.copy(b.pos).addScaledVector(_ts, -0.2), _ts, tr, _u, dt, TRAIL_LIFE);
+    g.fx.updateTrail(1, _tf.copy(b.pos).addScaledVector(_ts, 0.2), _ts, tr, _u, dt, TRAIL_LIFE);
     // sparks: sprayed back off the skates (against the slide), white-hot to orange, more and
     // further the faster you go, with a hot flash where steel meets rock and the odd big burst
     A.spark -= dt;

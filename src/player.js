@@ -548,7 +548,7 @@ export class Player {
     const right = new THREE.Vector3(1, 0, 0).applyQuaternion(m.root.quaternion);
     const strength = b.skating && b.grounded ? Math.min(1, sp / 30) : this.vaneCarve ? 0.55 + 0.45 * Math.abs(this.vaneCarve) : 0; // (the Vanes leave ribbons in the air)
     const g = this.game;
-    g.fx.updateTrail(0, b.pos.clone().addScaledVector(right, -0.2), right, strength, up);
-    g.fx.updateTrail(1, b.pos.clone().addScaledVector(right, 0.2), right, strength, up);
+    g.fx.updateTrail(0, b.pos.clone().addScaledVector(right, -0.2), right, strength, up, dt);
+    g.fx.updateTrail(1, b.pos.clone().addScaledVector(right, 0.2), right, strength, up, dt);
   }
 }

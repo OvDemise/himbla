@@ -233,6 +233,7 @@ function build(kind, rr, p, q, planet, dims = null) {
       cols.push({ type: 'box', c, ax: sd, ay: new THREE.Vector3().crossVectors(t, sd).normalize(), az: t, hx: w * 1.05, hy: hh * 0.38 + 0.5, hz: sl / 2 + 0.05 });
     }
     rail = { pts: railPts };
+    for (const c of cols) c.rail = railPts; // (the rider on this crest doesn't collide with its own rock: rails.js)
   }
   const mesh = new THREE.Mesh(geo, mat);
   mesh.userData.rockKind = kind;
