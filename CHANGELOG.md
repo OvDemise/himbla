@@ -5,6 +5,7 @@ contains `[release]` (see the README's Download section). Newest first.
 
 ## Unreleased
 
+- **Vehicles no longer sink into the floor:** the wheels (and the Phase Skimmer's hull when parked) reached a little below where the vehicle was placed on the ground, so they clipped into the terrain, more so on slopes. Wheeled vehicles now ride 0.2 above the ground and a parked Skimmer settles just above it.
 - **Small outposts (farm domes, depots, towers, kiosks):** the "SAPLING SWIPED!" / "DOME DOWN!" pop-ups and the jar toasts now stay on screen about twice as long, so they can actually be read. A raided outpost just says PICKED CLEAN; the restock countdown is gone (it still restocks after 4 minutes, you're just not told when).
 - **Vehicle flag:** no more wild flapping at around 30-45 km/h. The ripple's phase was recomputed from the game clock times a speed-dependent frequency, so every small change in speed threw the wave forward by radians; it now advances frame by frame and the speed it reacts to is eased.
 - **Cheat menu splice submenu:** MORE → SPLICE MUTATIONS… toggles each of the ten splice-pod mutations on or off (no jar needed, ignores the 3-mutation cap) and has a RESET ALL button. It replaces the old CURE MUTATIONS button.

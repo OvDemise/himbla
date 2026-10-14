@@ -18,6 +18,7 @@ export const VEHICLES = {
 };
 
 const _v = new THREE.Vector3(), _mu = new THREE.Vector3(), _mf = new THREE.Vector3();
+const RIDE_LIFT = 0.2; // the wheeled ones ride a touch above the physics ground: the tyres (and their ink outlines) reach below the model's origin, and sank into the terrain on slopes
 const REBUILD = 90; // seconds the orbital crane needs to replace a wrecked vehicle
 const CRASH_SAFE = 18; // m/s you can hit a wall at without hurting the vehicle
 const SUMMON_MAX_SPEED = 2; // m/s: the fastest the runner can be moving and still call a vehicle
@@ -264,7 +265,7 @@ export class Garage {
     const model = this.build(id);
     const pos = g.planet.ground(P.pos.clone().addScaledVector(g.cam.right, 5), new THREE.Vector3(), 0.5);
     const e = { body: makeBody(pos), heading: tangent(g.cam.fwd.clone(), pos.clone().normalize()).normalize() };
-    model.root.position.copy(pos);
+    model.root.position.copy(pos).addScaledVector(pos.clone().normalize(), def.hover ? 0.35 : RIDE_LIFT);
     g.scene.add(model.root);
     this.active = { id, def, e, model };
     g.fx.explosion(pos, 5, false);
@@ -335,7 +336,7 @@ export class Garage {
     if (def.hover) b.vel.multiplyScalar(1 - 0.15 * dt);
     if (b.grounded && (input.pressed('ShiftLeft') || input.pressed('ShiftRight'))) { b.vel.addScaledVector(up, 9); b.grounded = false; b.wasGround = false; g.audio.jump(); } // (wasGround off: the ground snap mustn't swallow the hop)
     // pose
-    model.root.position.copy(b.pos).addScaledVector(up, def.hover ? 0.8 + Math.sin(g.time * 3) * 0.15 : 0);
+    model.root.position.copy(b.pos).addScaledVector(up, def.hover ? 0.8 + Math.sin(g.time * 3) * 0.15 : RIDE_LIFT);
     const q = frameQuat(b.groundN, e.heading, new THREE.Quaternion());
     model.root.quaternion.slerp(q, Math.min(1, dt * 8));
     const sp = b.vel.length();
@@ -420,9 +421,8 @@ export class Garage {
     if (v.model.anim) v.model.anim(g.time, 0);
     this.trail(v.model, dt, false);
     const b = v.e.body;
-    if (b.vel.lengthSq() > 0.01) {
-      stepRover(v.e, dt, this.game.planet, this.game.colliders, v.e.heading, 0, { engine: 10, grip: v.def.grip, turn: 0, radius: 3, solidPlatforms: true });
-      v.model.root.position.copy(b.pos);
-    }
+    if (b.vel.lengthSq() > 0.01) stepRover(v.e, dt, this.game.planet, this.game.colliders, v.e.heading, 0, { engine: 10, grip: v.def.grip, turn: 0, radius: 3, solidPlatforms: true });
+    // (parked, a hover car settles on the ground rather than floating: its hull reaches 0.24 below its origin)
+    v.model.root.position.copy(b.pos).addScaledVector(_v.copy(b.pos).normalize(), v.def.hover ? 0.35 : RIDE_LIFT);
   }
 }
