@@ -120,6 +120,7 @@ export class Garage {
   toggle() {
     const g = this.game;
     const P = g.player;
+    if (P.rag) return; // (limp in a ragdoll: nothing to call)
     if (P.vehicle) { this.exit(); return; }
     const owned = this.owned();
     if (!owned.length) { g.hud.toast('No vehicles yet. Faction leaders hand them out as you rise in their story.', 3); return; }
@@ -142,7 +143,7 @@ export class Garage {
   // controller's wheel it stays up instead (sticky): the right stick picks, A calls, B cancels.
   openRadial(sticky = false) {
     const owned = this.owned();
-    if (!owned.length) return;
+    if (!owned.length || this.game.player.rag) return;
     if (!this.radialEl) {
       this.radialEl = document.createElement('div');
       this.radialEl.id = 'vradial';

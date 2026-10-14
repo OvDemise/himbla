@@ -57,14 +57,14 @@ const HOLD = { [B.A]: 'ShiftLeft', [B.B]: 'KeyQ', [B.X]: 'KeyF', [B.Y]: 'KeyV', 
 // the radial menu on d-pad down: everything that has no button of its own, clockwise from the top.
 // `has`: is it yours yet (the wedge stays in place, dimmed, until it is); `code`: the key it presses
 const RADIAL = [
-  { id: 'vehicles', name: 'VEHICLES', has: (g) => g.garage && (g.garage.owned().length > 0 || !!g.player.vehicle), state: (g) => (g.player.vehicle ? 'GET OUT' : '') },
+  { id: 'vehicles', name: 'VEHICLES', has: (g) => g.garage && !g.player.rag && (g.garage.owned().length > 0 || !!g.player.vehicle), state: (g) => (g.player.vehicle ? 'GET OUT' : '') },
   { code: 'KeyC', name: 'WARDROBE' },
   { code: 'KeyJ', name: 'REP LOG' },
   { code: 'KeyN', name: 'MUSIC', keep: true, state: (g) => (g.audio.musicOn === false ? 'OFF' : 'ON') },
   { code: 'KeyH', name: 'HELP' },
   { id: 'jar', code: 'KeyX', name: 'EMPTY JAR', has: (g) => (g.upgrades.jar || 0) > 0 },
   { code: 'KeyP', name: 'PEN LINK', has: (g) => (g.upgrades.penlink || 0) > 0 },
-  { code: 'KeyT', name: 'TELEPORTER', has: (g) => g.story && g.story.tech.includes('teleport') },
+  { code: 'KeyT', name: 'TELEPORTER', has: (g) => g.story && !g.player.rag && g.story.tech.includes('teleport') },
 ];
 // the panels a highlight can work in, topmost first
 const UI_ROOTS = ['settings', 'dialog', 'board', 'replog', 'wardrobe', 'casino', 'help', 'pause', 'death', 'globe-wrap'];
@@ -247,7 +247,7 @@ export class Gamepad {
     const g = this.game, gar = g.garage;
     const cancel = () => { gar.closeRadial(false); g.vHold = 0; this.radialMask = true; return true; }; // (vHold: or letting go of Y would call it anyway)
     // (a ride, a death or a vehicle you're already in: nothing to call)
-    if (g.rides.ride || g.player.dead || g.player.vehicle) return cancel();
+    if (g.rides.ride || g.player.dead || g.player.vehicle || g.player.rag) return cancel();
     gar.radialStick(rx, ry);
     if (pressed(B.B) || pressed(B.START)) return cancel();
     if (!gw.sticky) return false;

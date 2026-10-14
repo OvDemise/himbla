@@ -1323,8 +1323,10 @@ class Game {
       if (this.upgrades.penlink) this.alchemy.penMenu();
       else this.hud.toast('No pen link. Dr. Zbornak sells a remote holding-pen link at the Antimatter Lab.', 3);
     }
-    // V: tap to call / board / leave; hold (with more than one vehicle) for the radial picker
-    if (this.input.pressed('KeyV') && this.boardCooldown <= 0 && !this.rides.ride) this.vHold = 1e-4;
+    // V: tap to call / board / leave; hold (with more than one vehicle) for the radial picker.
+    // (Limp in a ragdoll there's no calling a vehicle: the wheel closes and a press in flight is dropped.)
+    if (this.player.rag) { if (this.garage.radial) this.garage.closeRadial(false); this.vHold = 0; }
+    else if (this.input.pressed('KeyV') && this.boardCooldown <= 0 && !this.rides.ride) this.vHold = 1e-4;
     if (this.vHold) {
       if (this.input.down('KeyV')) {
         this.vHold += dt;
@@ -1335,7 +1337,7 @@ class Game {
       }
     }
     this.powers.update(dt);
-    if (this.input.pressed('KeyT') && this.boardCooldown <= 0) this.story.useTech('teleport');
+    if (this.input.pressed('KeyT') && this.boardCooldown <= 0 && !this.player.rag) this.story.useTech('teleport');
     if (this.input.pressed('KeyN')) this.hud.toast(this.audio.toggleMusic() ? '♪ Music on' : 'Music off', 1.5);
     this.cosmetics.update(dt);
     this.updateScanner(dt);
