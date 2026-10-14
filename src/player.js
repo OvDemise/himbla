@@ -122,7 +122,7 @@ export class Player {
   // A wipeout or a hard crash: the runner goes limp and falls as a physics ragdoll (ragdoll.js).
   // Only the model's pose: you keep your momentum and your controls. sign: +1 tumbles forward, -1 back.
   startRagdoll(sign = 1) {
-    if (this.rag || this.vehicle || this.dead) return;
+    if (this.rag || this.vehicle || this.dead || this.game.indoors) return; // (no tumbling inside the casino or Dr. Zbornak's lab)
     this.rag = new Ragdoll(this.game, this.model, this.body, sign);
   }
 

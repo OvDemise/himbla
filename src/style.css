@@ -741,6 +741,8 @@ body:has(#title:not(.hidden)) #hud { visibility: hidden; }
 /* ---- casino 3D ---- */
 /* walk-in games action bar (casinoGames.js) */
 #cas3d { position: fixed; left: 50%; bottom: 16px; transform: translateX(-50%); z-index: 35; width: min(760px, calc(100vw - 32px)); background: var(--ui-bg); color: var(--ui-text); border: 2px solid var(--ui-edge); box-shadow: 0 0 0 2px #05030c, var(--ui-shadow); padding: 8px 12px 6px; font-family: var(--body); pointer-events: auto; cursor: default; }
+/* inside the casino hall: no HUD at all (prompts, toasts and pop-ups still show, so you can sit down at a game) */
+body.in-casino #hud > :not(#popups):not(#prompt):not(#toast):not(#splash):not(#dilate) { display: none !important; }
 /* seated at blackjack, the Duck Derby or Plinko: only the game's bar and its pop-ups (wins, QUACK!) stay up */
 body.seated #hud > :not(#popups) { display: none !important; }
 #cas3d .c3-head { display: flex; align-items: center; gap: 12px; font-family: var(--comic); font-size: 11px; line-height: 1.4; border-bottom: 2px solid var(--ui-edge); padding-bottom: 6px; flex-wrap: wrap; }
