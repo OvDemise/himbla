@@ -326,6 +326,13 @@ float rimWob = (rimNoise(rimP * 0.05) - 0.5) * 1.0 + (rimNoise(rimP * 0.17 + 4.0
 float rimEdge = min(abs(rimU + rimWob), abs(rimOwn + rimWob));
 float rimPx = max(fwidth(rimEdge), 1e-3); // metres per pixel across the band
 float rimFar = 1.0 - smoothstep(${(RIM_INK_REACH * 0.7).toFixed(1)}, ${RIM_INK_REACH.toFixed(1)}, distance(vHoleW, cameraPosition));
+// Everything below is zero (so nothing changes) unless the pixel is within reach of a rim: past
+// RIM_INK_REACH rimFar is 0, and the halo (the widest term) is 0 once rimEdge + 1.5 * rimRag >= 3.2 * rimHw,
+// with rimRag >= -1.6 (so 2.4 at worst) and rimHw <= max(3.2, 1.2 * rimPx) (the noise term is at most 1.9);
+// the core and the pebbles and chips lie inside that. The test uses only rimEdge and rimPx (a screen-space
+// derivative, worked out above so nothing derivative-dependent sits inside the branch), with a little to
+// spare, and it skips six of the block's eight noise lookups on nearly every pixel: same result, less work.
+if (rimFar > 0.0 && rimEdge < 3.2 * max(3.2, 1.2 * rimPx) + 2.5) {
 // Not ink: a band of shattered regolith along the crest. An uneven rocky core whose edges break up
 // into patches, a soft scuffed halo round it, and rubble through it - dark pebbles and bright
 // chips of fresh rock (the grit fades out with distance before it can shimmer)
@@ -341,6 +348,7 @@ vec3 rimRock = vec3(0.24, 0.21, 0.29);
 diffuseColor.rgb = mix(diffuseColor.rgb, rimRock, rimLine);
 diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.1, 0.085, 0.14), rimPeb * max(rimCore, rimHalo * 1.6) * 0.85 * rimFar);
 diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.93, 0.9, 0.86), rimChip * rimCore * 0.6 * rimFar);
+}
 // mineral colour boost: the tint (what the mineral hues added, brightness-neutral) pushed further,
 // warm ones (tan, buff, rust) and cool ones (blue-grey) by their own amounts, and more the higher up
 // you are: modest under your feet, richer from orbit. The classic tones underneath are left alone.

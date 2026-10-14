@@ -73,6 +73,7 @@ export class ComicPost {
           // speed lines
           vec2 p = vUv - 0.5; p.x *= res.x / res.y;
           float rad = length(p);
+          if (speed != 0.0 || boost != 0.0) { // (both lines are weighted by speed / boost: with neither there is nothing to draw, so skip the maths)
           float a = atan(p.y, p.x) / 6.2831853 * 90.0;
           float id = floor(a);
           float fr = fract(a);
@@ -83,6 +84,7 @@ export class ComicPost {
           col = mix(col, vec3(1.0, 0.98, 0.9), line * mask * 0.75);
           // thrust: cyan streaks
           col = mix(col, vec3(0.2, 0.9, 1.0), line * boost * lines * smoothstep(0.35, 0.8, rad) * 0.35); // settings
+          }
 
           // vignettes
           col *= 1.0 - smoothstep(0.55, 1.05, rad) * 0.45;

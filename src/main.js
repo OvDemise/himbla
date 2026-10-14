@@ -276,7 +276,17 @@ class Game {
       const added = [], forced = [];
       for (const l of this.locations) if (l.group && !l.group.parent) { this.scene.add(l.group); added.push(l); }
       this.scene.traverse((o) => { if (!o.visible) { o.visible = true; forced.push(o); } });
+      // (into the post target, the way every frame draws: the target's colour space is part of a program's key, so
+      // programs compiled against the bare canvas would be useless and the first frame would compile its own)
+      this.renderer.setRenderTarget(this.post.target);
       try { await this.renderer.compileAsync(this.scene, this.camera); } catch (e) { console.warn('[shaders] precompile failed', e); }
+      // ...and again with the helmet lamp, its glow and the reactor light out: the way the lights sit nearly all the time
+      // (syncLocalLights), a second set of programs that is ready before it's ever needed
+      const idle = [this.player.lamp, this.player.glowLight, this.world.reactorLight].filter(Boolean);
+      for (const l of idle) l.visible = false;
+      try { await this.renderer.compileAsync(this.scene, this.camera); } catch (e) { console.warn('[shaders] precompile (idle lights) failed', e); }
+      this.renderer.setRenderTarget(null);
+      for (const l of idle) l.visible = true;
       for (const o of forced) o.visible = false;
       for (const l of added) if (!l.shown) this.scene.remove(l.group); // (unless it came into view meanwhile)
     }
@@ -1139,6 +1149,7 @@ class Game {
 
     if (this.trailer) this.trailer.post(u);
     this.renderer.setViewport(0, 0, window.innerWidth, window.innerHeight);
+    this.syncLocalLights();
     this.cheats.beforeRender();
     if (this.cheats.debugView) this.cheats.renderDebug(); // (dev menu: polygons / draw calls laid bare)
     else this.post.render(this.scene, this.camera);
@@ -1212,6 +1223,22 @@ class Game {
     document.body.classList.toggle('in-casino', where === 'casino'); // (style.css hides the HUD)
   }
 
+  // The helmet lamp, its glow and the lab reactor's light sit at intensity 0 nearly all the time (daylight,
+  // away from the lab), yet every lit pixel in the game still loops over them. While all three are idle they're
+  // switched off (visible = false), which takes them out of the shaders altogether: a light at 0 adds nothing,
+  // so the picture is the same, it just costs less. They go on and off together, so there are only two light
+  // set-ups to compile (both are warmed up at startup, see init). Called once a frame, after everything that
+  // sets their intensity.
+  syncLocalLights() {
+    const L = this._localLights || (this._localLights = []);
+    const P = this.player, rl = this.world.reactorLight;
+    if (L[0] !== P.lamp || L[1] !== P.glowLight || L[2] !== rl) { L[0] = P.lamp; L[1] = P.glowLight; L[2] = rl; this._localLit = undefined; } // (a rebuilt lab brings a new reactor light)
+    const lit = L.some((l) => l && l.intensity > 0);
+    if (lit === this._localLit) return;
+    this._localLit = lit;
+    for (const l of L) if (l) l.visible = lit;
+  }
+
   // Sun, sky fill and the helmet lamp all depend on where you stand on the sphere.
   // On the Spindle: you, your shots, the story step and the asteroid; the Moon waits.
   updateAway(dt, c) {
@@ -1277,11 +1304,14 @@ class Game {
     const lampOn = this.lampForce != null ? this.lampForce : dark > 0.35 || (this.secrets && this.secrets.isUnder(P.pos));
     const k = P.dead ? 0 : lampOn ? 1 : 0;
     P.lamp.intensity += (k * 9 - P.lamp.intensity) * 0.2;
+    if (!k && P.lamp.intensity < 0.01) P.lamp.intensity = 0; // (the fade never quite arrives: this faint it can't be seen, and a light at exactly 0 can be switched off: syncLocalLights)
     // void skin lets you see in the dark: a wide violet glow without giving you away with a lamp
     const voidSight = this.alchemy.mutations.includes('void') && dark > 0.35 && !P.dead;
     P.glowLight.distance = voidSight ? 140 : 26;
     P.glowLight.color.setHex(voidSight ? 0xb69cff : 0x9be7ff);
-    P.glowLight.intensity += ((voidSight ? 4 : k * 1.2) - P.glowLight.intensity) * 0.2;
+    const glowK = voidSight ? 4 : k * 1.2;
+    P.glowLight.intensity += (glowK - P.glowLight.intensity) * 0.2;
+    if (!glowK && P.glowLight.intensity < 0.005) P.glowLight.intensity = 0;
     const isDark = dark > 0.6;
     if (isDark !== this.wasDark && this.state === 'play') {
       this.wasDark = isDark;
