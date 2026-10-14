@@ -5,6 +5,7 @@ contains `[release]` (see the README's Download section). Newest first.
 
 ## Unreleased
 
+- **Vehicle flag:** no more wild flapping at around 30-45 km/h. The ripple's phase was recomputed from the game clock times a speed-dependent frequency, so every small change in speed threw the wave forward by radians; it now advances frame by frame and the speed it reacts to is eased.
 - **Vehicle wheel:** the boxy "YOUR VEHICLES" list is gone. The controller menu's VEHICLES wedge now opens the vehicle wheel (the same one you get holding `V` / `Y`), restyled to match the controller menu: the right stick picks, `A` calls it, `B` / `Start` cancels, and the pick glows white in the light and purple on the dark side.
 
 ## 0.9.99-1 — 2026-10-13
