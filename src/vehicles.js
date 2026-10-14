@@ -386,13 +386,20 @@ export class Garage {
   // dust kicked up by the wheels (the same puff as the skate's, which kicks in at 25 m/s) once you're
   // moving fast over the ground. The rear wheels throw the most: bigger puffs and more of them the
   // faster you go. The front wheels kick up a steady lighter puff. The hover ones scatter it from
-  // under their pads.
+  // under their pads, the rear of it right behind the end of the engine plumes.
   kickDust(v, dt, sp, up) {
     if (sp < 18 || !v.e.body.grounded) return;
     const { def, model } = v;
     const sc = def.scale || 1;
-    const spots = model.wheels.length ? model.wheels.map((w) => [w.position.x * sc, w.position.z * sc]) : [[-1.1, -1.6], [1.1, -1.6], [-1.1, 1.6], [1.1, 1.6]];
     const k = Math.min(1, (sp - 18) / 60); // 0 at the dust threshold, 1 at 78 m/s
+    let spots;
+    if (model.wheels.length) spots = model.wheels.map((w) => [w.position.x * sc, w.position.z * sc]);
+    else {
+      // (the skimmer's plumes: pivots at x = +-1.78, z = -3.06, 2.2 long at full scale, which model.anim
+      // stretches from 0.35 to 1.25 with speed)
+      const tail = -3.06 - 2.2 * (0.35 + 0.9 * Math.min(1, sp / 60)) - 0.4;
+      spots = [[-1.78, tail], [1.78, tail], [-1.1, 1.6], [1.1, 1.6]];
+    }
     const back = _mf.copy(v.e.body.vel).multiplyScalar(-0.2);
     for (const [x, z] of spots) {
       const rear = z < 0;
@@ -403,7 +410,8 @@ export class Garage {
       // otherwise puff from its wheel hubs)
       const p = model.root.localToWorld(_mu.set(x, 0, z));
       p.addScaledVector(up, -p.clone().sub(v.e.body.pos).dot(up));
-      this.game.fx.dust(p, back, n, up, 0xe8e2d8, rear ? 0.5 + 1.1 * k : 0.5);
+      const size = def.hover ? (rear ? 0.5 + 1.1 * k : 0.5) : (rear ? 0.5 + 0.7 * k : 0.7); // (ground vehicles top out at 1.2)
+      this.game.fx.dust(p, back, n, up, 0xe8e2d8, size);
     }
   }
 
