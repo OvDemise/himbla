@@ -345,7 +345,7 @@ export class GlobeMap {
       c.beginPath(); c.ellipse(p.x, p.y, rr, rr * p.z, Math.atan2(p.y - H / 2, p.x - W / 2) + Math.PI / 2, 0, Math.PI * 2); c.fill();
       c.strokeStyle = '#7b5cff'; c.stroke();
     }
-    // terminator: the edge of the dark side, in its own colour (SAT-7's orbit is the yellow dashes).
+    // terminator: the edge of the dark side, in its own colour (SAT-7's orbit is the orange dashes).
     // It's always drawn, fog or not, and lights up when you point at it.
     const hot = this.termHover;
     this.termPts = [];
@@ -442,7 +442,7 @@ export class GlobeMap {
     // SAT-7's orbit (dashed) and where it is right now
     if (g.secrets && g.secrets.sat) {
       const S = g.secrets;
-      c.strokeStyle = 'rgba(255,210,63,0.55)'; c.lineWidth = 1.5; c.setLineDash([3, 6]);
+      c.strokeStyle = '#FF5F15'; c.lineWidth = 1.5; c.setLineDash([3, 6]);
       c.beginPath();
       let pen = false;
       const q = new THREE.Vector3();
