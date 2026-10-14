@@ -277,7 +277,7 @@ export class Garage {
     const tune = def.hover
       ? { grip: Math.max(def.grip, 10), stick: 70, traction: 7 }
       : { grip: Math.max(def.grip * 1.6, 24), stick: 55, traction: 15 };
-    for (let i = 0; i < steps; i++) stepRover(e, dt / steps, g.planet, g.colliders, target, max, { engine: fwdIn || back ? def.engine : 0, turn: def.turn, radius: def.radius || 3.2 * (def.scale || 1), weight: def.hover ? 1.5 : 1.7, ...tune });
+    for (let i = 0; i < steps; i++) stepRover(e, dt / steps, g.planet, g.colliders, target, max, { engine: fwdIn || back ? def.engine : 0, turn: def.turn, radius: def.radius || 3.2 * (def.scale || 1), weight: def.hover ? 1.5 : 1.7, solidPlatforms: true, ...tune });
     if (def.hover) b.vel.multiplyScalar(1 - 0.15 * dt);
     if (b.grounded && (input.pressed('ShiftLeft') || input.pressed('ShiftRight'))) { b.vel.addScaledVector(up, 9); b.grounded = false; b.wasGround = false; g.audio.jump(); } // (wasGround off: the ground snap mustn't swallow the hop)
     // pose
@@ -366,7 +366,7 @@ export class Garage {
     this.trail(v.model, dt, false);
     const b = v.e.body;
     if (b.vel.lengthSq() > 0.01) {
-      stepRover(v.e, dt, this.game.planet, this.game.colliders, v.e.heading, 0, { engine: 10, grip: v.def.grip, turn: 0, radius: 3 });
+      stepRover(v.e, dt, this.game.planet, this.game.colliders, v.e.heading, 0, { engine: 10, grip: v.def.grip, turn: 0, radius: 3, solidPlatforms: true });
       v.model.root.position.copy(b.pos);
     }
   }

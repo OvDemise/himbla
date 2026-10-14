@@ -5,6 +5,8 @@ contains `[release]` (see the README's Download section). Newest first.
 
 ## Unreleased
 
+- **Vehicles hit traffic:** the rovers, bikes and hover vehicles you drive no longer pass straight through land-trains and road hover-cars (and the satellite deck). They were skipping every moving-deck collider; they're solid now, and you bounce off at the speed you closed on them. Ramming still damages them. Pirate and military rovers are unchanged.
+
 - **Vehicle wheel:** the boxy "YOUR VEHICLES" list is gone. The controller menu's VEHICLES wedge now opens the vehicle wheel (the same one you get holding `V` / `Y`), restyled to match the controller menu: the right stick picks, `A` calls it, `B` / `Start` cancels, and the pick glows white in the light and purple on the dark side.
 
 ## 0.9.99-1 — 2026-10-13

@@ -35,7 +35,10 @@ function steerToward(heading, up, target, maxAngle) {
 // stick: hold the ground over crests and bumps (pirate and military rovers). It's the speed above
 // which a real crest may throw the rig clear (a pirate ram run at full tilt); below it the rig
 // snaps back down over crests, and once airborne it's pulled down hard
-export function stepRover(e, dt, planet, colliders, targetDir, maxSpeed, { engine = 16, grip = 0, turn = 1.8, radius = 2.4, stick = false, traction = 0, weight = 1 } = {}) {
+// solidPlatforms: moving decks (land-train cars, hover-cars, the satellite) are solid too. They're
+// skipped by default, since the pirate and military rovers have always driven through them; a
+// vehicle you drive hits them.
+export function stepRover(e, dt, planet, colliders, targetDir, maxSpeed, { engine = 16, grip = 0, turn = 1.8, radius = 2.4, stick = false, traction = 0, weight = 1, solidPlatforms = false } = {}) {
   const b = e.body;
   const up = b.up.copy(b.pos).normalize();
   steerToward(e.heading, up, targetDir, (turn / (1 + b.vel.length() / 60)) * dt);
@@ -76,12 +79,13 @@ export function stepRover(e, dt, planet, colliders, targetDir, maxSpeed, { engin
   if (colliders) {
     const cp = b.pos.clone().addScaledVector(up, radius * 0.7);
     for (const c of colliders.query(cp, radius + 3, _near)) {
-      if (c.platform) continue;
+      if (c.platform && !solidPlatforms) continue;
       const pen = colliders.contact(c, cp, radius, _n);
       if (pen > 0) {
         b.pos.addScaledVector(_n, pen);
         cp.addScaledVector(_n, pen);
-        const vn = b.vel.dot(_n);
+        // (a moving deck is hit at the speed you close on it, not your speed over the ground)
+        const vn = b.vel.dot(_n) - (c.platform && c.platform.vel ? c.platform.vel.dot(_n) : 0);
         if (vn < 0) b.vel.addScaledVector(_n, -vn * 1.3);
       }
     }
