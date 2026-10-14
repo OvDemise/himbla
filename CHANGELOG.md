@@ -5,6 +5,7 @@ contains `[release]` (see the README's Download section). Newest first.
 
 ## Unreleased
 
+- **Small outposts (farm domes, depots, towers, kiosks):** the "SAPLING SWIPED!" / "DOME DOWN!" pop-ups and the jar toasts now stay on screen about twice as long, so they can actually be read. A raided outpost just says PICKED CLEAN; the restock countdown is gone (it still restocks after 4 minutes, you're just not told when).
 - **Vehicle flag:** no more wild flapping at around 30-45 km/h. The ripple's phase was recomputed from the game clock times a speed-dependent frequency, so every small change in speed threw the wave forward by radians; it now advances frame by frame and the speed it reacts to is eased.
 - **Cheat menu splice submenu:** MORE → SPLICE MUTATIONS… toggles each of the ten splice-pod mutations on or off (no jar needed, ignores the 3-mutation cap) and has a RESET ALL button. It replaces the old CURE MUTATIONS button.
 - **Fewer triangles in settlements:** outline (ink) shells are now cut into 60 m chunks and switched off beyond ~110 m (and on resident characters beyond 50 m), where they're thinner than a pixel and the post pass's own outlines carry the silhouette; and the never-seen undersides of boxes, cylinders and aprons standing on the ground (and their outline shells') are no longer built. In the hub the ink drawn per frame drops by roughly 40%; nothing changes up close.

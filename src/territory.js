@@ -336,7 +336,7 @@ export class Territory {
     g.audio.boom(true);
     g.cam.shake = Math.max(g.cam.shake, 0.8);
     const L = LOOT[o.kind];
-    g.fx.pop(L.boom, c.clone().addScaledVector(o.dir, 8), { color: '#ff4f2e', size: 64, life: 1.4 });
+    g.fx.pop(L.boom, c.clone().addScaledVector(o.dir, 8), { color: '#ff4f2e', size: 64, life: 2.4 });
     // the same haul as a raid, flung out of the wreck onto open ground where you can see it
     const spots = this.landingSpots(o, (L.credits ? 1 : 0) + 1);
     if (L.credits) g.alchemy.dropLoot(null, c, { credits: L.credits[0] + Math.floor(Math.random() * (L.credits[1] - L.credits[0] + 1)), to: spots.pop() });
@@ -540,18 +540,19 @@ export class Territory {
     const L = LOOT[o.kind];
     const F = FACTIONS[o.faction];
     const wait = (o.lootAt || -1e9) + LOOT_CD - g.time;
-    if (wait > 0) { g.hud.prompt(`${KIND_NAMES[o.kind].toUpperCase()} — PICKED CLEAN. RESTOCKS IN ${Math.ceil(wait)}s`); return true; }
+    // it does restock, but the player isn't told when
+    if (wait > 0) { g.hud.prompt(`${KIND_NAMES[o.kind].toUpperCase()} — PICKED CLEAN`); return true; }
     g.hud.prompt(`<b>F</b> — ${L.verb} <span style="color:#ff2a4a">(−${LOOT_REP} ${F ? F.name.toUpperCase() : ''} REP)</span>`);
     if (!g.input.pressed('KeyF') || g.boardCooldown > 0) return true;
     const A = g.alchemy;
     if (L.crate) A.openCrate();
     else {
       // everything but credits rides in the jar
-      if (!A.owned) { g.hud.toast(`You need a containment jar to carry a ${ITEMS[L.item].name.toLowerCase()}. Dr. Zbornak sells them.`, 3); return true; }
-      if (A.used >= A.slots) { g.hud.toast('Your jar is full.', 2); return true; }
+      if (!A.owned) { g.hud.toast(`You need a containment jar to carry a ${ITEMS[L.item].name.toLowerCase()}. Dr. Zbornak sells them.`, 5); return true; }
+      if (A.used >= A.slots) { g.hud.toast('Your jar is full.', 3.5); return true; }
       if (L.credits) g.addCredits(L.credits[0] + Math.floor(Math.random() * (L.credits[1] - L.credits[0] + 1)), KIND_NAMES[o.kind]);
       A.add(L.item, L.names ? L.names[Math.floor(Math.random() * L.names.length)] : undefined);
-      g.fx.pop(L.pop, null, { color: ITEMS[L.item].color, size: 46 });
+      g.fx.pop(L.pop, null, { color: ITEMS[L.item].color, size: 46, life: 2.4 });
     }
     o.lootAt = g.time;
     g.rep.add(o.faction, -LOOT_REP, `Raided a ${KIND_NAMES[o.kind]}`, { war: false });
