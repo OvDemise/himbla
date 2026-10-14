@@ -77,7 +77,8 @@ export class Cheats {
       { label: `3 · CRACKED VISOR: ${on(this.crackedVisor)}`, fn: () => { this.crackedVisor = !this.crackedVisor; g.hud.crackKey = -1; this.displayMenu(); } },
       { label: `4 · SHOW EACH POLYGON: ${on(this.debugView === 'poly')}`, fn: () => { this.setDebugView(this.debugView === 'poly' ? null : 'poly'); this.displayMenu(); } },
       { label: `5 · SHOW EACH DRAW CALL: ${on(this.debugView === 'draw')}`, fn: () => { this.setDebugView(this.debugView === 'draw' ? null : 'draw'); this.displayMenu(); } },
-      { label: '6 · BACK', fn: () => this.dev() },
+      { label: `6 · STATIC SHADOW CACHE: ${g.shadowCache.failed ? 'FAILED (see console)' : on(g.shadowCache.enabled)}`, fn: () => { g.shadowCache.enabled = !g.shadowCache.enabled; g.shadowCache.failed = false; g.shadowCache.invalidate(); this.displayMenu(); } },
+      { label: '7 · BACK', fn: () => this.dev() },
       { label: 'CLOSE' },
     ]);
   }
@@ -161,7 +162,7 @@ export class Cheats {
     this.statsT = now;
     const r = this.game.renderer.info.render;
     const tris = Math.max(0, r.triangles - (this.debugView ? 0 : 2));
-    el.textContent = `${Math.max(0, r.calls - (this.debugView ? 0 : 1)).toLocaleString('en-US')} DRAWS · ${tris >= 1e6 ? (tris / 1e6).toFixed(2) + 'M' : tris.toLocaleString('en-US')} POLYS`;
+    el.textContent = `${Math.max(0, r.calls - (this.debugView ? 0 : 1)).toLocaleString('en-US')} DRAWS · ${tris >= 1e6 ? (tris / 1e6).toFixed(2) + 'M' : tris.toLocaleString('en-US')} POLYS${this.game.shadowCache.failed ? ' · SHADOW CACHE FAILED' : this.game.shadowCache.enabled ? ` · SHADOWS ${this.game.shadowCache.stats.mode.toUpperCase()}` : ''}`;
   }
 
   speedLabel() { return `3 · SPEED: ×${this.speed}  (◄ ►)`; }

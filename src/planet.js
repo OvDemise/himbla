@@ -595,6 +595,8 @@ diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.93, 0.9, 0.86), rimChip * rimCor
     im.count = hull.count = n;
     im.castShadow = true;
     im.frustumCulled = hull.frustumCulled = false;
+    im.updateMatrix(); hull.updateMatrix();
+    im.matrixAutoUpdate = hull.matrixAutoUpdate = false; // (never moved: the shadow cache can take them at once)
     const g = new THREE.Group();
     g.add(im, hull);
     // shaped rocks: ramps, arches, hoodoos, mesas, wave walls (rocks.js)

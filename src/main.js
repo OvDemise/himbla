@@ -50,6 +50,7 @@ import { MainMenu } from './menu.js'; // main menu
 import { WEAPONS } from './weapons.js';
 import { clamp, pick, mulberry32 } from './rng.js';
 import { inkMat } from './toon.js';
+import { ShadowCache } from './shadowcache.js';
 import { SUN, dirFromAngles, darkness, arcDist, tangent, upAt, greatCircle } from './geo.js';
 
 // version from package.json (injected by vite.config.js), shown bottom right on the title and pause screens
@@ -191,6 +192,8 @@ class Game {
     this.sun.shadow.normalBias = 0.6;
     this.sun.shadow.radius = 2.5; // (PCF: shadow edges a touch soft, so they don't step along the terrain grid)
     this.scene.add(this.sun, this.sun.target);
+    this.shadowCache = new ShadowCache(this); // (the sun's static casters drawn once, not every refresh: shadowcache.js)
+    this.shadowCache.install();
     this.hemi = new THREE.HemisphereLight(0x9a8cff, 0x40305a, 0.85);
     this.scene.add(this.hemi);
     this.earthLight = new THREE.DirectionalLight(0x6fb8ff, 0.3);
@@ -1282,19 +1285,10 @@ class Game {
     sm.autoUpdate = false;
     sm.needsUpdate = day > 0.01 && refresh;
     if (day > 0.01 && refresh) { if (!this._shPos) this._shPos = new THREE.Vector3(); this._shPos.copy(P.pos); }
-    // The shadow box follows you, moved in whole shadow-map texels along the light's own axes (the
-    // ones the shadow camera's lookAt builds: z toward the sun, x = worldUp x z, y = z x x), so the
-    // texel grid never slides across the ground and shadows hold still as you move. (Snapping on the
-    // world axes still left sub-texel slips along the tilted light axes: a constant shimmer.)
-    const snap = 320 / 2048;
-    const p = P.pos;
-    if (!this._lx) {
-      this._lz = SUN.clone().normalize();
-      this._lx = new THREE.Vector3(0, 1, 0).cross(this._lz).normalize();
-      this._ly = this._lz.clone().cross(this._lx);
-    }
-    const lx = Math.round(p.dot(this._lx) / snap) * snap, ly = Math.round(p.dot(this._ly) / snap) * snap, lz = p.dot(this._lz);
-    _v.copy(this._lx).multiplyScalar(lx).addScaledVector(this._ly, ly).addScaledVector(this._lz, lz);
+    // The shadow box follows you, moved in whole shadow-map texels along the light's own axes so the texel
+    // grid never slides across the ground and shadows hold still as you move; it steps rather than
+    // glides, which is what lets the static casters' shadows be kept between refreshes (shadowcache.js).
+    this.shadowCache.centre(P.pos, _v);
     this.sun.target.position.copy(_v);
     this.sun.position.copy(_v).addScaledVector(SUN, 600);
     this.earthLight.target.position.copy(_v);
