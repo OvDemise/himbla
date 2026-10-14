@@ -33,7 +33,7 @@ import { Gamepad } from './gamepad.js';
 import { DILATE_RATE } from './monolith.js';
 import { Cosmetics } from './cosmetics.js';
 import { Cheats } from './cheats.js';
-import { Territory } from './territory.js';
+import { Territory, locationAnchors, holderOf } from './territory.js';
 import { Civilians } from './civilians.js';
 import { Story } from './story.js';
 import { Garage } from './vehicles.js';
@@ -50,7 +50,7 @@ import { MainMenu } from './menu.js'; // main menu
 import { WEAPONS } from './weapons.js';
 import { clamp, pick, mulberry32 } from './rng.js';
 import { inkMat } from './toon.js';
-import { SUN, dirFromAngles, darkness, arcDist, tangent, upAt } from './geo.js';
+import { SUN, dirFromAngles, darkness, arcDist, tangent, upAt, greatCircle } from './geo.js';
 
 // version from package.json (injected by vite.config.js), shown bottom right on the title and pause screens
 for (const el of document.querySelectorAll('.app-ver')) el.textContent = `v${__APP_VERSION__}`;
@@ -115,6 +115,35 @@ function scanGeo(g0) {
 }
 const _q = new THREE.Quaternion();
 
+// A pirate camp belongs on Rustmoon ground, not out in somebody else's territory. A camp that landed
+// in another faction's land (or too near its border) is moved to the closest dark-side spot that is
+// well inside Rustmoon's own, keeping its distance from every settlement and camp. The rest stay put.
+const CAMP_KEEP = 1.03, CAMP_DEPTH = 1.6; // how deep inside Rustmoon ground (rival distance / own distance) a camp can stay, and a moved one must land
+function keepCampsInRustmoonGround(locs) {
+  const anchors = locationAnchors(locs);
+  const camps = locs.filter((l) => l.camp);
+  const ok = (d, self, depth) => {
+    if (darkness(d) < 0.6) return false;
+    const h = holderOf(d, anchors);
+    if (h.faction !== 'rustmoon' || h.depth < depth) return false;
+    return !locs.some((l) => l !== self && arcDist(d, l.dir) < 900);
+  };
+  const t = new THREE.Vector3();
+  for (const c of camps) {
+    if (ok(c.dir, c, CAMP_KEEP)) continue;
+    const rr = mulberry32(31337 + camps.indexOf(c));
+    let moved = false;
+    for (let r = 60; r <= 4000 && !moved; r += 60) {
+      for (let k = 0; k < 36 && !moved; k++) {
+        const a = ((k + rr()) / 36) * Math.PI * 2;
+        tangent(t.set(Math.cos(a), 0.3, Math.sin(a)), c.dir).normalize();
+        const d = greatCircle(c.dir, t, r);
+        if (ok(d, c, CAMP_DEPTH)) { c.dir = d; moved = true; }
+      }
+    }
+  }
+}
+
 function buildLocations() {
   const locs = LOCATIONS.map((l) => ({ ...l, dir: dirFromAngles(l.theta, l.phi) }));
   // a few unmarked pirate camps scattered across the dark side
@@ -126,6 +155,7 @@ function buildLocations() {
     locs.push({ id: 'camp' + k, name: CAMP_NAMES[k], short: 'CAMP', type: 'pirate', faction: 'rustmoon', camp: true, r: 55, hostile: true, dark: true, dir: d, blurb: 'A pirate camp. Lights off, guns on.' });
     k++;
   }
+  keepCampsInRustmoonGround(locs);
   return locs;
 }
 

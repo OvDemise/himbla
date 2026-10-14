@@ -50,6 +50,35 @@ function boxDist(p, h) {
   return Math.sqrt(qx * qx + qy * qy + qz * qz);
 }
 
+// The ground each settlement claims, before any outposts: one anchor per faction location (HQs claim
+// more). Pirate camps and neutral places of interest hold no ground of their own.
+export function locationAnchors(locations) {
+  const out = [];
+  for (const l of locations) {
+    if (l.poi || l.camp || !FACTIONS[l.faction] || l.faction === 'none') continue;
+    out.push({ dir: l.dir, faction: l.faction, w: l.hq ? 1.5 : 1, loc: l });
+  }
+  return out;
+}
+
+// Who holds the ground at dir, and how safely: the ratio of the nearest rival faction's weighted
+// distance to the holder's (1 is right on a border, bigger is deeper inside).
+export function holderOf(dir, anchors) {
+  let best = null, bd = Infinity;
+  for (const a of anchors) {
+    const d = arcDist(dir, a.dir) / a.w;
+    if (d < bd) { bd = d; best = a; }
+  }
+  if (!best) return { faction: 'spacecom', depth: 1 };
+  let rival = Infinity;
+  for (const a of anchors) {
+    if (a.faction === best.faction) continue;
+    const d = arcDist(dir, a.dir) / a.w;
+    if (d < rival) rival = d;
+  }
+  return { faction: best.faction, depth: rival / Math.max(bd, 1e-6) };
+}
+
 const hex = (f) => new THREE.Color(FACTIONS[f] ? FACTIONS[f].color : '#c9c3d9').getHex();
 
 export class Territory {
@@ -76,12 +105,7 @@ export class Territory {
   }
 
   locAnchors() {
-    const out = [];
-    for (const l of this.game.locations) {
-      if (l.poi || l.camp || !FACTIONS[l.faction] || l.faction === 'none') continue;
-      out.push({ dir: l.dir, faction: l.faction, w: l.hq ? 1.5 : 1, loc: l });
-    }
-    return out;
+    return locationAnchors(this.game.locations);
   }
 
   // A finale moved the borders (main.js applyWorldLive): re-deal the outposts exactly as a fresh
