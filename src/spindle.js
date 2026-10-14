@@ -461,6 +461,9 @@ export class Spindle {
   recover() {
     const g = this.game;
     this.clearHazards(); // (the mothership's beams hang frozen over the rock while it runs)
+    // hide the mothership (its eyes ride on it) and the drones too: they would hang frozen in frame
+    this.recHidden = [this.ship.root, ...this.drones.map((d) => d.model.root)].filter((o) => o.visible);
+    for (const o of this.recHidden) o.visible = false;
     this.rec = new Medevac(g, this);
     g.state = 'cutscene';
   }
@@ -507,6 +510,7 @@ export class Spindle {
     const r = this.rec;
     this.rec = null;
     r.dispose();
+    for (const o of this.recHidden || []) o.visible = true; // (the Spindle carries on)
     const bars = this.game.recall.bars;
     bars.classList.add('hidden');
     if (r.dawn) r.dawn.remove();
