@@ -27,27 +27,24 @@ export class HUD {
     this.buildCracks();
   }
 
-  // Cracked visor: glass cracks spread over the screen (behind the rest of the HUD) as hull drops. Five
-  // impact points, each a star of jagged rays with a few branches; an impact wakes up at its hull
-  // level and its rays then grow out over the next 10% or so, so the damage creeps in.
+  // Cracked visor: glass cracks spread over the screen (in front of the rest of the HUD) as hull drops.
+  // Five impact points, each a star of jagged rays with a few branches; an impact wakes up at its hull
+  // level and its rays then grow out over the next 10% or so, so the damage creeps in. The geometry is
+  // built once; the cracks are painted onto one canvas, and only repainted when the hull moves by a
+  // whole percent (a canvas the browser just composites costs nothing per frame, unlike a few hundred
+  // live SVG paths under a CSS filter, which it redrew over the whole game every frame).
   buildCracks() {
-    const NS = 'http://www.w3.org/2000/svg';
-    const svg = document.createElementNS(NS, 'svg');
-    svg.id = 'cracks';
-    svg.setAttribute('viewBox', '0 0 160 90');
-    svg.setAttribute('preserveAspectRatio', 'xMidYMid slice');
+    const W = 1280, H = 720, K = W / 160; // (the canvas is 16:9 and cover-fitted to the screen; points are in a 160 x 90 box)
+    const cv = document.createElement('canvas');
+    cv.id = 'cracks';
+    cv.width = W; cv.height = H;
     const rnd = mulberry32(7731);
     const IMPACTS = [[128, 22, 0.72], [24, 70, 0.58], [100, 78, 0.44], [34, 20, 0.3], [80, 46, 0.16]]; // x, y, hull fraction it starts at
     this.cracks = [];
-    const mk = (d, w, thr) => {
-      const p = document.createElementNS(NS, 'path');
-      p.setAttribute('d', d);
-      p.setAttribute('pathLength', '1');
-      p.setAttribute('stroke-width', w);
-      p.setAttribute('stroke-dasharray', '1');
-      p.setAttribute('stroke-dashoffset', '1');
-      svg.appendChild(p);
-      this.cracks.push({ p, thr, last: 1 });
+    const mk = (pts, w, thr) => {
+      const cum = [0];
+      for (let i = 1; i < pts.length; i++) cum.push(cum[i - 1] + Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]));
+      this.cracks.push({ pts, cum, total: cum[cum.length - 1], w, thr });
     };
     // a jagged line from (x, y) heading `a`, `n` segments long; returns its points
     const walk = (x, y, a, n, seg) => {
@@ -60,7 +57,6 @@ export class HUD {
       }
       return pts;
     };
-    const path = (pts) => 'M' + pts.map((q) => q[0].toFixed(1) + ' ' + q[1].toFixed(1)).join('L');
     for (const [cx, cy, thr] of IMPACTS) {
       const rays = 6 + Math.floor(rnd() * 3);
       const a0 = rnd() * Math.PI * 2;
@@ -68,14 +64,14 @@ export class HUD {
         const a = a0 + (r / rays) * Math.PI * 2 + (rnd() - 0.5) * 0.5;
         const pts = walk(cx, cy, a, 5 + Math.floor(rnd() * 4), 5 + rnd() * 3);
         const t = thr - rnd() * 0.05; // (rays of one impact don't all start together)
-        mk(path(pts), 0.3, t);
+        mk(pts, 0.3, t);
         // a branch or two off the middle of the ray
         for (let b = 0; b < 2; b++) {
           if (rnd() < 0.35) continue;
           const i = 1 + Math.floor(rnd() * (pts.length - 2));
           const from = pts[i];
           const ba = a + (rnd() < 0.5 ? -1 : 1) * (0.5 + rnd() * 0.6);
-          mk(path(walk(from[0], from[1], ba, 2 + Math.floor(rnd() * 3), 3 + rnd() * 2)), 0.17, t - 0.03);
+          mk(walk(from[0], from[1], ba, 2 + Math.floor(rnd() * 3), 3 + rnd() * 2), 0.17, t - 0.03);
         }
       }
       // a few short rings of hairline cracks round the impact point
@@ -88,28 +84,55 @@ export class HUD {
           const rr = rad * (0.85 + rnd() * 0.3);
           pts.push([cx + Math.cos(a) * rr, cy + Math.sin(a) * rr]);
         }
-        mk(path(pts), 0.14, thr - 0.04 - k * 0.03);
+        mk(pts, 0.14, thr - 0.04 - k * 0.03);
       }
     }
-    $('hud').prepend(svg);
-    this.crackEl = svg;
+    this.crackCtx = cv.getContext('2d');
+    this.crackK = K;
+    cv.style.display = 'none';
+    $('hud').appendChild(cv);
+    this.crackEl = cv;
     this.crackKey = -1;
+  }
+
+  // paint the cracks for a hull fraction (0-1): each crack grows from nothing to full length over the 10% of hull after its threshold
+  paintCracks(frac) {
+    const ctx = this.crackCtx, K = this.crackK;
+    ctx.clearRect(0, 0, 1280, 720);
+    ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    const strokes = [];
+    for (const c of this.cracks) {
+      const p = Math.max(0, Math.min(1, (c.thr - frac) / 0.1));
+      if (p > 0) strokes.push([c, p * c.total]);
+    }
+    const trace = (c, len) => {
+      ctx.beginPath();
+      ctx.moveTo(c.pts[0][0] * K, c.pts[0][1] * K);
+      for (let i = 1; i < c.pts.length; i++) {
+        if (c.cum[i] <= len) { ctx.lineTo(c.pts[i][0] * K, c.pts[i][1] * K); continue; }
+        const f = (len - c.cum[i - 1]) / (c.cum[i] - c.cum[i - 1]); // (the segment the crack has reached: partway along it)
+        ctx.lineTo((c.pts[i - 1][0] + (c.pts[i][0] - c.pts[i - 1][0]) * f) * K, (c.pts[i - 1][1] + (c.pts[i][1] - c.pts[i - 1][1]) * f) * K);
+        break;
+      }
+    };
+    // a dark under-stroke for body, then the bright glass line on top (instead of a blurred shadow)
+    ctx.strokeStyle = 'rgba(5, 3, 12, 0.7)';
+    for (const [c, len] of strokes) { ctx.lineWidth = c.w * K + 2; trace(c, len); ctx.stroke(); }
+    ctx.strokeStyle = '#e8f4ff';
+    for (const [c, len] of strokes) { ctx.lineWidth = c.w * K; trace(c, len); ctx.stroke(); }
+    return strokes.length > 0;
   }
 
   // hull fraction 0-1
   updateCracks(frac) {
     const off = this.game.cheats && !this.game.cheats.crackedVisor; // (dev menu: DISPLAY & DEBUG)
-    const key = off ? -2 : Math.round(frac * 400);
+    const key = off ? -2 : Math.round(frac * 100); // (repainted at most once per percent of hull)
     if (key === this.crackKey) return;
     this.crackKey = key;
-    if (off) { this.crackEl.style.opacity = '0'; return; }
-    let any = false;
-    for (const c of this.cracks) {
-      const p = Math.max(0, Math.min(1, (c.thr - frac) / 0.1));
-      if (p !== c.last) { c.p.setAttribute('stroke-dashoffset', String(1 - p)); c.last = p; }
-      if (p > 0) any = true;
-    }
-    this.crackEl.style.opacity = any ? String(0.6 + 0.4 * (1 - frac)) : '0';
+    if (off) { this.crackEl.style.display = 'none'; return; }
+    const any = this.paintCracks(frac);
+    this.crackEl.style.display = any ? '' : 'none'; // (nothing to composite while the hull is healthy)
+    this.crackEl.style.opacity = String(0.6 + 0.4 * (1 - frac));
   }
 
   show(id, on = true) { $(id).classList.toggle('hidden', !on); }

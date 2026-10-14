@@ -39,9 +39,8 @@ button { font-family: var(--comic); }
 }
 
 #hud { position: fixed; inset: 0; pointer-events: none; user-select: none; }
-/* the cracked visor (hud.js buildCracks): glass cracks that spread as hull drops, behind the rest of the HUD (z-index: -1 inside #hud's own stacking context) */
-#cracks { position: absolute; inset: 0; width: 100%; height: 100%; z-index: -1; pointer-events: none; opacity: 0; filter: drop-shadow(0 0 1.5px rgba(5, 3, 12, 0.9)); }
-#cracks path { fill: none; stroke: #e8f4ff; stroke-linecap: round; stroke-linejoin: round; }
+/* the cracked visor (hud.js buildCracks): one canvas of glass cracks that spread as hull drops, in front of the rest of the HUD (the HUD's own z-indexes top out at 30) */
+#cracks { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; z-index: 40; pointer-events: none; }
 
 /* ---------- top-left ---------- */
 #topleft { position: absolute; top: 16px; left: 16px; display: flex; flex-direction: column; gap: 8px; align-items: flex-start; max-width: 340px; }
