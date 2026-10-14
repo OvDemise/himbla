@@ -42,6 +42,12 @@ const JOIN = 18; // junction connectors join the ring this far along it either s
 const JOIN_OUT = 20; // ...and leave the road lanes this far out from the ring
 const GATE_SEP = 80; // minimum ring distance between two junctions
 const FILLET = 16; // drawn flare at each junction
+// Roads that were cut, and roads that end in a T on another road instead (buildSpur): the ILMB's
+// three roads east to Meridian, south-east to Tranquility and west to Aldrin became one road that
+// meets the Meridian-Tranquility road side-on, and traffic splits there.
+const CUT_ROADS = [['ilmb', 'aldrin'], ['ilmb', 'meridian'], ['ilmb', 'tranq']];
+const TEES = [{ from: 'ilmb', on: ['meridian', 'tranq'] }];
+const T_ARM = 24; // metres from a T's centre where the lanes stop and the turning connectors take over
 const STOP_IN = 50; // the stop is at least this far along its stretch of ring (room for a land-train)
 
 function part(geo, mat, x = 0, y = 0, z = 0, outline = 0.05) {
@@ -599,6 +605,7 @@ export class Traffic {
       const detour = safe.some((x) => x !== a && x !== n1.b && has(a, x) && has(x, n1.b) && dist(a, x) + dist(x, n1.b) < 1.3 * n1.d);
       if (!detour) pairs.add(key(a, n1.b));
     }
+    for (const [a, b] of CUT_ROADS) if (this.L[a] && this.L[b]) pairs.delete(key(this.L[a], this.L[b]));
     this.roadGeo = { pos: [], uv: [], fade: [], idx: [] };
     this.posts = [];
     this.pieces = [];
@@ -611,6 +618,12 @@ export class Traffic {
     for (const k of keys) {
       const [a, b] = k.split('|');
       this.buildRoad(this.L[a], this.L[b]);
+    }
+    for (const t of TEES) {
+      const [m, n] = t.on.map((id) => this.L[id]);
+      const main = this.roads.find((r) => (r.A === m && r.B === n) || (r.A === n && r.B === m));
+      if (this.L[t.from] && main) this.buildSpur(this.L[t.from], main);
+      else console.warn('[traffic] no road to put a T on for', t.from);
     }
     for (const [loc, R] of this.rings) this.buildRing(loc, R);
     this.pieces.forEach((pc, i) => { pc.id = i; this.finishPiece(pc); });
@@ -840,20 +853,21 @@ export class Traffic {
     return out;
   }
 
-  buildRoad(A, B) {
+  // Where a ring gate's road leaves the ring: `extra` metres further out along the gate's radial.
+  ringExit(e, extra) {
+    return this.w.toWorld(e.loc, Math.cos(e.a) * (e.rr + extra), 0, Math.sin(e.a) * (e.rr + extra)).normalize();
+  }
+
+  // The dense ground centreline of a road, a point every ~4 m: it leaves the first ring radially,
+  // meanders along a great circle (steering round every settlement ring, military zone and black lake
+  // except its own ends) and arrives along dB2 -> dB1 -> dB. B is null for a road that ends on another
+  // road (a T). Returns { g, dirs, N, side, tan, cum }.
+  roadCentreline(A, B, [dA, dA1, dA2], [dB, dB1, dB2]) {
     const P = this.P, R = P.R;
-    const RA = this.rings.get(A), RB = this.rings.get(B);
-    const eA = this.ringGate(RA, B);
-    RA.gates.push(eA);
-    const eB = this.ringGate(RB, A);
-    RB.gates.push(eB);
-    const dirAt = (e, extra) => this.w.toWorld(e.loc, Math.cos(e.a) * (e.rr + extra), 0, Math.sin(e.a) * (e.rr + extra)).normalize();
-    // leave each ring radially (straight for the first ~50 m so the junction reads as a clean T)
-    const dA = dirAt(eA, 0), dA1 = dirAt(eA, 24), dA2 = dirAt(eA, 52), dB = dirAt(eB, 0), dB1 = dirAt(eB, 24), dB2 = dirAt(eB, 52);
     // control points: then a gently meandering great circle
     const len = arcDist(dA2, dB2);
     const n = Math.max(3, Math.ceil(len / 30));
-    const rr = mulberry32(Math.floor(len * 7) + A.id.length * 131 + B.id.length * 17);
+    const rr = mulberry32(Math.floor(len * 7) + A.id.length * 131 + (B ? B.id.length * 17 : 53));
     const ph1 = rr() * 6.28, ph2 = rr() * 6.28, f1 = Math.max(1, Math.round(len / 900)), f2 = Math.max(2, Math.round(len / 330));
     const axis = new THREE.Vector3().crossVectors(dA2, dB2).normalize();
     const ctrl = [dA, dA1, dA2];
@@ -900,6 +914,13 @@ export class Traffic {
     const dirs = curve.getSpacedPoints(N).map((p) => p.normalize());
     const g = dirs.map((d) => P.ground(d, new THREE.Vector3()));
     const { side, tan, cum } = this.frames(g);
+    return { g, dirs, N, side, tan, cum };
+  }
+
+  // The visible strip, marker posts and keep-out footprints of a road centreline. `ends` lists the
+  // towns it starts / ends at ([loc, atStart]): their pads and shelters stay off the first stretch out.
+  layRoad({ g, dirs, N, side, tan, cum }, ends) {
+    const P = this.P;
     this.mapLines.push(this.thin(g, 5));
     // the strip stops just short of each ring's centreline (the ring strip covers the join)
     let i0 = 0, i1 = N;
@@ -917,12 +938,24 @@ export class Traffic {
       this.posts.push({ pos: p, q: frameQuat(dirs[i], tan[i], new THREE.Quaternion()) });
     }
     // pads and shelters stay off the first stretch out of each town
-    for (const [loc, from] of [[A, true], [B, false]]) {
+    for (const [loc, from] of ends) {
       for (let k = 0; k <= N && (from ? cum[k] : cum[N] - cum[N - k]) < 90; k += 2) {
         const p = this.local(loc, g[from ? k : N - k], _a);
         loc.stopKeep.push({ x: p.x, z: p.z, r: 6 });
       }
     }
+  }
+
+  buildRoad(A, B) {
+    const RA = this.rings.get(A), RB = this.rings.get(B);
+    const eA = this.ringGate(RA, B);
+    RA.gates.push(eA);
+    const eB = this.ringGate(RB, A);
+    RB.gates.push(eB);
+    const dA = this.ringExit(eA, 0), dA1 = this.ringExit(eA, 24), dA2 = this.ringExit(eA, 52), dB = this.ringExit(eB, 0), dB1 = this.ringExit(eB, 24), dB2 = this.ringExit(eB, 52);
+    const line = this.roadCentreline(A, B, [dA, dA1, dA2], [dB, dB1, dB2]);
+    this.layRoad(line, [[A, true], [B, false]]);
+    const { g, N, side, cum } = line;
     // ---- lanes: right-hand traffic; the last ~20 m at each end belong to the ring junctions ----
     const step = cum[N] / N;
     const K = Math.max(2, Math.round(JOIN_OUT / step));
@@ -944,12 +977,102 @@ export class Traffic {
     eA.gate = gA; eB.gate = gB;
     road.lanes = [pAB, pBA];
     road.gates = [gA, gB];
+    road.geo = { ...line, step, K, ab, ba, pAB, pBA, gA, gB };
     for (const gt of [gA, gB]) {
       if (!this.towns.has(gt.loc)) this.towns.set(gt.loc, []);
       this.towns.get(gt.loc).push(gt);
       this.gates.push(gt);
     }
     this.roads.push(road);
+  }
+
+  // A road from town A that ends in a T on `main`, another road's lane pair. It meets it at the point
+  // of `main` nearest the town, side-on. The main road's two lane pieces are cut in two there (the
+  // far halves keep the ring gates), and short connectors carry the turns: each main lane goes
+  // straight on or turns off down the spur, and the spur's lane turns either way onto the main road.
+  // Routing is by piece links, so traffic simply splits at the T.
+  buildSpur(A, main) {
+    const R = this.P.R, G = main.geo, N0 = G.N;
+    if (!this.rings.has(A)) this.rings.set(A, this.ringProfile(A));
+    const RA = this.rings.get(A);
+    // where it meets the road: nearest to the town, well clear of both ends
+    _b.copy(A.dir).multiplyScalar(R);
+    let jx = -1, bd = Infinity;
+    for (let i = 0; i <= N0; i++) {
+      if (G.cum[i] < 200 || G.cum[N0] - G.cum[i] < 200) continue;
+      const d = G.g[i].distanceToSquared(_b);
+      if (d < bd) { bd = d; jx = i; }
+    }
+    if (jx < 0) { console.warn('[traffic] no room for a T on the road to', A.id); return; }
+    const X = G.g[jx];
+    // it arrives from the town's side of the road
+    const perp = G.side[jx].clone();
+    if (perp.dot(_a.copy(_b).sub(X)) < 0) perp.negate();
+    const at = (d) => X.clone().addScaledVector(perp, d).normalize();
+    const dirX = X.clone().normalize();
+    const eA = this.ringGate(RA, { id: 'T', dir: dirX });
+    RA.gates.push(eA);
+    const line = this.roadCentreline(A, null, [this.ringExit(eA, 0), this.ringExit(eA, 24), this.ringExit(eA, 52)], [dirX, at(24), at(52)]);
+    this.layRoad(line, [[A, true]]);
+    const { g, N, side, cum } = line;
+    const step = cum[N] / N;
+    const K = Math.max(2, Math.round(JOIN_OUT / step));
+    const Ke = Math.max(3, Math.ceil(T_ARM / step)); // (the lanes stop this far short of the T)
+    const ab = g.map((p, i) => p.clone().addScaledVector(side[i], LANE)); // town -> T
+    const ba = []; // T -> town
+    for (let i = N; i >= 0; i--) ba.push(g[i].clone().addScaledVector(side[i], -LANE));
+    const dir = (p, q) => q.clone().sub(p).normalize();
+    const road = { A, B: main.A, eA, eB: null, len: cum[N] };
+    const gA = { loc: A, other: main.A, e: eA, road, cl: g.slice(0, K * 2 + 2) };
+    const pIn = this.newPiece('e', ab.slice(K, N + 1 - Ke), { from: gA, to: null, fromLoc: A, toLoc: A, road });
+    const pOut = this.newPiece('e', ba.slice(Ke, N + 1 - K), { from: null, to: gA, fromLoc: A, toLoc: A, road });
+    gA.out = pIn; gA.in = pOut;
+    gA.inEnd = ba[N - K]; gA.inDir = dir(ba[N - K - 1], ba[N - K]);
+    gA.outStart = ab[K]; gA.outDir = dir(ab[K], ab[K + 1]);
+    eA.gate = gA;
+    road.lanes = [pIn, pOut];
+    road.gates = [gA];
+    if (!this.towns.has(A)) this.towns.set(A, []);
+    this.towns.get(A).push(gA);
+    this.gates.push(gA);
+    this.roads.push(road);
+
+    // ---- the main road, cut at the T (m steps either side of the centre) ----
+    const m = Math.max(3, Math.ceil(T_ARM / G.step));
+    const kb = N0 - jx - m, ka = N0 - jx + m; // (indices into ba, which runs the other way)
+    const opts = (p) => ({ from: p.from, to: p.to, fromLoc: p.fromLoc, toLoc: p.toLoc, road: main });
+    const pAB2 = this.newPiece('e', G.ab.slice(jx + m, N0 + 1 - G.K), opts(G.pAB));
+    const pBA2 = this.newPiece('e', G.ba.slice(ka, N0 + 1 - G.K), opts(G.pBA));
+    G.pAB.raw = G.ab.slice(G.K, jx - m + 1);
+    G.pBA.raw = G.ba.slice(G.K, kb + 1);
+    G.gA.in = pBA2; G.gB.in = pAB2; // (the ends that arrive at the rings are the far halves now)
+    main.lanes = [G.pAB, pAB2, G.pBA, pBA2];
+    // straight through, and the four turns
+    const thAB = this.newPiece('j', G.ab.slice(jx - m, jx + m + 1), { vlim: 11 });
+    const thBA = this.newPiece('j', G.ba.slice(kb, ka + 1), { vlim: 11 });
+    const ein = ab[N - Ke], din = dir(ab[N - Ke - 1], ab[N - Ke]); // spur lane arriving
+    const eout = ba[Ke], dout = dir(ba[Ke], ba[Ke + 1]); // spur lane leaving
+    const turn = (p0, t0, p1, t1) => this.newPiece('j', this.bez(p0, t0, p1, t1), { vlim: 7 });
+    const abEnd = G.ab[jx - m], baEnd = G.ba[kb], abStart = G.ab[jx + m], baStart = G.ba[ka];
+    const abEndT = dir(G.ab[jx - m - 1], abEnd), baEndT = dir(G.ba[kb - 1], baEnd);
+    const abStartT = dir(abStart, G.ab[jx + m + 1]), baStartT = dir(baStart, G.ba[ka + 1]);
+    const offAB = turn(abEnd, abEndT, eout, dout), offBA = turn(baEnd, baEndT, eout, dout);
+    const onAB = turn(ein, din, abStart, abStartT), onBA = turn(ein, din, baStart, baStartT);
+    G.pAB.next = [thAB, offAB]; G.pBA.next = [thBA, offBA];
+    thAB.next = [pAB2]; thBA.next = [pBA2];
+    offAB.next = [pOut]; offBA.next = [pOut];
+    pIn.next = [onAB, onBA];
+    onAB.next = [pAB2]; onBA.next = [pBA2];
+    // the drawn flares where the spur meets the road, either side
+    const cl = g.slice(N - K * 2 - 1).reverse();
+    let k = 1;
+    while (k < cl.length - 1 && cl[k].distanceTo(cl[0]) < FILLET) k++;
+    const q = cl[k], tIn = cl[k - 1].clone().sub(cl[k]).normalize();
+    const mf = Math.max(2, Math.round(FILLET / G.step));
+    for (const d of [1, -1]) {
+      const j = jx + d * mf;
+      this.drawLine(this.bez(q, tIn, G.g[j], G.tan[j].clone().multiplyScalar(d), 10, 0.5), 0, 0.85, (t) => smooth(t / 0.3) * smooth((1 - t) / 0.3));
+    }
   }
 
   // The ring itself: one closed strip, a flared join for each road, lanes and junction connectors.
@@ -1175,7 +1298,7 @@ export class Traffic {
   // Put a land-train, two hover-cars and a buggy on each road, each with somewhere to go.
   populateRoad(road, k) {
     const add = (v) => {
-      const pc = road.lanes[this.r() < 0.5 ? 0 : 1];
+      const pc = road.lanes[Math.floor(this.r() * road.lanes.length)];
       Object.assign(v, {
         piece: null, s: pc.len * (0.1 + this.r() * 0.8), plan: [], hist: [], dest: null, cur: 0, state: 'drive', timer: 0,
         pos: new THREE.Vector3(), prevPos: new THREE.Vector3(), vel: new THREE.Vector3(), fwd: new THREE.Vector3(),
