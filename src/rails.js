@@ -101,7 +101,10 @@ export class Grinder {
       const rim = !!n.r.rimOf;
       const lined = hsp > 4 && Math.abs(along) / hsp > (rim ? 0.5 : 0.75);
       const tip = !n.r.loop && !rim && (n.s < 6 || n.s > n.r.len - 6);
-      const reach = tip && lined ? 4 : lined ? (rim ? 3.4 : 2.8) : 1.8;
+      // crossing a crest at an angle only grabs you if you're dropping onto it; skating or flying
+      // over it doesn't (heading along it, a tip, or hitting it side-on at speed still do)
+      const dropping = b.vel.dot(_u) < -3;
+      const reach = tip && lined ? 4 : lined ? (rim ? 3.4 : 2.8) : tip ? 1.8 : 1.5;
       // a crater rim only takes you if you're heading along it (crossing one square-on mustn't snag you)
       if (rim && !lined) return false;
       const above = _b.subVectors(b.pos, n.p).dot(_u);
@@ -111,6 +114,7 @@ export class Grinder {
       const toward = -_b.dot(b.vel) + above * b.vel.dot(_u); // (closing in on the crest line, across the ground)
       const sideOn = !rim && hsp > 7 && above > -3.6 && above < 0 && flat < 2.5 && toward > 2 * Math.max(flat, 0.5);
       if (n.d > reach && !sideOn) return false;
+      if (!lined && !tip && !sideOn && !dropping) return false;
       if (above < (sideOn ? -3.6 : -1.6) || above > (rim ? 3 : 2.2) || b.vel.dot(_u) > 6 + 0.25 * hsp) return false; // (rising a little is just the slope you're on, at speed)
       // which way: at a tip, always inward (into the rail); elsewhere, the way you're moving
       let dir;
@@ -132,6 +136,10 @@ export class Grinder {
     A.s += A.dir * A.speed * dt;
     if (r.loop) A.s = ((A.s % r.len) + r.len) % r.len;
     A.t += dt;
+    // the player's physics (where the tank refills) is skipped while grinding, so recharge here
+    b.thrusting = false;
+    b.energy = Math.min(b.maxEnergy, b.energy + P.params.energyRegen * dt);
+    if (b.jetLocked && b.energy >= b.maxEnergy * 0.25) b.jetLocked = false;
     railAt(r, A.s, _p, _t);
     _u.copy(_p).normalize();
     const left = r.loop ? Infinity : A.dir > 0 ? r.len - A.s : A.s;

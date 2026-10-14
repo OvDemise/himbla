@@ -170,20 +170,29 @@ export class Cosmetics {
     this.outfit = 'courier';
     this.skates = 'stock';
     this.laser = 0;
+    this.jarShown = true; // wear the containment jar on your pack (if you own one)
     this.extraMeshes = [];
     try {
       const d = JSON.parse(localStorage.getItem(KEY) || 'null');
-      if (d) Object.assign(this, { outfit: d.outfit || 'courier', skates: d.skates || 'stock', laser: d.laser || 0 });
+      if (d) Object.assign(this, { outfit: d.outfit || 'courier', skates: d.skates || 'stock', laser: d.laser || 0, jarShown: d.jarShown !== false });
     } catch { /* default look */ }
   }
 
   save() {
-    try { localStorage.setItem(KEY, JSON.stringify({ outfit: this.outfit, skates: this.skates, laser: this.laser })); } catch { /* unavailable */ }
+    try { localStorage.setItem(KEY, JSON.stringify({ outfit: this.outfit, skates: this.skates, laser: this.laser, jarShown: this.jarShown })); } catch { /* unavailable */ }
   }
 
   owned(kind, id) {
     if (kind === 'outfit') return id === 'courier' || (this.game.upgrades['outfit_' + id] || 0) > 0;
     return id === 'stock' || (this.game.upgrades['skates_' + id] || 0) > 0;
+  }
+
+  // the jar on your pack: only there to show once Dr. Zbornak has sold you one
+  get hasJar() { return !!(this.game.alchemy && this.game.alchemy.owned); }
+  setJarShown(on) {
+    this.jarShown = on;
+    this.save();
+    if (this.game.alchemy) this.game.alchemy.refreshJarMesh();
   }
 
   get laserColor() { return LASERS[this.laser].color; }

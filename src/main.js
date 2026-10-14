@@ -44,6 +44,7 @@ import { Recall } from './recall.js';
 import { Secrets } from './secrets.js';
 import { Settings } from './settings.js'; // settings
 import { Casino } from './casino.js'; // casino
+import { HALL as CASINO_HALL } from './casinoWorld.js'; // casino
 import { SaveSlots } from './saves.js'; // save slots
 import { MainMenu } from './menu.js'; // main menu
 import { WEAPONS } from './weapons.js';
@@ -1066,6 +1067,7 @@ class Game {
     this.time += dt;
 
     const playing = this.state === 'play';
+    if (!playing) { if (this.garage && this.garage.radial) this.garage.closeRadial(false); this.vHold = 0; } // (the vehicle wheel, or a V / Y tap still in flight, doesn't outlive the play screen: a pause, the map, a dialog, a death)
     if (playing && !this.world.mergeDone) this.world.finishMerges(); // (static geometry: see world.mergeLocation)
     if (playing) this.updatePlay(dt);
     else if (this.state === 'derby') this.race.watch(dt); // watching your chimera race: the race drives the camera
@@ -1145,6 +1147,25 @@ class Game {
       if (arcDist(P.pos, l.dir) < l.r * 1.5) return l.id === 'antimatter' || l.id === 'monolith' ? 'lab' : l.id;
     }
     return darkness(P.up) > 0.6 ? 'dark' : 'free';
+  }
+
+  // 'casino' or 'lab' while you're standing inside the Lucky Crater Casino's hall or Dr. Zbornak's lab,
+  // else null. Indoors the HUD steps aside (casino only) and a wipeout or crash doesn't ragdoll you.
+  updateIndoors() {
+    const p = this.player.pos, w = this.world;
+    let where = null;
+    const cas = w.casino;
+    if (cas && cas.loc.active) {
+      const l = cas.toLocal(p, _v);
+      if (l.y > -3 && l.y < CASINO_HALL.H && Math.abs(l.x) < CASINO_HALL.W && l.z > CASINO_HALL.BACK && l.z < CASINO_HALL.FRONT) where = 'casino';
+    }
+    const lab = w.lab;
+    if (!where && lab && lab.loc.active) {
+      const l = lab.loc.group.worldToLocal(_v.copy(p));
+      if (l.y > -3 && l.y < lab.half.h && Math.abs(l.x) < lab.half.w && Math.abs(l.z) < lab.half.d) where = 'lab';
+    }
+    this.indoors = where;
+    document.body.classList.toggle('in-casino', where === 'casino'); // (style.css hides the HUD)
   }
 
   // Sun, sky fill and the helmet lamp all depend on where you stand on the sphere.
@@ -1238,6 +1259,7 @@ class Game {
     this.secrets.preUpdate(dt);
     if (this.spindle.active) { this.updateAway(dt, c); return; }
     this.cheats.tick();
+    this.updateIndoors();
     P.update(dt, this.input, c);
     this.secrets.update(dt);
     this.missions.update(dt);
