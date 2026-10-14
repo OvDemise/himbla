@@ -55,6 +55,8 @@ export class Grinder {
     const g = this.game, b = P.body;
     if (this.cool > 0) this.cool -= dt;
     if ((this.rimT -= dt) <= 0) { this.rimT = 0.5; g.planet.rimRailsNear(b.pos); }
+    // a ragdoll is limp: it never grabs a rail (and lets go of one it was on)
+    if (P.rag) { this.active = null; return false; }
     if (!this.active) {
       if (this.cool > 0 || P.seat || P.vehicle || P.dead) return false;
       // look where you are and where you'll be in a moment, so a fast approach can't tunnel past
