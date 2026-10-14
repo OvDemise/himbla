@@ -5,6 +5,7 @@ contains `[release]` (see the README's Download section). Newest first.
 
 ## Unreleased
 
+- **Minimap:** the terminator (violet dashes) and SAT-7's orbit (green dashes) now show on the minimap too, in the same colours as the globe map, so you can see where the dark side starts and where the satellite will pass. Like the roads they stay however far out the minimap looks.
 - **Pirate camps:** every settlement already sat inside its own faction's territory, but three of the five hidden pirate camps were out in other factions' ground or right on a border. Those camps now move to the nearest dark-side spot well inside Rustmoon's land; camps that were already inside stay where they were.
 - **Globe map:** territory borders are now sharp, smooth lines. Each pixel of explored ground is coloured by the faction that actually holds it (no mixed colours at the edge, and no more steps along the ~180 m exploration cells), so a border stays crisp however far you zoom in.
 - **Vehicle dust trails:** above about 18 m/s the vehicles you drive kick up the same pale dust as the skate. On wheeled vehicles the rear wheels throw bigger and thicker clouds the faster you go (puffs grow from 0.5 to 1.2 and the amount up to four times at 78 m/s) and the front wheels kick up a steady 0.7 puff. The Phase Skimmer's rear dust comes from just behind the ends of its engine plumes. Nothing while airborne.

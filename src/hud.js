@@ -2,13 +2,14 @@ import * as THREE from 'three';
 import { glyphHtml } from './glyphs.js';
 import { NAME_TAGS } from './toon.js';
 import { FACTIONS } from './locations.js';
-import { arcDist, darkness, upAt } from './geo.js';
+import { arcDist, darkness, upAt, E1, E2 } from './geo.js';
 import { WEAPONS } from './weapons.js';
-import { EVENT_RANGE } from './config.js';
+import { EVENT_RANGE, PLANET } from './config.js';
 import { pixelFont } from './fonts.js';
 import { mulberry32 } from './rng.js';
 
 const $ = (id) => document.getElementById(id);
+const MM_CURVE_N = 720; // samples round each great circle drawn on the minimap (~30 m apart)
 const MM_RANGE = 700; // metres from the centre to the edge of the minimap when standing still
 
 export class HUD {
@@ -591,6 +592,14 @@ export class HUD {
       c.stroke();
       c.restore();
     }
+    // the terminator and SAT-7's orbit, in the globe map's colours, under the markers. Like the roads
+    // they stay however far out it looks
+    const cv = this.mmCurves();
+    c.save();
+    c.lineJoin = c.lineCap = 'round';
+    this.mmLine(c, proj, up, range, cv.term, [8, 5], '#180c33', '#a070ff');
+    if (g.secrets && g.secrets.sat) this.mmLine(c, proj, up, range, this.mmOrbit(g.secrets), [6, 5], '#120a1e', '#00ffa8');
+    c.restore();
     c.globalAlpha = fade;
     c.strokeStyle = 'rgba(255,255,255,0.12)';
     c.lineWidth = 1;
@@ -681,6 +690,45 @@ export class HUD {
     }
     c.fillStyle = '#ff4f2e'; c.strokeStyle = '#fff'; c.lineWidth = 2;
     c.beginPath(); c.moveTo(W / 2, H / 2 - 9); c.lineTo(W / 2 + 6, H / 2 + 7); c.lineTo(W / 2, H / 2 + 3); c.lineTo(W / 2 - 6, H / 2 + 7); c.closePath(); c.fill(); c.stroke();
+  }
+
+  // The two fixed great circles drawn on the minimap, sampled once as unit directions: the terminator
+  // (the edge of the dark side) and, once there is one, SAT-7's orbit.
+  mmCurves() {
+    if (this.mmCv) return this.mmCv;
+    const term = [], N = MM_CURVE_N;
+    for (let i = 0; i <= N; i++) {
+      const t = (i / N) * Math.PI * 2;
+      term.push(new THREE.Vector3().copy(E1).multiplyScalar(Math.cos(t)).addScaledVector(E2, Math.sin(t)));
+    }
+    return (this.mmCv = { term });
+  }
+
+  mmOrbit(S) {
+    if (this.mmOrbitOf === S) return this.mmOrb;
+    const pts = [];
+    for (let i = 0; i <= MM_CURVE_N; i++) pts.push(S.orbitPoint((i / MM_CURVE_N) * Math.PI * 2, new THREE.Vector3()).normalize());
+    this.mmOrbitOf = S;
+    return (this.mmOrb = pts);
+  }
+
+  // Stroke the stretches of a sampled curve that lie within the minimap's reach: a dark casing under
+  // a dashed coloured line, so it reads on lit ground and in the dark alike.
+  mmLine(c, proj, up, range, pts, dash, casing, color) {
+    const cosLim = Math.cos((range * 1.8) / PLANET.radius);
+    const path = new Path2D();
+    let pen = false, any = false;
+    for (const p of pts) {
+      if (p.dot(up) < cosLim) { pen = false; continue; }
+      const [x, y] = proj(p);
+      if (pen) path.lineTo(x, y); else path.moveTo(x, y);
+      pen = any = true;
+    }
+    if (!any) return;
+    c.setLineDash(dash);
+    c.strokeStyle = casing; c.lineWidth = 4.5; c.stroke(path);
+    c.strokeStyle = color; c.lineWidth = 2; c.stroke(path);
+    c.setLineDash([]);
   }
 
   updateArrow() {
