@@ -144,6 +144,7 @@ class Game {
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     this.renderer.setSize(window.innerWidth, window.innerHeight);
     this.renderer.shadowMap.enabled = true;
+    this._frameMs = 16; // (smoothed frame time: updateLighting throttles the shadow map while frames are quick)
     this.renderer.shadowMap.type = THREE.PCFShadowMap;
     document.getElementById('game').appendChild(this.renderer.domElement);
 
@@ -1208,8 +1209,21 @@ class Game {
     this.hemi.position.copy(up);
     this.hemi.intensity = 0.06 + 0.8 * THREE.MathUtils.smoothstep(e, -0.25, 0.15);
     this.earthLight.intensity = 0.3 * THREE.MathUtils.smoothstep(up.dot(this.world.earthDir), -0.1, 0.3);
-    // shadows only matter where the sun is up
-    this.renderer.shadowMap.autoUpdate = day > 0.01;
+    // shadows only matter where the sun is up. The shadow map is the heaviest single pass (every caster
+    // within 160 m redrawn into a 2048² map), so while frames are quick (50+ fps) and you're moving
+    // slowly (standing, walking, a settlement: where the scenes are heaviest) it's refreshed every other
+    // frame: the old map stays valid (its matrix only changes with it) and a frame-old shadow is invisible
+    // at that speed. Fast skating, a teleport or a slow frame rate redraw it every frame.
+    const sm = this.renderer.shadowMap;
+    const now = performance.now();
+    if (this._shT) this._frameMs += (Math.min(100, now - this._shT) - this._frameMs) * 0.1;
+    this._shT = now;
+    const moved = this._shPos ? P.pos.distanceTo(this._shPos) : 1e9;
+    const calm = this._frameMs < 20 && P.speed < 25 && moved < 6;
+    const refresh = !calm || (this._shFlip = !this._shFlip);
+    sm.autoUpdate = false;
+    sm.needsUpdate = day > 0.01 && refresh;
+    if (day > 0.01 && refresh) { if (!this._shPos) this._shPos = new THREE.Vector3(); this._shPos.copy(P.pos); }
     // The shadow box follows you, moved in whole shadow-map texels along the light's own axes (the
     // ones the shadow camera's lookAt builds: z toward the sun, x = worldUp x z, y = z x x), so the
     // texel grid never slides across the ground and shadows hold still as you move. (Snapping on the
