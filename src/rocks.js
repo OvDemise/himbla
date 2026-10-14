@@ -218,10 +218,11 @@ function build(kind, rr, p, q, planet, dims = null) {
         const up0 = ups[i].clone().add(ups[i + 1]).normalize();
         const sd = new THREE.Vector3().crossVectors(t, up0).normalize();
         const ay = new THREE.Vector3().crossVectors(sd, t).normalize(); // (square to the slope, upward)
-        const k = 0.3 + 0.7 * Math.min(taper(i), taper(i + 1));
-        const th = 0.35;
-        const c = a.clone().add(b2).multiplyScalar(0.5).addScaledVector(ay, -th);
-        cols.push({ type: 'box', c, ax: sd, ay, az: t, hx: w * k, hy: th, hz: sl / 2 + 0.05 });
+        // (solid right down to the ground: a thin slab let a fast rider slip under it and into the rock)
+        const k = 0.3 + 0.7 * Math.max(taper(i), taper(i + 1));
+        const depth = Math.max(a.dot(up0), b2.dot(up0)) - Math.min(a.dot(up0), b2.dot(up0)) + H + 1;
+        const c = a.clone().add(b2).multiplyScalar(0.5).addScaledVector(ay, -depth / 2);
+        cols.push({ type: 'box', c, ax: sd, ay, az: t, hx: w * 1.2 * k + SKIN, hy: depth / 2, hz: sl / 2 + 0.05 });
         continue;
       }
       const t = base[i + 1].clone().sub(base[i]), sl = t.length();
@@ -230,7 +231,7 @@ function build(kind, rr, p, q, planet, dims = null) {
       const sd = new THREE.Vector3().crossVectors(t, up).normalize();
       const hh = H;
       const c = base[i].clone().add(base[i + 1]).multiplyScalar(0.5).addScaledVector(up, hh * 0.38);
-      cols.push({ type: 'box', c, ax: sd, ay: new THREE.Vector3().crossVectors(t, sd).normalize(), az: t, hx: w * 1.05, hy: hh * 0.38 + 0.5, hz: sl / 2 + 0.05 });
+      cols.push({ type: 'box', c, ax: sd, ay: new THREE.Vector3().crossVectors(t, sd).normalize(), az: t, hx: w * 1.2 + SKIN, hy: hh * 0.38 + 0.5, hz: sl / 2 + 0.05 });
     }
     rail = { pts: railPts };
     for (const c of cols) c.rail = railPts; // (the rider on this crest doesn't collide with its own rock: rails.js)
@@ -245,6 +246,7 @@ function build(kind, rr, p, q, planet, dims = null) {
   return { mesh, cols, rail };
 }
 const _o = new THREE.Vector3();
+const SKIN = 0.2; // m: a snake rock's colliders stand this far outside its flanks (which bulge to 1.2 x its half-width and are roughened)
 
 // Shaped rocks for one terrain chunk. ok(p) says whether a spot is free (no settlement, plateau,
 // road or lake). More of them in rocky country (rock = 0..1 at the chunk centre).
