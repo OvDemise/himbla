@@ -653,6 +653,7 @@ src/
   storyAssets.js faction troops, boss war machines, mission props, founded-outpost compounds
   hometown.js    your town (Kepler finale): its plots and buildings, the Moon Council and its votes
   spindle.js     the Spindle (Meridian finale): the asteroid world, its sky, the mothership
+  medevac.js     the Spindle's K.O. cutscene: a recovery craft, two medics and a stretcher carry you off the rock
   worldstate.js  what the story finales changed for good, applied before the world is built
   kade.js        Captain Kade's gun truck: orbit driving, gatling and flak turret, Junk Mortar drop
   monolith.js    the Monolith's spells: low-G, time dilation, echo decoys

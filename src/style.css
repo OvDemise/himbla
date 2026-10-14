@@ -720,6 +720,7 @@ body:has(#title:not(.hidden)) #hud { visibility: hidden; }
 #cinebars .cb-cap { position: absolute; top: calc(11vh + 14px); left: 24px; max-width: calc(100vw - 48px); background: var(--ui-bg); color: var(--yellow); font-family: var(--comic); font-size: 12px; line-height: 1.4; padding: 8px 12px 6px; border: 2px solid var(--yellow); box-shadow: 0 0 0 2px #05030c, var(--ui-shadow); }
 #cinebars .cb-skip { position: absolute; bottom: calc(11vh + 12px); right: 24px; color: var(--ui-muted); font-family: var(--comic); font-size: 8px; opacity: 0.85; }
 #cinebars.cb-out { opacity: 0; transition: opacity 0.4s; }
+body.medevac #hud > *:not(#popups):not(#cinebars) { visibility: hidden; } /* (the Spindle med-evac cutscene: just the picture and its caption) */
 @keyframes cbin { from { transform: scaleY(0); } to { transform: scaleY(1); } }
 #jarchip .artifact-slot { color: #7dffd4; text-shadow: 0 0 8px #7dffd4; }
 /* ---- rail lance scope ---- */

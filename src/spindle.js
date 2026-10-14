@@ -14,8 +14,9 @@ import * as THREE from 'three';
 import { Kit, T, G, GLASS, BEAM } from './outpostModels.js';
 import { toon, glow, ink } from './toon.js';
 import { mulberry32 } from './rng.js';
-import { SUN, tangent, GRAV, frameQuat } from './geo.js';
+import { SUN, tangent, GRAV } from './geo.js';
 import { makeShuttle, makePlanets } from './models.js';
+import { Medevac } from './medevac.js';
 import { RC, L, CIRC, START_S, CORE_S, PAD_S, wrapW, pointAt, smooth, heightAt, meshHeightAt, buildRockArrays, ROCK_S0, ROCK_S1 } from './spindleTerrain.js';
 
 const AX = new THREE.Vector3(1, 0, 0);
@@ -43,14 +44,9 @@ export function spindleGeometry(len = 1000, rad = 120, seed = 3) {
 // ---------- the rock ----------
 // (s, w): metres along the axis, and metres round the girth (w wraps every CIRC; w = 0 is the top, +y)
 const _d = new THREE.Vector3();
-const _rh = new THREE.Vector3(-1, 0, 0); // (facing back along the rock: toward the recovery shuttle)
 function radial(p, out = new THREE.Vector3()) { out.set(0, p.y, p.z); if (out.lengthSq() < 1e-8) out.set(0, 1, 0); return out.normalize(); }
 function rad(p) { return Math.hypot(p.y, p.z); }
 
-const REC_SCALE = 0.85; // the recovery shuttle
-// the recovery transit's timeline (seconds): it lands, the ramp drops, you board, it closes and lifts off,
-// then the screen fades and you're home
-const REC = { land: 2.6, ramp: 3.0, board: 3.7, close: 5.9, lift: 6.5, fade: 8.8, end: 11 };
 const PAD_DECK = 2.4; // the launch pad stands this high on its plinth
 
 // The planet interface the physics, camera and effects use (planet.js has the Moon's). Heights are
@@ -457,37 +453,20 @@ export class Spindle {
   }
 
   // ---- recovery transit ----
-  // A K.O. on the rock: a Meridian transit shuttle drops out of the sky beside where you fell, you stagger
-  // up its ramp, and it lifts off and carries you home. You come down at the Monolith's launch complex
-  // (exit()) and the mission starts over from there (story.retrySpindle). It runs as a cutscene: the
-  // game's state is 'cutscene', this drives its own camera, and main.js calls updateRecovery every frame.
+  // A K.O. on the rock: a Meridian recovery craft drops out of the sky beside where you fell, two medics rush
+  // out with a stretcher, load you on and run back aboard, and it lifts off and carries you home (the scene is
+  // medevac.js). You come down at the Monolith's launch complex (exit()) and the mission starts over from
+  // there (story.retrySpindle). It runs as a cutscene: the game's state is 'cutscene', the scene drives its
+  // own camera, and main.js calls updateRecovery every frame.
   recover() {
-    const g = this.game, P = g.player;
-    const [s0, w] = this.world.sw(P.pos);
-    const s = Math.min(L - 80, Math.max(80, s0)); // (fell off an end: it comes down on the rock's near end)
-    const ground = (ss) => { const p0 = bandPoint(ss, w); return bandPoint(ss, w, this.world.meshLift(p0)); };
-    const stand = ground(s), land = ground(s - 15); // (the shuttle sits behind you, nose away, ramp toward you)
-    const sh = makeShuttle({ color: 0xeeecf6, stripe: 0x2ec4ff });
-    sh.root.scale.setScalar(REC_SCALE);
-    sh.setGear(0); sh.setRamp(0);
-    this.root.add(sh.root);
-    const upL = radial(land);
-    this.rec = { t: 0, sh, stand, land, up: radial(stand), upL, right: new THREE.Vector3().crossVectors(AX, upL).normalize(), landed: false, boarded: false, dawn: null };
+    const g = this.game;
+    this.clearHazards(); // (the mothership's beams hang frozen over the rock while it runs)
+    this.rec = new Medevac(g, this);
     g.state = 'cutscene';
-    const bars = g.recall.bars;
-    bars.querySelector('.cb-cap').textContent = 'MERIDIAN TRANSIT · RECOVERY IN PROGRESS…';
-    bars.classList.remove('hidden', 'cb-out');
-    g.audio.tone(70, 2.6, 'sawtooth', 0.12, 0.6);
-    this.poseRecovery(0);
   }
 
-  // the shuttle's pose: `alt` metres above its landing spot
-  poseRecovery(alt) {
-    const r = this.rec, sh = r.sh;
-    sh.root.position.copy(r.land).addScaledVector(r.upL, sh.gearH * REC_SCALE + alt);
-    frameQuat(r.upL, _rh, sh.root.quaternion);
-    r.alt = alt;
-  }
+  // the ground at (s, w) as drawn (the mesh stands a little above heightAt in hollows), `lift` metres up
+  groundAt(s, w, lift = 0) { return bandPoint(s, w, this.world.meshLift(bandPoint(s, w)) + lift); }
 
   // the roll: the sky (and the sun with it) turns round the rock's axis
   rollSky(dt) {
@@ -499,70 +478,11 @@ export class Spindle {
   updateRecovery(dt) {
     const r = this.rec;
     if (!r) return;
-    const g = this.game, P = g.player, sh = r.sh, ease = (k) => 1 - Math.pow(1 - Math.min(1, Math.max(0, k)), 3);
+    const g = this.game;
     if (g.state !== 'cutscene') { this.endRecovery(); return; } // (the game moved on under it: quit to the menu)
-    if (r.t > 1.5 && r.t < REC.fade && (g.input.pressed('Space') || g.input.pressed('Enter'))) r.t = REC.fade; // (skip to the fade)
-    r.t += dt;
-    const t = r.t;
-    // descend on retro-thrusters, touch down
-    if (t < REC.land) {
-      const alt = 220 * (1 - ease(t / REC.land));
-      this.poseRecovery(alt);
-      sh.setGear(Math.min(1, Math.max(0, 1 - (alt - 4) / 30)));
-      sh.setThrust(0.3, 1, t);
-      if (Math.random() < dt * 40) g.fx.spawn(sh.root.position.clone().addScaledVector(r.upL, -3), r.upL.clone().multiplyScalar(-18), { color: Math.random() < 0.5 ? 0xff9f1c : 0xffd23f, size: 0.6, life: 0.4, count: 2, spread: 2 });
-    } else if (t < REC.lift) {
-      this.poseRecovery(0);
-      sh.setGear(1);
-      sh.setThrust(0, Math.max(0, 1 - (t - REC.land) * 2), t);
-      if (!r.landed) {
-        r.landed = true;
-        g.fx.dust(r.land, new THREE.Vector3(), 30, r.upL);
-        g.audio.thud(30);
-        g.cam.shake = 0.5;
-        g.fx.pop('TOUCHDOWN!', r.land.clone().addScaledVector(r.upL, 7), { color: '#2ee6ff', size: 52 });
-      }
-    } else {
-      // lift off with you aboard
-      const k = t - REC.lift;
-      this.poseRecovery(0.5 * 45 * k * k);
-      sh.setGear(Math.max(0, 1 - k * 0.8));
-      sh.setThrust(Math.min(1, k * 0.6), 1, t);
-      if (Math.random() < dt * 30) g.fx.spawn(sh.root.position.clone().addScaledVector(r.upL, -3), r.upL.clone().multiplyScalar(-14), { color: 0xff9f1c, size: 0.5, life: 0.4, count: 1, spread: 1.5 });
-    }
-    // the ramp drops, you stagger up it and in, the ramp closes
-    sh.setRamp(t < REC.close ? ease((t - REC.ramp) / 0.6) : 1 - ease((t - REC.close) / 0.6));
-    if (t >= REC.board && t < REC.close) {
-      const k = Math.min(1, (t - REC.board) / (REC.close - REC.board - 0.2));
-      const head = _rh;
-      if (!r.boarded) { r.boarded = true; P.respawn(r.stand, head); } // (you, back on your feet: health and all)
-      sh.root.updateMatrixWorld(true);
-      const bottom = sh.root.localToWorld(sh.rampBottom.clone()), inside = sh.root.localToWorld(sh.inside.clone());
-      if (k < 0.45) P.body.pos.lerpVectors(r.stand, bottom, ease(k / 0.45)); else P.body.pos.lerpVectors(bottom, inside, ease((k - 0.45) / 0.55));
-      P.body.vel.set(0, 0, 0);
-      P.model.root.visible = true;
-      P.model.root.position.copy(P.body.pos);
-      P.heading.copy(head);
-      frameQuat(r.up, head, P.model.root.quaternion);
-      const sw = Math.sin(t * 9) * 0.5 * (1 - k * 0.5);
-      P.model.legL.rotation.x = sw; P.model.legR.rotation.x = -sw;
-    } else if (t >= REC.close) P.model.root.visible = false;
-    // the camera watches from beside the ramp, then follows it up
-    const cam = g.camera;
-    cam.position.copy(r.land).addScaledVector(r.right, 24).addScaledVector(AX, 15).addScaledVector(r.upL, 7);
-    cam.up.copy(r.upL);
-    cam.lookAt(t < REC.lift ? _d.copy(r.land).addScaledVector(r.upL, 2.5 + r.alt * 0.6) : sh.root.position);
-    g.cam.position.copy(cam.position);
+    r.update(dt);
     this.rollSky(dt);
-    // fade out, then home
-    if (t >= REC.fade && !r.dawn) {
-      const el = document.createElement('div');
-      el.id = 'dawn';
-      el.innerHTML = '<div class="dw-t">RECOVERED</div><div class="dw-s">BACK AT THE LAUNCH COMPLEX</div>';
-      document.body.appendChild(el);
-      r.dawn = el;
-    }
-    if (t >= REC.end) this.finishRecovery();
+    if (r.done) this.finishRecovery();
   }
 
   // the transit has landed you at the Monolith: the Spindle is over, and the mission starts again from the
@@ -570,7 +490,7 @@ export class Spindle {
   finishRecovery() {
     const g = this.game, r = this.rec;
     this.rec = null;
-    r.sh.root.removeFromParent();
+    r.dispose();
     this.exit(true); // (quiet: no teleport flash, you came by shuttle)
     g.story.retrySpindle();
     g.state = 'play';
@@ -586,7 +506,7 @@ export class Spindle {
   endRecovery() {
     const r = this.rec;
     this.rec = null;
-    r.sh.root.removeFromParent();
+    r.dispose();
     const bars = this.game.recall.bars;
     bars.classList.add('hidden');
     if (r.dawn) r.dawn.remove();
