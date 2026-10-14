@@ -175,6 +175,8 @@ export class HUD {
         const col = (FACTIONS[ev.faction] && FACTIONS[ev.faction].color) || '#ffffff';
         row.style.setProperty('--c', col);
         row.classList.toggle('dl-active', ev.state === 'active');
+        const left = g.events.timeLeft(ev);
+        row.classList.toggle('dl-expiring', left !== null && left <= 30); // about to be withdrawn: flash slowly
         row.querySelector('.dl-name').textContent = `${ev.icon || ''}${ev.short || ev.title}`.toUpperCase();
         const dist = this.logTarget(ev).distanceTo(P.pos);
         row.querySelector('.dl-dist').textContent = dist > 999 ? `${(dist / 1000).toFixed(1)}KM` : `${Math.round(dist / 10) * 10}M`;

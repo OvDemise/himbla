@@ -1125,6 +1125,8 @@ body.trailer #vehbar { display: none !important; }
 #distresslog .dl-dist { flex: none; color: var(--ui-muted); }
 #distresslog .dl-active { border-color: var(--c, #fff); background: rgba(30, 22, 50, 0.95); }
 #distresslog .dl-active .dl-name { color: var(--c, #fff); }
+#distresslog .dl-expiring { animation: dlexpire 2s ease-in-out infinite; }
+@keyframes dlexpire { 50% { opacity: 0.3; } }
 #distresslog .dl-new { animation: dlpop 1.2s steps(6); }
 @keyframes dlpop { 0% { transform: translateX(-12px); opacity: 0; background: var(--c, #fff); } 30% { transform: none; opacity: 1; } 100% { } }
 

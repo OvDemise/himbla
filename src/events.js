@@ -149,6 +149,11 @@ export class Events {
     return false;
   }
 
+  // Seconds until an open event is withdrawn (null for ones that never time out)
+  timeLeft(ev) {
+    return ev.state === 'open' && !ev.special ? OPEN_LIFETIME - ev.age : null;
+  }
+
   removeMarker(ev) {
     if (ev.marker) { this.game.scene.remove(ev.marker); ev.marker = null; }
     for (const o of ev.props || []) o.removeFromParent();
