@@ -5,6 +5,7 @@ contains `[release]` (see the README's Download section). Newest first.
 
 ## Unreleased
 
+- **Freighter camera:** hopping onto a freighter (or shuttle, or a funpark ride) while you were still ragdolling no longer leaves the camera behind at the boarding spot; the tumble ends as you take your seat and the camera follows the ride.
 - **Casino and lab interiors:** stepping inside the Lucky Crater Casino hides the HUD (interaction prompts, toasts and pop-ups stay), and wipeouts and hard crashes no longer ragdoll you inside the casino or Dr. Zbornak's lab.
 - **Jar toggle in the wardrobe:** once you own a containment jar, a JAR ON / OFF button (or `J`) sits in the top-right corner of the wardrobe preview; the preview turns to show your back. Hiding it is cosmetic only, it still works.
 - **Grinds are harder to snag:** skating or flying across a crest at an angle no longer clamps you to it. You grab a rail by heading along it, dropping onto it, skating into a tip, or hitting a snake rock's side at speed.

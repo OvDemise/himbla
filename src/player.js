@@ -153,6 +153,7 @@ export class Player {
     // seat carries you, no physics; the ride decides where you get off
     if (this.seat) {
       const s = this.seat;
+      if (this.rag) { this.rag.release(); this.rag = null; } // (a ragdoll that was still tumbling when you hopped on: its camera focus would stay behind, and it only updates in the physics step below)
       s.obj.updateMatrixWorld(true);
       const p = s.obj.localToWorld(_sp.copy(s.local));
       if (dt > 0) b.vel.copy(p).sub(b.pos).divideScalar(dt);
