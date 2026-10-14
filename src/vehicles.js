@@ -20,6 +20,7 @@ export const VEHICLES = {
 const _v = new THREE.Vector3(), _mu = new THREE.Vector3(), _mf = new THREE.Vector3();
 const REBUILD = 90; // seconds the orbital crane needs to replace a wrecked vehicle
 const CRASH_SAFE = 18; // m/s you can hit a wall at without hurting the vehicle
+const SUMMON_MAX_SPEED = 2; // m/s: the fastest the runner can be moving and still call a vehicle
 
 export class Garage {
   constructor(game) {
@@ -134,8 +135,17 @@ export class Garage {
     }
     // already parked nearby? hop in; otherwise it gets dropped in next to you
     if (this.active && this.active.id === id && this.active.e.body.pos.distanceTo(P.pos) < 12) { this.enter(); return; }
+    if (!this.canSummon()) return;
     this.summon(id);
     this.enter();
+  }
+
+  // a drop needs the runner on the ground and nearly still (hopping into one already parked beside you is fine)
+  canSummon() {
+    const P = this.game.player;
+    if (!P.body.grounded) { this.game.hud.toast("Can't call a vehicle while airborne.", 2); return false; }
+    if (P.speed > SUMMON_MAX_SPEED) { this.game.hud.toast(`Slow down to call a vehicle (under ${SUMMON_MAX_SPEED} m/s).`, 2); return false; }
+    return true;
   }
 
   // ---- the vehicle wheel (the same wheel as the controller's menu: gamepad.js) ----
@@ -241,6 +251,7 @@ export class Garage {
     if (this.cooldown(k) > 0) { g.hud.toast(`${VEHICLES[k].name} is being rebuilt: ready in ${Math.ceil(this.cooldown(k))}s.`, 2.5); return; }
     this.choice = k;
     if (this.active && this.active.id === k && this.active.e.body.pos.distanceTo(g.player.pos) < 12) { this.enter(); return; }
+    if (!this.canSummon()) return;
     this.summon(k);
     this.enter();
   }
