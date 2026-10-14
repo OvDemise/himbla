@@ -177,10 +177,11 @@ export class Garage {
     this.radialHub();
   }
 
-  // the mouse (pushed round while V is held)
+  // the mouse (pushed round while V is held). Called every frame the wheel is up, with nothing when the mouse is
+  // still: that must leave the pick alone, or it would wipe the one the right stick just made.
   radialMove(dx, dy) {
     const R = this.radial;
-    if (!R) return;
+    if (!R || (!dx && !dy)) return;
     R.ax += dx; R.ay += dy;
     const len = Math.hypot(R.ax, R.ay);
     if (len > 140) { R.ax *= 140 / len; R.ay *= 140 / len; }

@@ -210,16 +210,9 @@ export class Gamepad {
     this.set('KeyW', ly < -0.45); this.set('KeyS', ly > 0.45); this.set('KeyA', lx < -0.45); this.set('KeyD', lx > 0.45);
     // (the right stick picks a wedge while the radial menu is open, so it doesn't look round; A and B
     // are the radial's own buttons then, and aren't a jump or a trick)
-    // the vehicle wheel (garage: from this menu's VEHICLES wedge, or hold Y): the stick picks, and when it came from
-    // the menu A calls the pick and B / Start cancels. (Done before the menu below, which may be what opens it.)
+    // the vehicle wheel (garage: from this menu's VEHICLES wedge, or hold Y). Before the menu below, which may be what opens it.
     const gw = g.garage && g.garage.radial;
-    if (gw) {
-      g.garage.radialStick(rx, ry);
-      if (gw.sticky) {
-        if (pressed(B.B) || pressed(B.START)) { g.garage.closeRadial(false); this.radialMask = true; }
-        else if (pressed(B.A)) { g.garage.closeRadial(true); this.radialMask = true; }
-      }
-    }
+    const gwUsed = gw ? this.vehicleWheel(gw, pressed, rx, ry) : false;
     if (!this.radial && !gw) this.look(rx, ry, dt);
     // (A, B and Y are held back while the wheel is open and until they're let go after it closes, so the press that
     // used or cancelled it isn't also a jump, a trick or the vehicle key a frame later)
@@ -239,8 +232,28 @@ export class Gamepad {
     if (btn[B.VIEW]) { this.viewT = this.viewT < 0 ? 0 : this.viewT + dt; this.set('KeyR', this.viewT > 0.35); }
     else if (this.viewT >= 0) { if (this.viewT <= 0.35) this.tap('KeyM'); this.set('KeyR', false); this.viewT = -1; }
     const wasOpen = !!this.radial || !!(gw && gw.sticky); // (Start cancels the wheel without also pausing)
-    this.radialMenu(btn, pressed, rx, ry);
+    if (!gwUsed) this.radialMenu(btn, pressed, rx, ry);
     if (pressed(B.START) && !wasOpen) this.pause();
+  }
+
+  // The vehicle wheel works like the menu's: the right stick picks (the pick stays until you pick another),
+  // A calls it (a vehicle still being rebuilt buzzes and the wheel stays up), d-pad ↓ again calls the pick or
+  // closes the wheel if none is picked, B / Start cancels. (Opened by hold-Y instead, it's Y's release that calls.)
+  // Returns true when a button press was used here, so the menu doesn't also see it.
+  vehicleWheel(gw, pressed, rx, ry) {
+    const g = this.game, gar = g.garage;
+    gar.radialStick(rx, ry);
+    if (!gw.sticky) return false;
+    const q = gw.sel >= 0 ? gw.items[gw.sel] : null;
+    const use = () => { gar.closeRadial(true); this.radialMask = true; };
+    if (pressed(B.B) || pressed(B.START)) { gar.closeRadial(false); this.radialMask = true; return true; }
+    if (pressed(B.A)) {
+      if (q && gar.cooldown(q) > 0) { if (g.audio && g.audio.tone) g.audio.tone(180, 0.1, 'sawtooth', 0.05); return true; } // (not ready: stays open, like a locked wedge)
+      use();
+      return true;
+    }
+    if (pressed(B.DOWN)) { if (q && gar.cooldown(q) > 0) gar.closeRadial(false); else gar.closeRadial(true); return true; }
+    return false;
   }
 
   // the gyro's virtual stick while Circle is held on a PlayStation pad (null otherwise); starts and stops its tracking on the press
