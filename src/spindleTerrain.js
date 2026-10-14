@@ -199,11 +199,34 @@ export function heightAt(s, w) {
 }
 
 
+// The rock mesh is a grid of MESH_D metre squares over heightAt, each split into two straight triangles
+// (5 m: the craters' rims and bowls come out round, not as polygons). Round the girth it wraps in MESH_NW
+// columns.
+const MESH_D = 5, MESH_NW = Math.round(CIRC / MESH_D);
+
+// Which diagonal splits a square: the one that follows the ground (see buildRockArrays). ha..hd are the
+// heights at its corners a (s, w), b (s, w+), c (s+, w), d (s+, w+).
+const diagB = (ha, hb, hc, hd) => Math.abs(hb - hc) <= Math.abs(ha - hd);
+
+// The height of the drawn rock at (s, w): the mesh's own straight triangles, not the true ground. In a
+// hollow or on a bowl's floor it stands a little above heightAt (and a little below on a crest). Anything
+// meant to sit ON the visible rock (the skate trail) should follow this, not heightAt.
+export function meshHeightAt(s, w) {
+  const dw = CIRC / MESH_NW;
+  w = ((w % CIRC) + CIRC) % CIRC;
+  const fs = (s - ROCK_S0) / MESH_D, fw = w / dw;
+  const i = Math.floor(fs), j = Math.floor(fw), v = fs - i, u = fw - j; // (u along w, v along s)
+  const s0 = ROCK_S0 + i * MESH_D, w0 = j * dw;
+  const ha = heightAt(s0, w0), hb = heightAt(s0, w0 + dw), hc = heightAt(s0 + MESH_D, w0), hd = heightAt(s0 + MESH_D, w0 + dw);
+  if (diagB(ha, hb, hc, hd)) return u + v <= 1 ? ha + (hb - ha) * u + (hc - ha) * v : hd + (hc - hd) * (1 - u) + (hb - hd) * (1 - v); // (triangles abc, bdc)
+  return u >= v ? ha + (hb - ha) * u + (hd - hb) * v : ha + (hd - hc) * u + (hc - ha) * v; // (triangles abd, adc)
+}
+
 // The rock's mesh data: positions, colours, a triangle index and smooth normals (plain arrays).
 export function buildRockArrays() {
-    const ds = 5, dw = 5; // (5 m: the craters' rims and bowls come out round, not as polygons)
+    const ds = MESH_D;
     const S0 = ROCK_S0, S1 = ROCK_S1;
-    const ns = Math.ceil((S1 - S0) / ds) + 1, nw = Math.round(CIRC / dw);
+    const ns = Math.ceil((S1 - S0) / ds) + 1, nw = MESH_NW;
     const pos = new Float32Array(ns * nw * 3), col = new Float32Array(ns * nw * 3), hs = new Float32Array(ns * nw);
     const c0 = new THREE.Color(0xb0a8c4), c1 = new THREE.Color(0x8a82a2), c2 = new THREE.Color(0x3e3656), cc = new THREE.Color();
     const cMare = new THREE.Color(0x5e5878), cRay = new THREE.Color(0xe6e2f4), cFloor = new THREE.Color(0x6d6688), cWall = new THREE.Color(0x4a4366), cRim = new THREE.Color(0xd8d2ec);
@@ -231,7 +254,7 @@ export function buildRockArrays() {
     // every crater rim and rille edge that crossed the grid at a slant into a row of teeth)
     for (let i = 0; i < ns - 1; i++) for (let j = 0; j < nw; j++) {
       const j2 = (j + 1) % nw; const a = i * nw + j, b = i * nw + j2, c = a + nw, d = b + nw;
-      if (Math.abs(hs[b] - hs[c]) <= Math.abs(hs[a] - hs[d])) { idx[q++] = a; idx[q++] = b; idx[q++] = c; idx[q++] = b; idx[q++] = d; idx[q++] = c; }
+      if (diagB(hs[a], hs[b], hs[c], hs[d])) { idx[q++] = a; idx[q++] = b; idx[q++] = c; idx[q++] = b; idx[q++] = d; idx[q++] = c; }
       else { idx[q++] = a; idx[q++] = b; idx[q++] = d; idx[q++] = a; idx[q++] = d; idx[q++] = c; }
     }
     const geo = new THREE.BufferGeometry();

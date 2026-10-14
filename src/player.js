@@ -550,7 +550,10 @@ export class Player {
     const right = new THREE.Vector3(1, 0, 0).applyQuaternion(m.root.quaternion);
     const strength = b.skating && b.grounded ? Math.min(1, sp / 30) : this.vaneCarve ? 0.55 + 0.45 * Math.abs(this.vaneCarve) : 0; // (the Vanes leave ribbons in the air)
     const g = this.game;
-    g.fx.updateTrail(0, b.pos.clone().addScaledVector(right, -0.2), right, strength, up, dt);
-    g.fx.updateTrail(1, b.pos.clone().addScaledVector(right, 0.2), right, strength, up, dt);
+    // (laid on the ground you can see: the Spindle's rock is a 5 m mesh that stands above the height you skate on
+    // in a hollow, which used to bury the ribbon there)
+    const foot = b.pos.clone().addScaledVector(up, g.planet.meshLift ? g.planet.meshLift(b.pos) : 0);
+    g.fx.updateTrail(0, foot.clone().addScaledVector(right, -0.2), right, strength, up, dt);
+    g.fx.updateTrail(1, foot.clone().addScaledVector(right, 0.2), right, strength, up, dt);
   }
 }

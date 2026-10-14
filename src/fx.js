@@ -18,6 +18,7 @@ export class FX {
     this.pMesh.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(MAX_P * 3), 3);
     this.pMesh.frustumCulled = false;
     this.pMesh.count = 0;
+    this.pMesh.userData.persist = true; // (the Spindle hides the Moon's scene, not this)
     scene.add(this.pMesh);
     this.m4 = new THREE.Matrix4();
     this.q = new THREE.Quaternion();
@@ -52,6 +53,7 @@ export class FX {
     });
     const mesh = new THREE.Mesh(geo, mat);
     mesh.frustumCulled = false;
+    mesh.userData.persist = true; // (the Spindle hides the Moon's scene, not this)
     this.scene.add(mesh);
     return { mesh, pts: [], N, mat, life: TRAIL_LIFE };
   }
