@@ -36,13 +36,11 @@ const LOOT = {
   shack: { verb: 'STRIP SOME SCRAP PLATING', boom: 'SHACK FLATTENED!', item: 'plating', pop: 'SCRAP PLATING!' },
   junk: { verb: 'COAX OUT A JUNK BOT', boom: 'JUNK EVERYWHERE!', item: 'junkbot', names: BOT_NAMES, pop: 'JUNK BOT! BEEP!' },
 };
+const MAP_GRID = 96; // owner cells per cube-face edge for the globe map's territory lookup
 const BUILT_R = 40; // founded outposts: flattened radius (the compound itself: storyAssets.js)
-const MAP_FEATHER = 280; // metres either side of a border over which the globe map fades one faction's colour into the next
 const _v = new THREE.Vector3();
 const _q = new THREE.Quaternion();
 const _w = new THREE.Vector3();
-const _u = new THREE.Vector3();
-const _c = new THREE.Color();
 
 // distance from a point (outpost frame) to a yawed box { x, y, z, hx, hy, hz, yaw }
 function boxDist(p, h) {
@@ -245,7 +243,7 @@ export class Territory {
   // Outposts claim a little ground of their own (so captures move the borders).
   rebuild() {
     this.anchors = this.baseAnchors.concat(this.outposts.map((o) => ({ dir: o.dir, faction: o.faction, w: o.built ? 0.6 : OUTPOST_W })));
-    this.mapCache = null;
+    this.mapG = null;
     this.buildRoutes();
   }
 
@@ -575,52 +573,79 @@ export class Territory {
     return best;
   }
 
-  // territory colour for a globe-map cell (cached per cell). The map's cells are ~180 m across, so
-  // a hard nearest-anchor pick steps along the borders: instead each cell blends the colours of
-  // every faction whose ground lies within MAP_FEATHER metres of it, so borders fade across a
-  // few cells instead of jumping from one colour to the next.
-  cellColor(k, x, y, z) {
-    if (!this.mapCache) this.mapCache = new Map();
-    let c = this.mapCache.get(k);
-    if (!c) {
-      c = this.blendColor(_v.set(x, y, z));
-      this.mapCache.set(k, c);
+  // ---------- globe map ----------
+  // The map colours every screen pixel by the exact owner of the ground under it, so borders are
+  // crisp lines rather than steps along the exploration cells. Asking owner() (a loop over every
+  // anchor) for every pixel of every redraw would be far too slow, so a coarse cube-face grid
+  // answers wherever a cell and its neighbours all belong to one faction. A cell touching a border
+  // keeps the short list of anchors that claim it or its neighbours, and only those compete for its
+  // pixels. The grid is rebuilt lazily after any border change.
+  mapGrid() {
+    if (this.mapG) return this.mapG;
+    const T = MAP_GRID, S = T + 2; // (one spare ring of cells round each face, so rims need no special case)
+    const names = Object.keys(FACTIONS), fi = {};
+    names.forEach((n, i) => { fi[n] = i; });
+    const A = this.anchors, n = A.length;
+    const ad = new Float32Array(n * 3), aw = new Float32Array(n), af = new Uint8Array(n);
+    A.forEach((a, i) => { const l = a.dir.length() || 1; ad[i * 3] = a.dir.x / l; ad[i * 3 + 1] = a.dir.y / l; ad[i * 3 + 2] = a.dir.z / l; aw[i] = a.w; af[i] = fi[a.faction] || 0; }); // (owner() normalises too)
+    const own = new Uint16Array(6 * S * S), d = new THREE.Vector3();
+    let k = 0;
+    for (let f = 0; f < 6; f++) for (let j = -1; j <= T; j++) for (let i = -1; i <= T; i++) {
+      const a = ((i + 0.5) / T) * 2 - 1, b = ((j + 0.5) / T) * 2 - 1;
+      switch (f) {
+        case 0: d.set(1, b, -a); break;
+        case 1: d.set(-1, b, a); break;
+        case 2: d.set(a, 1, -b); break;
+        case 3: d.set(a, -1, b); break;
+        case 4: d.set(a, b, 1); break;
+        default: d.set(-a, b, -1);
+      }
+      d.normalize();
+      let best = 0, bd = Infinity;
+      for (let q = 0; q < n; q++) {
+        const dd = Math.acos(Math.min(1, ad[q * 3] * d.x + ad[q * 3 + 1] * d.y + ad[q * 3 + 2] * d.z)) / aw[q];
+        if (dd < bd) { bd = dd; best = q; }
+      }
+      own[k++] = best;
     }
-    return c;
+    // per cell: a lone faction (colour straight from the grid) or, at a border, the anchors in play
+    const col = new Uint8Array(T * T * 6), edge = new Int32Array(T * T * 6).fill(-1), cand = [];
+    for (let f = 0; f < 6; f++) for (let j = 0; j < T; j++) for (let i = 0; i < T; i++) {
+      const c = (f * T + j) * T + i, base = (f * S + (j + 1)) * S + (i + 1);
+      const ids = [];
+      let mixed = false;
+      for (let dj = -1; dj <= 1; dj++) for (let di = -1; di <= 1; di++) {
+        const q = own[base + dj * S + di];
+        if (!ids.includes(q)) ids.push(q);
+        if (af[q] !== af[own[base]]) mixed = true;
+      }
+      col[c] = af[own[base]];
+      if (mixed) { edge[c] = cand.length; cand.push(ids.length, ...ids); }
+    }
+    const rgb = names.map((nm) => { const c = new THREE.Color(FACTIONS[nm].color); return [c.r * 255, c.g * 255, c.b * 255]; });
+    return (this.mapG = { T, col, edge, cand: Uint16Array.from(cand), ad, aw, af, rgb });
   }
 
-  blendColor(dir, anchors = this.anchors) {
-    // each faction's closest claim, in the weighted distance owner() ranks by
-    const near = new Map();
-    for (const a of anchors) {
-      const d = arcDist(dir, a.dir) / a.w;
-      const n = near.get(a.faction);
-      if (!n || d < n.d) near.set(a.faction, { d, a });
+  // colour [r, g, b] (0-255) of the territory holding the unit direction (x, y, z)
+  mapColor(x, y, z) {
+    const G = this.mapGrid(), T = G.T;
+    const ax = x < 0 ? -x : x, ay = y < 0 ? -y : y, az = z < 0 ? -z : z;
+    let f, a, b;
+    if (ax >= ay && ax >= az) { if (x > 0) { f = 0; a = -z / x; b = y / x; } else { f = 1; a = z / -x; b = y / -x; } }
+    else if (ay >= az) { if (y > 0) { f = 2; a = x / y; b = -z / y; } else { f = 3; a = x / -y; b = z / -y; } }
+    else if (z > 0) { f = 4; a = x / z; b = y / z; } else { f = 5; a = x / z; b = y / -z; }
+    const i = Math.min(T - 1, Math.max(0, ((a + 1) * 0.5 * T) | 0)), j = Math.min(T - 1, Math.max(0, ((b + 1) * 0.5 * T) | 0));
+    const c = (f * T + j) * T + i, e = G.edge[c];
+    if (e < 0) return G.rgb[G.col[c]];
+    // at a border: whichever nearby anchor is closest (by the same weighted distance owner() uses)
+    const { cand, ad, aw } = G;
+    let best = 0, bd = Infinity;
+    for (let q = 1; q <= cand[e]; q++) {
+      const m = cand[e + q];
+      const dd = Math.acos(Math.min(1, ad[m * 3] * x + ad[m * 3 + 1] * y + ad[m * 3 + 2] * z)) / aw[m];
+      if (dd < bd) { bd = dd; best = m; }
     }
-    const out = new THREE.Color(0, 0, 0);
-    if (!near.size) return out.set(FACTIONS.spacecom.color);
-    let best = null;
-    for (const n of near.values()) if (!best || n.d < best.d) best = n;
-    // the border with a faction is where its weighted distance catches up with the owner's;
-    // the gap shrinks fastest walking along the surface at the rate the two claims' tangent
-    // directions disagree, which turns the gap into (about) metres to that border
-    const tb = tangent(best.a.dir, dir, _w).normalize();
-    let sum = 0;
-    for (const [f, n] of near) {
-      let m = 0;
-      if (n !== best) {
-        const tf = tangent(n.a.dir, dir, _u).normalize();
-        const wf = 1 / n.a.w, wb = 1 / best.a.w;
-        const slope = Math.sqrt(Math.max(1e-6, wf * wf + wb * wb - 2 * wf * wb * tf.dot(tb)));
-        m = (n.d - best.d) / slope;
-      }
-      const t = 1 - Math.min(1, m / MAP_FEATHER);
-      if (t <= 0) continue;
-      const wgt = t * t * (3 - 2 * t);
-      out.add(_c.set(FACTIONS[f].color).multiplyScalar(wgt));
-      sum += wgt;
-    }
-    return out.multiplyScalar(1 / sum);
+    return G.rgb[G.af[best]];
   }
 }
 

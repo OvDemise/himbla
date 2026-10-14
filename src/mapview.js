@@ -285,26 +285,27 @@ export class GlobeMap {
     c.strokeStyle = 'rgba(120,100,170,0.12)';
     c.lineWidth = 1;
     for (let x = -H; x < W; x += 10) { c.beginPath(); c.moveTo(x, 0); c.lineTo(x + H, H); c.stroke(); }
-    // explored ground, lit by the sun
+    // explored ground, lit by the sun, drawn to its own layer so the territory tint can be applied
+    // per pixel (exact borders) rather than per ~180 m cell (which stepped along every border)
     const cell = ((Math.PI / 2) / RES) * Rp * 1.35;
     const cells = this.cells;
     const tmp = new THREE.Vector3();
+    const lay = this.layer || (this.layer = document.createElement('canvas'));
+    if (lay.width !== W || lay.height !== H) { lay.width = W; lay.height = H; this.layerCtx = null; }
+    const lc = this.layerCtx || (this.layerCtx = lay.getContext('2d', { willReadFrequently: true }));
+    lc.clearRect(0, 0, W, H);
     for (let k = 0; k < this.explored.length; k++) {
       if (!this.explored[k]) continue;
       tmp.set(cells[k * 3], cells[k * 3 + 1], cells[k * 3 + 2]);
       const p = this.project(tmp, v);
       if (p.z <= 0) continue;
       const lit = THREE.MathUtils.clamp(tmp.dot(SUN) * 1.3 + 0.12, 0, 1);
-      let r = 28 + lit * 170, gg = 22 + lit * 160, b = 48 + lit * 160;
-      // territory: every cell is tinted by the faction that holds it
-      if (g.territory) {
-        const tc = g.territory.cellColor(k, tmp.x, tmp.y, tmp.z);
-        r = r * 0.62 + tc.r * 255 * 0.38; gg = gg * 0.62 + tc.g * 255 * 0.38; b = b * 0.62 + tc.b * 255 * 0.38;
-      }
-      c.fillStyle = `rgb(${Math.round(r)},${Math.round(gg)},${Math.round(b)})`;
+      lc.fillStyle = `rgb(${Math.round(28 + lit * 170)},${Math.round(22 + lit * 160)},${Math.round(48 + lit * 160)})`;
       const s = cell * (0.55 + 0.45 * p.z);
-      c.fillRect(p.x - s / 2, p.y - s / 2, s, s);
+      lc.fillRect(p.x - s / 2, p.y - s / 2, s, s);
     }
+    if (g.territory) this.tintTerritory(lc, W, H, Rp);
+    c.drawImage(lay, 0, 0);
     // craters & black lakes you've seen
     const seen = (d) => this.explored[this.cellOf(d)];
     // the road network over ground you've charted (a dark casing under a pale line, so it reads on
@@ -548,6 +549,36 @@ export class GlobeMap {
       c.fillStyle = cur.grab ? '#ffd23f' : '#fff';
       c.beginPath(); c.arc(cur.x, cur.y, cur.grab ? rr - 1 : 2, 0, Math.PI * 2); c.fill();
     }
+  }
+
+  // Tint every explored pixel of the layer by the faction holding the ground under it. Each pixel
+  // is turned back into a point on the globe and given a whole faction's colour, never a blend, so
+  // a border is a single sharp line.
+  tintTerritory(lc, W, H, Rp) {
+    const t = this.game.territory;
+    const img = lc.getImageData(0, 0, W, H), px = img.data;
+    // project() applies Q as is, so a Q that isn't exactly unit length scales the globe: undo that scale
+    // (s) and rotate back with the normalised Q, so every pixel maps to a true unit direction
+    const s = this.Q.lengthSq() || 1;
+    const e = new THREE.Matrix4().makeRotationFromQuaternion(this.Q.clone().normalize().invert()).elements;
+    const cx = W / 2, cy = H / 2, k = 1 / (Rp * s);
+    for (let y = 0; y < H; y++) {
+      const sy = -(y + 0.5 - cy) * k;
+      for (let x = 0; x < W; x++) {
+        const o = (y * W + x) * 4;
+        if (!px[o + 3]) continue;
+        const sx = (x + 0.5 - cx) * k;
+        const r2 = sx * sx + sy * sy;
+        const sz = r2 < 1 ? Math.sqrt(1 - r2) : 0;
+        const dx = e[0] * sx + e[4] * sy + e[8] * sz, dy = e[1] * sx + e[5] * sy + e[9] * sz, dz = e[2] * sx + e[6] * sy + e[10] * sz;
+        const il = 1 / (Math.sqrt(dx * dx + dy * dy + dz * dz) || 1); // (a rim pixel past the limb is not on the unit sphere)
+        const tc = t.mapColor(dx * il, dy * il, dz * il);
+        px[o] = px[o] * 0.62 + tc[0] * 0.38;
+        px[o + 1] = px[o + 1] * 0.62 + tc[1] * 0.38;
+        px[o + 2] = px[o + 2] * 0.62 + tc[2] * 0.38;
+      }
+    }
+    lc.putImageData(img, 0, 0);
   }
 
   cellOf(d) {
