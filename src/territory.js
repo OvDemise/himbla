@@ -37,9 +37,12 @@ const LOOT = {
   junk: { verb: 'COAX OUT A JUNK BOT', boom: 'JUNK EVERYWHERE!', item: 'junkbot', names: BOT_NAMES, pop: 'JUNK BOT! BEEP!' },
 };
 const BUILT_R = 40; // founded outposts: flattened radius (the compound itself: storyAssets.js)
+const MAP_FEATHER = 280; // metres either side of a border over which the globe map fades one faction's colour into the next
 const _v = new THREE.Vector3();
 const _q = new THREE.Quaternion();
 const _w = new THREE.Vector3();
+const _u = new THREE.Vector3();
+const _c = new THREE.Color();
 
 // distance from a point (outpost frame) to a yawed box { x, y, z, hx, hy, hz, yaw }
 function boxDist(p, h) {
@@ -572,16 +575,52 @@ export class Territory {
     return best;
   }
 
-  // territory colour for a globe-map cell (cached per cell)
+  // territory colour for a globe-map cell (cached per cell). The map's cells are ~180 m across, so
+  // a hard nearest-anchor pick steps along the borders: instead each cell blends the colours of
+  // every faction whose ground lies within MAP_FEATHER metres of it, so borders fade across a
+  // few cells instead of jumping from one colour to the next.
   cellColor(k, x, y, z) {
     if (!this.mapCache) this.mapCache = new Map();
     let c = this.mapCache.get(k);
     if (!c) {
-      const f = this.owner(_v.set(x, y, z));
-      c = new THREE.Color(FACTIONS[f].color);
+      c = this.blendColor(_v.set(x, y, z));
       this.mapCache.set(k, c);
     }
     return c;
+  }
+
+  blendColor(dir, anchors = this.anchors) {
+    // each faction's closest claim, in the weighted distance owner() ranks by
+    const near = new Map();
+    for (const a of anchors) {
+      const d = arcDist(dir, a.dir) / a.w;
+      const n = near.get(a.faction);
+      if (!n || d < n.d) near.set(a.faction, { d, a });
+    }
+    const out = new THREE.Color(0, 0, 0);
+    if (!near.size) return out.set(FACTIONS.spacecom.color);
+    let best = null;
+    for (const n of near.values()) if (!best || n.d < best.d) best = n;
+    // the border with a faction is where its weighted distance catches up with the owner's;
+    // the gap shrinks fastest walking along the surface at the rate the two claims' tangent
+    // directions disagree, which turns the gap into (about) metres to that border
+    const tb = tangent(best.a.dir, dir, _w).normalize();
+    let sum = 0;
+    for (const [f, n] of near) {
+      let m = 0;
+      if (n !== best) {
+        const tf = tangent(n.a.dir, dir, _u).normalize();
+        const wf = 1 / n.a.w, wb = 1 / best.a.w;
+        const slope = Math.sqrt(Math.max(1e-6, wf * wf + wb * wb - 2 * wf * wb * tf.dot(tb)));
+        m = (n.d - best.d) / slope;
+      }
+      const t = 1 - Math.min(1, m / MAP_FEATHER);
+      if (t <= 0) continue;
+      const wgt = t * t * (3 - 2 * t);
+      out.add(_c.set(FACTIONS[f].color).multiplyScalar(wgt));
+      sum += wgt;
+    }
+    return out.multiplyScalar(1 / sum);
   }
 }
 
