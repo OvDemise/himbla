@@ -38,7 +38,9 @@ function steerToward(heading, up, target, maxAngle) {
 // solidPlatforms: moving decks (land-train cars, hover-cars, the satellite) are solid too. They're
 // skipped by default, since the pirate and military rovers have always driven through them; a
 // vehicle you drive hits them.
-export function stepRover(e, dt, planet, colliders, targetDir, maxSpeed, { engine = 16, grip = 0, turn = 1.8, radius = 2.4, stick = false, traction = 0, weight = 1, solidPlatforms = false } = {}) {
+// crash: { speed } filled in with the hardest head-on hit this step (m/s closing on a wall, a
+// building or a deck). Ramps and roofs you can drive up, and bouncy inflatables, don't count.
+export function stepRover(e, dt, planet, colliders, targetDir, maxSpeed, { engine = 16, grip = 0, turn = 1.8, radius = 2.4, stick = false, traction = 0, weight = 1, solidPlatforms = false, crash = null } = {}) {
   const b = e.body;
   const up = b.up.copy(b.pos).normalize();
   steerToward(e.heading, up, targetDir, (turn / (1 + b.vel.length() / 60)) * dt);
@@ -86,7 +88,10 @@ export function stepRover(e, dt, planet, colliders, targetDir, maxSpeed, { engin
         cp.addScaledVector(_n, pen);
         // (a moving deck is hit at the speed you close on it, not your speed over the ground)
         const vn = b.vel.dot(_n) - (c.platform && c.platform.vel ? c.platform.vel.dot(_n) : 0);
-        if (vn < 0) b.vel.addScaledVector(_n, -vn * 1.3);
+        if (vn < 0) {
+          if (crash && !c.bouncy && _n.dot(up) < 0.55) crash.speed = Math.max(crash.speed, -vn);
+          b.vel.addScaledVector(_n, -vn * 1.3);
+        }
       }
     }
   }

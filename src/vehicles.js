@@ -19,6 +19,7 @@ export const VEHICLES = {
 
 const _v = new THREE.Vector3(), _mu = new THREE.Vector3(), _mf = new THREE.Vector3();
 const REBUILD = 90; // seconds the orbital crane needs to replace a wrecked vehicle
+const CRASH_SAFE = 18; // m/s you can hit a wall at without hurting the vehicle
 
 export class Garage {
   constructor(game) {
@@ -52,6 +53,13 @@ export class Garage {
     this.hp[v.id] = (this.hp[v.id] ?? max) - amount;
     v.flash = 0.15;
     if (this.hp[v.id] <= 0) { this.destroy(v); return 12; }
+    // every hit that gets through bursts on the hull: a puff for a scrape, a fireball for a hard one
+    if (amount >= 4 && (v.boomT || 0) < g.time) {
+      v.boomT = g.time + 0.3;
+      const pos = v.model.root.position.clone().addScaledVector(v.e.body.pos.clone().normalize(), 1.5);
+      g.fx.explosion(pos, Math.min(6, 1.5 + amount * 0.06), amount > 40);
+      g.audio.boom(amount > 40);
+    }
     return amount * v.def.armor * 0.25;
   }
 
@@ -298,7 +306,16 @@ export class Garage {
     const tune = def.hover
       ? { grip: Math.max(def.grip, 10), stick: 70, traction: 7 }
       : { grip: Math.max(def.grip * 1.6, 24), stick: 55, traction: 15 };
-    for (let i = 0; i < steps; i++) stepRover(e, dt / steps, g.planet, g.colliders, target, max, { engine: fwdIn || back ? def.engine : 0, turn: def.turn, radius: def.radius || 3.2 * (def.scale || 1), weight: def.hover ? 1.5 : 1.7, solidPlatforms: true, ...tune });
+    const crash = { speed: 0 };
+    for (let i = 0; i < steps; i++) stepRover(e, dt / steps, g.planet, g.colliders, target, max, { engine: fwdIn || back ? def.engine : 0, turn: def.turn, radius: def.radius || 3.2 * (def.scale || 1), weight: def.hover ? 1.5 : 1.7, solidPlatforms: true, crash, ...tune });
+    // crashes: a hard hit on a wall, a building or road traffic hurts the vehicle (and bursts on it: hit())
+    if (crash.speed > CRASH_SAFE && (this.crashT || 0) < g.time) {
+      this.crashT = g.time + 0.4;
+      g.audio.thud(crash.speed);
+      g.fx.pop('CRASH!', b.pos.clone().addScaledVector(up, 4), { color: '#ff4f2e', size: 54 });
+      g.damagePlayer(Math.min((crash.speed - CRASH_SAFE) * 2.5, this.maxHp(v.id) * 0.5), 'crash');
+      if (!P.vehicle) return; // (wrecked: destroy() has already got you out)
+    }
     if (def.hover) b.vel.multiplyScalar(1 - 0.15 * dt);
     if (b.grounded && (input.pressed('ShiftLeft') || input.pressed('ShiftRight'))) { b.vel.addScaledVector(up, 9); b.grounded = false; b.wasGround = false; g.audio.jump(); } // (wasGround off: the ground snap mustn't swallow the hop)
     // pose
