@@ -380,7 +380,7 @@ front doors and press `F` at a station
 
 No spot on the Moon is unclaimed. Territory is a weighted split around every faction's settlements and
 ~120 smaller outposts (watchtowers, supply depots, farm domes, relay masts, trading kiosks, scrap shacks).
-Glowing faction-coloured pylons mark the borders, a chip shows whose land you're on, and the globe map is
+A chip shows whose land you're on, and the globe map is
 tinted by owner. The purple line on the globe map is the terminator, the edge of the dark side (point at it
 for details); SAT-7's orbit is the yellow dashes, with chevrons showing which way it's heading. Military patrols drive between their faction's outposts and shoot pirates (never you, so
 settlement threat radii are unchanged). Captured and founded outposts move the borders.
@@ -656,7 +656,7 @@ src/
   worldstate.js  what the story finales changed for good, applied before the world is built
   kade.js        Captain Kade's gun truck: orbit driving, gatling and flak turret, Junk Mortar drop
   monolith.js    the Monolith's spells: low-G, time dilation, echo decoys
-  territory.js   faction territory, border pylons, small outposts, patrols
+  territory.js   faction territory, small outposts, patrols
   vehicles.js    drivable faction vehicles
   settings.js    settings menu + key remapping
   casino.js      Lucky Crater Casino games, VIP, prizes, loan shark (casinoWorld.js: the building)
