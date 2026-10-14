@@ -142,7 +142,7 @@ export class Gamepad {
     const [lx, ly] = stick(0, 1), [rx, ry] = stick(2, 3);
     const any = btn.some(Boolean) || lx || ly || rx || ry;
     if (any && !this.input.padActive) this.setActive(true);
-    if (!this.input.padActive) { this.prev = btn; return; }
+    if (!this.input.padActive) { this.prev = btn; if (!btn.some(Boolean)) this.gwWas = false; return; } // (gwWas: a wheel the keyboard closed is forgotten once the pad is idle; a button held through the switch stays masked)
     const pressed = (i) => btn[i] && !this.prev[i];
     const released = (i) => !btn[i] && this.prev[i];
     const g = this.game;
@@ -265,7 +265,7 @@ export class Gamepad {
   // the gyro's virtual stick while Circle is held on a PlayStation pad (null otherwise); starts and stops its tracking on the press
   gyroStick(btn) {
     const G = this.gyro, S = this.game.settings;
-    const on = this.kind === 'ps' && G.live() && !(S && S.v.gyro === false) && btn[B.B] && !this.radial && !this.radialMask && !(this.game.garage && this.game.garage.radial);
+    const on = this.kind === 'ps' && G.live() && !(S && S.v.gyro === false) && btn[B.B] && !this.radial && !this.radialMask && !this.gwWas && !(this.game.garage && this.game.garage.radial);
     if (on !== this.gyroOn) { this.gyroOn = on; if (on) G.begin(); else G.end(); }
     if (!on) return null;
     const v = S ? S.v : {};
@@ -325,6 +325,7 @@ export class Gamepad {
     if (this.game.garage && this.game.garage.radial) return; // (the hold-Y vehicle picker is up)
     this.radial = { sel: -1, hub: '' };
     this.game.vHold = 0; // (a vehicle key still going down isn't a tap: Y is held back while the wheel is up)
+    this.set('KeyV', false); this.input.justPressed.delete('KeyV'); // (and one pressed this very frame, along with d-pad down, isn't either)
     this.drawRadial(true);
     if (this.game.audio && this.game.audio.tone) this.game.audio.tone(520, 0.08, 'triangle', 0.12);
   }
