@@ -85,6 +85,8 @@ export class Ragdoll {
     this.p = this.rest.map((w) => w.clone());
     this.prev = this.rest.map((w) => w.clone());
     this.G = (PHYS.gravity || 6) * GRAV;
+    this.cam = body.pos.clone(); // (what the camera follows: body.pos, smoothed; see follow())
+    this.camV = body.vel.clone();
 
     // launch: every particle gets the body's velocity plus a random tumble about a horizontal axis
     // (pitching forward or back), a random spin about the vertical and a kick of its own
@@ -173,16 +175,27 @@ export class Ragdoll {
     this.calm = fast < 0.7 ? this.calm + h : 0;
   }
 
+  // The camera's focus: the body's position, filtered. The raw pelvis jerks with every contact and
+  // constraint pass, and the sim only moves in whole fixed steps, so following it directly shakes the
+  // view. This coasts on a smoothed velocity (no lag behind a steady fall) and eases onto the target.
+  follow(dt, at, vel) {
+    const k = 1 - Math.exp(-dt * 10);
+    if (vel) this.camV.lerp(vel, k); else this.camV.multiplyScalar(1 - k);
+    this.cam.addScaledVector(this.camV, dt).lerp(at, k);
+  }
+
   // The player's body goes where the ragdoll goes: the pelvis, brought down to the feet's level
   // while it's in the air and to the ground once it's lying. Called after update().
   sync(dt) {
     const b = this.b, pel = this.p[PEL];
-    if (this.getUp >= 0) { b.vel.set(0, 0, 0); return; } // (settled: stay put and stand up here)
+    if (this.getUp >= 0) { b.vel.set(0, 0, 0); this.follow(dt, b.pos, null); return; } // (settled: stay put and stand up here)
     b.up.copy(pel).normalize();
     const sr = this.g.planet.surface(pel, _n);
     const h = Math.max(0, pel.length() - sr);
     b.pos.copy(pel).addScaledVector(b.up, -Math.min(0.95, h));
     b.vel.subVectors(pel, this.prev[PEL]).multiplyScalar(1 / STEP);
+    // (the sim is a fraction of a step behind the frame: look ahead by what's left in the accumulator)
+    this.follow(dt, _sh.copy(b.pos).addScaledVector(b.vel, this.acc), b.vel);
     b.groundN.copy(_n);
     b.grounded = h < 0.7;
     b.airTime = b.grounded ? 0 : b.airTime + dt;

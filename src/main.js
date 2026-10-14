@@ -1415,7 +1415,8 @@ class Game {
   updateCamera(dt, snap = false) {
     const P = this.player;
     const c = this.cam;
-    const up = upAt(P.pos, c.up);
+    const focus = P.rag ? P.rag.cam : P.pos; // (a ragdoll's smoothed focus: the raw pelvis shakes the view)
+    const up = upAt(focus, c.up);
     if (snap) {
       c.right.crossVectors(c.fwd, up).normalize();
       c.look.copy(c.fwd).multiplyScalar(Math.cos(c.pitch)).addScaledVector(up, Math.sin(c.pitch));
@@ -1425,7 +1426,7 @@ class Game {
     const scoped = !!P.scoped;
     const targetDist = scoped ? 0.2 : P.seat && P.seat.camDist ? P.seat.camDist : (7.5 + Math.min(7, sp * 0.06)) * (sv ? sv.camDist : 1); // settings
     c.dist += (targetDist - c.dist) * Math.min(1, dt * (scoped ? 14 : 3));
-    const target = P.pos.clone().addScaledVector(up, 2.3);
+    const target = focus.clone().addScaledVector(up, 2.3);
     // (looking up past ~30°, the camera stops swinging lower: it stays behind your shoulders and just
     // tilts, so you can aim nearly straight up without it burying itself in the ground)
     const pp = Math.min(c.pitch, 0.55);
