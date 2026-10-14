@@ -360,6 +360,7 @@ export class Garage {
     P.body.thrusting = false; // (the jet hiss would otherwise stay on from before you got in)
     P.heading.copy(e.heading);
     model.root.updateMatrixWorld();
+    this.kickDust(v, dt, sp, up);
     // ramming: at speed your vehicle hurts whatever it hits - pirates, defence turrets and patrols
     // (that's an attack on their base), road traffic, people and Moon Mites
     if (sp > 14) {
@@ -379,6 +380,25 @@ export class Garage {
       if (tr && tr.ram(front, reach, sp)) { b.vel.multiplyScalar(0.75); g.fx.pop('BASH!', front.clone(), { color: '#ff9f1c', size: 50 }); }
       if (g.civilians && (this.ramPeopleT || 0) < g.time) { this.ramPeopleT = g.time + 0.25; g.civilians.blast(front, reach * 0.8, sp * 1.5, 'player'); }
       if (g.alchemy) g.alchemy.blastMites(front, reach, 1, 'player');
+    }
+  }
+
+  // dust thrown up behind the rear wheels (the same puff as the skate's, which kicks in at 25 m/s) once
+  // you're moving fast over the ground; the hover ones scatter it from under their rear pads
+  kickDust(v, dt, sp, up) {
+    if (sp < 18 || !v.e.body.grounded) return;
+    const { def, model } = v;
+    const sc = def.scale || 1;
+    const spots = model.wheels.length ? model.wheels.filter((w) => w.position.z < 0).map((w) => [w.position.x * sc, w.position.z * sc]) : [[-1.1, -1.6], [1.1, -1.6]];
+    const rate = dt * 30 * Math.min(2, sp / 40);
+    const back = _mf.copy(v.e.body.vel).multiplyScalar(-0.2);
+    for (const [x, z] of spots) {
+      if (Math.random() >= rate) continue;
+      // (dropped onto the ground plane under the body: a hover vehicle floats, a tilted one would
+      // otherwise puff from its wheel hubs)
+      const p = model.root.localToWorld(_mu.set(x, 0, z));
+      p.addScaledVector(up, -p.clone().sub(v.e.body.pos).dot(up));
+      this.game.fx.dust(p, back, 1, up, 0xe8e2d8);
     }
   }
 
