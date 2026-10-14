@@ -20,6 +20,8 @@ export class Cheats {
     this.mapTeleport = false; // click a location (or press A with the controller cursor on it) in the full map to go there
     this.aiPaths = false; // draw every AI's current path / steering goal
     this.showFps = false; // frame-rate readout under the minimap
+    this.showStats = false; // draw calls + polygons rendered per frame, under the minimap
+    this.crackedVisor = true; // the cracks that spread over the screen as hull drops (hud.js)
     this.spawnDebug = false; // bottom-right pirate counts + spawn timers overlay
     this.speed = 1; // player speed multiplier, 1 to 10 (player.js)
     // once the dev menu has been opened (F8 / controller combo) it gets a button on the pause card, remembered across launches
@@ -46,7 +48,7 @@ export class Cheats {
       { label: this.speedLabel(), fn: () => { this.setSpeed(this.speed >= 10 ? 1 : this.speed + 1); this.dev(); } },
       { label: '4 · TELEPORT TO RUSTMOON HOLD', fn: () => { const l = g.locations.find((x) => x.id === 'rustmoon'); if (l) this.teleport(l); } },
       { label: `5 · PIRATE SPAWN DEBUG: ${this.spawnDebug ? 'ON' : 'OFF'}`, fn: () => { this.spawnDebug = !this.spawnDebug; this.tick(); this.dev(); } },
-      { label: `6 · SHOW FPS: ${this.showFps ? 'ON' : 'OFF'}`, fn: () => { this.showFps = !this.showFps; this.tick(); this.dev(); } },
+      { label: '6 · DISPLAY & DEBUG…', fn: () => this.displayMenu() },
       { label: `7 · SHOW AI PATHS: ${this.aiPaths ? 'ON' : 'OFF'}`, fn: () => { this.aiPaths = !this.aiPaths; this.tick(); this.dev(); } },
       { label: '8 · FULL CHEAT MENU…', fn: () => this.open() },
       { label: `9 · CLICK MAP TO TELEPORT: ${this.mapTeleport ? 'ON' : 'OFF'}`, fn: () => { this.mapTeleport = !this.mapTeleport; this.dev(); } },
@@ -61,6 +63,47 @@ export class Cheats {
       row.addEventListener('adj', (e) => bump(e.detail));
       row.onclick = (e) => { e.stopPropagation(); bump(this.speed >= 10 ? -9 : 1); };
     }
+  }
+
+  // On-screen readouts and effects: frame rate, draw calls and polygons, the cracked visor
+  displayMenu() {
+    const g = this.game;
+    const on = (v) => (v ? 'ON' : 'OFF');
+    g.dialog('DISPLAY & DEBUG', '<small>Toggles last until you reload.</small>', [
+      { label: `1 · SHOW FPS: ${on(this.showFps)}`, fn: () => { this.showFps = !this.showFps; this.tick(); this.displayMenu(); } },
+      { label: `2 · DRAW CALLS & POLYGONS: ${on(this.showStats)}`, fn: () => { this.setStats(!this.showStats); this.displayMenu(); } },
+      { label: `3 · CRACKED VISOR: ${on(this.crackedVisor)}`, fn: () => { this.crackedVisor = !this.crackedVisor; g.hud.crackKey = -1; this.displayMenu(); } },
+      { label: '4 · BACK', fn: () => this.dev() },
+      { label: 'CLOSE' },
+    ]);
+  }
+
+  // three.js resets its counters on every render call, and a frame renders twice (the scene, then the
+  // post-processing quad), so while the readout is up the game resets them once per frame instead
+  setStats(on) {
+    this.showStats = on;
+    this.game.renderer.info.autoReset = !on;
+    if (!on && this.statsEl) this.statsEl.classList.add('hidden');
+  }
+
+  beforeRender() { if (this.showStats) this.game.renderer.info.reset(); }
+
+  // after the frame is drawn: draw calls and triangles for the scene (the post quad's one call and two triangles left out)
+  drawStats() {
+    if (!this.showStats) return;
+    let el = this.statsEl;
+    if (!el) {
+      el = this.statsEl = document.createElement('div');
+      el.id = 'render-readout';
+      (document.getElementById('undermap') || document.body).appendChild(el);
+    }
+    el.classList.remove('hidden');
+    const now = performance.now();
+    if (now - (this.statsT || 0) < 250) return; // (a few times a second is plenty to read)
+    this.statsT = now;
+    const r = this.game.renderer.info.render;
+    const tris = Math.max(0, r.triangles - 2);
+    el.textContent = `${Math.max(0, r.calls - 1).toLocaleString('en-US')} DRAWS · ${tris >= 1e6 ? (tris / 1e6).toFixed(2) + 'M' : tris.toLocaleString('en-US')} POLYS`;
   }
 
   speedLabel() { return `3 · SPEED: ×${this.speed}  (◄ ►)`; }

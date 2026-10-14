@@ -98,9 +98,11 @@ export class HUD {
 
   // hull fraction 0-1
   updateCracks(frac) {
-    const key = Math.round(frac * 400);
+    const off = this.game.cheats && !this.game.cheats.crackedVisor; // (dev menu: DISPLAY & DEBUG)
+    const key = off ? -2 : Math.round(frac * 400);
     if (key === this.crackKey) return;
     this.crackKey = key;
+    if (off) { this.crackEl.style.opacity = '0'; return; }
     let any = false;
     for (const c of this.cracks) {
       const p = Math.max(0, Math.min(1, (c.thr - frac) / 0.1));

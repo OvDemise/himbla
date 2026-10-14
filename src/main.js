@@ -1108,7 +1108,9 @@ class Game {
 
     if (this.trailer) this.trailer.post(u);
     this.renderer.setViewport(0, 0, window.innerWidth, window.innerHeight);
+    this.cheats.beforeRender();
     this.post.render(this.scene, this.camera);
+    this.cheats.drawStats();
     this.input.endFrame();
   }
 
