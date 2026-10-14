@@ -5,6 +5,7 @@ contains `[release]` (see the README's Download section). Newest first.
 
 ## Unreleased
 
+- **Grinds are harder to snag:** skating or flying across a crest at an angle no longer clamps you to it. You grab a rail by heading along it, dropping onto it, skating into a tip, or hitting a snake rock's side at speed.
 - **Grinding recharges the jets:** the thruster tank now refills while you ride a rail (it used to freeze, because the normal physics step that recharges it is skipped on a grind), and a locked-out tank unlocks at 25% as usual.
 - **Vehicle wheel:** the boxy "YOUR VEHICLES" list is gone. The controller menu's VEHICLES wedge now opens the vehicle wheel (the same one you get holding `V` / `Y`), restyled to match the controller menu: the right stick picks, `A` calls it, `B` / `Start` cancels, and the pick glows white in the light and purple on the dark side.
 
