@@ -346,7 +346,7 @@ export class GlobeMap {
       c.beginPath(); c.ellipse(p.x, p.y, rr, rr * p.z, Math.atan2(p.y - H / 2, p.x - W / 2) + Math.PI / 2, 0, Math.PI * 2); c.fill();
       c.strokeStyle = '#7b5cff'; c.stroke();
     }
-    // terminator: the edge of the dark side, in its own colour (SAT-7's orbit is the orange dashes).
+    // terminator: the edge of the dark side, in its own colour (SAT-7's orbit is the green dashes).
     // It's always drawn, fog or not, and lights up when you point at it.
     const hot = this.termHover;
     this.termPts = [];
@@ -443,16 +443,20 @@ export class GlobeMap {
     // SAT-7's orbit (dashed) and where it is right now
     if (g.secrets && g.secrets.sat) {
       const S = g.secrets;
-      c.strokeStyle = '#FF5F15'; c.lineWidth = 1.5; c.setLineDash([3, 6]);
-      c.beginPath();
+      // spring green is the one hue no faction uses, and a dark casing under it (like the roads) keeps
+      // it readable on lit ground as well as in the fog
+      c.setLineDash([6, 5]);
+      const orbit = new Path2D();
       let pen = false;
       const q = new THREE.Vector3();
       for (let i = 0; i <= 240; i++) {
         S.orbitPoint((i / 240) * Math.PI * 2, q).normalize();
         const pp = this.project(q, v);
-        if (pp.z > 0) { if (pen) c.lineTo(pp.x, pp.y); else c.moveTo(pp.x, pp.y); pen = true; } else pen = false;
+        if (pp.z > 0) { if (pen) orbit.lineTo(pp.x, pp.y); else orbit.moveTo(pp.x, pp.y); pen = true; } else pen = false;
       }
-      c.stroke(); c.setLineDash([]);
+      c.strokeStyle = '#120a1e'; c.lineWidth = 4.5; c.stroke(orbit);
+      c.strokeStyle = '#00ffa8'; c.lineWidth = 2.5; c.stroke(orbit);
+      c.setLineDash([]);
       // the low pass, marked
       S.orbitPoint(S.lowAt, q).normalize();
       const lp = this.project(q, v);

@@ -382,7 +382,7 @@ No spot on the Moon is unclaimed. Territory is a weighted split around every fac
 ~120 smaller outposts (watchtowers, supply depots, farm domes, relay masts, trading kiosks, scrap shacks).
 A chip shows whose land you're on, and the globe map is
 tinted by owner. The purple line on the globe map is the terminator, the edge of the dark side (point at it
-for details); SAT-7's orbit is the orange dashes, with chevrons showing which way it's heading. Military patrols drive between their faction's outposts and shoot pirates (never you, so
+for details); SAT-7's orbit is the green dashes, with chevrons showing which way it's heading. Military patrols drive between their faction's outposts and shoot pirates (never you, so
 settlement threat radii are unchanged). Captured and founded outposts move the borders.
 
 Each small outpost is a 50-odd-metre compound on its own flattened plateau: a lattice **Watchtower** with a
