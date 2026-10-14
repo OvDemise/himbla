@@ -602,6 +602,7 @@ export class Traffic {
     this.roadGeo = { pos: [], uv: [], fade: [], idx: [] };
     this.posts = [];
     this.pieces = [];
+    this.mapLines = []; // every road and town ring as a thin polyline of unit directions, for the maps
     this.gates = [];
     this.towns = new Map(); // loc -> gates
     this.rings = new Map(); // loc -> ring profile
@@ -645,6 +646,34 @@ export class Traffic {
     this.posts = null;
     this.roadVehicles = [];
     this.roads.forEach((road, k) => this.populateRoad(road, k));
+  }
+
+  // Every k-th point of a world-space polyline as a unit direction (the last point always stays).
+  thin(pts, k) {
+    const out = [];
+    for (let i = 0; i < pts.length; i += k) out.push(pts[i].clone().normalize());
+    if ((pts.length - 1) % k) out.push(pts[pts.length - 1].clone().normalize());
+    return out;
+  }
+
+  // The road network for the globe map and the minimap: short runs of the polylines above, each with
+  // a bounding cap (c: unit direction, r: metres) so the maps can cull them and test them against
+  // the fog. Built on first use.
+  mapChunks() {
+    if (this._chunks) return this._chunks;
+    const out = [], N = 12, R = this.P.R;
+    for (const line of this.mapLines) {
+      for (let i = 0; i < line.length - 1; i += N) {
+        const pts = line.slice(i, Math.min(line.length, i + N + 1));
+        const c = new THREE.Vector3();
+        for (const p of pts) c.add(p);
+        c.normalize();
+        let r = 0;
+        for (const p of pts) r = Math.max(r, Math.acos(Math.min(1, c.dot(p))));
+        out.push({ pts, c, r: r * R });
+      }
+    }
+    return (this._chunks = out);
   }
 
   // Can a 10 m road run over local (x,z)? Exact contact tests against colliders plus the keep-out
@@ -871,6 +900,7 @@ export class Traffic {
     const dirs = curve.getSpacedPoints(N).map((p) => p.normalize());
     const g = dirs.map((d) => P.ground(d, new THREE.Vector3()));
     const { side, tan, cum } = this.frames(g);
+    this.mapLines.push(this.thin(g, 5));
     // the strip stops just short of each ring's centreline (the ring strip covers the join)
     let i0 = 0, i1 = N;
     while (i0 < N && cum[i0] < 2.5) i0++;
@@ -929,6 +959,7 @@ export class Traffic {
     for (let i = 0; i < M; i++) { const p = this.ringLocal(R, i); W.push(P.ground(this.w.toWorld(loc, p.x, 0, p.z), new THREE.Vector3())); }
     const { side, tan } = this.frames(W, true);
     R.W = W; R.side = side; R.tan = tan;
+    this.mapLines.push(this.thin([...W, W[0]], Math.max(1, Math.round(20 / (R.step || 10)))));
     const wrap = (i) => ((i % M) + M) % M;
     // closed strip (the last row repeats the first)
     {

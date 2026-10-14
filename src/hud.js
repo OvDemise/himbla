@@ -462,6 +462,21 @@ export class HUD {
     const dark = darkness(up);
     c.fillStyle = dark > 0.5 ? '#0e0b18' : '#2a2440';
     c.fillRect(0, 0, W, H);
+    // the road network, under everything: only the stretches of ground you've charted (the same fog
+    // as the globe map), and it stays when the rest drops away at speed
+    const tr = g.world.traffic, gl = g.globe;
+    if (tr && tr.mapChunks && gl) {
+      c.save();
+      c.strokeStyle = dark > 0.5 ? 'rgba(196,172,255,0.55)' : 'rgba(233,207,148,0.7)';
+      c.lineWidth = 3; c.lineJoin = c.lineCap = 'round';
+      c.beginPath();
+      for (const ch of tr.mapChunks()) {
+        if (arcDist(ch.c, up) - ch.r > range * 1.1 || !gl.explored[gl.cellOf(ch.c)]) continue;
+        ch.pts.forEach((p, i) => { const [x, y] = proj(p); if (i) c.lineTo(x, y); else c.moveTo(x, y); });
+      }
+      c.stroke();
+      c.restore();
+    }
     c.globalAlpha = fade;
     c.strokeStyle = 'rgba(255,255,255,0.12)';
     c.lineWidth = 1;
