@@ -741,6 +741,8 @@ body:has(#title:not(.hidden)) #hud { visibility: hidden; }
 /* ---- casino 3D ---- */
 /* walk-in games action bar (casinoGames.js) */
 #cas3d { position: fixed; left: 50%; bottom: 16px; transform: translateX(-50%); z-index: 35; width: min(760px, calc(100vw - 32px)); background: var(--ui-bg); color: var(--ui-text); border: 2px solid var(--ui-edge); box-shadow: 0 0 0 2px #05030c, var(--ui-shadow); padding: 8px 12px 6px; font-family: var(--body); pointer-events: auto; cursor: default; }
+/* inside the casino hall: no HUD at all (prompts, toasts and pop-ups still show, so you can sit down at a game) */
+body.in-casino #hud > :not(#popups):not(#prompt):not(#toast):not(#splash):not(#dilate) { display: none !important; }
 /* seated at blackjack, the Duck Derby or Plinko: only the game's bar and its pop-ups (wins, QUACK!) stay up */
 body.seated #hud > :not(#popups) { display: none !important; }
 #cas3d .c3-head { display: flex; align-items: center; gap: 12px; font-family: var(--comic); font-size: 11px; line-height: 1.4; border-bottom: 2px solid var(--ui-edge); padding-bottom: 6px; flex-wrap: wrap; }
@@ -903,6 +905,11 @@ body.trailer #vehbar { display: none !important; }
 .wd-tag.on { background: var(--green); color: #05030c; }
 .wd-tag.own { background: var(--cyan); color: #05030c; }
 .wd-tag.lock { background: var(--red); color: #fff; }
+.wd-jar-toggle { position: absolute; top: 10px; right: 10px; display: flex; align-items: center; gap: 7px; font-family: var(--comic); font-size: 8px; line-height: 1; padding: 6px 8px 5px; cursor: pointer; background: var(--ui-bg2); color: var(--ui-muted); border: 2px solid var(--ui-edge); }
+.wd-jar-toggle:hover { color: var(--ui-text); border-color: var(--ui-muted); }
+.wd-jar-toggle.on { background: var(--cyan); color: #05030c; border-color: #05030c; box-shadow: 3px 3px 0 #05030c; }
+.wd-jar-toggle b { font-weight: normal; }
+.wd-jar-toggle.pad-focus { position: absolute; } /* (the pad highlight's position: relative would drop it out of the corner) */
 .wd-drag { position: absolute; bottom: 10px; left: 50%; transform: translateX(-50%); font-family: var(--comic); font-size: 8px; line-height: 1; color: var(--ui-dim); pointer-events: none; white-space: nowrap; }
 .wd-side { display: flex; flex-direction: column; min-height: 0; padding: 10px 12px 12px; gap: 10px; }
 .wd-tabs { display: flex; gap: 6px; flex-wrap: wrap; }
