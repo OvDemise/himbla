@@ -43,6 +43,11 @@ export const LASERS = [
   { name: 'Pure White', color: 0xffffff },
 ];
 
+// Things worn that you show or hide rather than swap (the wardrobe's Accessories tab).
+export const ACCESSORIES = {
+  jar: { name: 'Containment Jar', color: 0x9be7ff },
+};
+
 // Shop entries for the job boards (bought once, then equipped from the wardrobe with C).
 export function cosmeticShopItems(locId) {
   const out = [];
@@ -170,20 +175,32 @@ export class Cosmetics {
     this.outfit = 'courier';
     this.skates = 'stock';
     this.laser = 0;
+    this.jarShown = true; // wear the containment jar on your pack (if you own one)
     this.extraMeshes = [];
     try {
       const d = JSON.parse(localStorage.getItem(KEY) || 'null');
-      if (d) Object.assign(this, { outfit: d.outfit || 'courier', skates: d.skates || 'stock', laser: d.laser || 0 });
+      if (d) Object.assign(this, { outfit: d.outfit || 'courier', skates: d.skates || 'stock', laser: d.laser || 0, jarShown: d.jarShown !== false });
     } catch { /* default look */ }
   }
 
   save() {
-    try { localStorage.setItem(KEY, JSON.stringify({ outfit: this.outfit, skates: this.skates, laser: this.laser })); } catch { /* unavailable */ }
+    try { localStorage.setItem(KEY, JSON.stringify({ outfit: this.outfit, skates: this.skates, laser: this.laser, jarShown: this.jarShown })); } catch { /* unavailable */ }
   }
 
   owned(kind, id) {
+    if (kind === 'acc') return this.owns(id);
     if (kind === 'outfit') return id === 'courier' || (this.game.upgrades['outfit_' + id] || 0) > 0;
     return id === 'stock' || (this.game.upgrades['skates_' + id] || 0) > 0;
+  }
+
+  // accessories: the jar is only there to show once Dr. Zbornak has sold you one
+  owns(id) { return id === 'jar' ? !!(this.game.alchemy && this.game.alchemy.owned) : false; }
+  accShown(id) { return id === 'jar' ? this.jarShown : false; }
+  setAcc(id, on) {
+    if (id !== 'jar') return;
+    this.jarShown = on;
+    this.save();
+    if (this.game.alchemy) this.game.alchemy.refreshJarMesh();
   }
 
   get laserColor() { return LASERS[this.laser].color; }

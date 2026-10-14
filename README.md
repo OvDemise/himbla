@@ -91,7 +91,7 @@ Vite's hot reload restarts the page.
 | `Q` + `A`/`D` (air) | Spins |
 | Left mouse | Fire the selected weapon (the Pulse Spinner homes slightly; its splash can disc-jump you) |
 | `1` `2` `3` `4` | Switch weapon: Pulse Spinner, Vostok Scattergun, Daedalus Rail Lance, Rustmoon Junk Mortar |
-| `C` | Wardrobe: cycle owned outfits, skate finishes and pulse-disc colours |
+| `C` | Wardrobe: cycle owned outfits, skate finishes and pulse-disc colours, and show or hide accessories (the containment jar) |
 | `N` | Music on / off |
 | `V` (hold: radial) | Call / board / leave your faction vehicle; hold to pick one (story unlock) |
 | `Z` · mouse wheel | Use your selected **power** · step through your powers. Powers: Phase Dash, the Teleporter (`T` too), the Kepler Hitch-Line Winch (hold) and the pen link (`P` too) |
@@ -528,7 +528,7 @@ over crests; only a rig at full ramming speed gets thrown into the air.
   a coloured glide trail.
 - **Pulse-disc colours:** eight, free.
 - **Wardrobe (`C`):** a full screen with a live 3D preview of your runner facing you (drag to turn). Tabs for
-  outfits, skates and lasers; hover any item (even a locked one) to try it on, click or Enter to wear it.
+  outfits, skates, lasers and accessories (the containment jar, once you own one, can be shown or hidden on your pack); hover any item (even a locked one) to try it on, click or Enter to wear it.
   Locked items say exactly how to get them (shop, price, standing needed, casino chips, or a legendary hint).
 - New purchases are equipped immediately; your look is saved.
 
