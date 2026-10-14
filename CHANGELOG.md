@@ -5,6 +5,7 @@ contains `[release]` (see the README's Download section). Newest first.
 
 ## Unreleased
 
+- **Debug views:** DISPLAY & DEBUG in the dev menu gets SHOW EACH POLYGON (every triangle outlined over a dark fill) and SHOW EACH DRAW CALL (every draw call in its own flat colour, so you can see what batches and what doesn't). Both draw the bare scene without the comic post pass; they're mutually exclusive and last until you turn them off or reload.
 - **Shadow pass:** the shadow map (the heaviest single render pass) now refreshes every other frame while frames are quick and you're moving slowly (standing, walking, in a settlement), and every frame when you skate fast, teleport, or the frame rate is low. Shadows look the same; the saving shows up in busy places.
 - **Cracked visor, faster and in front:** the cracks are now painted once onto a single canvas (repainted only when your hull moves by a percent) instead of a few hundred live SVG paths under a screen-wide filter, which tanked the frame rate near death. They also draw in front of the rest of the HUD now.
 - **Dev menu, DISPLAY & DEBUG:** item 6 of the dev menu (F8) opens a new submenu with the FPS readout (moved here from item 6), a DRAW CALLS & POLYGONS readout under the minimap, and a CRACKED VISOR toggle.
