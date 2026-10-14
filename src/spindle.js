@@ -17,7 +17,7 @@ import { makeProp } from './storyAssets.js';
 import { mulberry32 } from './rng.js';
 import { SUN, tangent, GRAV } from './geo.js';
 import { makeShuttle, makePlanets } from './models.js';
-import { RC, L, CIRC, CHECK, CORE_S, PAD_S, wrapW, pointAt, smooth, heightAt, buildRockArrays, ROCK_S0, ROCK_S1 } from './spindleTerrain.js';
+import { RC, L, CIRC, CHECK, CORE_S, PAD_S, wrapW, pointAt, smooth, heightAt, meshHeightAt, buildRockArrays, ROCK_S0, ROCK_S1 } from './spindleTerrain.js';
 
 const AX = new THREE.Vector3(1, 0, 0);
 const TEAL = 0x7dffd4, PINK = 0xff2e88, VIO = 0xc77dff;
@@ -74,6 +74,12 @@ class SpindleWorld {
     return out.set(v.x, up.y * r, up.z * r);
   }
   altitude(p) { return rad(p) - this.surface(p); }
+  // How far the drawn rock stands above the ground you skate on at p (never below it): the mesh is a 5 m
+  // grid of straight triangles over heightAt, so in a hollow it hides anything laid on the true surface.
+  meshLift(p) {
+    const [s, w] = this.sw(p);
+    return Math.max(0, meshHeightAt(s, w) - heightAt(s, w));
+  }
   visible(a, b, steps = 12) { const q = new THREE.Vector3(); for (let i = 1; i < steps; i++) { q.lerpVectors(a, b, i / steps); if (this.altitude(q) < -0.5) return false; } return true; }
   inLake() { return null; }
   update() {}
@@ -379,7 +385,8 @@ export class Spindle {
     this.podCalled = false;
     this.spin = 0;
     // hide (and freeze) the Moon; this world takes over
-    this.hidden = g.scene.children.filter((o) => o.visible && o !== this.root && o !== g.player.model.root && !o.isLight && o !== g.sun.target && o !== g.earthLight.target);
+    // (anything marked userData.persist - the particles and skate ribbons - belongs to every world and stays)
+    this.hidden = g.scene.children.filter((o) => o.visible && o !== this.root && o !== g.player.model.root && !o.isLight && !o.userData.persist && o !== g.sun.target && o !== g.earthLight.target);
     for (const o of this.hidden) o.visible = false;
     this.root.visible = true;
     this.savedPlanet = g.planet;

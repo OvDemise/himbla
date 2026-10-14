@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { PHYS } from './config.js';
+import { upAt, radOf } from './geo.js';
 
 // A physics ragdoll for the runner (wipeouts and hard crashes). Eleven verlet particles joined by
 // distance constraints: a rigid torso cage (pelvis, chest, both shoulders and hips), a head that
@@ -27,6 +28,7 @@ const MIN = [[HED, PEL, 0.9], [HED, SHL, 0.85], [HED, SHR, 0.85], [HNL, HNR, 0.5
 const _x = new THREE.Vector3(), _y = new THREE.Vector3(), _z = new THREE.Vector3(), _d = new THREE.Vector3();
 const _n = new THREE.Vector3(), _w = new THREE.Vector3(), _vel = new THREE.Vector3(), _sh = new THREE.Vector3();
 const _near = [];
+const _g = new THREE.Vector3();
 const _mc = new THREE.Matrix4(), _mr = new THREE.Matrix4();
 const _qr = new THREE.Quaternion(), _ql = new THREE.Quaternion();
 
@@ -140,7 +142,7 @@ export class Ragdoll {
       }
     };
     const sr = g.planet.surface(p, _n);
-    const pen = sr + rad - p.length();
+    const pen = sr + rad - radOf(p); // (from the Moon's centre, or the Spindle's axis)
     if (pen > 0) resolve(_n, pen, 0.2);
     if (!solids) return;
     for (const col of g.colliders.query(p, 1.2, _near)) {
@@ -156,8 +158,7 @@ export class Ragdoll {
       _vel.subVectors(p[i], prev[i]).multiplyScalar(0.996);
       if (_vel.length() > MAXV * h) _vel.setLength(MAXV * h);
       prev[i].copy(p[i]);
-      const len = p[i].length() || 1;
-      p[i].add(_vel).addScaledVector(p[i], -this.G * h * h / len);
+      p[i].add(_vel).addScaledVector(upAt(p[i], _g), -this.G * h * h); // (down is toward the Moon's centre, or the Spindle's axis)
     }
     for (let it = 0; it < ITER; it++) {
       for (const [a, c, d] of this.rigid) {
@@ -197,9 +198,9 @@ export class Ragdoll {
   sync(dt) {
     const b = this.b, pel = this.p[PEL];
     if (this.getUp >= 0) { b.vel.set(0, 0, 0); this.follow(dt, b.pos); return; } // (settled: stay put and stand up here)
-    b.up.copy(pel).normalize();
+    upAt(pel, b.up);
     const sr = this.g.planet.surface(pel, _n);
-    const h = Math.max(0, pel.length() - sr);
+    const h = Math.max(0, radOf(pel) - sr);
     b.pos.copy(pel).addScaledVector(b.up, -Math.min(0.95, h));
     b.vel.subVectors(pel, this.prev[PEL]).multiplyScalar(1 / STEP);
     this.follow(dt, _sh.copy(b.pos).add(this.R[PEL]).sub(pel)); // (b.pos, but for the pelvis as drawn)

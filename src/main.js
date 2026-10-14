@@ -44,6 +44,7 @@ import { Recall } from './recall.js';
 import { Secrets } from './secrets.js';
 import { Settings } from './settings.js'; // settings
 import { Casino } from './casino.js'; // casino
+import { HALL as CASINO_HALL } from './casinoWorld.js'; // casino
 import { SaveSlots } from './saves.js'; // save slots
 import { MainMenu } from './menu.js'; // main menu
 import { WEAPONS } from './weapons.js';
@@ -143,6 +144,7 @@ class Game {
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     this.renderer.setSize(window.innerWidth, window.innerHeight);
     this.renderer.shadowMap.enabled = true;
+    this._frameMs = 16; // (smoothed frame time: updateLighting throttles the shadow map while frames are quick)
     this.renderer.shadowMap.type = THREE.PCFShadowMap;
     document.getElementById('game').appendChild(this.renderer.domElement);
 
@@ -722,6 +724,7 @@ class Game {
     const causes = {
       impact: 'You hit the ground way too hard with your skates off.',
       ram: 'Rammed into oblivion.',
+      crash: 'You wrapped your vehicle round something solid.',
       pirate: 'Scrapjaw pirates blasted you off your skates.',
       mil: 'Military defences turned you into a crater.',
       player: 'Your own Pulse Spinner. Classic.',
@@ -1005,7 +1008,7 @@ class Game {
     document.getElementById('title').classList.add('hidden');
     this.state = 'play';
     this.input.lock();
-    this.hud.banner(this.hub);
+    this.enterPlace(this.hub);
     // the first load after a story finale: what changed on the Moon
     if (this.ws.bulletin) {
       const news = this.ws.bulletin;
@@ -1066,6 +1069,7 @@ class Game {
     this.time += dt;
 
     const playing = this.state === 'play';
+    if (!playing) { if (this.garage && this.garage.radial) this.garage.closeRadial(false); this.vHold = 0; } // (the vehicle wheel, or a V / Y tap still in flight, doesn't outlive the play screen: a pause, the map, a dialog, a death)
     if (playing && !this.world.mergeDone) this.world.finishMerges(); // (static geometry: see world.mergeLocation)
     if (playing) this.updatePlay(dt);
     else if (this.state === 'derby') this.race.watch(dt); // watching your chimera race: the race drives the camera
@@ -1105,7 +1109,10 @@ class Game {
 
     if (this.trailer) this.trailer.post(u);
     this.renderer.setViewport(0, 0, window.innerWidth, window.innerHeight);
-    this.post.render(this.scene, this.camera);
+    this.cheats.beforeRender();
+    if (this.cheats.debugView) this.cheats.renderDebug(); // (dev menu: polygons / draw calls laid bare)
+    else this.post.render(this.scene, this.camera);
+    this.cheats.drawStats();
     this.input.endFrame();
   }
 
@@ -1147,6 +1154,34 @@ class Game {
     return darkness(P.up) > 0.6 ? 'dark' : 'free';
   }
 
+  // Walking into a settlement: its big banner shows only the first time (remembered in the save);
+  // after that the name just sits under the territory chip (territory.js setPlace).
+  enterPlace(loc) {
+    const seen = this.stats.seenPlaces || (this.stats.seenPlaces = []);
+    if (seen.includes(loc.id)) return;
+    seen.push(loc.id);
+    this.hud.banner(loc);
+  }
+
+  // 'casino' or 'lab' while you're standing inside the Lucky Crater Casino's hall or Dr. Zbornak's lab,
+  // else null. Indoors the HUD steps aside (casino only) and a wipeout or crash doesn't ragdoll you.
+  updateIndoors() {
+    const p = this.player.pos, w = this.world;
+    let where = null;
+    const cas = w.casino;
+    if (cas && cas.loc.active) {
+      const l = cas.toLocal(p, _v);
+      if (l.y > -3 && l.y < CASINO_HALL.H && Math.abs(l.x) < CASINO_HALL.W && l.z > CASINO_HALL.BACK && l.z < CASINO_HALL.FRONT) where = 'casino';
+    }
+    const lab = w.lab;
+    if (!where && lab && lab.loc.active) {
+      const l = lab.loc.group.worldToLocal(_v.copy(p));
+      if (l.y > -3 && l.y < lab.half.h && Math.abs(l.x) < lab.half.w && Math.abs(l.z) < lab.half.d) where = 'lab';
+    }
+    this.indoors = where;
+    document.body.classList.toggle('in-casino', where === 'casino'); // (style.css hides the HUD)
+  }
+
   // Sun, sky fill and the helmet lamp all depend on where you stand on the sphere.
   // On the Spindle: you, your shots, the story step and the asteroid; the Moon waits.
   updateAway(dt, c) {
@@ -1175,8 +1210,21 @@ class Game {
     this.hemi.position.copy(up);
     this.hemi.intensity = 0.06 + 0.8 * THREE.MathUtils.smoothstep(e, -0.25, 0.15);
     this.earthLight.intensity = 0.3 * THREE.MathUtils.smoothstep(up.dot(this.world.earthDir), -0.1, 0.3);
-    // shadows only matter where the sun is up
-    this.renderer.shadowMap.autoUpdate = day > 0.01;
+    // shadows only matter where the sun is up. The shadow map is the heaviest single pass (every caster
+    // within 160 m redrawn into a 2048² map), so while frames are quick (50+ fps) and you're moving
+    // slowly (standing, walking, a settlement: where the scenes are heaviest) it's refreshed every other
+    // frame: the old map stays valid (its matrix only changes with it) and a frame-old shadow is invisible
+    // at that speed. Fast skating, a teleport or a slow frame rate redraw it every frame.
+    const sm = this.renderer.shadowMap;
+    const now = performance.now();
+    if (this._shT) this._frameMs += (Math.min(100, now - this._shT) - this._frameMs) * 0.1;
+    this._shT = now;
+    const moved = this._shPos ? P.pos.distanceTo(this._shPos) : 1e9;
+    const calm = this._frameMs < 20 && P.speed < 25 && moved < 6;
+    const refresh = !calm || (this._shFlip = !this._shFlip);
+    sm.autoUpdate = false;
+    sm.needsUpdate = day > 0.01 && refresh;
+    if (day > 0.01 && refresh) { if (!this._shPos) this._shPos = new THREE.Vector3(); this._shPos.copy(P.pos); }
     // The shadow box follows you, moved in whole shadow-map texels along the light's own axes (the
     // ones the shadow camera's lookAt builds: z toward the sun, x = worldUp x z, y = z x x), so the
     // texel grid never slides across the ground and shadows hold still as you move. (Snapping on the
@@ -1238,6 +1286,7 @@ class Game {
     this.secrets.preUpdate(dt);
     if (this.spindle.active) { this.updateAway(dt, c); return; }
     this.cheats.tick();
+    this.updateIndoors();
     P.update(dt, this.input, c);
     this.secrets.update(dt);
     this.missions.update(dt);
@@ -1270,12 +1319,14 @@ class Game {
     if (!this.input.down('KeyX')) this.jarHoldDone = false;
     if (this.input.pressed('KeyX') && !A.jar.length) A.empty();
     if (this.input.pressed('KeyC') && this.boardCooldown <= 0) this.cosmetics.wardrobe();
-    if (this.input.pressed('KeyP') && this.boardCooldown <= 0) {
+    if (this.input.pressed('KeyP') && this.boardCooldown <= 0 && !this.player.rag) {
       if (this.upgrades.penlink) this.alchemy.penMenu();
       else this.hud.toast('No pen link. Dr. Zbornak sells a remote holding-pen link at the Antimatter Lab.', 3);
     }
-    // V: tap to call / board / leave; hold (with more than one vehicle) for the radial picker
-    if (this.input.pressed('KeyV') && this.boardCooldown <= 0 && !this.rides.ride) this.vHold = 1e-4;
+    // V: tap to call / board / leave; hold (with more than one vehicle) for the radial picker.
+    // (Limp in a ragdoll there's no calling a vehicle: the wheel closes and a press in flight is dropped.)
+    if (this.player.rag) { if (this.garage.radial) this.garage.closeRadial(false); this.vHold = 0; }
+    else if (this.input.pressed('KeyV') && this.boardCooldown <= 0 && !this.rides.ride) this.vHold = 1e-4;
     if (this.vHold) {
       if (this.input.down('KeyV')) {
         this.vHold += dt;
@@ -1286,7 +1337,7 @@ class Game {
       }
     }
     this.powers.update(dt);
-    if (this.input.pressed('KeyT') && this.boardCooldown <= 0) this.story.useTech('teleport');
+    if (this.input.pressed('KeyT') && this.boardCooldown <= 0 && !this.player.rag) this.story.useTech('teleport');
     if (this.input.pressed('KeyN')) this.hud.toast(this.audio.toggleMusic() ? '♪ Music on' : 'Music off', 1.5);
     this.cosmetics.update(dt);
     this.updateScanner(dt);
@@ -1308,7 +1359,8 @@ class Game {
 
     const z = this.zoneAt(P.pos);
     if (z !== this.currentZone) {
-      if (z) this.hud.banner(z);
+      if (z) this.enterPlace(z);
+      this.territory.setPlace(z ? z.name : null); // (the name sits under the territory chip while you're inside)
       this.currentZone = z;
     }
     const zw = document.getElementById('zonewarn');

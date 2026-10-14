@@ -1616,6 +1616,7 @@ export class Story {
   useTech(k) {
     const g = this.game;
     const P = g.player;
+    if (P.rag) return; // (limp in a ragdoll: no dash, no teleport)
     if (!this.tech.includes(k)) { g.hud.toast(`${TECH[k].name} isn't yours yet.`, 1.5); return; }
     if (this.techCd[k] > 0) { g.hud.toast(`${TECH[k].name}: ${Math.ceil(this.techCd[k])} s`, 1); return; }
     if (k === 'dash') {

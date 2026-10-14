@@ -91,7 +91,7 @@ Vite's hot reload restarts the page.
 | `Q` + `A`/`D` (air) | Spins |
 | Left mouse | Fire the selected weapon (the Pulse Spinner homes slightly; its splash can disc-jump you) |
 | `1` `2` `3` `4` | Switch weapon: Pulse Spinner, Vostok Scattergun, Daedalus Rail Lance, Rustmoon Junk Mortar |
-| `C` | Wardrobe: cycle owned outfits, skate finishes and pulse-disc colours |
+| `C` | Wardrobe: cycle owned outfits, skate finishes and pulse-disc colours; `J` in the wardrobe shows or hides the containment jar |
 | `N` | Music on / off |
 | `V` (hold: radial) | Call / board / leave your faction vehicle; hold to pick one (story unlock) |
 | `Z` · mouse wheel | Use your selected **power** · step through your powers. Powers: Phase Dash, the Teleporter (`T` too), the Kepler Hitch-Line Winch (hold) and the pen link (`P` too) |
@@ -380,7 +380,7 @@ front doors and press `F` at a station
 
 No spot on the Moon is unclaimed. Territory is a weighted split around every faction's settlements and
 ~120 smaller outposts (watchtowers, supply depots, farm domes, relay masts, trading kiosks, scrap shacks).
-Glowing faction-coloured pylons mark the borders, a chip shows whose land you're on, and the globe map is
+A chip shows whose land you're on, and the globe map is
 tinted by owner. The purple line on the globe map is the terminator, the edge of the dark side (point at it
 for details); SAT-7's orbit is the yellow dashes, with chevrons showing which way it's heading. Military patrols drive between their faction's outposts and shoot pirates (never you, so
 settlement threat radii are unchanged). Captured and founded outposts move the borders.
@@ -500,7 +500,7 @@ Hold `=` and `` ` `` (backtick) together during play (deliberately awkward so pl
 (±10, FRIENDLY / TRUSTED / HONORED / NEUTRAL / HOSTILE, or all factions HONORED) · teleport to any location ·
 god mode · unlock all gear, weapons and cosmetics · lab kit (big jar, items, 3 chimeras) · and under MORE: join
 Rustmoon, spawn a pirate squad or the Mega Mite, spawn an event for any faction (and teleport to it), max out
-the unlock counters, cure mutations, or reset all progress. Number keys pick, Esc closes.
+the unlock counters, toggle any splice-pod mutation (with a reset), or reset all progress. Number keys pick, Esc closes.
 
 ## Enemy outlines & Threat Scanner
 
@@ -528,7 +528,7 @@ over crests; only a rig at full ramming speed gets thrown into the air.
   a coloured glide trail.
 - **Pulse-disc colours:** eight, free.
 - **Wardrobe (`C`):** a full screen with a live 3D preview of your runner facing you (drag to turn). Tabs for
-  outfits, skates and lasers; hover any item (even a locked one) to try it on, click or Enter to wear it.
+  outfits, skates and lasers (and a JAR ON / OFF button in the preview's corner, once you own a containment jar); hover any item (even a locked one) to try it on, click or Enter to wear it.
   Locked items say exactly how to get them (shop, price, standing needed, casino chips, or a legendary hint).
 - New purchases are equipped immediately; your look is saved.
 
@@ -656,7 +656,7 @@ src/
   worldstate.js  what the story finales changed for good, applied before the world is built
   kade.js        Captain Kade's gun truck: orbit driving, gatling and flak turret, Junk Mortar drop
   monolith.js    the Monolith's spells: low-G, time dilation, echo decoys
-  territory.js   faction territory, border pylons, small outposts, patrols
+  territory.js   faction territory, small outposts, patrols
   vehicles.js    drivable faction vehicles
   settings.js    settings menu + key remapping
   casino.js      Lucky Crater Casino games, VIP, prizes, loan shark (casinoWorld.js: the building)

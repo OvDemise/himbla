@@ -799,7 +799,7 @@ export class Alchemy {
         }
       }
     }
-    if (this.owned && (!this.jarMesh || !this.jarMesh.parent)) this.refreshJarMesh();
+    if (this.jarVisible && (!this.jarMesh || !this.jarMesh.parent)) this.refreshJarMesh();
     // the Monolith
     const mono = g.world.monolith;
     this.monoCd -= dt;
@@ -963,33 +963,17 @@ export class Alchemy {
     }
   }
 
+  // Worn only if you own one and haven't hidden it in the wardrobe (Accessories tab).
+  get jarVisible() { return this.owned && this.game.cosmetics?.jarShown !== false; }
+
   // The jar rides on your back and shows what's inside.
   refreshJarMesh() {
     const P = this.game.player;
     if (this.jarMesh) this.jarMesh.removeFromParent();
     this.jarMesh = null;
-    if (!this.owned) return;
-    const g = new THREE.Group();
-    const glass = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.32, 0.8, 12), new THREE.MeshBasicMaterial({ color: 0x9be7ff, transparent: true, opacity: 0.3 }));
-    g.add(glass);
-    this.jar.forEach((it, i) => {
-      const blob = new THREE.Mesh(new THREE.SphereGeometry(it.kind === 'car' ? 0.24 : 0.17, 8, 6), glow(new THREE.Color(ITEMS[it.kind].color).getHex()));
-      blob.position.set(Math.sin(i * 2.1) * 0.12, -0.25 + i * 0.2, Math.cos(i * 2.1) * 0.12);
-      g.add(blob);
-    });
-    if (this.artifact) {
-      const art = new THREE.Mesh(new THREE.OctahedronGeometry(0.16, 0), glow(0x7dffd4));
-      art.position.set(0, 0.28, 0);
-      g.add(art);
-    }
-    const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.36, 0.36, 0.12, 12), toon(0x3a3550));
-    cap.position.y = 0.45;
-    g.add(cap);
-    // tucked against the right side of the backpack, a bit smaller
-    g.position.set(-0.5, -0.12, 0.22); // (on the right: the scarf hangs down the left)
-    g.scale.setScalar(0.78);
-    P.model.cargoSlot.add(g);
-    this.jarMesh = g;
+    if (!this.jarVisible) return;
+    this.jarMesh = makeJarMesh(this.jar, this.artifact);
+    P.model.cargoSlot.add(this.jarMesh);
   }
 
   hudText() {
@@ -1011,6 +995,30 @@ export class Alchemy {
     if (this.mutations.length) parts.push(`<div class="muts">${this.mutations.map((k) => MUTATIONS[k].name).join(' · ')}</div>`);
     return parts.join('');
   }
+}
+
+// The jar as it hangs on the pack (also the wardrobe's preview): glass, what's inside, the cap.
+export function makeJarMesh(jar = [], artifact = false) {
+  const g = new THREE.Group();
+  const glass = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.32, 0.8, 12), new THREE.MeshBasicMaterial({ color: 0x9be7ff, transparent: true, opacity: 0.3 }));
+  g.add(glass);
+  jar.forEach((it, i) => {
+    const blob = new THREE.Mesh(new THREE.SphereGeometry(it.kind === 'car' ? 0.24 : 0.17, 8, 6), glow(new THREE.Color(ITEMS[it.kind].color).getHex()));
+    blob.position.set(Math.sin(i * 2.1) * 0.12, -0.25 + i * 0.2, Math.cos(i * 2.1) * 0.12);
+    g.add(blob);
+  });
+  if (artifact) {
+    const art = new THREE.Mesh(new THREE.OctahedronGeometry(0.16, 0), glow(0x7dffd4));
+    art.position.set(0, 0.28, 0);
+    g.add(art);
+  }
+  const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.36, 0.36, 0.12, 12), toon(0x3a3550));
+  cap.position.y = 0.45;
+  g.add(cap);
+  // tucked against the right side of the backpack, a bit smaller
+  g.position.set(-0.5, -0.12, 0.22); // (on the right: the scarf hangs down the left)
+  g.scale.setScalar(0.78);
+  return g;
 }
 
 const BUFF_NAMES = { lowGrav: 'LOW-G', slick: 'MOON MUD', bouncy: 'SPRINGY', invert: 'NEGATIVE', rain: 'BLACK RAIN', cushion: 'SOFT LANDING', dilate: 'TIME DILATION', echo: 'ECHO DECOYS' };
