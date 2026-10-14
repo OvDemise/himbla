@@ -61,13 +61,14 @@ export class Powers {
     // (not while the cable's on: swapping mid-swing would drop you)
     const steps = I.consumeWheel();
     if (steps && !g.winch.on) this.cycle(steps > 0 ? 1 : -1);
-    if (I.pressed('KeyZ')) {
+    const limp = !!g.player.rag; // (a ragdoll can't use powers)
+    if (I.pressed('KeyZ') && !limp) {
       const k = this.current();
       if (k) this.use(k);
       else g.hud.toast('No powers yet. Phase Dash, the Teleporter, the Kepler winch and the pen link all go on Z.', 2.5);
     }
     // the winch holds while Z does
-    g.winch.update(dt, I.down('KeyZ') && this.current() === 'winch');
+    g.winch.update(dt, I.down('KeyZ') && this.current() === 'winch' && !limp);
     if (this.flash > 0) this.flash -= dt;
     this.chipT -= dt;
     if (this.chipT <= 0) { this.chipT = 0.2; this.drawChip(); }

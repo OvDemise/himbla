@@ -19,6 +19,7 @@ export const VEHICLES = {
 
 const _v = new THREE.Vector3(), _mu = new THREE.Vector3(), _mf = new THREE.Vector3();
 const REBUILD = 90; // seconds the orbital crane needs to replace a wrecked vehicle
+const CRASH_SAFE = 18; // m/s you can hit a wall at without hurting the vehicle
 
 export class Garage {
   constructor(game) {
@@ -52,6 +53,13 @@ export class Garage {
     this.hp[v.id] = (this.hp[v.id] ?? max) - amount;
     v.flash = 0.15;
     if (this.hp[v.id] <= 0) { this.destroy(v); return 12; }
+    // every hit that gets through bursts on the hull: a puff for a scrape, a fireball for a hard one
+    if (amount >= 4 && (v.boomT || 0) < g.time) {
+      v.boomT = g.time + 0.3;
+      const pos = v.model.root.position.clone().addScaledVector(v.e.body.pos.clone().normalize(), 1.5);
+      g.fx.explosion(pos, Math.min(6, 1.5 + amount * 0.06), amount > 40);
+      g.audio.boom(amount > 40);
+    }
     return amount * v.def.armor * 0.25;
   }
 
@@ -112,6 +120,7 @@ export class Garage {
   toggle() {
     const g = this.game;
     const P = g.player;
+    if (P.rag) return; // (limp in a ragdoll: nothing to call)
     if (P.vehicle) { this.exit(); return; }
     const owned = this.owned();
     if (!owned.length) { g.hud.toast('No vehicles yet. Faction leaders hand them out as you rise in their story.', 3); return; }
@@ -134,7 +143,7 @@ export class Garage {
   // controller's wheel it stays up instead (sticky): the right stick picks, A calls, B cancels.
   openRadial(sticky = false) {
     const owned = this.owned();
-    if (!owned.length) return;
+    if (!owned.length || this.game.player.rag) return;
     if (!this.radialEl) {
       this.radialEl = document.createElement('div');
       this.radialEl.id = 'vradial';
@@ -161,10 +170,28 @@ export class Garage {
     const pad = this.game.input.padActive;
     const k = R.sel >= 0 ? R.items[R.sel] : null;
     const hint = pad
-      ? `<span>${glyphHtml(['RS'])} pick</span><span>${R.sticky ? glyphHtml(['A']) + ' call' : 'release ' + glyphHtml(['Y']) + ' call'}</span>` + (R.sticky ? `<span>${glyphHtml(['B'])} cancel</span>` : '')
+      ? `<span>${glyphHtml(['RS'])} pick</span><span>${R.sticky ? glyphHtml(['A']) + ' call' : 'release ' + glyphHtml(['Y']) + ' call'}</span><span>${glyphHtml(['B'])} cancel</span>`
       : '<span>move to pick</span><span>release V to call</span>';
     const hub = `<b>${k ? VEHICLES[k].name : 'VEHICLES'}</b><small>${hint}</small>`;
     if (R.hub !== hub) { R.hub = hub; this.radialEl.querySelector('.pr-hub').innerHTML = hub; }
+  }
+
+  // the labels follow the game while the wheel is up (a rebuild finishing, hull mending, a pad picked up or put down)
+  radialRefresh() {
+    const R = this.radial;
+    if (!R) return;
+    const els = this.radialEl.querySelectorAll('.pr-item');
+    R.items.forEach((k, i) => {
+      const el = els[i];
+      if (!el) return;
+      const cd = this.cooldown(k);
+      const txt = cd > 0 ? `REBUILDING ${Math.ceil(cd)}s` : `HULL ${Math.ceil(this.hp[k] ?? this.maxHp(k))}/${this.maxHp(k)}`;
+      el.classList.toggle('locked', cd > 0);
+      el.classList.toggle('cd', cd > 0);
+      const s = el.querySelector('small');
+      if (s && s.textContent !== txt) s.textContent = txt;
+    });
+    this.radialHub();
   }
 
   // the wheel's highlight: -1 for none
@@ -173,15 +200,17 @@ export class Garage {
     if (!R || sel === R.sel) return;
     R.sel = sel;
     for (const el of this.radialEl.querySelectorAll('.pr-item')) el.classList.toggle('on', +el.dataset.i === sel);
-    if (sel >= 0) this.game.audio.tone(700 + sel * 60, 0.04, 'square', 0.05);
+    const au = this.game.audio;
+    if (sel >= 0 && au && au.tone) au.tone(700 + sel * 40, 0.04, 'square', 0.04);
     this.radialHub();
   }
 
   // the mouse (pushed round while V is held). Called every frame the wheel is up, with nothing when the mouse is
-  // still: that must leave the pick alone, or it would wipe the one the right stick just made.
+  // still: that must leave the pick alone, or it would wipe the one the right stick just made. While a pad is the
+  // device in use the mouse is ignored altogether (the pointer can still be captured and a bump would clear the pick).
   radialMove(dx, dy) {
     const R = this.radial;
-    if (!R || (!dx && !dy)) return;
+    if (!R || (!dx && !dy) || this.game.input.padActive) return;
     R.ax += dx; R.ay += dy;
     const len = Math.hypot(R.ax, R.ay);
     if (len > 140) { R.ax *= 140 / len; R.ay *= 140 / len; }
@@ -208,6 +237,7 @@ export class Garage {
     if (this.radialEl) this.radialEl.classList.add('hidden');
     if (!commit || !R || R.sel < 0) return;
     const k = R.items[R.sel];
+    if (g.rides.ride || g.player.dead || g.player.vehicle) return; // (a transit ride started, or you died or boarded something while it was up: nothing to call)
     if (this.cooldown(k) > 0) { g.hud.toast(`${VEHICLES[k].name} is being rebuilt: ready in ${Math.ceil(this.cooldown(k))}s.`, 2.5); return; }
     this.choice = k;
     if (this.active && this.active.id === k && this.active.e.body.pos.distanceTo(g.player.pos) < 12) { this.enter(); return; }
@@ -237,7 +267,11 @@ export class Garage {
     if (!this.active) return;
     P.vehicle = this.active;
     P.resetTrick();
-    g.hud.toast(`${this.active.def.name}: W/S drive · A/D steer · SHIFT hop · V to get out`, 3.5);
+    // the controls, as the pad's own buttons when one is in use (left stick drives and steers, A hops, Y gets out)
+    const name = this.active.def.name.replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+    g.hud.toast(g.input.padActive
+      ? `${name}: ${glyphHtml(['LS'])} drive / steer · ${glyphHtml(['A'])} hop · ${glyphHtml(['Y'])} get out`
+      : `${name}: W/S drive · A/D steer · SHIFT hop · V to get out`, 3.5, g.input.padActive);
   }
 
   exit() {
@@ -277,7 +311,16 @@ export class Garage {
     const tune = def.hover
       ? { grip: Math.max(def.grip, 10), stick: 70, traction: 7 }
       : { grip: Math.max(def.grip * 1.6, 24), stick: 55, traction: 15 };
-    for (let i = 0; i < steps; i++) stepRover(e, dt / steps, g.planet, g.colliders, target, max, { engine: fwdIn || back ? def.engine : 0, turn: def.turn, radius: def.radius || 3.2 * (def.scale || 1), weight: def.hover ? 1.5 : 1.7, ...tune });
+    const crash = { speed: 0 };
+    for (let i = 0; i < steps; i++) stepRover(e, dt / steps, g.planet, g.colliders, target, max, { engine: fwdIn || back ? def.engine : 0, turn: def.turn, radius: def.radius || 3.2 * (def.scale || 1), weight: def.hover ? 1.5 : 1.7, solidPlatforms: true, crash, ...tune });
+    // crashes: a hard hit on a wall, a building or road traffic hurts the vehicle (and bursts on it: hit())
+    if (crash.speed > CRASH_SAFE && (this.crashT || 0) < g.time) {
+      this.crashT = g.time + 0.4;
+      g.audio.thud(crash.speed);
+      g.fx.pop('CRASH!', b.pos.clone().addScaledVector(up, 4), { color: '#ff4f2e', size: 54 });
+      g.damagePlayer(Math.min((crash.speed - CRASH_SAFE) * 2.5, this.maxHp(v.id) * 0.5), 'crash');
+      if (!P.vehicle) return; // (wrecked: destroy() has already got you out)
+    }
     if (def.hover) b.vel.multiplyScalar(1 - 0.15 * dt);
     if (b.grounded && (input.pressed('ShiftLeft') || input.pressed('ShiftRight'))) { b.vel.addScaledVector(up, 9); b.grounded = false; b.wasGround = false; g.audio.jump(); } // (wasGround off: the ground snap mustn't swallow the hop)
     // pose
@@ -337,6 +380,7 @@ export class Garage {
   }
 
   update(dt) {
+    if (this.radial) this.radialRefresh();
     const g = this.game;
     // field repairs: hull creeps back while you're not behind the wheel
     for (const id of Object.keys(this.hp)) if (!(g.player.vehicle && g.player.vehicle.id === id)) this.hp[id] = Math.min(this.maxHp(id), this.hp[id] + dt * 2);
@@ -366,7 +410,7 @@ export class Garage {
     this.trail(v.model, dt, false);
     const b = v.e.body;
     if (b.vel.lengthSq() > 0.01) {
-      stepRover(v.e, dt, this.game.planet, this.game.colliders, v.e.heading, 0, { engine: 10, grip: v.def.grip, turn: 0, radius: 3 });
+      stepRover(v.e, dt, this.game.planet, this.game.colliders, v.e.heading, 0, { engine: 10, grip: v.def.grip, turn: 0, radius: 3, solidPlatforms: true });
       v.model.root.position.copy(b.pos);
     }
   }

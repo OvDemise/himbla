@@ -9,8 +9,8 @@ import { outpostTemplate, SMALL_KINDS, FLAT_R } from './outpostModels.js';
 import { foundedTemplate, TERMINAL_Z } from './storyAssets.js';
 
 // Every square metre of the Moon belongs to somebody. Territory is a weighted Voronoi split
-// around each faction's settlements and outposts; borders are marked with glowing pylons,
-// small faction structures dot the countryside, and military patrols run between them.
+// around each faction's settlements and outposts; small faction structures dot the countryside,
+// and military patrols run between them.
 const KEY = 'moonrunner-territory-v1';
 const MILITARY = ['spacecom', 'vostok', 'daedalus'];
 const KINDS = {
@@ -60,6 +60,7 @@ export class Territory {
     this.outposts = [];
     this.patrols = [];
     this.current = null;
+    this.placeName = null; // the settlement you're standing in (its name goes under the territory line in the chip)
     this.chip = document.createElement('div');
     this.chip.id = 'terrchip';
     this.chip.className = 'chip terr hidden';
@@ -242,7 +243,6 @@ export class Territory {
   // Outposts claim a little ground of their own (so captures move the borders).
   rebuild() {
     this.anchors = this.baseAnchors.concat(this.outposts.map((o) => ({ dir: o.dir, faction: o.faction, w: o.built ? 0.6 : OUTPOST_W })));
-    this.buildBorders();
     this.mapCache = null;
     this.buildRoutes();
   }
@@ -267,46 +267,6 @@ export class Territory {
   }
 
   name(o) { return o.name || `${FACTIONS[o.faction] ? FACTIONS[o.faction].name : ''} ${KIND_NAMES[o.kind] || 'Outpost'}`; }
-
-  // ---------- border pylons (one instanced mesh for the whole Moon) ----------
-  buildBorders() {
-    const g = this.game;
-    if (this.borders) { g.scene.remove(this.borders.shaft, this.borders.cap); this.borders.shaft.dispose(); this.borders.cap.dispose(); }
-    const N = 9000, pts = [];
-    const ga = Math.PI * (3 - Math.sqrt(5));
-    const d = new THREE.Vector3(), t = new THREE.Vector3(), s = new THREE.Vector3(), o = new THREE.Vector3();
-    for (let i = 0; i < N; i++) {
-      const y = 1 - (2 * (i + 0.5)) / N, r = Math.sqrt(1 - y * y), th = ga * i;
-      d.set(r * Math.cos(th), y, r * Math.sin(th));
-      const f = this.owner(d);
-      tangent(t.set(1, 0, 0), d, t);
-      if (t.lengthSq() < 1e-4) tangent(t.set(0, 0, 1), d, t);
-      t.normalize();
-      s.crossVectors(d, t);
-      let edge = false;
-      for (const [a, b] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
-        o.copy(d).addScaledVector(t, a * 0.02).addScaledVector(s, b * 0.02).normalize();
-        if (this.owner(o) !== f) { edge = true; break; }
-      }
-      if (edge && !g.locations.some((l) => arcDist(d, l.dir) < (l.zoneR || l.r) + 40)) pts.push({ dir: d.clone(), f });
-    }
-    const shaftGeo = new THREE.CylinderGeometry(0.25, 0.35, 7, 6).translate(0, 3.5, 0);
-    const capGeo = new THREE.OctahedronGeometry(0.9, 0).translate(0, 7.8, 0);
-    const shaft = new THREE.InstancedMesh(shaftGeo, toon(0x2a2540), pts.length);
-    const cap = new THREE.InstancedMesh(capGeo, new THREE.MeshBasicMaterial({ color: 0xffffff }), pts.length);
-    const m = new THREE.Matrix4(), q = new THREE.Quaternion(), sc = new THREE.Vector3(1, 1, 1), p = new THREE.Vector3(), col = new THREE.Color();
-    pts.forEach((b, i) => {
-      g.planet.ground(b.dir, p, -0.3);
-      q.setFromUnitVectors(new THREE.Vector3(0, 1, 0), b.dir);
-      m.compose(p, q, sc);
-      shaft.setMatrixAt(i, m);
-      cap.setMatrixAt(i, m);
-      cap.setColorAt(i, col.set(FACTIONS[b.f].color));
-    });
-    for (const im of [shaft, cap]) { im.frustumCulled = false; im.instanceMatrix.needsUpdate = true; g.scene.add(im); }
-    if (cap.instanceColor) cap.instanceColor.needsUpdate = true;
-    this.borders = { shaft, cap, count: pts.length };
-  }
 
   // ---------- outpost structures, built only near the player ----------
   spawn(o) {
@@ -575,12 +535,26 @@ export class Territory {
         const first = this.current === null;
         this.current = f;
         const F = FACTIONS[f];
-        this.chip.textContent = `◆ ${F.name.toUpperCase()} TERRITORY`;
         this.chip.style.background = F.color;
+        this.drawChip();
         this.chip.classList.remove('hidden');
         if (!first && g.state === 'play') g.hud.toast(`Entering ${F.name} territory`, 2);
       }
     }
+  }
+
+  // the chip: the territory line, and under it (centred, same box) the settlement you're in
+  drawChip() {
+    const F = FACTIONS[this.current];
+    if (!F) return;
+    const esc = (s) => String(s).replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+    this.chip.innerHTML = `◆ ${esc(F.name.toUpperCase())} TERRITORY${this.placeName ? `<div class="terr-place">${esc(this.placeName.toUpperCase())}</div>` : ''}`;
+  }
+
+  setPlace(name) {
+    if (name === this.placeName) return;
+    this.placeName = name;
+    this.drawChip();
   }
 
   // ---------- raiding minor structures ----------

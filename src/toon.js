@@ -101,6 +101,41 @@ export function paintVertices(g, color) {
   return g;
 }
 
+// Triangles lying flat on the ground and facing down (the undersides of boxes, cylinder caps, aprons)
+// can never be seen from above the ground, and their ink shells' undersides sit below it: they're
+// dropped from a piece baked into a settlement (`g`: already placed in the place's frame, y up from
+// the ground at 0; indexed or not). Works on the position data alone. Returns g.
+export function dropFloorFaces(g, maxY = 0.05) {
+  const pos = g.attributes.position.array, idx = g.index ? g.index.array : null;
+  const tris = (idx ? idx.length : g.attributes.position.count) / 3;
+  const keep = new Uint8Array(tris);
+  let kept = 0;
+  for (let t = 0; t < tris; t++) {
+    const a = (idx ? idx[t * 3] : t * 3) * 3, b = (idx ? idx[t * 3 + 1] : t * 3 + 1) * 3, c = (idx ? idx[t * 3 + 2] : t * 3 + 2) * 3;
+    if (pos[a + 1] <= maxY && pos[b + 1] <= maxY && pos[c + 1] <= maxY) {
+      const ux = pos[b] - pos[a], uy = pos[b + 1] - pos[a + 1], uz = pos[b + 2] - pos[a + 2];
+      const vx = pos[c] - pos[a], vy = pos[c + 1] - pos[a + 1], vz = pos[c + 2] - pos[a + 2];
+      const nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx;
+      const len = Math.hypot(nx, ny, nz);
+      if (len > 1e-9 && ny / len < -0.98) continue; // (a floor: dropped)
+    }
+    keep[t] = 1; kept++;
+  }
+  if (kept === tris) return g;
+  if (idx) {
+    const out = new idx.constructor(kept * 3);
+    for (let t = 0, o = 0; t < tris; t++) if (keep[t]) { out[o++] = idx[t * 3]; out[o++] = idx[t * 3 + 1]; out[o++] = idx[t * 3 + 2]; }
+    g.setIndex(new THREE.BufferAttribute(out, 1));
+    return g;
+  }
+  for (const k of Object.keys(g.attributes)) {
+    const at = g.attributes[k], s = at.itemSize, out = new at.array.constructor(kept * 3 * s);
+    for (let t = 0, o = 0; t < tris; t++) if (keep[t]) { out.set(at.array.subarray(t * 3 * s, t * 3 * s + 3 * s), o); o += 3 * s; }
+    g.setAttribute(k, new THREE.BufferAttribute(out, s));
+  }
+  return g;
+}
+
 export function glow(color) {
   return new THREE.MeshBasicMaterial({ color });
 }

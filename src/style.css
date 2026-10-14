@@ -39,6 +39,8 @@ button { font-family: var(--comic); }
 }
 
 #hud { position: fixed; inset: 0; pointer-events: none; user-select: none; }
+/* the cracked visor (hud.js buildCracks): one canvas of glass cracks that spread as hull drops, in front of the rest of the HUD (the HUD's own z-indexes top out at 30) */
+#cracks { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; z-index: 40; pointer-events: none; }
 
 /* ---------- top-left ---------- */
 #topleft { position: absolute; top: 16px; left: 16px; display: flex; flex-direction: column; gap: 8px; align-items: flex-start; max-width: 340px; }
@@ -78,8 +80,11 @@ button { font-family: var(--comic); }
   transition: box-shadow 0.6s, border-color 0.6s;
 }
 #minimap.dark { border-color: #8f7bff; box-shadow: 0 0 0 2px #05030c, 0 0 22px 6px rgba(143, 100, 255, 0.75), var(--ui-shadow); }
+#render-readout { align-self: stretch; text-align: center; font: 13px/1.2 monospace; padding: 3px 0; background: rgba(5, 3, 12, 0.78); border: 1px solid var(--ui-edge); color: #7fd8ff; pointer-events: none; }
+#render-readout.hidden { display: none; }
 #fps-readout { align-self: stretch; text-align: center; font: 13px/1.2 monospace; padding: 3px 0; background: rgba(5, 3, 12, 0.78); border: 1px solid var(--ui-edge); pointer-events: none; }
 #fps-readout.hidden { display: none; }
+#terrchip .terr-place { margin-top: 4px; padding-top: 4px; border-top: 2px solid rgba(5, 3, 12, 0.35); font-size: 10px; line-height: 1.25; text-align: center; }
 #undermap #terrchip.chip { width: 100%; max-width: 100%; box-sizing: border-box; text-align: center; text-wrap: balance; overflow-wrap: anywhere; }
 #undermap { position: absolute; top: 242px; right: 16px; width: 210px; display: flex; flex-direction: column; gap: 6px; align-items: flex-end; }
 #minimap.big { width: min(560px, 80vmin); height: min(560px, 80vmin); top: 50%; right: 50%; transform: translate(50%, -50%); border-radius: 0; }
@@ -741,6 +746,8 @@ body:has(#title:not(.hidden)) #hud { visibility: hidden; }
 /* ---- casino 3D ---- */
 /* walk-in games action bar (casinoGames.js) */
 #cas3d { position: fixed; left: 50%; bottom: 16px; transform: translateX(-50%); z-index: 35; width: min(760px, calc(100vw - 32px)); background: var(--ui-bg); color: var(--ui-text); border: 2px solid var(--ui-edge); box-shadow: 0 0 0 2px #05030c, var(--ui-shadow); padding: 8px 12px 6px; font-family: var(--body); pointer-events: auto; cursor: default; }
+/* inside the casino hall: no HUD at all (prompts, toasts and pop-ups still show, so you can sit down at a game) */
+body.in-casino #hud > :not(#popups):not(#prompt):not(#toast):not(#splash):not(#dilate) { display: none !important; }
 /* seated at blackjack, the Duck Derby or Plinko: only the game's bar and its pop-ups (wins, QUACK!) stay up */
 body.seated #hud > :not(#popups) { display: none !important; }
 #cas3d .c3-head { display: flex; align-items: center; gap: 12px; font-family: var(--comic); font-size: 11px; line-height: 1.4; border-bottom: 2px solid var(--ui-edge); padding-bottom: 6px; flex-wrap: wrap; }
@@ -903,6 +910,11 @@ body.trailer #vehbar { display: none !important; }
 .wd-tag.on { background: var(--green); color: #05030c; }
 .wd-tag.own { background: var(--cyan); color: #05030c; }
 .wd-tag.lock { background: var(--red); color: #fff; }
+.wd-jar-toggle { position: absolute; top: 10px; right: 10px; display: flex; align-items: center; gap: 7px; font-family: var(--comic); font-size: 8px; line-height: 1; padding: 6px 8px 5px; cursor: pointer; background: var(--ui-bg2); color: var(--ui-muted); border: 2px solid var(--ui-edge); }
+.wd-jar-toggle:hover { color: var(--ui-text); border-color: var(--ui-muted); }
+.wd-jar-toggle.on { background: var(--cyan); color: #05030c; border-color: #05030c; box-shadow: 3px 3px 0 #05030c; }
+.wd-jar-toggle b { font-weight: normal; }
+.wd-jar-toggle.pad-focus { position: absolute; } /* (the pad highlight's position: relative would drop it out of the corner) */
 .wd-drag { position: absolute; bottom: 10px; left: 50%; transform: translateX(-50%); font-family: var(--comic); font-size: 8px; line-height: 1; color: var(--ui-dim); pointer-events: none; white-space: nowrap; }
 .wd-side { display: flex; flex-direction: column; min-height: 0; padding: 10px 12px 12px; gap: 10px; }
 .wd-tabs { display: flex; gap: 6px; flex-wrap: wrap; }
