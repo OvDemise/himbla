@@ -907,6 +907,7 @@ body.trailer #vehbar { display: none !important; }
 .wd-jar-toggle:hover { color: var(--ui-text); border-color: var(--ui-muted); }
 .wd-jar-toggle.on { background: var(--cyan); color: #05030c; border-color: #05030c; box-shadow: 3px 3px 0 #05030c; }
 .wd-jar-toggle b { font-weight: normal; }
+.wd-jar-toggle.pad-focus { position: absolute; } /* (the pad highlight's position: relative would drop it out of the corner) */
 .wd-drag { position: absolute; bottom: 10px; left: 50%; transform: translateX(-50%); font-family: var(--comic); font-size: 8px; line-height: 1; color: var(--ui-dim); pointer-events: none; white-space: nowrap; }
 .wd-side { display: flex; flex-direction: column; min-height: 0; padding: 10px 12px 12px; gap: 10px; }
 .wd-tabs { display: flex; gap: 6px; flex-wrap: wrap; }
