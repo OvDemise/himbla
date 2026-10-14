@@ -500,7 +500,7 @@ Hold `=` and `` ` `` (backtick) together during play (deliberately awkward so pl
 (±10, FRIENDLY / TRUSTED / HONORED / NEUTRAL / HOSTILE, or all factions HONORED) · teleport to any location ·
 god mode · unlock all gear, weapons and cosmetics · lab kit (big jar, items, 3 chimeras) · and under MORE: join
 Rustmoon, spawn a pirate squad or the Mega Mite, spawn an event for any faction (and teleport to it), max out
-the unlock counters, cure mutations, or reset all progress. Number keys pick, Esc closes.
+the unlock counters, toggle any splice-pod mutation (with a reset), or reset all progress. Number keys pick, Esc closes.
 
 ## Enemy outlines & Threat Scanner
 

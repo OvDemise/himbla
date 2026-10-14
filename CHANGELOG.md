@@ -5,6 +5,7 @@ contains `[release]` (see the README's Download section). Newest first.
 
 ## Unreleased
 
+- **Cheat menu splice submenu:** MORE → SPLICE MUTATIONS… toggles each of the ten splice-pod mutations on or off (no jar needed, ignores the 3-mutation cap) and has a RESET ALL button. It replaces the old CURE MUTATIONS button.
 - **Vehicle wheel:** the boxy "YOUR VEHICLES" list is gone. The controller menu's VEHICLES wedge now opens the vehicle wheel (the same one you get holding `V` / `Y`), restyled to match the controller menu: the right stick picks, `A` calls it, `B` / `Start` cancels, and the pick glows white in the light and purple on the dark side.
 
 ## 0.9.99-1 — 2026-10-13
