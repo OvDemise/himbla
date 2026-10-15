@@ -7,8 +7,10 @@ import { arcDist, tangent, frameQuat, greatCircle, darkness } from './geo.js';
 import { pick } from './rng.js';
 import { VEHICLES } from './vehicles.js';
 import { spawnKadeTruck, updateKadeTruck, kadeDefeated, updateMortarDrop } from './kade.js';
-import { FOES, makeProp } from './storyAssets.js';
+import { FOES, makeProp, EXTRA_MODS, PLOTS, OUTPOST_GUN } from './storyAssets.js';
 import { saveWorldState } from './worldstate.js';
+import { terminalPage, wireTerminal, stepSel, keepScroll } from './terminalUI.js';
+import { glyphHtml } from './glyphs.js';
 
 // Faction stories. Every faction has a leader who offers a four-chapter storyline once you're
 // FRIENDLY with them. Finishing the first chapter of one story commits you to it (the other
@@ -35,13 +37,19 @@ export const TECH = {
 
 // Modules for outposts you found (the base-builder part).
 export const MODULES = {
-  greenhouse: { name: 'Greenhouse', cost: 600, desc: 'Heals you while you are nearby, and grows a little income.' },
-  clinic: { name: 'Clinic', cost: 800, desc: 'You redeploy here after a K.O. (nearest clinic wins).' },
-  beacon: { name: 'Beacon Tower', cost: 700, desc: 'Charts 1.5 km of map around it and links to your other beacons for fast travel.' },
-  turret: { name: 'Militia Turret', cost: 900, desc: 'Shoots pirates within 300 m.' },
-  market: { name: 'Market Stall', cost: 1200, desc: 'Earns ₵40 a minute (up to ₵800) to collect at the terminal.' },
-  garage: { name: 'Garage', cost: 1500, desc: 'Unlocks your faction hauler and lets you summon it anywhere.' },
+  greenhouse: { name: 'Greenhouse', cost: 600, icon: 'greenhouse', tint: '#7dff6a', feature: 'Heals you within 60 m', desc: 'Heals you while you are nearby.' },
+  clinic: { name: 'Clinic', cost: 800, icon: 'clinic', tint: '#ff2a4a', feature: 'K.O. respawn point', desc: 'You redeploy here after a K.O. (nearest clinic wins).' },
+  beacon: { name: 'Beacon Tower', cost: 700, icon: 'beacon', tint: '#2ee6ff', feature: 'Charts 1.5 km · fast travel', desc: 'Charts 1.5 km of map around it and links to your other beacons for fast travel.' },
+  turret: { name: 'Militia Turret', cost: 900, icon: 'turret', tint: '#ff9f1c', feature: 'Shoots pirates within 300 m', desc: 'A manned gun on a tall stand. Shoots pirates within 300 m.' },
+  turret2: { name: 'Second Militia Turret', cost: 900, needs: 'turret', icon: 'turret2', tint: '#ff9f1c', feature: 'A second gun by the gate', desc: 'A second gun on a stand of its own beside the gate. Shoots pirates within 300 m.' },
+  market: { name: 'Market Stall', cost: 1200, icon: 'market', tint: '#ff2e88', feature: '₵40 a minute, up to ₵800', desc: 'Earns ₵40 a minute (up to ₵800) to collect at the terminal.' },
+  garage: { name: 'Garage', cost: 1500, icon: 'garage', tint: '#ffd23f', feature: 'Your faction hauler (V)', desc: 'Unlocks your faction hauler and lets you summon it anywhere.' },
 };
+// a free module goes into the first empty slot of its line; plotsOf counts the six plots (the extras have a stand of their own)
+const MODULE_LINES = { turret: ['turret', 'turret2'] };
+const HOMESTEAD = 'Pike\'s Hope';
+const BANK_CAP = 800, MARKET_RATE = 40; // the market stall: ₵ a minute, and the most it holds
+const plotsOf = (o) => o.modules.filter((k) => !EXTRA_MODS[k]).length;
 
 // Chapter scripts. Step types: goto, relays, clear, capture, build, defend, experiment, carry, boss,
 // kade, jam (plant a phase jammer and keep it alive while it converts a post), assault (storm a
@@ -195,7 +203,7 @@ const CHAPTERS = {
       title: 'Raiders at the Gate',
       brief: '"Pirates are sniffing around Pike\'s Hope. The settlers are frightened. Keep the generator running, dear: the militia is on its way, and they\'ll get there if you buy them the time."',
       steps: [
-        { t: 'goto', at: { founded: true }, r: 30, label: 'Get to Pike\'s Hope' },
+        { t: 'goto', at: { foundedIdx: 0 }, r: 30, label: 'Get to Pike\'s Hope' },
         { t: 'defend', at: { prev: true }, secs: 70, hp: 800, prop: 'homegen', foe: 'rustmoon', garrisonAt: 30, label: 'Keep the generator running' },
       ],
       reward: { credits: 660, module: 'turret', upgrade: ['dampers', 1] },
@@ -716,8 +724,8 @@ export class Story {
     if (r.vehicle && !this.vehicles.includes(r.vehicle)) { this.vehicles.push(r.vehicle); unlocks.push(`Vehicle: ${VEHICLES[r.vehicle].name} (V)`); }
     if (r.tech && !this.tech.includes(r.tech)) { this.tech.push(r.tech); unlocks.push(`Tech: ${TECH[r.tech].name}${TECH[r.tech].key !== '—' ? ` (${TECH[r.tech].key})` : ''}`); }
     if (r.outfit) { g.upgrades['outfit_' + r.outfit] = 1; unlocks.push('Outfit added to your wardrobe (C)'); }
-    if (r.module) { for (const o of this.myOutposts().slice(-1)) if (!o.modules.includes(r.module)) o.modules.push(r.module); unlocks.push(`Free ${MODULES[r.module].name} at your newest outpost`); this.refreshOutposts(); }
-    if (r.everyModule) { for (const o of this.myOutposts()) if (!o.modules.includes(r.everyModule)) o.modules.push(r.everyModule); this.refreshOutposts(); unlocks.push(`A ${MODULES[r.everyModule].name} at every homestead`); }
+    if (r.module) this.rewardModule(r.module, unlocks);
+    if (r.everyModule) { for (const o of this.myOutposts()) this.grantModule(o, r.everyModule); this.refreshOutposts(); unlocks.push(`A ${MODULES[r.everyModule].name} at every homestead`); }
     const WNAME = { rail: 'Daedalus Rail Lance (key 3)', scatter: 'Vostok Scattergun (key 2)', mortar: 'Rustmoon Junk Mortar (key 4)' };
     if (r.weapon && !g.upgrades[r.weapon]) { g.upgrades[r.weapon] = 1; g.player.applyUpgrades(g.upgrades); unlocks.push(`Weapon: ${WNAME[r.weapon] || r.weapon}`); }
     if (r.upgrade) {
@@ -1660,44 +1668,151 @@ export class Story {
   // ---------- outposts you founded: modules, income, healing ----------
   myOutposts() { return this.founded.map((id) => this.game.territory.outposts.find((o) => o.id === id)).filter(Boolean); }
 
+  // Pike's Hope: the homestead the first Kepler chapter founds (what the chapter rewards are for)
+  homestead() { const mine = this.myOutposts(); return mine.find((o) => o.name === HOMESTEAD) || mine[0] || null; }
+
+  // Put a module on an outpost, into the first empty slot of its line (a second turret goes in the second slot).
+  // Returns the module id that was added, or null if every slot was already built.
+  grantModule(o, k) {
+    for (const id of MODULE_LINES[k] || [k]) if (!o.modules.includes(id)) { o.modules.push(id); return id; }
+    return null;
+  }
+
+  // A chapter's free module: built at Pike's Hope, and if every slot of that line is already built, its price in credits.
+  rewardModule(k, unlocks) {
+    const o = this.homestead();
+    if (!o) return;
+    const at = this.game.territory.name(o);
+    const id = this.grantModule(o, k);
+    if (id) unlocks.push(`Free ${MODULES[id].name} at ${at}`);
+    else {
+      const m = MODULES[k];
+      this.game.addCredits(m.cost, `${m.name} refund`);
+      unlocks.push(`${(MODULE_LINES[k] || []).length > 1 ? `Both ${m.name} slots` : `The ${m.name}`} at ${at} ${(MODULE_LINES[k] || []).length > 1 ? 'were' : 'was'} already built: ₵${m.cost} instead`);
+    }
+    this.refreshOutposts();
+  }
+
   refreshOutposts() {
     const T = this.game.territory;
     for (const o of this.myOutposts()) if (o.model) T.despawn(o);
     T.save();
   }
 
-  outpostMenu(o) {
-    const g = this.game;
-    const T = g.territory;
-    o.bank = o.bank || 0;
-    const mods = Object.entries(MODULES);
-    const buttons = [];
-    if (o.modules.includes('market') && o.bank >= 1) buttons.push({ label: `${buttons.length + 1} · COLLECT MARKET TAKINGS — ₵${Math.floor(o.bank)}`, fn: () => { g.addCredits(Math.floor(o.bank), 'Market'); o.bank = 0; this.outpostMenu(o); } });
-    if (o.modules.includes('clinic')) buttons.push({ label: `${buttons.length + 1} · PATCH ME UP (free)`, fn: () => { g.player.health = g.player.maxHealth; g.fx.pop('GOOD AS NEW!', null, { color: '#7dff6a', size: 50 }); } });
-    if (o.modules.includes('beacon')) buttons.push({ label: `${buttons.length + 1} · BEACON TRAVEL…`, fn: () => this.beaconMenu(o) });
-    for (const [k, m] of mods) {
-      if (o.modules.includes(k)) continue;
-      if (o.modules.length >= 6) break;
-      buttons.push({
-        label: `${buttons.length + 1} · BUILD ${m.name.toUpperCase()} — ₵${m.cost}`,
-        fn: () => {
-          if (g.credits < m.cost) { g.hud.toast(`Not enough credits (need ₵${m.cost}).`, 2); return; }
-          g.credits -= m.cost;
-          o.modules.push(k);
-          if (k === 'garage') { const v = o.faction === 'meridian' ? 'van' : 'mule'; if (!this.vehicles.includes(v)) { this.vehicles.push(v); g.hud.toast(`${VEHICLES[v].name} unlocked! Press V.`, 3); } }
-          if (k === 'beacon') this.revealAround(o);
-          g.audio.cash();
-          this.refreshOutposts();
-          this.save();
-          g.save();
-          this.outpostMenu(o);
-        },
-      });
+  // Live numbers for the selected building on the terminal page: { rows: [[label, value, tone?]], meter?, note? }
+  moduleStatus(o, k) {
+    const P = this.game.player;
+    const has = (m) => o.modules.includes(m);
+    if (k === 'greenhouse') return { rows: [['EFFECT', 'Heals 4 hull / s'], ['RANGE', '60 m round the hub'], ['STATUS', 'ACTIVE']], note: 'Nothing to press: it works while you stand near it.' };
+    if (k === 'clinic') {
+      const near = this.clinicSpawn(P.pos.clone().normalize());
+      return { rows: [['EFFECT', 'You redeploy here after a K.O.'], ['NEAREST CLINIC', near === o ? 'THIS ONE (to you)' : 'Another is nearer to you', near === o ? '' : 'dim']] };
     }
-    buttons.push({ label: `${buttons.length + 1} · CLOSE` });
-    const built = o.modules.length ? o.modules.map((k) => MODULES[k].name).join(', ') : 'nothing yet';
-    const info = mods.filter(([k]) => !o.modules.includes(k)).map(([, m]) => `<b>${m.name}</b>: ${m.desc}`).join('<br>');
-    g.dialog(T.name(o).toUpperCase(), `Built: <b>${built}</b> (${o.modules.length}/6)<br><br><small>${info}</small>`, buttons);
+    if (k === 'beacon') {
+      const linked = this.myOutposts().filter((x) => x !== o && x.modules.includes('beacon')).length;
+      return { rows: [['MAP CHARTED', '1.5 km round the outpost'], ['LINKED BEACONS', linked ? `${linked} other${linked === 1 ? '' : 's'}` : 'none yet', linked ? '' : 'dim']] };
+    }
+    if (k === 'turret' || k === 'turret2') {
+      const G = OUTPOST_GUN, n = (has('turret') ? 1 : 0) + (has('turret2') ? 1 : 0);
+      return { rows: [['GUNS HERE', `${n} of 2`], ['RANGE', `${G.range} m`], ['FIRE', `${G.damage} dmg + splash, every ${G.interval} s each`], ['TARGETS', 'Pirates, not faction troops']], note: 'Nothing to press: each gun turns, aims and fires by itself.' };
+    }
+    if (k === 'market') {
+      const bank = Math.floor(o.bank || 0), left = BANK_CAP - (o.bank || 0);
+      return { rows: [['INCOME', `₵${MARKET_RATE} a minute`], ['CAP', `₵${BANK_CAP}`]], meter: { v: (o.bank || 0) / BANK_CAP, text: `₵${bank} / ₵${BANK_CAP}${left > 1 ? ` · FULL IN ${Math.ceil(left / (MARKET_RATE / 60) / 60)} MIN` : ' · FULL'}` }, note: bank < 1 ? 'Nothing to collect yet.' : '' };
+    }
+    if (k === 'garage') {
+      const v = o.faction === 'meridian' ? 'van' : 'mule';
+      return { rows: [['VEHICLE', VEHICLES[v].name], ['SUMMON', 'Press V anywhere'], ['STATUS', this.vehicles.includes(v) ? 'UNLOCKED' : 'NOT UNLOCKED']], note: 'Nothing to press: call it with V.' };
+    }
+    return { rows: [] };
+  }
+
+  // BUILD on the terminal page: checks again (a stale click, a held key, a pad) before it charges anything; the page
+  // stays open and answers in place
+  buildOutpostModule(o, k) {
+    const g = this.game, m = MODULES[k];
+    if (!m || o.modules.includes(k) || (m.needs && !o.modules.includes(m.needs)) || (!EXTRA_MODS[k] && plotsOf(o) >= PLOTS)) { this.outpostMenu(o, k); return; }
+    if (g.credits < m.cost) { g.audio.tone(180, 0.08, 'square', 0.05); this.outpostMenu(o, k, `NOT ENOUGH CREDITS: ₵${Math.ceil(m.cost - g.credits)} SHORT`, 'bad'); return; }
+    g.credits -= m.cost;
+    o.modules.push(k);
+    let msg = `${m.name.toUpperCase()} BUILT`;
+    if (k === 'garage') { const v = o.faction === 'meridian' ? 'van' : 'mule'; if (!this.vehicles.includes(v)) { this.vehicles.push(v); g.hud.toast(`${VEHICLES[v].name} unlocked! Press V.`, 3); msg += ` · ${VEHICLES[v].name.toUpperCase()} UNLOCKED`; } }
+    if (k === 'beacon') this.revealAround(o);
+    g.audio.cash();
+    this.refreshOutposts();
+    this.save();
+    g.save();
+    this.outpostMenu(o, k, msg);
+  }
+
+  // F at an outpost's terminal: an interactive page (terminalUI.js) with a tile for every building. Click or arrow to a
+  // tile for what it does; its button (or the number on it) collects, patches, travels or builds. The numbered choices
+  // are the old menu's buttons in the same order, so the number keys and Escape (= the last, CLOSE) work as before.
+  outpostMenu(o, sel = null, msg = '', msgTone = 'ok') {
+    const g = this.game, T = g.territory, P = g.player;
+    o.bank = o.bank || 0;
+    const has = (k) => o.modules.includes(k);
+    const plots = plotsOf(o);
+    const locked = (k) => { const n = MODULES[k].needs; return !!n && !has(n) && !has(k); };
+    const slotFull = (k) => !EXTRA_MODS[k] && plots >= PLOTS;
+    const buildable = (k) => !has(k) && !locked(k) && !slotFull(k);
+    const bank = Math.floor(o.bank);
+    const credits = Math.floor(g.credits);
+    const acts = [];
+    const act = (id, tile, label, short, tone, fn, keep = true) => acts.push({ id, tile, label, short, tone, fn, keep });
+    if (has('market') && o.bank >= 1) act('collect', 'market', `COLLECT MARKET TAKINGS — ₵${bank}`, `COLLECT ₵${bank}`, 'go', () => { const n = Math.floor(o.bank); g.addCredits(n, 'Market'); o.bank = 0; this.outpostMenu(o, 'market', `₵${n} COLLECTED`); });
+    if (has('clinic')) act('patch', 'clinic', 'PATCH ME UP (free)', 'PATCH ME UP (FREE)', 'go', () => { P.health = P.maxHealth; g.fx.pop('GOOD AS NEW!', null, { color: '#7dff6a', size: 50 }); }, false); // (closes, as before: the pop shows in the world)
+    if (has('beacon')) act('beacon', 'beacon', 'BEACON TRAVEL…', 'BEACON TRAVEL…', 'go', () => {
+      if (!this.myOutposts().some((x) => x !== o && x.modules.includes('beacon'))) { g.audio.tone(180, 0.08, 'square', 0.05); this.outpostMenu(o, 'beacon', 'BUILD A BEACON AT ANOTHER OUTPOST TO LINK THEM.', 'bad'); return; }
+      this.beaconMenu(o);
+    });
+    for (const [k, m] of Object.entries(MODULES)) if (buildable(k)) act('build:' + k, k, `BUILD ${m.name.toUpperCase()} — ₵${m.cost}`, `BUILD ₵${m.cost}`, 'build', () => this.buildOutpostModule(o, k));
+    const buttons = acts.map((a, i) => ({ label: `${i + 1} · ${a.label}`, fn: a.fn, keep: a.keep })).concat([{ label: `${acts.length + 1} · CLOSE` }]);
+
+    const stateOf = (k) => (has(k) ? 'built' : locked(k) ? 'locked' : slotFull(k) ? 'full' : 'open');
+    const tiles = Object.entries(MODULES).map(([k, m]) => {
+      const a = acts.find((x) => x.tile === k), state = stateOf(k);
+      return { id: k, name: m.name, icon: m.icon, tint: m.tint, state, feature: m.feature, key: a ? acts.indexOf(a) + 1 : '', chip: { built: 'BUILT', locked: 'LOCKED', full: 'NO PLOT' }[state] || `₵${m.cost}`, chipTone: state === 'open' && g.credits < m.cost ? 'short' : '' };
+    });
+    if (!MODULES[sel]) sel = acts.length ? acts[0].tile : tiles[0].id;
+    const m = MODULES[sel], state = stateOf(sel), a = acts.find((x) => x.tile === sel);
+    let st;
+    if (state === 'built') st = this.moduleStatus(o, sel);
+    else if (state === 'locked') st = { rows: [['REQUIRES', MODULES[m.needs].name, 'bad'], ['PRICE', `₵${m.cost}`, 'gold']], note: `Build a ${MODULES[m.needs].name} first.` };
+    else st = { rows: [['PRICE', `₵${m.cost}`, 'gold'], ['YOUR CREDITS', `₵${credits}`, g.credits < m.cost ? 'bad' : ''], g.credits < m.cost ? ['SHORT BY', `₵${Math.ceil(m.cost - g.credits)}`, 'bad'] : ['AFTER BUILDING', `₵${credits - m.cost}`]], note: state === 'full' ? 'Every plot is built on.' : '' };
+    const detail = {
+      id: sel, name: m.name, icon: m.icon, tint: m.tint, state, stateText: { built: 'BUILT', locked: 'LOCKED', full: 'NO PLOT FREE', open: 'NOT BUILT' }[state],
+      desc: m.desc, rows: st.rows, meter: st.meter, note: st.note,
+      action: a ? { id: a.id, label: a.short, key: acts.indexOf(a) + 1, tone: a.tone + (state === 'open' && g.credits < m.cost ? ' short' : '') } : null,
+      msg, msgTone,
+    };
+    const fac = FACTIONS[o.faction];
+    const spec = {
+      accent: fac ? fac.color : undefined,
+      title: T.name(o).toUpperCase(),
+      sub: `OUTPOST TERMINAL // ${fac ? fac.name.toUpperCase() : ''} ${String(o.kind).toUpperCase()}`,
+      stats: [{ k: 'CREDITS', v: `₵${credits}`, tone: 'gold' }, { k: 'PLOTS BUILT', v: `${plots} / ${PLOTS}` }, { k: 'MARKET BANK', v: has('market') ? `₵${bank} / ₵${BANK_CAP}` : '—' }],
+      tiles, sel, detail,
+      closeKey: acts.length + 1,
+      foot: { kb: `Click a building · 1-${acts.length || 1} do it · Arrows pick · Enter acts · Esc closes`, pad: `${glyphHtml(['A'])} pick a building, then its button · ${glyphHtml(['B'])} close` },
+    };
+    const settle = keepScroll();
+    g.dialog(spec.title, terminalPage(spec), buttons, {
+      raw: true, cls: 'otm-dlg', stay: true,
+      onKey: (code) => {
+        const root = document.querySelector('#dialog .otm');
+        if (!root) return false;
+        const next = stepSel(root, sel, code);
+        if (next) { if (next !== sel) { g.audio.click(); this.outpostMenu(o, next); } return true; }
+        if (code === 'Enter' || code === 'Space') { if (a) g.pickDialog(acts.indexOf(a)); else g.audio.click(); return true; }
+        return false;
+      },
+    });
+    settle();
+    wireTerminal(document.querySelector('#dialog .otm'), {
+      onSelect: (id) => { g.audio.click(); this.outpostMenu(o, id); },
+      onAct: (id) => g.pickDialog(id === 'close' ? acts.length : acts.findIndex((x) => x.id === id)),
+    });
   }
 
   beaconMenu(from) {
@@ -1764,23 +1879,10 @@ export class Story {
     const g = this.game;
     const P = g.player;
     for (const o of this.myOutposts()) {
-      if (o.modules.includes('market')) o.bank = Math.min(800, (o.bank || 0) + (40 / 60) * dt);
+      if (o.modules.includes('market')) o.bank = Math.min(BANK_CAP, (o.bank || 0) + (MARKET_RATE / 60) * dt);
       const d = P.pos.distanceTo(g.planet.ground(o.dir, _v));
-      if (o.modules.includes('greenhouse') && d < 60 && !P.dead) { P.health = Math.min(P.maxHealth, P.health + 4 * dt); o.bank = (o.bank || 0) + (o.modules.includes('market') ? 0 : 0); }
-      if (o.modules.includes('turret') && d < 900) {
-        o.fireCd = (o.fireCd || 0) - dt;
-        if (o.fireCd <= 0) {
-          o.fireCd = 1.2;
-          const from = g.planet.ground(o.dir, new THREE.Vector3(), 12.5); // above the hub dome
-          let target = null, bd = 300;
-          for (const e of g.enemies.list) {
-            if (e.dead || e.faction !== 'pirate' || !e.center || e.kind === 'core' || g.enemies.friendly(e)) continue;
-            const dd = e.center.distanceTo(from);
-            if (dd < bd) { bd = dd; target = e; }
-          }
-          if (target) g.projectiles.fire('mil', from, target.center.clone().sub(from).normalize().multiplyScalar(140), { damage: 26, splash: 4, color: 0xff9f1c, size: 0.45, knock: 0.5, spare: true });
-        }
-      }
+      if (o.modules.includes('greenhouse') && d < 60 && !P.dead) P.health = Math.min(P.maxHealth, P.health + 4 * dt);
+      // (the militia turrets are driven by territory.updateGuns: they turn and fire from their own barrels)
     }
   }
 

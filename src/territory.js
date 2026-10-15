@@ -5,7 +5,7 @@ import { arcDist, tangent, frameQuat, greatCircle, SUN, R as PLANET_R } from './
 import { mulberry32 } from './rng.js';
 import { ITEMS } from './alchemy.js';
 import { outpostTemplate, SMALL_KINDS, FLAT_R } from './outpostModels.js';
-import { foundedTemplate, TERMINAL_Z } from './storyAssets.js';
+import { foundedTemplate, TERMINAL_Z, OUTPOST_GUN as GUN } from './storyAssets.js';
 
 // Every square metre of the Moon belongs to somebody. Territory is a weighted Voronoi split
 // around each faction's settlements and outposts; small faction structures dot the countryside,
@@ -42,6 +42,8 @@ const BUILT_R = 40; // founded outposts: flattened radius (the compound itself: 
 const _v = new THREE.Vector3();
 const _q = new THREE.Quaternion();
 const _w = new THREE.Vector3();
+const _gp = new THREE.Vector3(), _gt = new THREE.Vector3(), _gl = new THREE.Vector3(), _gf = new THREE.Vector3();
+const wrapPi = (a) => Math.atan2(Math.sin(a), Math.cos(a));
 
 // distance from a point (outpost frame) to a yawed box { x, y, z, hx, hy, hz, yaw }
 function boxDist(p, h) {
@@ -309,6 +311,68 @@ export class Territory {
     // a paved apron and the modules you've built on their plots round it
     this.place(o, foundedTemplate(o.kind, c, o.modules || []));
     o.terminal = o.model.localToWorld(new THREE.Vector3(0, 0, TERMINAL_Z));
+    this.findGuns(o);
+  }
+
+  // The militia turrets you built: place() clones the baked template, so the live heads are found again by
+  // their tag every time the compound spawns (clone() copies only the plain userData, never a reference).
+  findGuns(o) {
+    o.guns = [];
+    o.model.updateMatrixWorld(true);
+    o.model.traverse((m) => {
+      if (!m.userData.outpostGun) return;
+      m.rotation.order = 'YXZ'; // clone() does not copy the Euler order: pitch about the head's own x, then yaw
+      o.guns.push({ head: m, root: m.parent, cd: 0.5 + 0.45 * o.guns.length, scanT: 0, target: null, skipT: null, skipCd: 0, side: 1 });
+    });
+  }
+
+  // Each gun turns its head (yaw and pitch) onto the lead point of the nearest raider and fires from a barrel
+  // tip, alternating the twin barrels, like the settlement turrets (enemies.updateTurret) but with the
+  // aim-lead and line-of-fire checks they use. It never parks: an idle head keeps sweeping, so the shadow
+  // cache does not see a still object.
+  updateGuns(o, dt) {
+    const g = this.game, E = g.enemies;
+    for (const gun of o.guns) {
+      const head = gun.head;
+      head.updateWorldMatrix(true, false);
+      head.getWorldPosition(_gp);
+      let tg = gun.target;
+      if (tg && (tg.dead || tg.center.distanceTo(_gp) > GUN.range * 1.05)) tg = gun.target = null;
+      gun.scanT -= dt; gun.skipCd -= dt; gun.cd = Math.max(-1, gun.cd - dt);
+      if (!tg && gun.scanT <= 0) {
+        gun.scanT = 0.4;
+        let bd = GUN.range;
+        for (const e of E.list) {
+          if (!E.gunTarget(e) || (e === gun.skipT && gun.skipCd > 0)) continue;
+          let d = e.center.distanceTo(_gp);
+          if (o.guns.some((x) => x !== gun && x.target === e)) d += 80; // a second gun prefers another raider
+          if (d < bd) { bd = d; tg = e; }
+        }
+        gun.target = tg;
+      }
+      let yawErr = 0, pitchErr = 0;
+      if (tg) { // track the lead point so the barrel points where the shell will go
+        _gl.copy(tg.center).addScaledVector(tg.body.vel, _gp.distanceTo(tg.center) / GUN.speed);
+        gun.root.worldToLocal(_gl).sub(head.position); // (never read root.rotation.y: clone() re-decomposes it)
+        yawErr = wrapPi(Math.atan2(_gl.x, _gl.z) - head.rotation.y);
+        pitchErr = THREE.MathUtils.clamp(Math.atan2(-_gl.y, Math.hypot(_gl.x, _gl.z)), -0.5, 0.6) - head.rotation.x; // (+rotation.x = barrel down)
+        head.rotation.y += THREE.MathUtils.clamp(yawErr, -GUN.turn * dt, GUN.turn * dt);
+        head.rotation.x += THREE.MathUtils.clamp(pitchErr, -GUN.pitchTurn * dt, GUN.pitchTurn * dt);
+      } else {
+        head.rotation.y = wrapPi(head.rotation.y + dt * 0.3);
+        head.rotation.x -= THREE.MathUtils.clamp(head.rotation.x, -dt, dt);
+      }
+      if (!tg || gun.cd > 0 || Math.abs(yawErr) > GUN.cone || Math.abs(pitchErr) > GUN.pitchCone) continue;
+      head.updateWorldMatrix(false, false); // (the rotation just changed: the muzzle must not be a frame stale)
+      gun.side = -gun.side;
+      head.localToWorld(_gt.set(gun.side * GUN.tip[0], GUN.tip[1], GUN.tip[2]));
+      gun.cd = GUN.interval;
+      if (!E.clearShot(_gt, tg.center)) { gun.cd = 0.3; gun.skipT = tg; gun.skipCd = 3; gun.target = null; continue; }
+      const dir = E.aimLead(_gt, GUN.speed, 0.01, tg.center, tg.body.vel);
+      g.projectiles.fire('mil', _gt, dir.multiplyScalar(GUN.speed), { damage: GUN.damage, splash: GUN.splash, color: 0xffb02e, size: 0.5, knock: 0.6, spare: true });
+      g.fx.spawn(_gt, _gf.set(0, 0, 1).transformDirection(head.matrixWorld).multiplyScalar(5), { color: 0xffe08a, size: 0.9, life: 0.12, count: 3, spread: 1.5, drag: 3 });
+      if (_gt.distanceTo(g.player.center) < 300) g.audio.tone(300, 0.1, 'square', 0.07, 0.4);
+    }
   }
 
   // Put a baked outpost model (or its wreck) on the ground: same yaw every time for this outpost.
@@ -443,6 +507,7 @@ export class Territory {
   despawn(o) {
     o.rubble = false;
     o.raidPoint = null;
+    o.guns = [];
     if (o.model) { o.model.removeFromParent(); o.model = null; }
     for (const c of o.cols) this.game.colliders.remove(c);
     o.cols = [];
@@ -517,6 +582,7 @@ export class Territory {
       if (!o.model && d < BUILD_R) this.spawn(o);
       else if (o.model && d > DROP_R) this.despawn(o);
       else if (o.rubble && !this.wrecked(o)) { this.despawn(o); this.spawn(o); } // rebuilt
+      if (o.guns && o.guns.length && o.model && !o.rubble) this.updateGuns(o, dt);
       if (o.rubble && o.model && d < 500 && Math.random() < dt * 6) g.fx.spawn((o.mainC || o.model.position).clone().addScaledVector(o.dir, 1.5), o.dir.clone().multiplyScalar(5), { color: 0x2a2433, size: 1.4, life: 1.6, count: 1, spread: 3 });
       if (o.model && d < 400) o.model.traverse((m) => {
         if (m.userData.spin) m.rotation.y += dt * 0.6;

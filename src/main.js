@@ -398,6 +398,7 @@ class Game {
       } else if (this.state === 'log') {
         if (esc || code === 'KeyJ') this.closeModal(esc);
       } else if (this.state === 'dialog') {
+        if (this.dialogKey) { if (e && e.repeat) return; if (this.dialogKey(code)) return; }
         if (code === 'F8' && this.dialogButtons.dev) { this.pickDialog(this.dialogButtons.length - 1, true); return; }
         const n = parseInt(code.replace('Digit', ''), 10);
         if (code === 'Enter') this.pickDialog(0);
@@ -428,6 +429,7 @@ class Game {
   }
 
   closeModal(viaEscape) {
+    this.dialogKey = null;
     this.hud.closeBoard();
     this.hud.closeDialog();
     document.getElementById('globe-wrap').classList.add('hidden');
@@ -455,14 +457,18 @@ class Game {
     this.hud.openRepLog(this);
   }
 
-  dialog(title, text, buttons) {
-    this.openModal('dialog');
+  // opts: raw / cls (hud.dialog), stay (repaint the dialog that is already open in place: no unlock, no click), onKey(code) -> true if
+  // the page used the key (arrows, Enter on a terminal page; the number keys and Escape still pick the buttons)
+  dialog(title, text, buttons, opts = {}) {
+    if (!(opts.stay && this.state === 'dialog')) this.openModal('dialog');
     this.dialogButtons = buttons;
-    this.hud.dialog(title, text, buttons, (i) => this.pickDialog(i));
+    this.dialogKey = opts.onKey || null;
+    this.hud.dialog(title, text, buttons, (i) => this.pickDialog(i), opts);
   }
 
   pickDialog(i, esc = false) {
     const b = this.dialogButtons && this.dialogButtons[i];
+    if (b && b.keep) { if (b.fn) b.fn(); return; } // (keep: the choice repaints its page itself instead of closing the dialog)
     this.closeModal(esc);
     if (b && b.fn) b.fn();
   }

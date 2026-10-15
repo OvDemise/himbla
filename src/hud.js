@@ -867,13 +867,16 @@ export class HUD {
     if (f.spill > 0) { c.fillStyle = '#ff2a4a'; c.font = pixelFont(10); c.fillText('SPILLING!', x0 + 6, y0 + 18); }
   }
 
-  dialog(title, text, buttons, onPick) {
+  // opts.raw: `text` is a whole page that draws its own title, choices and close (terminalUI.js); opts.cls: an extra class on the panel
+  dialog(title, text, buttons, onPick, opts = {}) {
     const el = $('dialog');
-    el.innerHTML = `<div class="panel dlg"><div class="dlg-title">${title}</div><div class="bubble">${text}</div><div class="dlg-btns">${buttons.map((b, i) => `<button data-i="${i}">${b.label}</button>`).join('')}</div></div>`;
+    el.innerHTML = opts.raw
+      ? `<div class="panel dlg ${opts.cls || ''}">${text}</div>`
+      : `<div class="panel dlg ${opts.cls || ''}"><div class="dlg-title">${title}</div><div class="bubble">${text}</div><div class="dlg-btns">${buttons.map((b, i) => `<button data-i="${i}">${b.label}</button>`).join('')}</div></div>`;
     el.classList.remove('hidden');
     el.onclick = (e) => {
       const b = e.target.closest('button');
-      if (b) onPick(+b.dataset.i);
+      if (b && b.dataset.i !== undefined) onPick(+b.dataset.i); // (a button that isn't a dialog choice used to read as choice NaN and just close the dialog)
     };
   }
 

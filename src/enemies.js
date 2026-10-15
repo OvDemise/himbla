@@ -1496,6 +1496,11 @@ export class Enemies {
     return dir.multiplyScalar(k + 0.3).add(e.center);
   }
 
+  // Who a friendly gun (an outpost turret, territory.updateGuns) may fire at: raiders. Not den cores, not the
+  // troops of other factions (main.explode deals no 'mil' damage to a foe other than rustmoon's), not a
+  // pirate that is friendly to an aligned player.
+  gunTarget(e) { return e.faction === 'pirate' && !e.dead && e.kind !== 'core' && !!e.center && !!e.body && !(e.foe && e.foe !== 'rustmoon') && !this.friendly(e); }
+
   // Clear line of fire: terrain plus solid colliders (walls, bastions, buildings) along the
   // way, sampled every couple of metres; the last stretch next to the target is ignored.
   clearShot(from, to) {
