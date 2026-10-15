@@ -29,7 +29,7 @@ export const ACTIONS = [
   { code: 'KeyV', label: 'Vehicle: call / board / leave' },
   { code: 'KeyZ', label: 'Power (mouse wheel: pick one)' },
   { code: 'KeyT', label: 'Personal Teleporter (tech)' },
-  { code: 'KeyH', label: 'Help panel' },
+  { code: 'KeyH', label: 'Blackjack: hit' }, // (H used to be the help panel: that's the pause card's HELP now, but the casino still reads the code)
 ];
 // keys the game hard-wires for menus and weapon slots
 const RESERVED = ['Escape', 'Enter', 'Digit1', 'Digit2', 'Digit3', 'Digit4', 'Digit5', 'Digit6', 'Digit7', 'Digit8', 'Digit9', 'Digit0'];
@@ -137,8 +137,8 @@ const HELP_PAD = {
   'Q + W/S · Q + A/D': ['B', '#+', 'LS'], '1 2 3 4': ['DL', 'DR'], 'X (hold)': ['DD'], 'R (hold)': ['VIEW', '#hold'], M: ['VIEW', '#tap'],
 };
 
-// Help-table rows with no pad button at all (music is under Settings → Audio, help is on the pause card): left out while a pad is in use
-const HELP_PAD_HIDE = ['N', 'H'];
+// Help-table rows with no pad button at all (music is under Settings → Audio): left out while a pad is in use
+const HELP_PAD_HIDE = ['N'];
 
 // Help-table / title-card labels rebuilt from the current bindings (k = code -> label).
 const HELP_ROWS = {
@@ -150,13 +150,13 @@ const HELP_ROWS = {
   'Q + W/S · Q + A/D': (k) => `${k('KeyQ')} + ${k('KeyW')}/${k('KeyS')} · ${k('KeyQ')} + ${k('KeyA')}/${k('KeyD')}`,
   J: (k) => k('KeyJ'), C: (k) => k('KeyC'), N: (k) => k('KeyN'), P: (k) => k('KeyP'), V: (k) => k('KeyV'), Z: (k) => k('KeyZ'), T: (k) => k('KeyT'),
   'X (hold)': (k) => `${k('KeyX')} (hold)`, G: (k) => k('KeyG'),
-  F: (k) => k('KeyF'), M: (k) => k('KeyM'), R: (k) => k('KeyR'), H: (k) => k('KeyH'),
+  F: (k) => k('KeyF'), M: (k) => k('KeyM'), R: (k) => k('KeyR'),
   '` (backtick)': (k) => (k('Backquote') === '`' ? '` (backtick)' : k('Backquote')),
 };
 const MINI_ROWS = {
   SPACE: (k) => k('Space'), WASD: (k) => `${k('KeyW')}${k('KeyA')}${k('KeyS')}${k('KeyD')}`, 'E/RMB': (k) => `${k('KeyE')}/RMB`,
   SHIFT: (k) => (k('ShiftLeft') === 'L-SHIFT' ? 'SHIFT' : k('ShiftLeft')), Q: (k) => k('KeyQ'), M: (k) => k('KeyM'), J: (k) => k('KeyJ'),
-  F: (k) => k('KeyF'), C: (k) => k('KeyC'), H: (k) => k('KeyH'),
+  F: (k) => k('KeyF'), C: (k) => k('KeyC'),
 };
 
 export class Settings {

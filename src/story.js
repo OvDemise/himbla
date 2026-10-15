@@ -29,7 +29,7 @@ export const LEADERS = {
 export const TECH = {
   dash: { name: 'Phase Dash', key: 'Z', desc: 'Swing all your momentum (plus a kick) towards wherever you are looking: a mid-air turn, climb or dive. 4 s cooldown.' },
   shield: { name: 'Deflector Shield', key: '—', desc: 'An invisible field that absorbs one hit or hard knock every 12 s (you see it when it takes one).' },
-  vanes: { name: 'Quantum Slipstream Vanes', key: '—', desc: 'Your skates keep a share of their grip on the air: steer while you fly.' },
+  vanes: { name: 'Quantum Slipstream Vanes', key: 'Z', desc: 'Switch on to let your skates keep a share of their grip on the air for 10 s: steer while you fly. 30 s cooldown.' },
   teleport: { name: 'Personal Teleporter', key: 'T', desc: 'Jump to any discovered settlement or your outposts. 90 s cooldown.' },
 };
 
@@ -272,7 +272,7 @@ const CHAPTERS = {
         { t: 'spindle', label: 'Cross the Spindle and bring back its core' },
       ],
       reward: { credits: 3600, tech: 'vanes', outfit: 'meridian2', rep: 15, world: 'quantum' },
-      outro: '"The core is in the vault and the board is ecstatic. We tuned a sliver of its field into your skates: Quantum Slipstream Vanes. They keep a grip on the air itself, Runner, so you can steer mid-flight. And the Gilded Executive. You\'ve made us very, very rich."',
+      outro: '"The core is in the vault and the board is ecstatic. We tuned a sliver of its field into your skates: Quantum Slipstream Vanes. They keep a grip on the air itself, Runner: switch them on from your powers and you can steer mid-flight for ten seconds at a time. And the Gilded Executive. You\'ve made us very, very rich."',
       final: true,
     },
   ],
@@ -320,6 +320,8 @@ const CHAPTERS = {
 
 const _v = new THREE.Vector3();
 
+const VANES_ON = 10; // seconds the Slipstream Vanes stay on once used
+const VANES_CD = 30; // seconds from using them until they can be used again (so 20 s once they've gone off)
 const KADE_BASE = 0.08; // chance Kade rides along with a squad
 const KADE_STEP = 0.04; // added after each squad that doesn't bring him, until you reach the light
 
@@ -336,7 +338,8 @@ export class Story {
     this.kade = { met: 0, beaten: 0, captured: false, nextAt: 0 };
     this.active = null;
     this.leaders = {};
-    this.techCd = { dash: 0, shield: 0, teleport: 0 };
+    this.techCd = { dash: 0, shield: 0, teleport: 0, vanes: 0 };
+    this.vanesT = 0; // seconds of Slipstream Vanes left (player.js steers the air while it runs)
     this.load();
     this.buildLeaders();
     this.buildUI();
@@ -1632,6 +1635,7 @@ export class Story {
     const P = g.player;
     if (P.rag) return; // (limp in a ragdoll: no dash, no teleport)
     if (!this.tech.includes(k)) { g.hud.toast(`${TECH[k].name} isn't yours yet.`, 1.5); return; }
+    if (k === 'vanes' && this.vanesT > 0) { g.hud.toast(`${TECH[k].name}: on for ${Math.ceil(this.vanesT)} s more`, 1); return; }
     if (this.techCd[k] > 0) { g.hud.toast(`${TECH[k].name}: ${Math.ceil(this.techCd[k])} s`, 1); return; }
     if (k === 'dash') {
       // a momentum redirect, not a blink: every bit of your speed (and a kick more) swings round to
@@ -1658,8 +1662,18 @@ export class Story {
           .concat([{ label: 'CANCEL' }]));
       };
       page(0);
+    } else if (k === 'vanes') {
+      // the skates' grip reaches the air for a while (player.js reads vanesActive()): steer your flight
+      if (P.vehicle) { g.hud.toast('The Vanes work through your skates: not from a vehicle.', 1.5); return; }
+      this.vanesT = VANES_ON;
+      this.techCd.vanes = VANES_CD;
+      g.fx.pop('*VANES*', null, { color: '#7dffd4', size: 44, life: 0.6 });
+      g.audio.tone(520, 0.25, 'sine', 0.18, 1.8);
     }
   }
+
+  // the Slipstream Vanes are on: used a moment ago (and still yours)
+  vanesActive() { return this.vanesT > 0 && this.tech.includes('vanes'); }
 
   // Deflector Shield: called from damagePlayer; returns true if the hit was absorbed.
   absorb(from = null) {
@@ -1765,6 +1779,7 @@ export class Story {
     if (this.pendingDawn && this.game.state === 'play') { const f = this.pendingDawn; this.pendingDawn = null; f(); }
     updateMortarDrop(this);
     for (const k of Object.keys(this.techCd)) this.techCd[k] = Math.max(0, this.techCd[k] - dt);
+    if (this.vanesT > 0 && (this.vanesT -= dt) <= 0) { this.vanesT = 0; this.game.audio.tone(380, 0.25, 'sine', 0.12, 0.5); } // (spent: a falling blip)
     for (const L of Object.values(this.leaders)) {
       if (!L.loc.active) continue;
       L.t += dt;
@@ -1790,9 +1805,10 @@ export class Story {
   hudTech() {
     if (!this.tech.length) return '';
     return this.tech.map((k) => {
-      const cd = this.techCd[k];
+      const on = k === 'vanes' && this.vanesActive();
+      const cd = on ? 0 : this.techCd[k];
       const key = TECH[k].key !== '—' ? `[${TECH[k].key}] ` : '';
-      return `<span class="${cd > 0 ? 'cd' : 'ready'}">${key}${TECH[k].name}${cd > 0 ? ` ${Math.ceil(cd)}s` : ''}</span>`;
+      return `<span class="${cd > 0 ? 'cd' : 'ready'}">${key}${TECH[k].name}${on ? ` ON ${Math.ceil(this.vanesT)}s` : cd > 0 ? ` ${Math.ceil(cd)}s` : ''}</span>`;
     }).join(' · ');
   }
 }

@@ -334,11 +334,12 @@ class Game {
       e.stopPropagation();
       this.quitToMenu();
     });
-    // the pause card's HELP: the controls panel over a dim backdrop (like the settings); BACK, Esc or the pad's B returns to the card
+    // the pause card's HELP: the controls panel over a dim backdrop (like the settings); BACK, Esc or the pad's B returns to the card.
+    // (It's the only way to it: there's no key for it in play)
     document.getElementById('help-btn-pause').addEventListener('click', (e) => { e.stopPropagation(); this.openHelp(); });
     document.getElementById('help-back').addEventListener('click', (e) => { e.stopPropagation(); this.closeHelp(); });
     window.addEventListener('keydown', (e) => {
-      if (e.code !== 'Escape' || !document.querySelector('#help.modal')) return;
+      if (e.code !== 'Escape' || document.getElementById('help').classList.contains('hidden')) return;
       e.preventDefault(); e.stopImmediatePropagation();
       this.closeHelp();
     }, true);
@@ -408,7 +409,6 @@ class Game {
       } else if (this.state === 'play') {
         if (code === 'KeyM') this.openMap();
         if (code === 'KeyJ') this.openLog();
-        if (code === 'KeyH') { this.refreshHelp(); document.getElementById('help').classList.toggle('hidden'); }
         if (code === 'F8') this.cheats.dev(); // hidden dev menu (B, B, X, Y on a controller)
         // hidden testing menu: hold = and ` together
         if ((code === 'Backquote' && this.input.down('Equal')) || (code === 'Equal' && this.input.down('Backquote'))) this.cheats.open();
@@ -1172,33 +1172,28 @@ class Game {
   }
 
   openHelp() {
-    const el = document.getElementById('help');
-    this.helpWas = !el.classList.contains('hidden'); // (H may have it up in the corner already: BACK leaves it as it found it)
     this.refreshHelp();
-    el.classList.remove('hidden');
-    el.classList.add('modal');
+    this.hud.show('help', true);
     this.hud.show('pause', false);
   }
 
   closeHelp() {
-    const el = document.getElementById('help');
-    if (!el.classList.contains('modal')) return;
-    el.classList.remove('modal');
-    if (!this.helpWas) el.classList.add('hidden');
+    if (document.getElementById('help').classList.contains('hidden')) return;
+    this.hud.show('help', false);
     // (back to the pause card, unless the game was resumed some other way meanwhile)
     if (this.state === 'paused') this.hud.show('pause', true);
   }
 
   // Which music track fits where you are: the casino, Chimera Downs and Dr. Zbornak's lab have
   // their own; the dark side has its own; everywhere else the speed-driven roaming groove.
-  // The controls panel (H) only lists what you can actually do yet: rows tagged data-req appear as
+  // The controls panel (pause → HELP) only lists what you can actually do yet: rows tagged data-req appear as
   // you unlock their feature
   refreshHelp() {
     const st = this.story, up = this.upgrades || {};
     const has = {
       weapons: WEAPONS.some((w) => w.unlock && (up[w.unlock] || 0) > 0),
       vehicle: !!(st && st.vehicles && st.vehicles.length),
-      dash: !!(st && st.tech && st.tech.includes('dash')),
+      power: !!(this.powers && this.powers.owned().length),
       teleport: !!(st && st.tech && st.tech.includes('teleport')),
       pen: !!up.penlink,
       jar: !!(this.alchemy && this.alchemy.owned),

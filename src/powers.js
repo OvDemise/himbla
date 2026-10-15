@@ -3,6 +3,7 @@
 //
 //   dash      Daedalus Phase Dash (story tech)
 //   teleport  Meridian Personal Teleporter (story tech; T still works)
+//   vanes     Meridian Quantum Slipstream Vanes (story tech: steer in the air for 10 s, story.js)
 //   winch     Kepler Hitch-Line Winch (hold Z: winch.js)
 //   pen       Dr. Zbornak's holding-pen link (P still works)
 //
@@ -15,7 +16,8 @@ const KEY = 'mr-power';
 const POWERS = {
   dash: { name: 'Phase Dash', has: (g) => g.story.tech.includes('dash'), cd: (g) => g.story.techCd.dash || 0 },
   teleport: { name: 'Teleporter', has: (g) => g.story.tech.includes('teleport'), cd: (g) => g.story.techCd.teleport || 0 },
-  winch: { name: 'Hitch-Line Winch', has: (g) => (g.upgrades.winch || 0) > 0, cd: (g) => (g.winch.on ? 0 : g.winch.cd) },
+  vanes: { name: 'Slipstream Vanes', has: (g) => g.story.tech.includes('vanes'), cd: (g) => (g.story.vanesActive() ? 0 : g.story.techCd.vanes || 0), status: (g) => (g.story.vanesActive() ? `ON ${Math.ceil(g.story.vanesT)} s` : null) },
+  winch: { name: 'Hitch-Line Winch', has: (g) => (g.upgrades.winch || 0) > 0, cd: (g) => (g.winch.on ? 0 : g.winch.cd), status: (g) => g.winch.status() },
   pen: { name: 'Pen Link', has: (g) => (g.upgrades.penlink || 0) > 0, cd: () => 0 },
 };
 
@@ -54,10 +56,10 @@ export class Powers {
     this.game.audio.tone(dir > 0 ? 760 : 640, 0.05, 'square', 0.05);
   }
 
-  // what a power's readout says: READY, how long until it is, or (the winch) what the cable is doing
+  // what a power's readout says: what it's doing right now (the winch's cable, the Vanes being on), else READY or how long until it is
   status(k) {
-    const cd = POWERS[k].cd(this.game);
-    return k === 'winch' ? this.game.winch.status() : cd > 0 ? `${Math.ceil(cd)} s` : 'READY';
+    const g = this.game, P = POWERS[k], cd = P.cd(g);
+    return (P.status && P.status(g)) || (cd > 0 ? `${Math.ceil(cd)} s` : 'READY');
   }
 
   // ---- the power wheel (the same wheel as the controller's menu and the vehicles': gamepad.js) ----
@@ -145,7 +147,7 @@ export class Powers {
 
   use(k) {
     const g = this.game;
-    if (k === 'dash' || k === 'teleport') g.story.useTech(k);
+    if (k === 'dash' || k === 'teleport' || k === 'vanes') g.story.useTech(k);
     else if (k === 'winch') g.winch.fire();
     else if (k === 'pen') g.alchemy.penMenu();
   }

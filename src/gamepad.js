@@ -559,7 +559,7 @@ export class Gamepad {
     }
     // (settings close back to whatever opened them: resuming from under them would leave them up)
     const setOpen = g.settings && g.settings.open;
-    const helpOpen = !!document.querySelector('#help.modal'); // (the pause card's HELP: B goes back to the card rather than resuming)
+    const helpOpen = !document.getElementById('help').classList.contains('hidden'); // (the pause card's HELP: B goes back to the card rather than resuming)
     if (pressed(B.B) || pressed(B.START)) { if (g.state === 'paused' && !setOpen && !helpOpen) this.resume(); else this.key('Escape'); }
     if (pressed(B.LB) || pressed(B.RB)) this.tab(root, pressed(B.RB) ? 1 : -1);
     // the right stick scrolls whatever scrolls
@@ -581,7 +581,6 @@ export class Gamepad {
   uiRoot() {
     for (const id of UI_ROOTS) {
       const el = document.getElementById(id);
-      if (id === 'help' && el && !el.classList.contains('modal')) continue; // (the corner panel H toggles in play has nothing to press, and would hide the pause card behind it)
       if (el && !el.classList.contains('hidden') && el.getClientRects().length) return el;
     }
     return null;

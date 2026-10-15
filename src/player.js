@@ -278,8 +278,8 @@ export class Player {
     if (plat) b.pos.add(_v.subVectors(plat.pos, plat.prevPos));
     this.prevVel = (this.prevVel || new THREE.Vector3()).copy(b.vel);
     if (plat) this.prevVel.add(plat.vel);
-    // Quantum Slipstream Vanes: a share of your ground handling in the air
-    const vanes = !!(g.story && g.story.tech.includes('vanes'));
+    // Quantum Slipstream Vanes (a power: on for a few seconds when used): a share of your ground handling in the air
+    const vanes = !!(g.story && g.story.vanesActive());
     this.params.airHandling = vanes ? 0.42 : 0;
     const steps = Math.ceil(dt / (1 / 120));
     const h = dt / steps;

@@ -219,7 +219,8 @@ button { font-family: var(--comic); }
 .empty { padding: 12px; color: var(--ui-muted); font-size: 16px; }
 
 /* ---------- help / overlays ---------- */
-#help { position: fixed; right: 24px; bottom: 24px; padding: 12px 16px; max-height: calc(100vh - 48px); overflow: auto; }
+/* (opened from the pause card's HELP: centred over a dim backdrop, like the settings) */
+#help { position: fixed; z-index: 60; left: 50%; top: 50%; transform: translate(-50%, -50%); padding: 12px 16px; max-height: calc(100vh - 48px); overflow: auto; background: rgba(10, 8, 20, 0.97); border-color: var(--cyan); box-shadow: 0 0 0 2px #05030c, 0 0 0 100vmax rgba(5, 3, 12, 0.78); }
 #help h2 { font-family: var(--comic); margin: 0 0 10px; font-size: 14px; color: var(--yellow); }
 #help td { padding: 2px 12px 2px 0; font-size: 15px; color: var(--ui-text); }
 #help td:first-child { font-family: var(--comic); font-size: 9px; color: var(--cyan); white-space: nowrap; }
@@ -1226,10 +1227,7 @@ body.trailer #tutorial, body.trailer #racepanel, body.trailer #vehbar, body.trai
 /* the controls panel: section headers, and the note about what unlocks later */
 #help tr.hsec td { padding-top: 8px; font-family: var(--comic); font-size: 8px; color: var(--yellow); letter-spacing: 1px; }
 #help .help-more { margin: 10px 0 0; font-size: 12px; color: var(--ui-text); opacity: 0.7; max-width: 340px; }
-/* (the pause card's HELP opens this panel centred over a dim backdrop, like the settings, with a BACK button; the one H toggles in play stays a corner reference) */
-#help .help-foot { display: none; text-align: center; }
-#help.modal { z-index: 60; right: auto; bottom: auto; left: 50%; top: 50%; transform: translate(-50%, -50%); background: rgba(10, 8, 20, 0.97); border-color: var(--cyan); box-shadow: 0 0 0 2px #05030c, 0 0 0 100vmax rgba(5, 3, 12, 0.78); }
-#help.modal .help-foot { display: block; }
+#help .help-foot { text-align: center; }
 /* BOLT's passing remarks under the current training step */
 #tutorial .tut-say { margin-top: 8px; padding-top: 6px; border-top: 1px dashed var(--ui-edge); font-family: var(--body); font-size: 15px; line-height: 1.3; color: var(--cyan); }
 

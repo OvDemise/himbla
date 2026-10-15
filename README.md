@@ -94,7 +94,7 @@ Vite's hot reload restarts the page.
 | `C` | Wardrobe: cycle owned outfits, skate finishes and pulse-disc colours; `J` in the wardrobe shows or hides the containment jar |
 | `N` | Music on / off |
 | `V` (hold: radial) | Call / board / leave your faction vehicle; hold to pick one (story unlock) |
-| `Z` · mouse wheel | Use your selected **power** · step through your powers. Powers: Phase Dash, the Teleporter (`T` too), the Kepler Hitch-Line Winch (hold) and the pen link (`P` too) |
+| `Z` · mouse wheel | Use your selected **power** · step through your powers. Powers: Phase Dash, the Teleporter (`T` too), the Slipstream Vanes (steer in the air for 10 s), the Kepler Hitch-Line Winch (hold) and the pen link (`P` too) |
 | `Esc` → SETTINGS | Graphics, gameplay, camera, audio and key remapping |
 | `P` | Holding pen, anywhere (needs the remote pen link from Dr. Zbornak) |
 | `Shift`+`X` (hold) | Dump the jar anywhere: materials are destroyed, creatures pop back out |
@@ -103,7 +103,6 @@ Vite's hot reload restarts the page.
 | `M` | Globe map: drag to spin, scroll to zoom. Fog of war covers anywhere you haven't been |
 | `J` | Reputation Log |
 | `R` (hold 1.5 s) | Emergency recall (₵100): a shuttle flies you to your HQ (the ILMB, the HQ of the faction whose story you've committed to, or Rustmoon Hold if you ride with the pirates); forfeits the current contract |
-| `H` | Help |
 
 ### Controller
 
@@ -299,8 +298,8 @@ guns silent, its outposts the clans'). Kepler founds **your own town** (a real s
 and the Moon Council's hall), and Meridian sends you to **the Spindle**, the long asteroid rolling overhead,
 for its Quantum Core, with an alien mothership hunting you across it. The Spindle is a real cylinder: you can
 run all the way round its girth (gravity points at its axis) on the way to the core at the far end. The prize
-is the **Quantum Slipstream Vanes**: your skates keep a share of their handling in the air, so you can steer
-mid-flight.
+is the **Quantum Slipstream Vanes**, a power (pick it on the power wheel, then `Z`): for 10 s your skates keep a
+share of their handling in the air, so you can steer mid-flight (30 s from using them until they're ready again).
 
 **The Moon Council** (once you have your town): call votes from the hall. Each member faction votes with you
 more readily the better its standing with you; a carried motion (a Vostok–Daedalus ceasefire, Open Skies, Free
@@ -484,7 +483,7 @@ more) to its own faster, brighter synthwave track (it starts with your first key
 The game opens on a main menu: CONTINUE, NEW GAME, LOAD GAME, SETTINGS (and QUIT in the desktop app). There
 are three save slots, each showing credits, deliveries, story faction, play time and last played; slots can
 be deleted (with a confirm). Progress is saved to the active slot every few seconds and on every delivery,
-purchase and K.O. Settings are shared by all slots. The pause menu has SETTINGS, HELP (the controls list; `Esc` or `B` goes back to the pause card) and QUIT TO MAIN MENU. Pausing (and the map,
+purchase and K.O. Settings are shared by all slots. The pause menu has SETTINGS, HELP (the controls list, which is only reachable from here; `Esc` or `B` goes back to the pause card) and QUIT TO MAIN MENU. Pausing (and the map,
 dialogs, job board and wardrobe) freezes the whole world: traffic, the satellite, particles and timers.
 
 ## Settings
