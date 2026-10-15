@@ -529,17 +529,21 @@ export class Audio {
   // (the groove isn't played into a muted or switched-off bus: no point synthesising what nobody hears)
   get musicPlays() { return this.musicOn && !this.muted; }
 
-  update(speed, skating, grounded, thrusting) {
+  // Every frame. `quiet`: the world is frozen (a pause, the map, a dialog...): the looping effects (wind, skate hum,
+  // thrusters) fade out rather than droning on at the level they had. The music, and the menus' own clicks and blips,
+  // carry on.
+  update(speed, skating, grounded, thrusting, quiet = false) {
     if (!this.ctx) return;
     const t = this.ctx.currentTime;
     const s = Math.min(1, speed / 90);
+    const k = quiet ? 0 : 1;
     // rumble swells with speed but stays low and soft (no high-frequency hiss at top speed)
-    this.windG.gain.setTargetAtTime(Math.min(0.5, s) * 0.16 * (grounded ? 1 : 0.6) * this.mix.wind, t, 0.15);
+    this.windG.gain.setTargetAtTime(Math.min(0.5, s) * 0.16 * (grounded ? 1 : 0.6) * this.mix.wind * k, t, 0.15);
     this.windF.frequency.setTargetAtTime(140 + Math.min(1, s) * 380, t, 0.15);
-    this.humG.gain.setTargetAtTime(skating && grounded ? (0.05 + s * 0.06) * this.mix.hum : 0, t, 0.05);
+    this.humG.gain.setTargetAtTime(skating && grounded ? (0.05 + s * 0.06) * this.mix.hum * k : 0, t, 0.05);
     const f0 = 55 + s * 120;
     for (const v of Object.values(this.skateVoices)) v.pitch(f0, t, s);
-    this.jetG.gain.setTargetAtTime(thrusting ? 0.16 : 0, t, 0.05);
+    this.jetG.gain.setTargetAtTime(thrusting && !quiet ? 0.16 : 0, t, 0.05);
     this.crowdBoost = Math.max(0, this.crowdBoost - 0.006);
     this.updateMusic(speed);
   }

@@ -1144,7 +1144,7 @@ class Game {
     if (!this.spindle.active) this.updateLighting(dt);
     const P = this.player;
     this.audio.setZone(this.musicZone());
-    this.audio.update(P.dead ? 0 : P.speed, P.body.skating, P.body.grounded, P.body.thrusting && playing);
+    this.audio.update(P.dead ? 0 : P.speed, P.body.skating, P.body.grounded, P.body.thrusting && playing, frozen); // (frozen: a pause, the map, a dialog: no wind, skate hum or thrusters)
 
     const dark = darkness(P.up);
     // (build-ahead: the terrain workers start on the chunks round where you'll be in ~1.5 s)
