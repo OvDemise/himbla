@@ -30,7 +30,7 @@ export class Cheats {
     this.debugView = null; // 'poly' (every polygon outlined) | 'draw' (every draw call its own flat colour): the scene drawn bare, without the comic post pass
     this.crackedVisor = true; // the cracks that spread over the screen as hull drops (hud.js)
     this.spawnDebug = false; // bottom-right pirate counts + spawn timers overlay (no menu entry for now: set game.cheats.spawnDebug = true from the console)
-    this.inputMon = null; // controller map + held keys + trick state (inputmon.js), top left
+    this.inputMon = null; // controller map + held keys + trick state (inputmon.js), bottom right
     this.speed = 1; // player speed multiplier, 1 to 10 (player.js)
     // once the dev menu has been opened (F8 / controller combo) it gets a button on the pause card, remembered across launches
     try { this.unlocked = localStorage.getItem(DEV_KEY) === '1'; } catch { this.unlocked = false; }
