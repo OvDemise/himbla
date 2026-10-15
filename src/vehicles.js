@@ -464,8 +464,8 @@ export class Garage {
     m.root.updateMatrixWorld(true);
   }
 
-  // Black smoke from the APC's exhaust stack: a thin trickle at idle, a thick plume while you're on the power, each
-  // puff shrinking away within about half a second. It leaves rising and carried along with the vehicle, then
+  // Black smoke from the APC's exhaust stack: a thin trickle at idle, a plume while you're on the power, each
+  // puff shrinking away within about a quarter of a second. It leaves rising and carried along with the vehicle, then
   // the drag leaves it hanging behind as you move off.
   exhaustSmoke(v, dt, thr, up) {
     const m = v.model;
