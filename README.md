@@ -607,7 +607,7 @@ crowd-noise bed for now (the cheering is due a rework), and the race countdown b
 | Location | Type | Notes |
 | --- | --- | --- |
 | International Moon Base (ILMB) | SPACECOM HQ | Fortress walls, turrets, artillery, embassies, job board, repair bay, launch pad |
-| Meridian Exchange · Shackleton Radar Array · Helium-3 Exchange | Meridian | Trade hub (trading tower with a live price ticker and a big stock board crowning it, warehouses, a container gantry and tower cranes at work), radar research (an observatory with a turning cupola), and a working strip-mine (bucket-wheel excavator, ore conveyor, pumping derrick, Horton-sphere tank farm) |
+| Meridian Exchange · Shackleton Radar Array · Helium-3 Exchange | Meridian | Trade hub (trading tower with a live price ticker, warehouses, a container gantry and tower cranes at work), radar research (an observatory with a turning cupola), and a working strip-mine (bucket-wheel excavator, ore conveyor, pumping derrick, Horton-sphere tank farm) |
 | Kepler Civic Center · Tranquility Commons · Aldrin Heights · Twilight Waystation · Hertzsprung Refuge | Kepler | Towns, safe rest and repair |
 | Farside Listening Post | SPACECOM (dark side) | Hazard-pay destination |
 | Bastion Vostok-9 · Vostok-4 Outpost | Vostok | Restricted zones: turrets, patrols, artillery |
@@ -680,7 +680,7 @@ src/
   missions.js    contract generation, pickup/delivery, integrity, payouts
   world.js       sky, settlement layout, colliders, ambient life
   settlements.js detailed settlements, HQs and landmarks built with the outpost kit (moving parts, skate park)
-  market.js      the Meridian Exchange's stocks: a random-walk market refreshed every 15 s (exchangeBoard.js: the tower's big board)
+  market.js      the Meridian Exchange's stocks: a random-walk market refreshed every 15 s, read by the tower's ticker (exchangeBoard.js: a stock-board screen, drawn from it, not mounted anywhere at present)
   traffic.js     landing pads, ship/bus flights and passengers, roads, land-trains, cars, buggies
   wardrobe.js    wardrobe screen with live 3D preview
   trailer.js     trailer director mode (?trailer): the official trailer, shot by shot, from live gameplay
