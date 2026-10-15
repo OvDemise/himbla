@@ -27,7 +27,7 @@ export const LEADERS = {
 
 // Tech unlocked by the research-minded stories.
 export const TECH = {
-  dash: { name: 'Phase Dash', key: 'Z', desc: 'Swing all your momentum (plus a kick) towards wherever you are looking: a mid-air turn, climb or dive. 4 s cooldown.' },
+  dash: { name: 'Phase Dash', key: 'Z', desc: 'Swing all your momentum (plus a kick) towards wherever you are looking: a mid-air turn, climb or dive, leaving a violet ghost trail of you along the way. 4 s cooldown.' },
   shield: { name: 'Deflector Shield', key: '—', desc: 'An invisible field that absorbs one hit or hard knock every 12 s (you see it when it takes one).' },
   vanes: { name: 'Quantum Slipstream Vanes', key: 'Z', desc: 'Switch on to let your skates keep a share of their grip on the air for 10 s: steer while you fly. 30 s cooldown.' },
   teleport: { name: 'Personal Teleporter', key: 'T', desc: 'Jump to any discovered settlement or your outposts. 90 s cooldown.' },
@@ -320,6 +320,9 @@ const CHAPTERS = {
 
 const _v = new THREE.Vector3();
 
+// Phase Dash: your speed (at least 30 m/s) times DASH_BOOST plus DASH_KICK, up to DASH_MAX: about 15-18% harder than the old
+// +12 m/s (cap 95) from 30 m/s up, 4 s cooldown
+const DASH_BOOST = 1.12, DASH_KICK = 16, DASH_MAX = 112;
 const VANES_ON = 10; // seconds the Slipstream Vanes stay on once used
 const VANES_CD = 30; // seconds from using them until they can be used again (so 20 s once they've gone off)
 const KADE_BASE = 0.08; // chance Kade rides along with a squad
@@ -1648,9 +1651,10 @@ export class Story {
       const dir = g.cam.look.clone().normalize();
       // on the ground, aiming down would only grind you into it
       if (P.body.grounded && dir.dot(P.up) < 0.08) dir.addScaledVector(P.up, 0.08 - dir.dot(P.up)).normalize();
-      const sp = Math.min(Math.max(P.vel.length(), 30) + 12, 95);
+      const sp = Math.min(Math.max(P.vel.length(), 30) * DASH_BOOST + DASH_KICK, DASH_MAX);
       const from = P.center.clone();
       P.vel.copy(dir).multiplyScalar(sp);
+      g.fx.startGhosts(P.model, 0.6); // (a purple afterimage of you every few metres along the path)
       if (dir.dot(P.up) > 0.05) { P.body.grounded = false; P.body.sinceContact = 1; }
       g.fx.beam(from.addScaledVector(dir, -6), P.center.clone(), 0xc77dff);
       g.fx.pop('*PHASE*', null, { color: '#c77dff', size: 44, life: 0.6 });

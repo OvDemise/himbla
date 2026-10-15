@@ -6,6 +6,10 @@ const MAX_P = 1200;
 // skate trail ribbons: a point every 1/60 s, the usual tail 40 points (2/3 s) long, up to 2 s while grinding
 const TRAIL_STEP = 1 / 60, TRAIL_LIFE = 40 * TRAIL_STEP, TRAIL_MAX = 2, TRAIL_N = Math.ceil(TRAIL_MAX / TRAIL_STEP) + 10;
 
+// Phase Dash afterimages: one every GHOST_GAP metres along the path, each fading out over GHOST_LIFE seconds
+const GHOST_GAP = 3, GHOST_LIFE = 0.55, GHOST_ALPHA = 0.55;
+const GHOST_NEW = new THREE.Color(0xc77dff), GHOST_OLD = new THREE.Color(0x5b3bff); // (the dash's violet, deepening as it fades)
+
 // Particles, explosions, warning rings, skate trails and comic onomatopoeia.
 export class FX {
   constructor(scene, camera) {
@@ -29,6 +33,8 @@ export class FX {
     this.booms = [];
     this.rings = [];
     this.embers = []; // burning phosphor fragments (phosphor): each one trails smoke as it falls
+    this.ghosts = []; // Phase Dash afterimages in flight
+    this.ghostRun = null; // the dash laying them: { model, left, last }
     this.popLayer = document.getElementById('popups');
 
     // skate trails (two ribbons)
@@ -159,6 +165,53 @@ export class FX {
     this.rings.push({ m, inner: core, t: 0, dur: 0.3, beam: true });
   }
 
+  // Phase Dash: for `secs`, leave a purplish ghost of the runner's model every few metres along the path. Each is a flat
+  // copy of the model's pose at that moment (its meshes, sharing the model's geometry, frozen in world space: nothing
+  // animates), so only the ghost's own material is ever disposed.
+  startGhosts(model, secs = 0.6) { this.ghostRun = { model, left: secs, last: null }; }
+
+  spawnGhost(model) {
+    const root = model.root;
+    root.updateWorldMatrix(true, true);
+    const mat = new THREE.MeshBasicMaterial({ color: GHOST_NEW, transparent: true, opacity: GHOST_ALPHA, depthWrite: false });
+    const g = new THREE.Group();
+    g.userData.persist = true; // (the Spindle hides the Moon's scene, not this)
+    const skip = [model.scarf, model.cargoSlot]; // (live geometry: a ghost's scarf would keep moving; the cargo isn't the runner)
+    const walk = (o) => {
+      if (!o.visible || skip.includes(o)) return;
+      if (o.isMesh && o.material && o.material.side !== THREE.BackSide) { // (not the ink outline shells)
+        const c = new THREE.Mesh(o.geometry, mat);
+        c.matrixAutoUpdate = false;
+        c.matrix.copy(o.matrixWorld);
+        g.add(c);
+      }
+      for (const ch of o.children) walk(ch);
+    };
+    walk(root);
+    this.scene.add(g);
+    this.ghosts.push({ g, mat, t: 0, pos: root.getWorldPosition(new THREE.Vector3()) });
+  }
+
+  updateGhosts(dt) {
+    const run = this.ghostRun;
+    if (run) {
+      run.left -= dt;
+      const p = run.model.root.getWorldPosition(this.v);
+      if (!run.last || p.distanceTo(run.last) >= GHOST_GAP) { this.spawnGhost(run.model); run.last = (run.last || new THREE.Vector3()).copy(p); }
+      if (run.left <= 0) this.ghostRun = null;
+    }
+    for (let i = this.ghosts.length - 1; i >= 0; i--) {
+      const gh = this.ghosts[i];
+      gh.t += dt;
+      const k = gh.t / GHOST_LIFE;
+      if (k >= 1) { gh.g.removeFromParent(); gh.mat.dispose(); this.ghosts.splice(i, 1); continue; }
+      // (they fade out as they go, and away from the camera too: they're left behind you, between it and you)
+      const near = Math.min(1, Math.max(0, (this.camera.position.distanceTo(gh.pos) - 3) / 8));
+      gh.mat.opacity = GHOST_ALPHA * Math.pow(1 - k, 1.5) * near;
+      gh.mat.color.lerpColors(GHOST_NEW, GHOST_OLD, k);
+    }
+  }
+
   // Deflector Shield hit: the invisible field shows itself for a moment, a faceted shell that
   // flashes, swells and fades round you, shedding sparks off the side the hit came from.
   shieldHit(follow, from = null) {
@@ -266,6 +319,7 @@ export class FX {
   update(dt) {
     this.updateEmbers(dt);
     this.updateShells(dt);
+    this.updateGhosts(dt);
     // particles
     let n = 0;
     for (let i = this.particles.length - 1; i >= 0; i--) {

@@ -315,8 +315,8 @@ Trade, a Militia Pact) reshapes the Moon and puts other factions' vehicles, weap
   Militia Turret (shoots pirates), Market (₵40/min to collect) and Garage (hauler vehicle).
 - **Research (Meridian, plus Daedalus):** plant sensor relays, survive **phase-field experiments**
   (anomalies strike where the warning rings appear), carry unstable antimatter without cracking it, and
-  build a research station. Rewards are **tech**: Phase Dash (`Z`, swings all your momentum to where you
-  look) and a Personal Teleporter (`T`, any discovered location or your outposts). The **Deflector Shield**
+  build a research station. Rewards are **tech**: Phase Dash (`Z`, swings all your momentum, plus a kick, to where you
+  look, leaving a trail of violet ghost copies of you along the way) and a Personal Teleporter (`T`, any discovered location or your outposts). The **Deflector Shield**
   (an invisible field that absorbs a hit every 12 s, and shows itself when it does) comes with SPACECOM's,
   Vostok's and Rustmoon's third chapters.
 - **Rustmoon (Kade):** take a SPACECOM depot, crack an armoured convoy, blow up three SPACECOM outposts
