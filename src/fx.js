@@ -11,9 +11,10 @@ const GHOST_GAP = 3, GHOST_LIFE = 0.55, GHOST_ALPHA = 0.55;
 const GHOST_NEW = new THREE.Color(0xc77dff), GHOST_OLD = new THREE.Color(0x5b3bff); // (the dash's violet, deepening as it fades)
 
 // Comic popups: at most POP_MAX are on screen at once and the rest queue behind them, each running its full time once it
-// starts. A backed-up queue sheds its oldest low-rank popups (POP_QUEUE_MAX), and a rank-0 popup that has waited longer than
-// it is still worth showing (about the thing it names: a shout at a spot that's long gone, a "+credit" that's old news) is dropped.
-const POP_MAX = 2, POP_QUEUE_MAX = 8, POP_WAIT_WORLD = 1.2, POP_WAIT_SCREEN = 3;
+// starts. A popup pinned to a spot in the world that waits too long is dropped rather than shown late at a spot you've left
+// (POP_WAIT_WORLD; the runner's own, prio 1, wait longer; prio 2, the K.O., never goes stale), and one pinned to somewhere you
+// can't see isn't shown at all. A backed-up queue sheds its oldest lowest-rank popups past POP_QUEUE_MAX.
+const POP_MAX = 2, POP_QUEUE_MAX = 8, POP_WAIT_WORLD = 1.2, POP_WAIT_WORLD_PRIO = 3;
 
 // Particles, explosions, warning rings, skate trails and comic onomatopoeia.
 export class FX {
@@ -309,7 +310,7 @@ export class FX {
   }
 
   // Onomatopoeia anchored at a world position (or screen centre if pos null). Only POP_MAX show at a time; the rest wait
-  // their turn (priority ones jump ahead of the ordinary ones, and are never dropped for waiting too long).
+  // their turn (prio 1, the runner's own feedback, jumps ahead of ordinary chatter; prio 2 is the K.O.).
   pop(text, pos = null, { color = '#ffd23f', size = 64, life = 1.0, rot = null, prio = 0 } = {}) {
     const q = this.popQueue;
     let i = q.length;
@@ -320,6 +321,7 @@ export class FX {
   }
 
   // starts queued popups while there's room: each one's run time counts from here, not from when it was asked for
+  // (one pinned to somewhere off screen is dropped, not started: it would hold a slot for nothing)
   pumpPops() {
     while (this.pops.length < POP_MAX && this.popQueue.length) this.startPop(this.popQueue.shift());
   }
@@ -333,23 +335,27 @@ export class FX {
     el.style.fontSize = Math.round(Math.max(10, e.size * 0.55)) + 'px';
     el.style.setProperty('--rot', Math.round((e.rot ?? (Math.random() * 24 - 12)) * 0.25) + 'deg');
     el.style.animationDuration = e.life + 's';
-    this.popLayer.appendChild(el);
-    const p = { el, pos: e.pos, t: 0, life: e.life, lp: 50, tp: 36, w: el.offsetWidth, h: el.offsetHeight, nudge: 0, fresh: true };
+    const p = { el, pos: e.pos, t: 0, life: e.life, lp: 50, tp: 36, w: 0, h: 0, nudge: 0, fresh: true, done: false };
     if (!e.pos) { p.lp = 50 + (Math.random() * 20 - 10); p.tp = 32 + Math.random() * 10; }
+    if (!this.placePop(p)) return;
+    this.popLayer.appendChild(el);
+    p.w = el.offsetWidth; p.h = el.offsetHeight;
+    el.addEventListener('animationend', () => { p.done = true; }); // (the CSS animation runs on the wall clock: when it's over the slot is free, however slow the frames)
     this.pops.push(p);
-    this.placePop(p);
   }
 
-  // a world-anchored popup follows its spot on screen; a screen one stays where it was dropped
+  // a world-anchored popup follows its spot on screen; a screen one stays where it was dropped. False: the spot is off screen
   placePop(p) {
     if (p.pos) {
+      this.camera.updateMatrixWorld();
       this.v.copy(p.pos).project(this.camera);
-      p.el.style.visibility = this.v.z > 1 ? 'hidden' : ''; // (behind the camera: hidden, not display:none, which would restart its animation)
+      if (this.v.z > 1 || Math.abs(this.v.x) > 1.2 || Math.abs(this.v.y) > 1.2) return false;
       p.lp = ((this.v.x + 1) / 2) * 100;
       p.tp = ((1 - this.v.y) / 2) * 100;
     }
     p.el.style.left = p.lp + '%';
     p.el.style.top = p.tp + '%';
+    return true;
   }
 
   // Two popups never sit on top of each other: if the newer one would overlap the older, it's nudged up or down clear of it.
@@ -441,15 +447,15 @@ export class FX {
     for (let i = q.length - 1; i >= 0; i--) {
       const e = q[i];
       e.wait += popDt;
-      if (e.prio === 0 && e.wait > (e.pos ? POP_WAIT_WORLD : POP_WAIT_SCREEN)) q.splice(i, 1);
+      if (e.pos && e.prio < 2 && e.wait > (e.prio ? POP_WAIT_WORLD_PRIO : POP_WAIT_WORLD)) q.splice(i, 1);
     }
     for (let i = this.pops.length - 1; i >= 0; i--) {
       const p = this.pops[i];
       p.t += popDt;
-      if (p.t >= p.life) { p.el.remove(); this.pops.splice(i, 1); }
+      if (p.t >= p.life || p.done) { p.el.remove(); this.pops.splice(i, 1); }
+      else if (p.pos && !this.placePop(p)) { p.el.remove(); this.pops.splice(i, 1); } // (its spot has left the screen)
     }
     this.pumpPops();
-    for (const p of this.pops) if (p.pos) this.placePop(p);
     this.separatePops(popDt);
   }
 }

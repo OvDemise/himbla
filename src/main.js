@@ -767,7 +767,7 @@ class Game {
     P.dead = true;
     P.model.root.visible = false;
     this.fx.explosion(P.center, 8, true);
-    this.fx.pop('K.O.!', P.center.clone().addScaledVector(P.up, 3), { color: '#ff2a4a', size: 110, life: 2, prio: 1 });
+    this.fx.pop('K.O.!', P.center.clone().addScaledVector(P.up, 3), { color: '#ff2a4a', size: 110, life: 2, prio: 2 });
     this.audio.boom(true);
     if (this.missions.active) this.missions.failAll('You went down — the cargo is lost.');
     this.story.onDeath();

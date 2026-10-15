@@ -18,7 +18,7 @@ const FLIP_RATE = 11; // rad/s ≈ 1.75 rotations per second
 const SPIN_RATE = 12;
 const NUMS = ['', '', 'DOUBLE ', 'TRIPLE ', 'QUAD ', 'QUINT '];
 const BIG_AIR_MIN = 5; // s in the air before BIG AIR! is called out (shorter hops still pay their style points, quietly)
-const SKY_HIGH_GAIN = 40; // m climbed above where a jump began before SKY-HIGH! is called out
+const SKY_HIGH_GAIN = 40; // m climbed (distance from the Moon's centre) above where a jump began before SKY-HIGH! is called out
 
 const _q = new THREE.Quaternion();
 const _Z = new THREE.Vector3(0, 0, 1);
@@ -41,7 +41,7 @@ export class Player {
     this.cargoMesh = null;
     this.speedMarks = SPEED_MARKS.map(() => false);
     this.launchCheck = -1;
-    this.airBase = null; // altitude where this spell in the air began (SKY-HIGH! counts the climb from it)
+    this.airBase = null; // distance from the Moon's centre where this spell in the air began (SKY-HIGH! counts the climb from it)
     this.skyHigh = false; // ...and whether this jump has had its SKY-HIGH! yet
     this.anim = 0;
     this.upSmooth = spawn.clone().normalize();
@@ -367,8 +367,8 @@ export class Player {
     // SKY-HIGH!: once a jump has climbed SKY_HIGH_GAIN m above where it began (not for falling off a cliff or a ride)
     if (b.grounded) { this.airBase = null; this.skyHigh = false; }
     else {
-      this.airBase ??= b.altitude;
-      if (!this.skyHigh && b.altitude - this.airBase >= SKY_HIGH_GAIN && b.vel.dot(up) > 0) {
+      this.airBase ??= b.pos.length(); // (not b.altitude: that's the height over the ground below, which jumps when the ground drops away at a rim or a cliff)
+      if (!this.skyHigh && b.pos.length() - this.airBase >= SKY_HIGH_GAIN && b.vel.dot(up) > 0) {
         this.skyHigh = true;
         g.fx.pop('SKY-HIGH!', null, { color: '#2ee6ff', size: 72, prio: 1 });
       }
