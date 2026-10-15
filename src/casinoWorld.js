@@ -497,8 +497,7 @@ export function buildCasino(w, loc) {
   }
   // bouncer in a tux by the door
   const bouncer = makeFigure({ suit: 0x16121f, helmet: 0x16121f, visor: 0xffd23f, scale: 1.35 });
-  put(bouncer.root, 7.6, D + 2.6, 0, 0);
-  col({ type: 'cyl', x: 7.6, z: D + 2.6, y0: -1, y1: 3, r: 0.7 });
+  put(bouncer.root, 7.6, D + 2.6, 0, 0); // (no collider: the people here, like the patrons, are walked through, not round)
 
   // chip stacks out front
   const chipCols = [0xff2a4a, 0x2ee6ff, 0x111111, 0x7dff6a, 0xffd23f];
@@ -630,8 +629,7 @@ export function buildCasino(w, loc) {
   stoolLeg.position.set(0, 0.4, R + 0.9);
   bj.add(stool, stoolLeg);
   put(bj, BJ.x, BJ.z, 0, 0, true);
-  col({ type: 'box', x: BJ.x, y: 0.7, z: BJ.z + R / 2, hx: R + 0.2, hy: 0.7, hz: R / 2 + 0.2 });
-  col({ type: 'cyl', x: BJ.x, z: BJ.z - 0.9, y0: -1, y1: 2.4, r: 0.6 });
+  col({ type: 'box', x: BJ.x, y: 0.7, z: BJ.z + R / 2, hx: R + 0.2, hy: 0.7, hz: R / 2 + 0.2 }); // (the table; the dealer behind it has none)
   const bjSign = new THREE.Mesh(new THREE.PlaneGeometry(7, 1.75), new THREE.MeshBasicMaterial({ map: neonTex('BLACKJACK', { color: '#7dff6a', edge: '#ffd23f', sub: 'PAYS 3 TO 2 · {F} AT THE STOOL TO PLAY' }) }));
   put(bjSign, BJ.x, BJ.z - 0.3, 7.5);
   padSign(bjSign, 'BLACKJACK', { color: '#7dff6a', edge: '#ffd23f', sub: 'PAYS 3 TO 2 · {F} AT THE STOOL TO PLAY' });
@@ -826,8 +824,7 @@ export function buildCasino(w, loc) {
   const spots = [[-4, -18.6, Math.PI], [-16, -18.4, Math.PI], [-21, -18.8, Math.PI + 0.3], [8.5, -23, 2.5], [19.5, -23.5, -2.6], [-8.5, -4, -1.2], [5, 2, 0.6]];
   spots.forEach(([x, z, yaw], i) => {
     const f = makeFigure({ suit: [0xffc83a, 0x2ee6ff, 0xff7ad9, 0x16121f, 0x7dff6a, 0xc77dff, 0xff9f1c][i], helmet: 0xfff4e0, visor: [0xff2e88, 0x241a5c, 0xffd23f][i % 3] });
-    put(f.root, x, z, 0, yaw, true);
-    col({ type: 'cyl', x, z, y0: -1, y1: 2.4, r: 0.55 });
+    put(f.root, x, z, 0, yaw, true); // (no collider: a skater used to stop dead on these)
     crowd.push({ root: f.root, phase: i * 1.7, cheer: 0 });
   });
 
