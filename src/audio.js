@@ -19,7 +19,7 @@ export class Audio {
     const ctx = this.ctx;
     this.master = ctx.createGain();
     this.master.gain.value = 0.5 * (this.vol ? this.vol.sfx : 1); // settings: master = effects bus
-    this.out = ctx.createGain(); this.out.gain.value = this.vol ? this.vol.master : 1; // settings
+    this.out = ctx.createGain(); this.out.gain.value = this.vol ? (this.vol.mute ? 0 : this.vol.master) : 1; // settings (the one node wired to the speakers: muting it silences everything)
     this.musicBus = ctx.createGain(); this.musicBus.gain.value = 0.5 * (this.vol ? this.vol.music : 1); // settings
     this.master.connect(this.out); this.musicBus.connect(this.out); this.out.connect(ctx.destination); // settings
 
@@ -385,13 +385,13 @@ export class Audio {
     } else this.fade = Math.min(1, this.fade + 0.015);
     if (this.track !== 'free') {
       const info = this.trackInfo(this.track);
-      this.music.gain.setTargetAtTime(this.musicOn ? info.vol * this.fade : 0, t, 0.3);
+      this.music.gain.setTargetAtTime(this.musicPlays ? info.vol * this.fade : 0, t, 0.3);
       this.musicTone.frequency.setTargetAtTime(info.tone, t, 0.4);
       const fn = { menu: this.menuStep, casino: this.casinoStep, downs: this.downsStep, lab: this.labStep, dark: this.darkStep }[this.track];
       const six = 60 / this.bpm / 4;
       if (this.nextNote < t - 0.5) this.nextNote = t + 0.05;
       while (this.nextNote < t + 0.2) {
-        if (this.musicOn && this.fade > 0.02) fn.call(this, this.nextNote, this.step);
+        if (this.musicPlays && this.fade > 0.02) fn.call(this, this.nextNote, this.step);
         this.nextNote += six;
         this.step++;
       }
@@ -399,24 +399,24 @@ export class Audio {
     }
     const target = Math.max(this.levelFloor || 0, Math.min(1, speed / 110));
     this.level += (target - this.level) * (target > this.level ? 0.02 : 0.008);
-    const vol = this.musicOn ? (0.05 + this.level * 0.55) * this.fade : 0;
+    const vol = this.musicPlays ? (0.05 + this.level * 0.55) * this.fade : 0;
     this.music.gain.setTargetAtTime(vol, t, 0.4);
     this.musicTone.frequency.setTargetAtTime(700 + this.level * 3300, t, 0.4);
     const sixteenth = 60 / this.bpm / 4;
     if (this.nextNote < t - 0.5) this.nextNote = t + 0.05; // tab was asleep: don't burst-fire
     while (this.nextNote < t + 0.2) {
-      if (this.musicOn && this.fade > 0.02) this.playStep(this.nextNote, this.step, this.level);
+      if (this.musicPlays && this.fade > 0.02) this.playStep(this.nextNote, this.step, this.level);
       this.nextNote += sixteenth;
       this.step++;
     }
   }
 
-  // settings: master / music / effects volume (0..1); safe to call before init()
-  setVolumes(master, music, sfx) {
-    this.vol = { master, music, sfx };
+  // settings: master / music / effects volume (0..1) and the mute switch; safe to call before init()
+  setVolumes(master, music, sfx, mute = false) {
+    this.vol = { master, music, sfx, mute };
     if (!this.ctx || !this.out) return;
     const t = this.ctx.currentTime;
-    this.out.gain.setTargetAtTime(master, t, 0.03);
+    this.out.gain.setTargetAtTime(mute ? 0 : master, t, 0.03);
     this.musicBus.gain.setTargetAtTime(0.5 * music, t, 0.03);
     this.master.gain.setTargetAtTime(0.5 * sfx, t, 0.03);
   }
@@ -522,6 +522,12 @@ export class Audio {
     this.musicOn = !this.musicOn;
     return this.musicOn;
   }
+
+  // settings → Audio → Mute all audio
+  get muted() { return !!(this.vol && this.vol.mute); }
+
+  // (the groove isn't played into a muted or switched-off bus: no point synthesising what nobody hears)
+  get musicPlays() { return this.musicOn && !this.muted; }
 
   update(speed, skating, grounded, thrusting) {
     if (!this.ctx) return;

@@ -120,7 +120,7 @@ back. Prompts show the pad's buttons while it's in use.
 | `LT` · `RT` | Thrusters (Rail Lance: scope) · fire |
 | `L3` · `R3` | Thrusters · scoop into the jar |
 | D-pad ← → · ↑ | Previous / next weapon · next power |
-| D-pad ↓ (tap) · right stick · `A` / `B` | Open the radial menu (tap again to use the highlighted wedge, or to close it if none is picked): vehicles and powers (each opens its own wheel of the ones you own, with the same controls; the power you pick there, equipped with `A`, is the one `RB` uses; the equipped one has an orange edge), wardrobe, reputation log, music, help, empty jar · pick a wedge (it glows like the minimap: white in the light, purple on the dark side) · use it / cancel |
+| D-pad ↓ (tap) · right stick · `A` / `B` | Open the radial menu (tap again to use the highlighted wedge, or to close it if none is picked): vehicles and powers (each opens its own wheel of the ones you own, with the same controls; the power you pick there, equipped with `A`, is the one `RB` uses; the equipped one has an orange edge), wardrobe, reputation log, empty jar · pick a wedge (it glows like the minimap: white in the light, purple on the dark side) · use it / cancel |
 | `Circle` held + tilt the pad (PlayStation) | **Gyro:** how far you turn the pad since Circle went down acts like the left stick: pitch it forward / back and turn it like a steering wheel to move on the ground, or to flip and spin in the air. Settings → Gameplay: on / off, how far is a full push, flip either axis |
 | `View` (tap · hold) · `Start` | Globe map · emergency recall · pause |
 
@@ -484,15 +484,15 @@ more) to its own faster, brighter synthwave track (it starts with your first key
 The game opens on a main menu: CONTINUE, NEW GAME, LOAD GAME, SETTINGS (and QUIT in the desktop app). There
 are three save slots, each showing credits, deliveries, story faction, play time and last played; slots can
 be deleted (with a confirm). Progress is saved to the active slot every few seconds and on every delivery,
-purchase and K.O. Settings are shared by all slots. The pause menu has QUIT TO MAIN MENU. Pausing (and the map,
+purchase and K.O. Settings are shared by all slots. The pause menu has SETTINGS, HELP (the controls list; `Esc` or `B` goes back to the pause card) and QUIT TO MAIN MENU. Pausing (and the map,
 dialogs, job board and wardrobe) freezes the whole world: traffic, the satellite, particles and timers.
 
 ## Settings
 
 `Esc` → SETTINGS (or the button on the title screen). Graphics: render scale, FOV, view distance, terrain
 detail, shadows and their resolution, halftone, speed lines, ink strength, particles, screen shake, damage
-flash, frame cap. Gameplay: mouse sensitivity, invert Y, camera distance/height/shoulder/smoothing, tips, minimap, HUD scale, km/h or m/s. Audio:
-master, music, effects. Controls: remap every action key (taking a key that's in use swaps the two).
+flash, frame cap. Gameplay: mouse sensitivity, invert Y, camera distance/height/shoulder/smoothing, tips, minimap, HUD scale, km/h or m/s. Audio: a
+mute switch for everything, then master, music and effects volume. Controls: remap every action key (taking a key that's in use swaps the two).
 
 ## Cheat menu (testing)
 

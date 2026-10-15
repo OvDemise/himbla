@@ -334,6 +334,14 @@ class Game {
       e.stopPropagation();
       this.quitToMenu();
     });
+    // the pause card's HELP: the controls panel over a dim backdrop (like the settings); BACK, Esc or the pad's B returns to the card
+    document.getElementById('help-btn-pause').addEventListener('click', (e) => { e.stopPropagation(); this.openHelp(); });
+    document.getElementById('help-back').addEventListener('click', (e) => { e.stopPropagation(); this.closeHelp(); });
+    window.addEventListener('keydown', (e) => {
+      if (e.code !== 'Escape' || !document.querySelector('#help.modal')) return;
+      e.preventDefault(); e.stopImmediatePropagation();
+      this.closeHelp();
+    }, true);
     // (the dev menu's pause entry: shown once the menu has been opened by its F8 / controller combo)
     document.getElementById('dev-btn-pause').addEventListener('click', (e) => {
       e.stopPropagation();
@@ -1163,6 +1171,24 @@ class Game {
     this.input.endFrame();
   }
 
+  openHelp() {
+    const el = document.getElementById('help');
+    this.helpWas = !el.classList.contains('hidden'); // (H may have it up in the corner already: BACK leaves it as it found it)
+    this.refreshHelp();
+    el.classList.remove('hidden');
+    el.classList.add('modal');
+    this.hud.show('pause', false);
+  }
+
+  closeHelp() {
+    const el = document.getElementById('help');
+    if (!el.classList.contains('modal')) return;
+    el.classList.remove('modal');
+    if (!this.helpWas) el.classList.add('hidden');
+    // (back to the pause card, unless the game was resumed some other way meanwhile)
+    if (this.state === 'paused') this.hud.show('pause', true);
+  }
+
   // Which music track fits where you are: the casino, Chimera Downs and Dr. Zbornak's lab have
   // their own; the dark side has its own; everywhere else the speed-driven roaming groove.
   // The controls panel (H) only lists what you can actually do yet: rows tagged data-req appear as
@@ -1395,7 +1421,7 @@ class Game {
     }
     this.powers.update(dt);
     if (this.input.pressed('KeyT') && this.boardCooldown <= 0 && !this.player.rag) this.story.useTech('teleport');
-    if (this.input.pressed('KeyN')) this.hud.toast(this.audio.toggleMusic() ? '♪ Music on' : 'Music off', 1.5);
+    if (this.input.pressed('KeyN')) { const on = this.audio.toggleMusic(); this.hud.toast(this.audio.muted ? `Music ${on ? 'on' : 'off'} (all audio is muted: Settings → Audio)` : on ? '♪ Music on' : 'Music off', this.audio.muted ? 3 : 1.5); }
     this.cosmetics.update(dt);
     this.updateScanner(dt);
     this.enemies.update(wdt, this.time);

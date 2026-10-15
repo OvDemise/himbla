@@ -66,7 +66,7 @@ export function glyphHtml(tokens, kind = glyphState.kind) {
 const WORDS = {
   SPACE: ['LB'], SHIFT: ['A'], ENTER: ['A'], MOUSE: ['RS'], 'RIGHT MOUSE': ['LT'], RMB: ['LT'], 'E/RMB': ['LT'], LMB: ['RT'],
   E: ['LT'], Q: ['B'], F: ['X'], G: ['R3'], V: ['Y'], Z: ['RB'], M: ['VIEW'], R: ['VIEW', '#hold'],
-  X: ['DD'], C: ['DD'], J: ['DD'], P: ['DD'], T: ['DD'], H: ['DD'], N: ['DD'],
+  X: ['DD'], C: ['DD'], J: ['DD'], P: ['DD'], T: ['DD'], // (the radial menu's wedges; N and H have no button: music is under Settings → Audio, help is on the pause card)
 };
 export function tokensFor(text) {
   const t = text.trim();

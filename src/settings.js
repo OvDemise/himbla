@@ -82,6 +82,7 @@ export const SCHEMA = {
     { key: 'gyroInvY', label: 'Gyro: flip forward / back', type: 'toggle', def: false },
   ],
   audio: [
+    { key: 'mute', label: 'Mute all audio', type: 'toggle', def: false, hint: 'Silences everything: music, effects, wind, skates and thrusters' },
     { key: 'master', label: 'Master volume', type: 'range', min: 0, max: 1, step: 0.05, def: 1, fmt: pct },
     { key: 'music', label: 'Music volume', type: 'range', min: 0, max: 1, step: 0.05, def: 1, fmt: pct },
     { key: 'sfx', label: 'Effects volume', type: 'range', min: 0, max: 1, step: 0.05, def: 1, fmt: pct },
@@ -135,6 +136,9 @@ const HELP_PAD = {
   Mouse: ['RS'], 'Left mouse': ['RT'], 'SPACE (hold)': ['LB'], 'A / D on skates': ['LS'], 'E / Right mouse': ['LT'],
   'Q + W/S · Q + A/D': ['B', '#+', 'LS'], '1 2 3 4': ['DL', 'DR'], 'X (hold)': ['DD'], 'R (hold)': ['VIEW', '#hold'], M: ['VIEW', '#tap'],
 };
+
+// Help-table rows with no pad button at all (music is under Settings → Audio, help is on the pause card): left out while a pad is in use
+const HELP_PAD_HIDE = ['N', 'H'];
 
 // Help-table / title-card labels rebuilt from the current bindings (k = code -> label).
 const HELP_ROWS = {
@@ -294,7 +298,7 @@ export class Settings {
       if (u.lines) u.lines.value = v.speedLines ? 1 : 0;
       if (u.inkK) u.inkK.value = v.ink;
     }
-    if (g.audio && g.audio.setVolumes) g.audio.setVolumes(v.master, v.music, v.sfx);
+    if (g.audio && g.audio.setVolumes) g.audio.setVolumes(v.master, v.music, v.sfx, v.mute);
     if (g.input && g.input.setBindings) g.input.setBindings(v.binds);
     const mm = document.getElementById('minimap');
     if (mm) mm.style.display = v.minimap ? '' : 'none';
@@ -314,6 +318,7 @@ export class Settings {
     const pad = !!(this.game && this.game.input && this.game.input.padActive);
     for (const td of document.querySelectorAll('#help td:first-child')) {
       if (!td.dataset.orig) td.dataset.orig = td.textContent;
+      if (HELP_PAD_HIDE.includes(td.dataset.orig)) td.parentElement.style.display = pad ? 'none' : '';
       const toks = pad && (HELP_PAD[td.dataset.orig] || tokensFor(td.dataset.orig));
       if (toks) { td.innerHTML = glyphHtml(toks); continue; }
       const f = HELP_ROWS[td.dataset.orig];

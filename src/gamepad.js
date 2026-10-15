@@ -41,7 +41,7 @@
 //                                               left stick / d-pad  pick a duck   A  race · new race
 //                                               LB / RB     lower / raise the bet   B  stand up
 //   d-pad ↓      the radial menu (tap to open, tap again to close): vehicles, powers, wardrobe, reputation log,
-//                music, help, empty the jar (vehicles and powers open their own wheel of the ones you own:
+//                empty the jar (vehicles and powers open their own wheel of the ones you own:
 //                same controls; a power you pick on its wheel is the one RB uses). The right stick picks a wedge (the
 //                highlight glows like the minimap: purple on the dark side, white in the light), A or
 //                d-pad ↓ again uses it, B / Start cancels.
@@ -61,8 +61,6 @@ const RADIAL = [
   { id: 'powers', name: 'POWERS', has: (g) => g.powers && !g.player.rag && g.powers.owned().length > 0 }, // (the pen link and Teleporter are on it)
   { code: 'KeyC', name: 'WARDROBE' },
   { code: 'KeyJ', name: 'REP LOG' },
-  { code: 'KeyN', name: 'MUSIC', keep: true, state: (g) => (g.audio.musicOn === false ? 'OFF' : 'ON') },
-  { code: 'KeyH', name: 'HELP' },
   { id: 'jar', code: 'KeyX', name: 'EMPTY JAR', has: (g) => (g.upgrades.jar || 0) > 0 },
 ];
 // the panels a highlight can work in, topmost first
@@ -316,11 +314,6 @@ export class Gamepad {
       const locked = !!(q && q.has && !q.has(g));
       if (locked && pressed(B.A)) { if (g.audio && g.audio.tone) g.audio.tone(180, 0.1, 'sawtooth', 0.05); return; } // (A on a wedge that isn't yours yet: stays open)
       if (locked) q = null; // (d-pad ↓ on one just closes the wheel)
-      if (q && q.keep) {
-        // (a toggle, like music: A flips it and the wheel stays up; d-pad ↓ closes it)
-        if (pressed(B.A)) { this.useRadial(q); this.drawRadial(); return; }
-        q = null;
-      }
       this.closeRadial();
       // (a held d-pad ↓ must not also step the highlight in whatever screen this opens)
       if (pressed(B.DOWN)) { this.navDir = 'down'; this.navT = 0.38; }
@@ -380,7 +373,7 @@ export class Gamepad {
     el.querySelectorAll('.pr-item').forEach((it) => {
       const i = +it.dataset.i, q = RADIAL[i];
       it.classList.toggle('on', i === R.sel);
-      // (labels that show a state, like music ON / OFF, follow it while the wheel is up)
+      // (labels that show a state, like VEHICLES' GET OUT, follow it while the wheel is up)
       if (q.state && !it.classList.contains('locked')) { const s = it.querySelector('small'), t = q.state(g); if (s && s.textContent !== t) s.textContent = t; }
     });
     const q = R.sel >= 0 ? RADIAL[R.sel] : null;
@@ -566,7 +559,8 @@ export class Gamepad {
     }
     // (settings close back to whatever opened them: resuming from under them would leave them up)
     const setOpen = g.settings && g.settings.open;
-    if (pressed(B.B) || pressed(B.START)) { if (g.state === 'paused' && !setOpen) this.resume(); else this.key('Escape'); }
+    const helpOpen = !!document.querySelector('#help.modal'); // (the pause card's HELP: B goes back to the card rather than resuming)
+    if (pressed(B.B) || pressed(B.START)) { if (g.state === 'paused' && !setOpen && !helpOpen) this.resume(); else this.key('Escape'); }
     if (pressed(B.LB) || pressed(B.RB)) this.tab(root, pressed(B.RB) ? 1 : -1);
     // the right stick scrolls whatever scrolls
     if (ry) {
@@ -587,6 +581,7 @@ export class Gamepad {
   uiRoot() {
     for (const id of UI_ROOTS) {
       const el = document.getElementById(id);
+      if (id === 'help' && el && !el.classList.contains('modal')) continue; // (the corner panel H toggles in play has nothing to press, and would hide the pause card behind it)
       if (el && !el.classList.contains('hidden') && el.getClientRects().length) return el;
     }
     return null;
