@@ -140,9 +140,9 @@ function roadMaterial() {
         float scr2 = n2(vec2(X * 15.0 + n1(s * 0.07 + 9.0) * 6.0, s * 0.14));
         float edgeR = 7.3 + (ne - 0.5) * 0.15;
         // (a junction flare has no berm and a soft edge, so it melts into the road or ring under it)
-        float bed = 1.0 - smoothstep(edgeR - 0.3 - vSoft * 1.6, edgeR + 0.1 + vSoft * 0.6, ax);
+        float bed = 1.0 - smoothstep(edgeR - 0.3 - vSoft * 1.2, edgeR + 0.1 + vSoft * 0.6, ax);
         vec3 soil = mix(vec3(0.09, 0.085, 0.115), vec3(0.25, 0.24, 0.28), mot);
-        soil *= 0.88 + 0.28 * (scr - 0.5) + 0.12 * (scr2 - 0.5);
+        soil *= (0.88 + 0.28 * (scr - 0.5) + 0.12 * (scr2 - 0.5)) * (1.0 - 0.14 * vSoft);
         // dust that has drifted back over the bed, and the crown between the lanes where nothing runs
         float drift = smoothstep(0.6, 0.9, n2(vec2(X * 0.35, s * 0.04 + 3.0)));
         float crown = 1.0 - smoothstep(0.5, 1.5, ax);
@@ -161,7 +161,7 @@ function roadMaterial() {
         col = mix(col, vec3(0.03, 0.028, 0.045), cut * 0.92);
         col = mix(col, vec3(0.82, 0.79, 0.85) * (0.94 + 0.06 * n1(s * 0.05 + sg * 11.0)), crest * 0.9);
         // translucent, so the ground shows through, and soft where it melts into the surface
-        float a = max(bed * 0.84 * (1.0 - 0.25 * vSoft), max(cut * 0.9, crest * 0.8));
+        float a = max(bed * mix(0.84, 0.96, vSoft), max(cut * 0.9, crest * 0.8));
         a = max(a, groove * 0.9);
         a *= 1.0 - smoothstep(8.3, 9.0, ax);
         col *= 0.22 + 0.85 * vLit;
