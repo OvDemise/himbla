@@ -11,6 +11,8 @@ import { DevOverlay, SECTIONS } from './devoverlay.js';
 
 const DEV_KEY = 'mr-dev-unlocked';
 const METEOR_KEY = 'mr-dev-meteor-power';
+const GITCHIP_KEY = 'mr-dev-git-chip';
+const GIT_POLL = 90; // seconds between looks at the upstream while the upstream chip is on
 
 // Testing menu on the ` (backtick) key. Everything goes through the normal dialog, so number
 // keys pick options and Esc closes.
@@ -30,6 +32,11 @@ export class Cheats {
     try { this.meteorPower = localStorage.getItem(METEOR_KEY) === '1'; } catch { this.meteorPower = false; }
     this.overlay = new DevOverlay(game, this); // (F3: every on-screen readout in one panel: devoverlay.js)
     this.showPauseButton();
+    // the chip at the top left that counts the commits the upstream has and this checkout does not (GIT menu, dev server only)
+    try { this.gitChip = localStorage.getItem(GITCHIP_KEY) === '1'; } catch { this.gitChip = false; }
+    this.gitState = null; // the last answer from the dev server's git status
+    this.gitTimer = 0;
+    this.gitChipSync();
   }
 
   // (read by enemies.js: whether to record each AI's steering goal for the AI paths drawing)
@@ -62,49 +69,95 @@ export class Cheats {
     g.dialogButtons.dev = true;
   }
 
-  // Fetch and pull this checkout's upstream without leaving the game. The dev server runs git (tools/devGit.mjs: a fast-forward
-  // pull only), so this works from `npm run dev` and nowhere else. The dev server notices the pulled files and reloads the page.
+  // ---- git: the dev server runs it for us (tools/devGit.mjs: a fetch, and a fast-forward pull only), so all of this works from
+  // `npm run dev` and nowhere else ----
+  async gitCall(act) {
+    try {
+      const r = await fetch(`/__dev/git/${act}`, { method: 'POST', headers: { 'X-Dev-Git': '1' } });
+      return await r.json();
+    } catch (e) { return { ok: false, err: String((e && e.message) || e) }; }
+  }
+
+  // The upstream chip (top left of the HUD): how many commits the upstream has that this checkout does not. While it is on, the
+  // upstream is fetched every GIT_POLL seconds (and whenever the GIT menu looks); the toggle is in the GIT menu, kept across launches.
+  gitChipSync() {
+    const on = this.gitChip && import.meta.env.DEV;
+    clearInterval(this.gitTimer);
+    this.gitTimer = 0;
+    if (on) {
+      this.gitCheck();
+      this.gitTimer = setInterval(() => { if (!document.hidden) this.gitCheck(); }, GIT_POLL * 1000);
+    }
+    this.gitChipDraw();
+  }
+
+  async gitCheck() { this.gitSeen(await this.gitCall('status')); }
+
+  gitSeen(st) {
+    this.gitState = st && st.ok && !st.noUpstream ? st : null;
+    this.gitChipDraw();
+  }
+
+  gitChipDraw() {
+    const el = document.getElementById('gitchip');
+    if (!el) return;
+    const on = this.gitChip && import.meta.env.DEV;
+    el.classList.toggle('hidden', !on);
+    if (!on) return;
+    const st = this.gitState;
+    const n = st ? st.behind : null;
+    el.textContent = n === null ? '⇣ ? UPSTREAM' : `⇣ ${n}${st.fetchError ? '?' : ''} UPSTREAM`;
+    el.classList.toggle('behind', n > 0);
+    el.classList.toggle('unknown', n === null);
+  }
+
+  // Fetch and pull this checkout's upstream without leaving the game. The dev server notices the pulled files and reloads the page.
   async gitMenu() {
     const g = this.game;
     const esc = (t) => String(t).replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
-    const back = { label: 'BACK', fn: () => this.dev() };
-    const show = (text, buttons) => {
-      const list = [...buttons, back, { label: 'CLOSE' }].map((b, i) => ({ ...b, label: `${i + 1} · ${b.label}` }));
+    const dev = import.meta.env.DEV;
+    const show = (text, buttons, again = null) => {
+      // (the chip's switch sits just before BACK on every screen that can come back to itself)
+      const sw = dev && again ? [{
+        label: `UPSTREAM CHIP: ${this.gitChip ? 'ON' : 'OFF'}`,
+        fn: () => { this.gitChip = !this.gitChip; try { localStorage.setItem(GITCHIP_KEY, this.gitChip ? '1' : '0'); } catch { /* unavailable */ } this.gitChipSync(); again(); },
+      }] : [];
+      const list = [...buttons, ...sw, { label: 'BACK', fn: () => this.dev() }, { label: 'CLOSE' }].map((b, i) => ({ ...b, label: `${i + 1} · ${b.label}` }));
       g.dialog('GIT: FETCH & PULL', text, list);
       return list;
     };
-    if (!import.meta.env.DEV) { show('<small>Only available when the game runs from the dev server (npm run dev).</small>', []); return; }
-    const call = async (act) => {
-      try {
-        const r = await fetch(`/__dev/git/${act}`, { method: 'POST', headers: { 'X-Dev-Git': '1' } });
-        return await r.json();
-      } catch (e) { return { ok: false, err: String(e && e.message || e) }; }
-    };
+    if (!dev) { show('<small>Only available when the game runs from the dev server (npm run dev).</small>', []); return; }
     const mine = show('<small>Fetching…</small>', []);
-    const st = await call('status');
+    const st = await this.gitCall('status');
     if (g.dialogButtons !== mine) return; // (closed or changed while it was working)
-    if (!st.ok) { show(`<small>${esc(st.err || 'The dev server did not answer.')}</small>`, [{ label: 'TRY AGAIN', fn: () => this.gitMenu() }]); return; }
-    if (st.noUpstream) { show(`<small>${esc(st.branch)} has no upstream branch. In a terminal: git branch -u origin/${esc(st.branch)}</small>`, []); return; }
-    const lines = [`<b>${esc(st.branch)}</b> → ${esc(st.upstream)} · now at ${esc(st.head)}`];
-    lines.push(st.behind ? `${st.behind} new commit${st.behind === 1 ? '' : 's'} upstream${st.ahead ? `, ${st.ahead} of yours not pushed` : ''}` : st.ahead ? `Up to date; ${st.ahead} commit${st.ahead === 1 ? '' : 's'} of yours not pushed` : 'Up to date.');
-    if (st.dirty) lines.push(`${st.dirty} uncommitted change${st.dirty === 1 ? '' : 's'} here (kept: a pull that would overwrite them stops)`);
-    if (st.fetchError) lines.push(`Fetch failed: ${esc(st.fetchError.split('\n')[0])}`);
-    for (const c of st.incoming.slice(0, 8)) lines.push(`&nbsp;· ${esc(c.length > 90 ? c.slice(0, 89) + '…' : c)}`);
-    if (st.incoming.length > 8) lines.push(`&nbsp;· …and ${st.behind - 8} more`);
-    const buttons = [];
-    if (st.behind && !st.ahead) buttons.push({ label: `PULL ${st.behind} COMMIT${st.behind === 1 ? '' : 'S'}`, fn: () => this.gitPull(show, call, esc) });
-    else if (st.behind) lines.push('Diverged from upstream: pull it by hand (a merge or rebase is not for the game to choose).');
-    buttons.push({ label: 'CHECK AGAIN', fn: () => this.gitMenu() });
-    show(`<small>${lines.join('<br>')}</small>`, buttons);
+    this.gitSeen(st);
+    const note = (msg) => { const again = () => note(msg); show(`<small>${msg}</small>`, [{ label: 'TRY AGAIN', fn: () => this.gitMenu() }], again); };
+    if (!st.ok) { note(esc(st.err || 'The dev server did not answer.')); return; }
+    if (st.noUpstream) { note(`${esc(st.branch)} has no upstream branch. In a terminal: git branch -u origin/${esc(st.branch)}`); return; }
+    const screen = () => {
+      const lines = [`<b>${esc(st.branch)}</b> → ${esc(st.upstream)} · now at ${esc(st.head)}`];
+      lines.push(st.behind ? `${st.behind} new commit${st.behind === 1 ? '' : 's'} upstream${st.ahead ? `, ${st.ahead} of yours not pushed` : ''}` : st.ahead ? `Up to date; ${st.ahead} commit${st.ahead === 1 ? '' : 's'} of yours not pushed` : 'Up to date.');
+      if (st.dirty) lines.push(`${st.dirty} uncommitted change${st.dirty === 1 ? '' : 's'} here (kept: a pull that would overwrite them stops)`);
+      if (st.fetchError) lines.push(`Fetch failed: ${esc(st.fetchError.split('\n')[0])}`);
+      for (const c of st.incoming.slice(0, 8)) lines.push(`&nbsp;· ${esc(c.length > 90 ? c.slice(0, 89) + '…' : c)}`);
+      if (st.incoming.length > 8) lines.push(`&nbsp;· …and ${st.behind - 8} more`);
+      const buttons = [];
+      if (st.behind && !st.ahead) buttons.push({ label: `PULL ${st.behind} COMMIT${st.behind === 1 ? '' : 'S'}`, fn: () => this.gitPull(show, esc) });
+      else if (st.behind) lines.push('Diverged from upstream: pull it by hand (a merge or rebase is not for the game to choose).');
+      buttons.push({ label: 'CHECK AGAIN', fn: () => this.gitMenu() });
+      show(`<small>${lines.join('<br>')}</small>`, buttons, screen);
+    };
+    screen();
   }
 
-  async gitPull(show, call, esc) {
+  async gitPull(show, esc) {
     const g = this.game;
     try { g.save(); } catch { /* the pull goes ahead without a fresh save */ }
     const mine = show('<small>Pulling…</small>', []);
-    const r = await call('pull');
+    const r = await this.gitCall('pull');
     if (g.dialogButtons !== mine) return;
     if (!r.ok) { show(`<small>Pull stopped: ${esc((r.err || r.out || 'git said no').split('\n').filter((l) => l && !/^hint:/.test(l)).slice(0, 4).join(' · '))}<br>Nothing was changed.</small>`, [{ label: 'CHECK AGAIN', fn: () => this.gitMenu() }]); return; }
+    if (this.gitState && r.from !== r.to) { this.gitState = { ...this.gitState, behind: 0, incoming: [] }; this.gitChipDraw(); }
     const lines = [r.from === r.to ? 'Already up to date.' : `Pulled ${esc(r.from)} → ${esc(r.to)} · ${r.changed} file${r.changed === 1 ? '' : 's'} changed.`];
     if (r.deps) lines.push('package.json changed: run npm install, then restart the dev server.');
     if (r.from !== r.to) lines.push('Your progress was saved. The page reloads by itself when the dev server sees the new files.');

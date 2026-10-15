@@ -52,7 +52,11 @@ async function pull() {
   };
 }
 
-const ACTIONS = { '/status': status, '/pull': pull };
+// one at a time: the chip polls while a pull may be running, and two gits in one checkout would fight over its lock files
+let queue = Promise.resolve();
+const serial = (fn) => { const run = queue.then(fn, fn); queue = run.catch(() => {}); return run; };
+
+const ACTIONS = { '/status': () => serial(status), '/pull': () => serial(pull) };
 
 export function devGit() {
   return {
