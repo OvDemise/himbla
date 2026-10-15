@@ -108,9 +108,9 @@ function roadMaterial() {
   return new THREE.ShaderMaterial({
     transparent: true, depthWrite: false, side: THREE.DoubleSide,
     uniforms: { sunDir: { value: SUN.clone() } },
-    vertexShader: `uniform vec3 sunDir; attribute float fade; attribute float mark; varying vec2 vUv; varying float vLit; varying float vFade; varying float vEnd; varying float vMark;
+    vertexShader: `uniform vec3 sunDir; attribute float fade; attribute float mark; attribute float berm; attribute float soft; varying vec2 vUv; varying float vLit; varying float vFade; varying float vEnd; varying float vMark; varying float vBerm; varying float vSoft;
       void main(){
-        vUv = uv; vEnd = fade; vMark = mark;
+        vUv = uv; vEnd = fade; vMark = mark; vBerm = berm; vSoft = soft;
         vec4 wp = modelMatrix * vec4(position, 1.0);
         vec3 toCam = cameraPosition - wp.xyz; float dist = length(toCam);
         // pull toward the eye (screen position unchanged) so coarse terrain LODs never swallow the track
@@ -119,7 +119,7 @@ function roadMaterial() {
         vFade = 1.0 - smoothstep(2300.0, 2900.0, dist);
         gl_Position = projectionMatrix * viewMatrix * wp;
       }`,
-    fragmentShader: `varying vec2 vUv; varying float vLit; varying float vFade; varying float vEnd; varying float vMark;
+    fragmentShader: `varying vec2 vUv; varying float vLit; varying float vFade; varying float vEnd; varying float vMark; varying float vBerm; varying float vSoft;
       float h1(float n){ return fract(sin(n) * 43758.5453); }
       float n1(float x){ float i = floor(x), f = fract(x); f = f * f * (3.0 - 2.0 * f); return mix(h1(i), h1(i + 1.0), f); }
       float h2(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
@@ -139,7 +139,8 @@ function roadMaterial() {
         float scr = n2(vec2(X * 5.5 + n1(s * 0.04) * 9.0, s * 0.045));
         float scr2 = n2(vec2(X * 15.0 + n1(s * 0.07 + 9.0) * 6.0, s * 0.14));
         float edgeR = 7.3 + (ne - 0.5) * 0.15;
-        float bed = 1.0 - smoothstep(edgeR - 0.3, edgeR + 0.1, ax);
+        // (a junction flare has no berm and a soft edge, so it melts into the road or ring under it)
+        float bed = 1.0 - smoothstep(edgeR - 0.3 - vSoft * 1.6, edgeR + 0.1 + vSoft * 0.6, ax);
         vec3 soil = mix(vec3(0.09, 0.085, 0.115), vec3(0.25, 0.24, 0.28), mot);
         soil *= 0.88 + 0.28 * (scr - 0.5) + 0.12 * (scr2 - 0.5);
         // dust that has drifted back over the bed, and the crown between the lanes where nothing runs
@@ -154,13 +155,13 @@ function roadMaterial() {
         soil = mix(soil, vec3(0.03, 0.028, 0.045), groove * 0.9);
         soil = mix(soil, vec3(0.5, 0.48, 0.54), lip * 0.32 * (0.5 + 0.5 * n1(s * 0.5 + 7.0)));
         // the cut: a dark line where the bed drops away, then a smooth berm of pushed-up regolith, palest at the crest
-        float cut = smoothstep(edgeR - 0.2, edgeR + 0.25, ax) * (1.0 - smoothstep(edgeR + 0.4, edgeR + 1.1, ax));
-        float crest = smoothstep(edgeR + 0.3, edgeR + 1.1, ax) * (1.0 - smoothstep(edgeR + 1.1, 9.0, ax));
+        float cut = smoothstep(edgeR - 0.2, edgeR + 0.25, ax) * (1.0 - smoothstep(edgeR + 0.4, edgeR + 1.1, ax)) * vBerm;
+        float crest = smoothstep(edgeR + 0.3, edgeR + 1.1, ax) * (1.0 - smoothstep(edgeR + 1.1, 9.0, ax)) * vBerm;
         vec3 col = soil;
         col = mix(col, vec3(0.03, 0.028, 0.045), cut * 0.92);
         col = mix(col, vec3(0.82, 0.79, 0.85) * (0.94 + 0.06 * n1(s * 0.05 + sg * 11.0)), crest * 0.9);
         // translucent, so the ground shows through, and soft where it melts into the surface
-        float a = max(bed * 0.84, max(cut * 0.9, crest * 0.8));
+        float a = max(bed * 0.84 * (1.0 - 0.25 * vSoft), max(cut * 0.9, crest * 0.8));
         a = max(a, groove * 0.9);
         a *= 1.0 - smoothstep(8.3, 9.0, ax);
         col *= 0.22 + 0.85 * vLit;
@@ -549,7 +550,7 @@ export class Traffic {
     }
     for (const [a, b] of CUT_ROADS) if (this.L[a] && this.L[b]) pairs.delete(key(this.L[a], this.L[b]));
     for (const [a, b] of EXTRA_ROADS) if (this.L[a] && this.L[b]) pairs.add(key(this.L[a], this.L[b]));
-    this.roadGeo = { pos: [], uv: [], fade: [], mark: [], idx: [] };
+    this.roadGeo = { pos: [], uv: [], fade: [], mark: [], berm: [], soft: [], idx: [] };
     this.posts = [];
     this.pieces = [];
     this.mapLines = []; // every road and town ring as a thin polyline of unit directions, for the maps
@@ -577,6 +578,8 @@ export class Traffic {
     geo.setAttribute('uv', new THREE.Float32BufferAttribute(G.uv, 2));
     geo.setAttribute('fade', new THREE.Float32BufferAttribute(G.fade, 1));
     geo.setAttribute('mark', new THREE.Float32BufferAttribute(G.mark, 1));
+    geo.setAttribute('berm', new THREE.Float32BufferAttribute(G.berm, 1));
+    geo.setAttribute('soft', new THREE.Float32BufferAttribute(G.soft, 1));
     geo.setIndex(G.idx);
     geo.computeBoundingSphere();
     const mesh = new THREE.Mesh(geo, roadMaterial());
@@ -737,7 +740,9 @@ export class Traffic {
   // Visible track: a strip of 5 ground-hugging samples across 10 m along a ground polyline.
   // `fade` (0..1) lets a strip melt into another one it overlaps (junction flares, road ends).
   // `mark` (0..1) is how much of the wheel ruts show (none on junction flares and where roads meet rings).
-  stripPush(centre, sideV, s, vScale = 1, fade = 1, mark = 1) {
+  // `bermL` / `bermR` (0..1) is how much of the cut line and berm shows on the strip's left (-) and right (+) edge, and
+  // `soft` (1 on a junction flare) widens the fade of its edge: where strips overlap, only the one that owns the edge shows a berm.
+  stripPush(centre, sideV, s, vScale = 1, fade = 1, mark = 1, bermL = 1, bermR = 1, soft = 0) {
     const G = this.roadGeo;
     for (const o of ROAD_LAT) {
       _b.copy(centre).addScaledVector(sideV, o * vScale);
@@ -746,6 +751,8 @@ export class Traffic {
       G.uv.push(o / ROAD_HALF, s);
       G.fade.push(fade);
       G.mark.push(mark);
+      G.berm.push(o < 0 ? bermL : o > 0 ? bermR : Math.min(bermL, bermR));
+      G.soft.push(soft);
     }
   }
 
@@ -778,7 +785,7 @@ export class Traffic {
   drawLine(g, s0 = 0, vScale = 1, fadeAt = null) {
     const { side, cum } = this.frames(g);
     const base = this.roadGeo.pos.length / 3;
-    for (let i = 0; i < g.length; i++) this.stripPush(g[i], side[i], s0 + cum[i], vScale, fadeAt ? fadeAt(i / (g.length - 1)) : 1, 0);
+    for (let i = 0; i < g.length; i++) this.stripPush(g[i], side[i], s0 + cum[i], vScale, fadeAt ? fadeAt(i / (g.length - 1)) : 1, 0, 0, 0, 1);
     this.stripIdx(base, g.length);
   }
 
@@ -868,7 +875,8 @@ export class Traffic {
 
   // The visible strip, marker posts and keep-out footprints of a road centreline. `ends` lists the
   // towns it starts / ends at ([loc, atStart]): their pads and shelters stay off the first stretch out.
-  layRoad({ g, dirs, N, side, tan, cum }, ends) {
+  layRoad(line, ends) {
+    const { g, dirs, N, side, tan, cum } = line;
     const P = this.P;
     this.mapLines.push(this.thin(g, 5));
     // the strip stops just short of each ring's centreline (the ring strip covers the join)
@@ -878,9 +886,11 @@ export class Traffic {
     const base = this.roadGeo.pos.length / 3;
     for (let i = i0; i <= i1; i++) {
       const e = Math.min(cum[i], cum[N] - cum[i]);
-      this.stripPush(g[i], side[i], cum[i], 1, smooth((e - 2.5) / 7), smooth((e - 12) / 16));
+      const b = smooth((e - 22) / 12); // (the berms stop short of where the flare takes over)
+      this.stripPush(g[i], side[i], cum[i], 1, smooth((e - 2.5) / 7), smooth((e - 12) / 16), b, b);
     }
     this.stripIdx(base, i1 - i0 + 1);
+    line.strip = { base, i0, i1 };
     // delineator posts every ~110 m, alternating sides
     for (let s = 60, k = 0; s < cum[N] - 60; s += 110, k++) {
       let i = 0;
@@ -966,6 +976,19 @@ export class Traffic {
     RA.gates.push(eA);
     const line = this.roadCentreline(A, null, [this.ringExit(eA, 0), this.ringExit(eA, 24), this.ringExit(eA, 52)], [dirX, at(24), at(52)]);
     this.layRoad(line, [[A, true]]);
+    // the main road's berm on the side the spur joins would run across the spur's mouth: fade it out either side of the T
+    {
+      const st = G.strip, GG = this.roadGeo, n = ROAD_LAT.length, spurSide = perp.dot(G.side[jx]) > 0 ? 1 : -1;
+      for (let i = st.i0; i <= st.i1; i++) {
+        const b = smooth((Math.abs(G.cum[i] - G.cum[jx]) - 40) / 18);
+        if (b >= 1) continue;
+        for (let k = 0; k < n; k++) {
+          if (Math.sign(ROAD_LAT[k]) !== spurSide) continue;
+          const at = st.base + (i - st.i0) * n + k;
+          GG.berm[at] = Math.min(GG.berm[at], b);
+        }
+      }
+    }
     const { g, N, side, cum } = line;
     const step = cum[N] / N;
     const K = Math.max(2, Math.round(JOIN_OUT / step));
@@ -1036,24 +1059,26 @@ export class Traffic {
     R.W = W; R.side = side; R.tan = tan;
     this.mapLines.push(this.thin([...W, W[0]], Math.max(1, Math.round(20 / (R.step || 10)))));
     const wrap = (i) => ((i % M) + M) % M;
+    // which way round has the town on its right (the stop goes on that lane); the road joins on the other, outer edge
+    const c0 = this.w.toWorld(loc, 0, 0, 0);
+    R.din = side[0].dot(_a.copy(c0).sub(W[0])) > 0 ? 1 : -1;
     // closed strip (the last row repeats the first)
     {
       const base = this.roadGeo.pos.length / 3;
       let s = 0;
       for (let i = 0; i <= M; i++) {
         if (i) s += W[wrap(i)].distanceTo(W[i - 1]);
-        // (no ruts for ~30 m either side of a junction, where the road's flare takes over)
+        // (no ruts for ~30 m either side of a junction, where the road's flare takes over, and the outer berm,
+        // which the road would cross, stops ~48 m short of it)
         let dg = Infinity;
         for (const e of R.gates) { const d = Math.abs(e.i - wrap(i)); dg = Math.min(dg, Math.min(d, M - d) * R.step); }
-        this.stripPush(W[wrap(i)], side[wrap(i)], s, 1, 1, smooth((dg - 24) / 14));
+        const b = smooth((dg - 32) / 18);
+        this.stripPush(W[wrap(i)], side[wrap(i)], s, 1, 1, smooth((dg - 24) / 14), R.din > 0 ? b : 1, R.din > 0 ? 1 : b);
       }
       this.stripIdx(base, M + 1);
     }
     const lane = (d, i) => W[wrap(i)].clone().addScaledVector(side[wrap(i)], LANE * d);
     const laneT = (d, i) => tan[wrap(i)].clone().multiplyScalar(d);
-    // which way round has the town on its right (the stop goes on that lane)
-    const c0 = this.w.toWorld(loc, 0, 0, 0);
-    R.din = side[0].dot(_a.copy(c0).sub(W[0])) > 0 ? 1 : -1;
     const gates = R.gates.sort((p, q) => p.i - q.i);
     const n = gates.length;
     loc.ring = { radius: Math.round(R.Rb), max: Math.round(R.maxR), gates: n };
