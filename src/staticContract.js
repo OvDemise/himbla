@@ -4,7 +4,7 @@
 
 // The kinds the game builds from the GLB (when the pilot is switched on and the file has them). A kind joins this
 // set once its gameplay data matches the Kit version's: tools/viewer.html?m=outpost&src=both shows whether it does.
-export const GLB_KINDS = new Set(['mast']);
+export const GLB_KINDS = new Set(['mast', 'tower']);
 
 export const ROLES = ['col', 'hit', 'raid', 'smoke', 'drop', 'text'];
 export const SHAPES = ['box', 'cyl', 'sphere'];

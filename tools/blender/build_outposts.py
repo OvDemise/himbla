@@ -2,9 +2,11 @@
 #
 # Builds the small faction structures from code and exports src/assets/outposts.glb, the file
 # docs/outpost-glb.md describes (read it first: axes, root names, material names, the gameplay empties,
-# the `anim` groups and the `ink` property). So far only the Relay Mast is here, as two roots at the origin:
-# `mast` (intact) and `mast_wreck` (main building in ruins), a port of mast() in src/outpostModels.js
-# (same positions, sizes, colours and outline values; the wreck replays the game's own random stream).
+# the `anim` groups and the `ink` property). Two kinds are here, each as two roots at the origin: the Relay Mast
+# (`mast`, `mast_wreck`) and the Watchtower (`tower`, `tower_wreck`; main building in ruins), ports of mast() and
+# tower() in src/outpostModels.js (same positions, sizes, colours and outline values; a wreck replays the game's own
+# random stream). Object names are unique across the file, so the mast's keep their plain names and the tower's all
+# carry a `tower` marker (`tower_apron`, `col_tower_lattice`, `smoke_tower`, ...; a role word stays first).
 #
 # Run it with any Python that has the bpy module (pip install bpy):
 #     MOONRUNNER_REPO=<checkout> python tools/blender/build_outposts.py
@@ -51,7 +53,7 @@ def srgb(h):
 STEEL, DARK, LIGHT, CONC, CHAR = 0x55607A, 0x3A3550, 0xD8D4E8, 0x8A8698, 0x2A2433
 FACTION = 0x2EC4FF  # preview accent: the game paints its own per owner
 F = 0.3  # apron top: small props stand on this
-KIND_SEED = {"mast": 41}  # the seeds of outpostModels.js (a kind's random streams start at KIND_SEED * 977)
+KIND_SEED = {"mast": 41, "tower": 11}  # the seeds of outpostModels.js (a kind's random streams start at KIND_SEED * 977)
 
 # material name -> (sRGB hex, double sided). The name picks the game's treatment: faction* take the owner's accent,
 # glow* are unlit in their own colour, anything else is lit toon in its own colour. Same hex and side = one material.
@@ -67,7 +69,16 @@ MATERIALS = {
     "rubble_grey": (0x55505E, False), "burnt_wall": (0x4A4652, False),
     "glow_red": (0xFF2A4A, False), "glow_green": (0x7DFF3A, False), "glow_cyan": (0x2EE6FF, False),
     "glow_lamp": (0xFFF3B0, False),
+    # the watchtower's (a name that repeats a colour above is the same material: "navy" is the barracks door, "cabinet" the fallen roof)
+    "apron_tower": (0x7E7A8C, False), "jersey": (0xA8A4B4, False), "yellow": (0xFFD23F, False),
+    "olive": (0x6F7A5A, False), "olive_dark": (0x4F5A42, False), "hut_skin": (0x4F5A42, True), "olive_burnt": (0x3A3F30, False),
+    "mustard": (0xC9A227, False), "sandbag": (0xB59F74, False), "crate_band": (0x5A3A22, False),
+    "steel_wreck": (0x3E4352, False), "wreck_block": (0x4A5068, False),
+    "glow_window": (0xFFF0A0, False), "glow_lens": (0xFFFBE0, False), "glow_warm": (0xFFE6A8, False), "glow_yellow": (0xFFD23F, False),
+    "additive_searchlight": (0xFFF3B0, True),
 }
+# see-through light beams: name -> alpha (the game's BEAM(colour, opacity)). Additive, unlit and double sided in the game.
+ADDITIVE = {"additive_searchlight": 0.13}
 SLOT_COLORS = {name: srgb(h) for name, (h, _) in MATERIALS.items()}
 
 # geometry and scene helpers shared with the other build scripts
@@ -76,6 +87,22 @@ exec(open(os.path.join(REPO, "tools", "blender", "kit.py"), encoding="utf-8").re
 C = coll()
 for _name, (_hex, _double) in MATERIALS.items():
     material(_name).use_backface_culling = not _double  # (off = double sided in glTF)
+
+
+def setup_additive():
+    """Make the beam materials see-through the way the glTF exporter writes it: the Principled BSDF's Alpha input
+    (-> baseColorFactor[3]) and the blended render method (-> alphaMode BLEND), backface culling off (-> doubleSided).
+    material() only rewrites Base Color and Roughness, so this survives it; call it once the meshes are built."""
+    for name, alpha in ADDITIVE.items():
+        m = material(name)
+        bsdf = next(n for n in m.node_tree.nodes if n.type == "BSDF_PRINCIPLED")
+        bsdf.inputs["Alpha"].default_value = alpha
+        m.diffuse_color = (*SLOT_COLORS[name], alpha)
+        if hasattr(m, "surface_render_method"):
+            m.surface_render_method = "BLENDED"  # (Blender 4.2+)
+        elif hasattr(m, "blend_method"):
+            m.blend_method = "BLEND"
+        m.use_backface_culling = False
 
 
 # ---------------- port of the game's Kit (src/outpostModels.js) ----------------
@@ -108,14 +135,18 @@ def dish_geo(r):
     return place(sphere(r, 14, 6, 0.75), Matrix.Translation((0, 0, r * 0.85)) @ Matrix.Rotation(-math.pi / 2, 4, "X"))
 
 
+ROLE_WORDS = ("col", "hit", "raid", "smoke", "drop", "text")  # (the gameplay roles: an empty's name starts with its role)
+
+
 class Kit:
     """The parts of the game's Kit this builder needs. Parts are meshes (verts in the root's frame) under `root`;
     colliders, blast boxes, the raid spot, smoke, drop and sign faces are empties; flags, blinkers and the
     spinning dish are `anim` empties with their meshes as children. Every method takes `name=` (the object's
-    name; a wreck's names all end in _wreck so they stay unique) and `ink=` (the JS `outline`, 0 = none)."""
+    name; a wreck's names all end in _wreck so they stay unique, and a kit made with `tag=` puts that marker in every
+    name) and `ink=` (the JS `outline`, 0 = none)."""
 
-    def __init__(self, root, seed, wreck):
-        self.root, self.wreck = root, wreck
+    def __init__(self, root, seed, wreck, tag=""):
+        self.root, self.wreck, self.tag = root, wreck, tag
         self.rr, self.mr, self.wr = mulberry32(seed), mulberry32(seed + 1), mulberry32(seed + 2)
         self.sfx = "_wreck" if wreck else ""
         self.names, self.counts = set(), {}
@@ -123,7 +154,11 @@ class Kit:
 
     # -- plumbing
     def name(self, base, auto="part"):
-        n = (base or f"{auto}_{self.count(auto)}") + self.sfx
+        n = base or f"{auto}_{self.count(auto)}"
+        if self.tag:  # (names are unique across the file: the marker goes after a role word, before anything else)
+            head, _, rest = n.partition("_")
+            n = f"{head}_{self.tag}" + (f"_{rest}" if rest else "") if head in ROLE_WORDS else f"{self.tag}_{n}"
+        n += self.sfx
         assert n not in self.names, f"duplicate object name {n}"
         self.names.add(n)
         return n
@@ -441,11 +476,188 @@ def build_mast(wreck):
     return root
 
 
-BUILDERS = {"mast": build_mast}  # kind -> build(wreck) -> root pivot (named kind / kind_wreck)
+# ---------------- shared props: sandbag nests and crates (sandbags() / crate() in outpostModels.js) ----------------
+
+def sandbags(k, cx, cz, r, a0, a1, rows=2):
+    """Rows of squashed sandbag spheres along an arc of radius r about (cx, cz), angles a0..a1 (a turn about +y from +z),
+    plus the collider boxes the game registers: one block per 2.4 m of the arc, as high as the stack."""
+    nest = k.count("nest")
+    for row in range(rows):
+        step = 1.25 / r
+        a, i = a0 + (row % 2) * step * 0.5, 0
+        while a <= a1:
+            k.add(place(sphere(0.66, 6, 3), Matrix.Diagonal((1, 0.5, 0.62, 1))), "sandbag", cx + math.sin(a) * r, F + 0.28 + row * 0.5, cz + math.cos(a) * r,
+                  ry=a + math.pi / 2, ink=0.03, name=f"sandbag_{nest}_{row}_{i}")
+            a += step
+            i += 1
+    n = max(1, math.ceil(((a1 - a0) * r) / 2.4))
+    da = (a1 - a0) / n
+    for i in range(n):
+        a = a0 + (i + 0.5) * da
+        k.solid((da * r) / 2 + 0.35, (F + rows * 0.5 + 0.1) / 2, 0.42, cx + math.sin(a) * r, cz + math.cos(a) * r, a + math.pi / 2, name=f"col_sandbag_{nest}_{i}")
+
+
+def crate(k, x, y0, z, s, slot, ry=0.0):
+    """A crate with a dark band round it, and its collider (crate() in outpostModels.js)."""
+    n = k.count("crate")
+    k.box(s, s, s, slot, x, y0, z, ry=ry, ink=0.04, name=f"crate_{n}")
+    k.box(s * 1.02, s * 0.14, s * 1.02, "crate_band", x, y0 + s * 0.43, z, ry=ry, ink=0, name=f"crate_{n}_band")
+    k.solid(s / 2, s / 2, s / 2, x, z, ry, y0, name=f"col_crate_{n}")
+
+
+# ---------------- Watchtower ----------------
+# A lattice tower with a lit cab and a sweeping searchlight (a spinning part), a Quonset barracks, a gun nest, a ring
+# of concrete barriers and a gate sign. The wreck: the tower snapped above the first bay and folded over towards the
+# gate, the barracks burnt out to ribs and buckled skin.
+
+def build_tower(wreck):
+    root = pivot("tower_wreck" if wreck else "tower", (0, 0, 0), None)
+    k = Kit(root, KIND_SEED["tower"] * 977 + 0 * 131, wreck, tag="tower")
+    k.apron(24, "apron_tower", "apron_edge")
+    # jersey barriers round the edge, gap at the gate (+z); every third one wears a faction cap
+    n, a = 0, 0.38
+    while a < math.pi * 2 - 0.37:
+        x, z = math.sin(a) * 22, math.cos(a) * 22
+        k.box(2.95, 0.55, 1.05, "jersey", x, F - 0.05, z, ry=a, ink=0.04, name=f"jersey_{n}_base")
+        k.box(2.95, 0.6, 0.5, "jersey", x, F + 0.5, z, ry=a, ink=0.04, name=f"jersey_{n}_top")
+        if n % 3 == 0:
+            k.box(2.97, 0.16, 0.52, "faction", x, F + 0.85, z, ry=a, ink=0, name=f"jersey_{n}_cap")
+        a += 3.25 / 22
+        n += 1
+    TX, TZ, H, BX, BZ = -7, -7, 22, 8.5, -8
+    cn = [(-1, -1), (1, -1), (1, 1), (-1, 1)]
+    if not wreck:
+        hw = lambda y: 3.4 + (2.0 - 3.4) * (y / H)
+        k.box(8, 0.5, 8, "concrete", TX, 0, TZ, name="lattice_base")
+        for i, (sx, sz) in enumerate(cn):
+            k.beam((TX + sx * 3.4, 0.4, TZ + sz * 3.4), (TX + sx * 2.0, H, TZ + sz * 2.0), 0.24, "steel", ink=0.05, seg=6, name=f"lattice_leg_{i}")
+        lv = [0.5, 5.8, 11.1, 16.4, H]
+        for i in range(4):
+            y0, y1 = lv[i], lv[i + 1]
+            w0, w1 = hw(y0), hw(y1)
+            for f in range(4):
+                (ax, az), (bx, bz) = cn[f], cn[(f + 1) % 4]
+                k.beam((TX + ax * w0, y0, TZ + az * w0), (TX + bx * w1, y1, TZ + bz * w1), 0.08, "dark", name=f"lattice_{i}_{f}_x1")
+                k.beam((TX + bx * w0, y0, TZ + bz * w0), (TX + ax * w1, y1, TZ + az * w1), 0.08, "dark", name=f"lattice_{i}_{f}_x2")
+                if i > 0:
+                    k.beam((TX + ax * w0, y0, TZ + az * w0), (TX + bx * w0, y0, TZ + bz * w0), 0.1, "steel", name=f"lattice_{i}_{f}_band")
+        # ladder up the gate-facing side
+        for i, s in enumerate((-0.5, 0.5)):
+            k.beam((TX + s, 0.5, TZ + 3.5), (TX + s, H, TZ + 2.1), 0.05, "dark", ink=0.02, name=f"ladder_rail_{i}")
+        y, j = 1.5, 0
+        while y < H:
+            zz = TZ + 3.5 - (1.4 * (y - 0.5)) / (H - 0.5)
+            k.beam((TX - 0.5, y, zz), (TX + 0.5, y, zz), 0.04, "dark", ink=0, name=f"ladder_rung_{j}")
+            y += 1.2
+            j += 1
+        # platform, railing and the observation cab
+        k.box(7.6, 0.4, 7.6, "dark", TX, H, TZ, name="platform")
+        for i, s in enumerate((-1, 1)):
+            k.box(7.6, 0.12, 0.12, "faction", TX, H + 1.1, TZ + s * 3.74, ink=0.02, name=f"rail_{i}_x")
+            k.box(0.12, 0.12, 7.6, "faction", TX + s * 3.74, H + 1.1, TZ, ink=0.02, name=f"rail_{i}_z")
+            for t in (-1, 0, 1):
+                k.box(0.1, 1.1, 0.1, "dark", TX + t * 3.7, H + 0.4, TZ + s * 3.74, ink=0, name=f"rail_post_{i}_{t + 1}_x")
+                k.box(0.1, 1.1, 0.1, "dark", TX + s * 3.74, H + 0.4, TZ + t * 3.7, ink=0, name=f"rail_post_{i}_{t + 1}_z")
+        k.box(5, 2.8, 5, "steel", TX, H + 0.4, TZ, ink=0.08, name="cab")
+        k.box(5.1, 1.0, 5.1, "glow_window", TX, H + 1.5, TZ, ink=0, name="cab_window")
+        for i in range(-1, 2):
+            for j, s in enumerate((-1, 1)):
+                k.box(0.18, 1.02, 0.18, "dark", TX + i * 1.6, H + 1.49, TZ + s * 2.56, ink=0, name=f"cab_post_{i + 1}_{j}_x")
+                k.box(0.18, 1.02, 0.18, "dark", TX + s * 2.56, H + 1.49, TZ + i * 1.6, ink=0, name=f"cab_post_{i + 1}_{j}_z")
+        k.box(6, 0.45, 6, "faction", TX, H + 3.2, TZ, name="cab_roof")
+        k.cyl(0.07, 0.09, 4, 5, "dark", TX + 2.2, H + 3.6, TZ + 2.2, ink=0.02, name="antenna")
+        k.blinker(TX + 2.2, H + 7.8, TZ + 2.2, "glow_red", 0.35)
+        # searchlight sweeping round on the roof: a spinning part whose meshes are authored in the spin node's frame,
+        # with the head's turn (up 1.15 m, nodded 0.42 rad about x) baked into the housing, lens and beam
+        sl = k.dyn("searchlight", "spin", TX, H + 3.62, TZ)
+        head = Matrix.Translation((0, 1.15, 0)) @ Matrix.Rotation(0.42, 4, "X")
+        k.child(sl, "searchlight_pedestal", place(cylinder(0.35, 0.5, 0.8, 8), Matrix.Translation((0, 0.4, 0))), "dark")
+        k.child(sl, "searchlight_housing", place(place(cylinder(0.6, 0.48, 1.3, 10), Matrix.Rotation(math.pi / 2, 4, "X")), head), "light")
+        k.child(sl, "searchlight_lens", place(place(cylinder(0.52, 0.52, 0.06, 10), Matrix.Rotation(math.pi / 2, 4, "X")), head @ Matrix.Translation((0, 0, 0.66))), "glow_lens")
+        cone = place(cylinder(0, 5, 38, 16, True), Matrix.Translation((0, 0, 19.7)) @ Matrix.Rotation(-math.pi / 2, 4, "X"))  # (ConeGeometry(5, 38, 16, 1, true))
+        beam = k.child(sl, "searchlight_beam", place(cone, head), "additive_searchlight")
+        del beam["ink"]  # (a light beam gets no outline)
+        k.solid(3.4, 12.6, 3.4, TX, TZ, name="col_lattice")
+        # the barracks: a Quonset hut
+        k.add(place(cylinder(3.4, 3.4, 11, 16), Matrix.Rotation(math.pi / 2, 4, "X")), "olive", BX, 0, BZ, ink=0.1, name="barracks")
+        for i, dz in enumerate((-4.5, -1.5, 1.5, 4.5)):
+            k.add(torus_partial(3.44, 0.1, 4, 18, math.pi), "olive_dark", BX, 0, BZ + dz, ink=0, name=f"barracks_rib_{i}")
+        k.add(torus_partial(3.46, 0.22, 4, 18, math.pi), "faction", BX, 0, BZ + 3, ink=0, name="barracks_arc")
+        k.box(1.6, 2.4, 0.2, "navy", BX, F, BZ + 5.52, ink=0.03, name="barracks_door")
+        for i, s in enumerate((-1, 1)):
+            k.add(place(cylinder(0.45, 0.45, 0.1, 10), Matrix.Rotation(math.pi / 2, 4, "X")), "glow_warm", BX + s * 1.9, 1.8, BZ + 5.52, ink=0, name=f"barracks_lamp_{i}")
+        k.box(0.6, 0.2, 0.3, "glow_lamp", BX, 2.95, BZ + 5.6, ink=0, name="barracks_door_light")
+        k.box(2, 1.4, 1.4, "mustard", BX + 5.2, F, BZ + 1, ink=0.05, name="barracks_box")
+        k.cyl(0.12, 0.12, 1.6, 6, "dark", BX + 5.8, F + 1.4, BZ + 1.3, ink=0.02, name="barracks_pole")
+        k.solid(3.4, 1.8, 5.5, BX, BZ, name="col_barracks")
+    else:
+        wr = k.wr
+        # the tower snapped above the first bay and folded over towards the gate
+        k.box(8, 0.5, 8, "concrete", TX, 0, TZ, name="lattice_base")
+        k.box(9, 0.06, 9, "char", TX, 0.5, TZ, ink=0, name="lattice_scorch")
+        for i, (sx, sz) in enumerate(cn):
+            h = 2.5 + wr() * 3.5
+            ex = TX + sx * 3.1 + (wr() - 0.5)
+            ez = TZ + sz * 3.1 + (wr() - 0.5)
+            k.beam((TX + sx * 3.4, 0.4, TZ + sz * 3.4), (ex, h, ez), 0.24, "steel_wreck", ink=0.05, seg=6, name=f"stump_{i}")
+        for si, sx in enumerate((-1, 1)):
+            for yi, y in enumerate((1.0, 1.9)):
+                k.beam((TX + sx * 2.1, y, TZ + 2), (TX + sx * 2.3 + (wr() - 0.5) * 0.6, y + 0.3, TZ + 14), 0.22, "steel_wreck", ink=0.05, seg=6, name=f"fallen_rail_{si}_{yi}")
+        for i in range(6):
+            z = TZ + 3 + i * 2
+            k.beam((TX - 2.2, 1.0 + (i % 2) * 0.9, z), (TX + 2.2, 1.9 - (i % 2) * 0.9, z + 2), 0.08, "dark", name=f"fallen_brace_{i}")
+        k.box(5, 2.2, 5, "wreck_block", TX, F + 0.3, TZ + 16.5, rx=0.25, rz=0.35, ink=0.08, name="fallen_cab")
+        k.box(6, 0.45, 6, "cabinet", TX + 0.8, F, TZ + 19.5, ry=0.5, rx=0.15, ink=0.06, name="fallen_roof")
+        # the barracks burnt out: ribs and buckled skin
+        k.box(7.4, 0.06, 11.5, "char", BX, F, BZ, ink=0, name="barracks_floor")
+        for i, dz in enumerate((-4.5, -1.5, 1.5, 4.5)):
+            if wr() < 0.75:
+                arc = math.pi * (0.35 + wr() * 0.5)
+                rz = wr() * 0.6
+                k.add(torus_partial(3.4, 0.12, 4, 14, arc), "olive_burnt", BX, 0, BZ + dz, rz=rz, ink=0.03, name=f"barracks_rib_{i}")
+        for i in range(4):
+            h = 2 + wr() * 2
+            t0 = wr() * 6
+            x = BX + (wr() - 0.5) * 2
+            rz = (wr() - 0.5) * 0.8
+            k.add(place(cylinder_arc(3.4, 3.4, h, 8, t0, 0.9), Matrix.Rotation(math.pi / 2, 4, "X")), "hut_skin", x, 0.2, BZ - 4 + i * 2.6, rz=rz, ink=0.04, name=f"barracks_skin_{i}")
+        k.scatter_debris(BX, BZ, 3.2, 5, 12, wr)
+        k.scatter_debris(TX, TZ, 4, 4, 8, wr)
+    k.hit(3.6, 12.8, 3.6, TX, TZ, name="hit_lattice")
+    k.hit(3.4, 1.8, 5.5, BX, BZ, name="hit_barracks")
+    k.point("smoke", TX, 2, TZ)
+    k.point("drop", 1, F, 8)
+    # ammo locker by the barracks door, with a crate of searchlight lenses: the raid spot
+    k.box(1.4, 2.0, 0.8, "olive_dark", BX + 2.6, F, BZ + 6.4, ink=0.05, name="locker")
+    k.box(1.42, 0.25, 0.82, "faction", BX + 2.6, F + 1.5, BZ + 6.4, ink=0, name="locker_cap")
+    k.box(0.9, 0.5, 0.05, "yellow", BX + 2.6, F + 0.8, BZ + 6.82, ink=0, name="locker_label")
+    crate(k, BX + 2.6, F, BZ + 8.0, 1.0, "olive", 0.2)
+    for i, (dx, dz) in enumerate(((-0.22, -0.2), (0.22, 0.2))):
+        k.add(cylinder(0.2, 0.2, 0.06, 10), "glow_lens", BX + 2.6 + dx, F + 1.03, BZ + 8.0 + dz, ink=0, name=f"crate_lens_{i}")
+    k.raid_at(BX, BZ + 8.3, "glow_yellow")
+    # gun nest
+    sandbags(k, -12, 8, 2.4, 0.6, 5.7, 2)
+    for i, a in enumerate((0, 2.1, 4.2)):
+        k.beam((-12, F + 1.1, 8), (-12 + math.sin(a) * 0.8, F, 8 + math.cos(a) * 0.8), 0.05, "dark", name=f"gun_tripod_{i}")
+    k.box(0.4, 0.4, 2.2, "dark", -12, F + 1.05, 8.6, rx=-0.15, ink=0.03, name="gun_barrel")
+    sandbags(k, 9, 12, 1.8, -0.6, 3.6, 2)
+    crate(k, 9, F, 12, 1.1, "olive_dark")
+    # gate arch, flags and floodlights
+    k.sign("WATCHTOWER", 0, 22, w=9.8, y=5.4, ph=2.2470)  # (2.2470 m: the board's text plane height at width 9.3, measured in the game)
+    k.flag(-6.6, 21.2, 10)
+    k.flag(6.6, 21.2, 10)
+    k.lamp(16, 13, 8)
+    k.lamp(-17, -10, 8)
+    k.lamp(18, -8, 8)
+    return root
+
+
+BUILDERS = {"mast": build_mast, "tower": build_tower}  # kind -> build(wreck) -> root pivot (named kind / kind_wreck)
 
 for _kind, _build in BUILDERS.items():
     _build(False)
     _build(True)
+setup_additive()
 print("built", len(C.objects), "objects:", sum(o.type == "MESH" for o in C.objects), "meshes,", sum(o.type == "EMPTY" for o in C.objects), "empties")
 
 if os.environ.get("MOONRUNNER_EXPORT", "1") == "1":

@@ -408,3 +408,42 @@ def mesh_smooth(name, geo, slot, parent, ink=0.04):
     o["ink"] = float(ink)
     o["slot"] = slot
     return o
+
+
+def cylinder_arc(rt, rb, h, seg, theta_start=0.0, theta_len=2 * math.pi):
+    """An OPEN cylinder shell over an arc: THREE.CylinderGeometry(rt, rb, h, seg, 1, true, thetaStart, thetaLength).
+    Axis y, centred; angle t is at (sin t, cos t) like cylinder(), so t = 0 is +z and t runs towards +x. A partial arc
+    has seg + 1 columns and open ends; a full turn wraps. No caps. Pair it with a double-sided material."""
+    full = theta_len >= 2 * math.pi - 1e-9
+    cols = seg if full else seg + 1
+    verts, top, bot = [], [], []
+    for i in range(cols):
+        t = theta_start + theta_len * i / seg
+        top.append(len(verts))
+        verts.append((math.sin(t) * rt, h / 2, math.cos(t) * rt))
+        bot.append(len(verts))
+        verts.append((math.sin(t) * rb, -h / 2, math.cos(t) * rb))
+    faces = [(bot[i], bot[(i + 1) % cols], top[(i + 1) % cols], top[i]) for i in range(seg)]
+    return verts, faces, [1] * len(faces)
+
+
+def torus_partial(R, r, radial, tubular, arc=math.pi):
+    """THREE.TorusGeometry(R, r, radial, tubular, arc) as built: a tube round an arc of a circle in the x-y plane,
+    starting on +x and turning counter-clockwise (towards +y) through `arc`; open at both ends when arc < 2 pi.
+    (torus_arc() above is the full ring already lying flat.)"""
+    full = arc >= 2 * math.pi - 1e-9
+    cols = tubular if full else tubular + 1
+    verts = []
+    for i in range(cols):
+        u = arc * i / tubular
+        for k in range(radial):
+            v = 2 * math.pi * k / radial
+            rr = R + r * math.cos(v)
+            verts.append((rr * math.cos(u), rr * math.sin(u), r * math.sin(v)))
+    faces = []
+    for i in range(tubular):
+        i2 = (i + 1) % cols
+        for k in range(radial):
+            k2 = (k + 1) % radial
+            faces.append((i * radial + k, i2 * radial + k, i2 * radial + k2, i * radial + k2))
+    return verts, faces, [1] * len(faces)
