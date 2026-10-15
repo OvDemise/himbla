@@ -9,6 +9,7 @@ import { greatCircle } from './geo.js';
 import { AIPaths, EnemyMarkers } from './aipaths.js';
 import { TimeGraph, GpuTimer } from './perfgraph.js';
 import { MUTATIONS } from './alchemy.js';
+import { InputMonitor } from './inputmon.js';
 
 const DEV_KEY = 'mr-dev-unlocked';
 
@@ -28,6 +29,7 @@ export class Cheats {
     this.debugView = null; // 'poly' (every polygon outlined) | 'draw' (every draw call its own flat colour): the scene drawn bare, without the comic post pass
     this.crackedVisor = true; // the cracks that spread over the screen as hull drops (hud.js)
     this.spawnDebug = false; // bottom-right pirate counts + spawn timers overlay (no menu entry for now: set game.cheats.spawnDebug = true from the console)
+    this.inputMon = null; // controller map + held keys + trick state (inputmon.js), top left
     this.speed = 1; // player speed multiplier, 1 to 10 (player.js)
     // once the dev menu has been opened (F8 / controller combo) it gets a button on the pause card, remembered across launches
     try { this.unlocked = localStorage.getItem(DEV_KEY) === '1'; } catch { this.unlocked = false; }
@@ -53,6 +55,7 @@ export class Cheats {
       { label: '3 · DISPLAY & DEBUG…', fn: () => this.displayMenu() },
       { label: `4 · CLICK MAP TO TELEPORT: ${this.mapTeleport ? 'ON' : 'OFF'}`, fn: () => { this.mapTeleport = !this.mapTeleport; this.dev(); } },
       { label: '5 · FULL CHEAT MENU…', fn: () => this.open() },
+      { label: `6 · INPUT & CONTROLLER MONITOR: ${this.inputMon && this.inputMon.on ? 'ON' : 'OFF'}`, fn: () => { this.toggleInputMon(); this.dev(); } },
       { label: 'CLOSE' },
     ]);
     g.dialogButtons.dev = true;
@@ -78,6 +81,15 @@ export class Cheats {
       row.onclick = (e) => { e.stopPropagation(); bump(this.speed >= 10 ? -9 : 1); };
     }
   }
+
+  // The input monitor: the pad drawn as it is now, what the game thinks is held, the trick state (inputmon.js)
+  toggleInputMon() {
+    const m = this.inputMon ||= new InputMonitor(this.game);
+    m.setOn(!m.on);
+  }
+
+  // every frame, whatever the screen (a pause or a menu is when you'd want to read it)
+  updateInputMon() { if (this.inputMon && this.inputMon.on) this.inputMon.update(); }
 
   // A rock that comes down on the spot you're standing on (meteors.js spawnOnPlayer): a few seconds' warning from the ring
   spawnMeteor() {

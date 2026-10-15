@@ -68,7 +68,7 @@ const UI_ROOTS = ['settings', 'dialog', 'board', 'replog', 'wardrobe', 'casino',
 const FOCUSABLE = 'button, [data-i], [data-k], [data-f], [data-tab], a[href], input, select, .wd-tile, [role="button"]';
 
 // which glyph set to show: PlayStation (Sony 054c) and Switch (Nintendo 057e) pads, else Xbox
-function padKind(id = '') {
+export function padKind(id = '') {
   if (/054c|dualsense|dualshock|playstation|wireless controller/i.test(id)) return 'ps';
   if (/057e|nintendo|switch|pro controller|joy-?con/i.test(id)) return 'switch';
   return 'xbox';

@@ -1115,6 +1115,7 @@ class Game {
     if (this.trailer) rdt = this.trailer.pre(rdt); // trailer: shot clock, staged input
     // paused, map, menus and dialogs freeze the whole world: traffic, the satellite, particles, clocks
     if (this.pad) { this.pad.update(rdt); this.pad.crosshair(rdt); } // (before anything reads input this frame)
+    this.cheats.updateInputMon(); // (dev overlay: controller map and held keys)
     const frozen = FROZEN_STATES.has(this.state);
     const dt = frozen ? 0 : rdt;
     this.time += dt;

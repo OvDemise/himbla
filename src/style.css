@@ -143,6 +143,23 @@ button { font-family: var(--comic); }
 #prompt b { display: inline-block; background: var(--yellow); color: #05030c; padding: 3px 6px 2px; margin-right: 6px; font-weight: normal; }
 #spawn-debug { position: fixed; right: 12px; bottom: 12px; z-index: 45; padding: 6px 10px; font: 12px/1.35 monospace; color: #7dff3a; background: rgba(5, 3, 12, 0.78); border: 1px solid #7dff3a; pointer-events: none; white-space: nowrap; }
 #spawn-debug.hidden { display: none; }
+#input-mon { position: fixed; left: 12px; top: 12px; z-index: 45; width: 330px; padding: 6px 8px 7px; font: 11px/1.4 monospace; color: #cfe9ff; background: rgba(5, 3, 12, 0.82); border: 1px solid #7fd8ff; pointer-events: none; }
+#input-mon.hidden { display: none; }
+#input-mon .im-head { color: #7fd8ff; margin-bottom: 2px; }
+#input-mon .im-svg { display: block; width: 100%; height: auto; margin: 2px 0 4px; }
+#input-mon .im-body { fill: #120c24; stroke: #4d6a86; stroke-width: 1.5; }
+#input-mon .im-shape { fill: #1d1638; stroke: #6a8aa8; stroke-width: 1; }
+#input-mon .im-shape.on { fill: #7dff3a; stroke: #fff; }
+#input-mon .im-fill { fill: #7dff3a; }
+#input-mon .im-dead { fill: none; stroke: #4d6a86; stroke-width: .6; stroke-dasharray: 1.5 1.5; }
+#input-mon .im-dot { fill: #4d6a86; }
+#input-mon .im-dot.on { fill: #ffd23f; }
+#input-mon .im-lab { fill: #cfe9ff; text-anchor: middle; dominant-baseline: central; pointer-events: none; font-family: monospace; }
+#input-mon .k { display: inline-block; min-width: 76px; color: #8e9bb5; }
+#input-mon i { display: inline-block; min-width: 16px; margin-right: 3px; padding: 0 3px; text-align: center; font-style: normal; color: #6a7893; border: 1px solid #3a4560; }
+#input-mon i.on { color: #05030c; background: #7dff3a; border-color: #7dff3a; }
+#input-mon .hot { color: #7dff3a; }
+#input-mon .bad { color: #ff5470; font-weight: bold; }
 #tip {
   position: absolute; bottom: 18px; left: 50%; transform: translateX(-50%); max-width: min(620px, 60vw);
   background: var(--ui-bg); color: var(--ui-text); font-size: 17px; line-height: 1.35; padding: 10px 16px; border: 2px solid var(--ui-edge);
