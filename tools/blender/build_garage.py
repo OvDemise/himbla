@@ -140,7 +140,7 @@ def build(NAME, PFX_, kind):
     # ---------------------------------------------------------------------------------------------------------------
     W, D = (38.0, 20.0) if FULL else (32.0, 17.0)      # the hall's outside (the small one is about the old sheds' 34 by 18)
     HX, HZ = W / 2, D / 2
-    FY = 0.25                          # the floor, on a plinth
+    FY = 0.08                          # the floor, a thin plinth proud of the ground (the road runs right up to the doors: no apron, no ramp)
     TOP = 9.0 if FULL else 8.6         # the wall tops (the parapet stands on the roof above them)
     BAYS = (-10.0, 0.0, 10.0) if FULL else (-8.0, 8.0)   # the bay centres
     BH = 3.5                           # half a bay's width
@@ -150,14 +150,9 @@ def build(NAME, PFX_, kind):
     FIT_DZ = 10.0 - HZ                 # the fit-outs are laid out for a hall 20 m deep: slide them forward to the back wall of a shallower one
     BX0, BX1 = BAYS[0] - BH, BAYS[-1] + BH
 
-    # ---- the plinth, the apron and the lanes ----
+    # ---- the plinth (the road runs right up to it) ----
     A = Acc("plinth", "concrete", root, 0.06)
     A.box(0, 0, 0, W + 1.2, FY, D + 1.2)
-    A.box(3.0 if FULL else 0.0, 0, HZ + 0.6 + 4.0, 50.0 if FULL else W + 2.0, 0.12, 8.0)   # the apron out front (across to the office on the main one)
-    A.flush()
-    A = Acc("lanes", "floor", root, 0.0)
-    for cx in BAYS:
-        A.box(cx, 0.12, HZ + 0.6 + 4.0, 7.6, 0.025, 8.0)
     A.flush()
     A = Acc("shopFloor", "shopfloor", root, 0.0)
     A.box(0, FY, 0, W - 1.0, 0.02, D - 1.0)                    # the workshop floor (lit: the game draws it self-lit)
@@ -322,14 +317,14 @@ def build(NAME, PFX_, kind):
     # bollards in front of every pier
     A = Acc("bollards", "hazard", root, 0.03)
     for x in [b + s * (BH + 0.4) for b in BAYS for s in (-1, 1)]:
-        A.cyl(x, 0.12, HZ + 2.4, 0.17, 1.0, 6)
+        A.cyl(x, 0.0, HZ + 2.4, 0.17, 1.0, 6)
     A.flush()
     A = Acc("bollardCaps", "dark", root, 0.02)
     for x in [b + s * (BH + 0.4) for b in BAYS for s in (-1, 1)]:
-        A.cyl(x, 1.12, HZ + 2.4, 0.19, 0.09, 6)
+        A.cyl(x, 1.0, HZ + 2.4, 0.19, 0.09, 6)
     A.flush()
 
-    # ---- the lettering: the name board, the bay plates, the hazard stripes on the jambs, the apron's lane lines ----
+    # ---- the lettering: the name board, the bay plates, the hazard stripes on the jambs and the thresholds ----
     d = Dec("+z", (0, BY0 + BHT / 2, HZ + 0.18))      # (the middle of the board)
     txt = "MERIDIAN MOTOR POOL" if FULL else "MERIDIAN SERVICE"
     ps = 0.17 if FULL else 0.15
@@ -352,15 +347,7 @@ def build(NAME, PFX_, kind):
             u = cx + s * (BH + 0.2)
             d.hazard(u - 0.17, 0.0, u + 0.17, OPEN - FY, "dark", "hazard", 0, 0.16, 0.9)
     d.build(PFX + "jambStripes", root)
-    # the floor: the lane lines on the apron and a hazard strip at each threshold (a page lying on the floor: u = +x, v = -z)
-    d = Dec("+z", (0, 0.145, HZ + 0.6))
-    d.right, d.up, d.n = (1.0, 0.0, 0.0), (0.0, 0.0, -1.0), (0.0, 1.0, 0.0)
-    for cx in BAYS:
-        for s in (-1, 1):
-            for k in range(3):
-                z0 = 1.4 + k * 2.5
-                d.rect(cx + s * 3.3 - 0.07, -z0 - 1.3, cx + s * 3.3 + 0.07, -z0, "white", 0)
-    d.build(PFX + "laneLines", root)
+    # the floor: a hazard strip at each threshold (a page lying on the floor: u = +x, v = -z)
     d = Dec("+z", (0, FY + 0.01, HZ + 0.6))
     d.right, d.up, d.n = (1.0, 0.0, 0.0), (0.0, 0.0, -1.0), (0.0, 1.0, 0.0)
     for cx in BAYS:

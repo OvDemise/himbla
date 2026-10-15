@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { toon, ink, glow, textSprite, setMask } from './toon.js';
 const VEH_DETAIL = 220; // past this, a vehicle's small parts stop drawing
-import { makeFigure, makeShuttle, makeRover, makeHoverCar, makeFreighter, makeLandTrain, LAND_TRAIN_FACTIONS, GARAGE_HALL, GARAGE_BAYS } from './models.js';
+import { makeFigure, makeShuttle, makeRover, makeHoverCar, makeFreighter, makeLandTrain, LAND_TRAIN_FACTIONS, GARAGE_HALL, GARAGE_BAYS, GARAGE_FLOOR } from './models.js';
 import { mulberry32 } from './rng.js';
 import { SUN, frameQuat, arcDist } from './geo.js';
 
@@ -48,6 +48,7 @@ const RING_PUSH = 90; // pushed out up to this much more where something is in t
 const JOIN = 24; // junction connectors join the ring this far along it either side of a road
 const JOIN_OUT = 26; // ...and leave the road lanes this far out from the ring
 const GATE_SEP = 90; // minimum ring distance between two junctions
+const PAD_APART = 26; // clear ground kept between the swept discs of two flights' pads, where the town has room (makePadStop)
 const FILLET = 24; // drawn flare at each junction
 // Roads that were cut, and roads that end in a T on another road instead (buildSpur): the ILMB's
 // three roads east to Meridian, south-east to Tranquility and west to Aldrin became one road that
@@ -111,9 +112,9 @@ function roadMaterial() {
   return new THREE.ShaderMaterial({
     transparent: true, depthWrite: false, side: THREE.DoubleSide,
     uniforms: { sunDir: { value: SUN.clone() } },
-    vertexShader: `uniform vec3 sunDir; attribute float fade; attribute float mark; attribute float berm; attribute float soft; varying vec2 vUv; varying float vLit; varying float vFade; varying float vEnd; varying float vMark; varying float vBerm; varying float vSoft;
+    vertexShader: `uniform vec3 sunDir; attribute float fade; attribute float mark; attribute float berm; attribute float soft; attribute float wid; varying vec2 vUv; varying float vLit; varying float vFade; varying float vEnd; varying float vMark; varying float vBerm; varying float vSoft; varying float vWid;
       void main(){
-        vUv = uv; vEnd = fade; vMark = mark; vBerm = berm; vSoft = soft;
+        vUv = uv; vEnd = fade; vMark = mark; vBerm = berm; vSoft = soft; vWid = wid;
         vec4 wp = modelMatrix * vec4(position, 1.0);
         vec3 toCam = cameraPosition - wp.xyz; float dist = length(toCam);
         // pull toward the eye (screen position unchanged) so coarse terrain LODs never swallow the track
@@ -122,7 +123,7 @@ function roadMaterial() {
         vFade = 1.0 - smoothstep(2300.0, 2900.0, dist);
         gl_Position = projectionMatrix * viewMatrix * wp;
       }`,
-    fragmentShader: `varying vec2 vUv; varying float vLit; varying float vFade; varying float vEnd; varying float vMark; varying float vBerm; varying float vSoft;
+    fragmentShader: `varying vec2 vUv; varying float vLit; varying float vFade; varying float vEnd; varying float vMark; varying float vBerm; varying float vSoft; varying float vWid;
       float h1(float n){ return fract(sin(n) * 43758.5453); }
       float n1(float x){ float i = floor(x), f = fract(x); f = f * f * (3.0 - 2.0 * f); return mix(h1(i), h1(i + 1.0), f); }
       float h2(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
@@ -136,21 +137,24 @@ function roadMaterial() {
       // the colour of the ground show through. Metres across (X) and along (s) the road.
       void main(){
         float X = vUv.x * ${ROAD_HALF.toFixed(1)}, s = vUv.y, ax = abs(X), sg = sign(X);
+        // (vWid: how many metres one unit across is, for a bed much wider than a road: its texture and its edge keep their size)
+        float XR = X * vWid;
         float ne = n1(s * 0.29 + sg * 41.0);
         // churned soil: broad mottling, finer clods, and the blade's streaks running along the road
-        float mot = n2(vec2(X * 0.8, s * 0.2)) * 0.5 + n2(vec2(X * 2.3, s * 0.9)) * 0.3 + n2(vec2(X * 6.0, s * 2.6)) * 0.2;
-        float scr = n2(vec2(X * 5.5 + n1(s * 0.04) * 9.0, s * 0.045));
-        float scr2 = n2(vec2(X * 15.0 + n1(s * 0.07 + 9.0) * 6.0, s * 0.14));
+        float mot = n2(vec2(XR * 0.8, s * 0.2)) * 0.5 + n2(vec2(XR * 2.3, s * 0.9)) * 0.3 + n2(vec2(XR * 6.0, s * 2.6)) * 0.2;
+        float scr = n2(vec2(XR * 5.5 + n1(s * 0.04) * 9.0, s * 0.045));
+        float scr2 = n2(vec2(XR * 15.0 + n1(s * 0.07 + 9.0) * 6.0, s * 0.14));
         float edgeR = 7.3 + (ne - 0.5) * 0.15;
+        float dE = (ax - edgeR) * vWid; // metres beyond the bed's edge
         // (a junction flare keeps the road's crisp edge and berm on the outside of its curve, and a soft, bermless edge on the
         // inside, where it melts into the neighbouring flare and the ring)
         float es = vSoft * (1.0 - vBerm);
-        float bed = 1.0 - smoothstep(edgeR - 0.3 - es * 1.2, edgeR + 0.1 + es * 0.6, ax);
+        float bed = 1.0 - smoothstep(-0.3 - es * 1.2, 0.1 + es * 0.6, dE);
         vec3 soil = mix(vec3(0.09, 0.085, 0.115), vec3(0.25, 0.24, 0.28), mot);
         soil *= (0.88 + 0.28 * (scr - 0.5) + 0.12 * (scr2 - 0.5)) * (1.0 - 0.14 * vSoft);
         // dust that has drifted back over the bed, and the crown between the lanes where nothing runs
-        float drift = smoothstep(0.6, 0.9, n2(vec2(X * 0.35, s * 0.04 + 3.0)));
-        float crown = 1.0 - smoothstep(0.5, 1.5, ax);
+        float drift = smoothstep(0.6, 0.9, n2(vec2(XR * 0.35, s * 0.04 + 3.0)));
+        float crown = (1.0 - smoothstep(0.5, 1.5, ax)) / (1.0 + (vWid - 1.0) * 4.0);
         soil = mix(soil, vec3(0.42, 0.4, 0.46), drift * 0.3 + crown * 0.1);
         // wheel ruts: a worn groove with a lip of pushed-up dust beside it (tyres run 1.75 and 5.85 m from the centre)
         float rd = min(abs(ax - 1.75), abs(ax - 5.85));
@@ -160,15 +164,15 @@ function roadMaterial() {
         soil = mix(soil, vec3(0.03, 0.028, 0.045), groove * 0.9);
         soil = mix(soil, vec3(0.5, 0.48, 0.54), lip * 0.32 * (0.5 + 0.5 * n1(s * 0.5 + 7.0)));
         // the cut: a dark line where the bed drops away, then a smooth berm of pushed-up regolith, palest at the crest
-        float cut = smoothstep(edgeR - 0.2, edgeR + 0.25, ax) * (1.0 - smoothstep(edgeR + 0.4, edgeR + 1.1, ax)) * vBerm;
-        float crest = smoothstep(edgeR + 0.3, edgeR + 1.1, ax) * (1.0 - smoothstep(edgeR + 1.1, 9.0, ax)) * vBerm;
+        float cut = smoothstep(-0.2, 0.25, dE) * (1.0 - smoothstep(0.4, 1.1, dE)) * vBerm;
+        float crest = smoothstep(0.3, 1.1, dE) * (1.0 - smoothstep(1.1, 9.0 - edgeR, dE)) * vBerm;
         vec3 col = soil;
         col = mix(col, vec3(0.03, 0.028, 0.045), cut * 0.92);
         col = mix(col, vec3(0.82, 0.79, 0.85) * (0.94 + 0.06 * n1(s * 0.05 + sg * 11.0)), crest * 0.9);
         // translucent, so the ground shows through, and soft where it melts into the surface
         float bedA = max(bed * mix(0.84, 0.96, vSoft), groove * 0.9);
         float a = max(bedA * vEnd, max(cut * 0.9, crest * 0.8)); // (the end fade is the bed's: a berm only stops where its strip says)
-        a *= 1.0 - smoothstep(8.3, 9.0, ax);
+        a *= 1.0 - smoothstep(8.3 - edgeR, 9.0 - edgeR, dE);
         col *= 0.22 + 0.85 * vLit;
         gl_FragColor = vec4(col, a * vFade);
       }`,
@@ -344,22 +348,27 @@ export class Traffic {
     }
     cands.sort((p, q) => q.score - p.score);
     let pick = null;
-    for (const c of cands) {
-      if (keeps.some((k) => k !== c.existing && Math.hypot(c.x - k.x, c.z - k.z) < spec.clearR * 0.85 + k.r)) continue;
-      // beyond the plateau the ground may slope: only accept gentle spots (pad is raised to the top)
-      let lo = 0, hi = 0;
-      if (c.d + spec.padR > loc.r * 0.98) {
-        lo = Infinity; hi = -Infinity;
-        for (let i = 0; i <= 8; i++) {
-          const a = (i / 8) * Math.PI * 2, rr = i === 8 ? 0 : spec.padR;
-          const y = this.groundY(loc, c.x + Math.cos(a) * rr, c.z + Math.sin(a) * rr);
-          lo = Math.min(lo, y); hi = Math.max(hi, y);
+    // (the pads of two flights keep PAD_APART metres of clear ground between their swept discs, where there is room: a freighter's
+    // wings and a shuttle's tail fins should not crowd each other. A town with no room for that takes the closer spot after all.)
+    for (const apart of [PAD_APART, 0]) {
+      for (const c of cands) {
+        if (keeps.some((k) => k !== c.existing && Math.hypot(c.x - k.x, c.z - k.z) < spec.clearR * 0.85 + k.r + (k.flyPad ? apart : 0))) continue;
+        // beyond the plateau the ground may slope: only accept gentle spots (pad is raised to the top)
+        let lo = 0, hi = 0;
+        if (c.d + spec.padR > loc.r * 0.98) {
+          lo = Infinity; hi = -Infinity;
+          for (let i = 0; i <= 8; i++) {
+            const a = (i / 8) * Math.PI * 2, rr = i === 8 ? 0 : spec.padR;
+            const y = this.groundY(loc, c.x + Math.cos(a) * rr, c.z + Math.sin(a) * rr);
+            lo = Math.min(lo, y); hi = Math.max(hi, y);
+          }
+          if (hi - lo > 3.5) continue;
         }
-        if (hi - lo > 3.5) continue;
+        if (!this.clearDisc(loc, c.x, c.z, spec.clearR, spec.heights, hi)) continue;
+        pick = { ...c, lo, hi };
+        break;
       }
-      if (!this.clearDisc(loc, c.x, c.z, spec.clearR, spec.heights, hi)) continue;
-      pick = { ...c, lo, hi };
-      break;
+      if (pick) break;
     }
     if (!pick) {
       // nothing fits: a raised pad well outside the settlement, toward the other end
@@ -394,7 +403,7 @@ export class Traffic {
       }
       this.w.put(lights, loc, pick.x, pick.z, base);
     }
-    loc.stopKeep.push({ x: pick.x, z: pick.z, r: spec.clearR });
+    loc.stopKeep.push({ x: pick.x, z: pick.z, r: spec.clearR, flyPad: true });
     // waiting shelter at the pad edge on the town side
     const dc = Math.hypot(pick.x, pick.z) || 1;
     const base = Math.atan2(-pick.z, -pick.x);
@@ -555,7 +564,7 @@ export class Traffic {
     }
     for (const [a, b] of CUT_ROADS) if (this.L[a] && this.L[b]) pairs.delete(key(this.L[a], this.L[b]));
     for (const [a, b] of EXTRA_ROADS) if (this.L[a] && this.L[b]) pairs.add(key(this.L[a], this.L[b]));
-    this.roadGeo = { pos: [], uv: [], fade: [], mark: [], berm: [], soft: [], idx: [] };
+    this.roadGeo = { pos: [], uv: [], fade: [], mark: [], berm: [], soft: [], wid: [], idx: [] };
     this.posts = [];
     this.pieces = [];
     this.mapLines = []; // every road and town ring as a thin polyline of unit directions, for the maps
@@ -586,6 +595,7 @@ export class Traffic {
     geo.setAttribute('mark', new THREE.Float32BufferAttribute(G.mark, 1));
     geo.setAttribute('berm', new THREE.Float32BufferAttribute(G.berm, 1));
     geo.setAttribute('soft', new THREE.Float32BufferAttribute(G.soft, 1));
+    geo.setAttribute('wid', new THREE.Float32BufferAttribute(G.wid, 1));
     geo.setIndex(G.idx);
     geo.computeBoundingSphere();
     const mesh = new THREE.Mesh(geo, roadMaterial());
@@ -749,7 +759,7 @@ export class Traffic {
   // `mark` (0..1) is how much of the wheel ruts show (none on junction flares and where roads meet rings).
   // `bermL` / `bermR` (0..1) is how much of the cut line and berm shows on the strip's left (-) and right (+) edge, and
   // `soft` (1 on a junction flare) widens the fade of its edge: where strips overlap, only the one that owns the edge shows a berm.
-  stripPush(centre, sideV, s, vScale = 1, fade = 1, mark = 1, bermL = 1, bermR = 1, soft = 0) {
+  stripPush(centre, sideV, s, vScale = 1, fade = 1, mark = 1, bermL = 1, bermR = 1, soft = 0, wid = 1) {
     const G = this.roadGeo;
     for (const o of ROAD_LAT) {
       _b.copy(centre).addScaledVector(sideV, o * vScale);
@@ -760,6 +770,7 @@ export class Traffic {
       G.mark.push(mark);
       G.berm.push(o < 0 ? bermL : o > 0 ? bermR : Math.min(bermL, bermR));
       G.soft.push(soft);
+      G.wid.push(wid);
     }
   }
 
@@ -1069,17 +1080,20 @@ export class Traffic {
   }
 
   // The Meridian Exchange's garage road. The main garage (settlements.js garage(), `loc.garage`) stands inside the ring with its bays
-  // facing the ring road. A rover comes out of one bay (the open one with nothing in its way), drives straight out along a road laid
-  // from the apron and turns right onto the ring's inner lane (the lane whose traffic has the town on its right), where it is just
-  // another road buggy. This lays the road's strip and works out the rover's path and where it meets the ring; buildRing calls it
-  // before the ring is drawn, so the ring's inner berm can make way, and the piece itself is made at the end of buildRing.
+  // facing the ring road. There is no apron: a forecourt of carved regolith runs right up to the garage's plinth across its whole
+  // front (hall and office), flaring out into the ring road like a bell-mouth, its berms along the outer edges. A rover comes out
+  // of one bay (the open one with nothing in its way), drives straight out and turns right onto the ring's inner lane
+  // (the lane whose traffic has the town on its right), where it is just another road buggy. This lays the strips and works out the
+  // rover's path and where it meets the ring; buildRing calls it before the ring is drawn, so the ring's inner berm can make way, and
+  // the piece itself is made at the end of buildRing.
   garageRoad(loc, R, W, side, tan) {
     const G = loc.garage, H = GARAGE_HALL.main, bx = GARAGE_BAYS.main[G.bay], M = R.M, step = R.step, din = R.din;
     const c = Math.cos(G.yaw), sn = Math.sin(G.yaw);
     const L2W = (lx, lz) => this.P.ground(this.w.toWorld(loc, G.x + lx * c + lz * sn, 0, G.z - lx * sn + lz * c), new THREE.Vector3());
     const wrap = (i) => ((i % M) + M) % M;
     const lane = (i) => W[wrap(i)].clone().addScaledVector(side[wrap(i)], LANE * din);
-    const S0 = L2W(bx, H.hz + 8.6), u = L2W(bx, H.hz + 9.6).sub(S0).normalize(); // the apron's front edge, and the way out
+    const LZ0 = H.hz + 0.6;                                                       // the plinth's front edge: the road meets it
+    const S0 = L2W(bx, LZ0), u = L2W(bx, LZ0 + 1).sub(S0).normalize();            // (and the way out)
     // where the line of the road meets the ring's inner lane
     let i0 = 0, best = Infinity, tLane = 0;
     for (let i = 0; i < M; i++) {
@@ -1098,17 +1112,39 @@ export class Traffic {
     const j = i0 + din * m, Q = lane(j), T = tan[wrap(j)].clone().multiplyScalar(din);
     const RAD = 22; // the curve's reach in from the ring
     const S1 = S0.clone().addScaledVector(u, Math.max(2, tLane - RAD));
-    // the rover's path (its right-hand lane): from inside the bay, out of the door, over the apron, along the road, round the curve to the ring
+    // the rover's path (its right-hand lane): from inside the bay, out of the door, along the road, round the curve to the ring
     const A = L2W(bx, -5), D0 = L2W(bx, H.hz - 0.4);
     const dense = (a, b, out, gap = 2.5) => { const n = Math.max(1, Math.ceil(a.distanceTo(b) / gap)); for (let k = 1; k <= n; k++) out.push(a.clone().lerp(b, k / n)); };
     const raw = [A];
     dense(A, D0, raw); dense(D0, S0, raw);
-    const iS0 = raw.length - 1;                      // (the road proper starts at S0: the apron before it)
+    const iS0 = raw.length - 1;                      // (the road proper starts at S0: the plinth before it)
     dense(S0, S1, raw);
     const iS1 = raw.length - 1;
     for (const p of this.bez(S1, u, Q, T, 14, 0.55).slice(1)) raw.push(p);
     const lenOf = (pts, a, b) => { let L = 0; for (let k = a + 1; k <= b; k++) L += pts[k].distanceTo(pts[k - 1]); return L; };
-    // the strip: the same line, its centre RIGHT-lane-width to the left of it, so the rover keeps to the right of the road
+
+    // ---- the forecourt: a wide bed across the whole front, from under the plinth to the ring's inner lane ----
+    // (x across the garage's front, z out from it; its edges run straight out from the hall's and the office's corners, then bend away
+    // along the ring's inner edge: a quarter-ellipse each side. The bed is as wide as a road is long, so the shader is told the width)
+    const FX0 = -27, FX1 = 30;                       // the left corner (beside the pump island) and the right (past the office)
+    const FL0 = 20, FL1 = 14;                        // how far each edge swings out (the right stops short of the casino road's junction)
+    const zA = H.hz + 0.2, zEnd = LZ0 + tLane - 1;   // (it begins under the plinth; it ends in the ring's bed, which melts it in)
+    const sideAt = (z) => L2W(1, z).sub(L2W(0, z)).normalize();
+    const N = 18;
+    const fc = { x0: FX0 - FL0, x1: FX1 + FL1 };     // (across its widest, where it meets the ring)
+    const baseF = this.roadGeo.pos.length / 3;
+    for (let k = 0; k <= N; k++) {
+      const th = (k / N) * Math.PI / 2, z = zA + (zEnd - zA) * Math.sin(th), e = 1 - Math.cos(th);
+      const xl = FX0 - FL0 * e, xr = FX1 + FL1 * e;
+      const centre = L2W((xl + xr) / 2, z), sv = sideAt(z), h = (xr - xl) / 2;
+      const fade = smooth((zEnd - z) / 5);
+      const berm = smooth((zEnd - 3.5 - z) / 3);
+      this.stripPush(centre, sv, z - zA, h / 7.3, fade, 0, berm, berm, 0, h / 7.3);
+    }
+    this.stripIdx(baseF, N + 1);
+
+    // ---- the rover's road: the same line as a sweep, melting in from the forecourt and out into the ring ----
+    // the strip: its centre RIGHT-lane-width to the left of the line, so the rover keeps to the right of the road
     const path = raw.slice(iS0).map((p) => this.P.ground(p.clone(), new THREE.Vector3()));
     const { side: ps, cum } = this.frames(path);
     const total = cum[path.length - 1], straight = cum[iS1 - iS0];
@@ -1116,20 +1152,26 @@ export class Traffic {
     for (let k = 0; k < path.length; k++) {
       const centre = path[k].clone().addScaledVector(ps[k], -LANE);
       const s = cum[k];
-      const fade = smooth(s / 6) * smooth((total - s) / 10);
+      const fade = smooth(s / 22) * smooth((total - s) / 10);
       const soft = smooth((s - straight * 0.8) / (total - straight * 0.8 + 1e-3));
-      const bR = smooth((straight - s) / 8) * smooth((total - s - 14) / 10); // the inner edge's berm stops where the curve begins
-      const bL = smooth((total - s - 10) / 12);                              // the outer edge's keeps on round the curve
-      this.stripPush(centre, ps[k], s, 1, fade, smooth((s - 6) / 10) * smooth((total - s - 8) / 10), bL, bR, soft);
+      this.stripPush(centre, ps[k], s, 1, fade, smooth((s - 8) / 12) * smooth((total - s - 8) / 10), 0, 0, Math.max(0.7, soft));
     }
     this.stripIdx(base, path.length);
-    // keep the first stretch free of pads and shelters
+    // keep the forecourt free of pads and shelters
+    for (let lx = fc.x0; lx <= fc.x1; lx += 12) {
+      for (let lz = zA; lz <= zEnd; lz += 12) {
+        const p = this.local(loc, L2W(lx, lz), _a);
+        loc.stopKeep.push({ x: p.x, z: p.z, r: 8 });
+      }
+    }
     for (let k = 0; k < path.length; k += 2) { const p = this.local(loc, path[k], _a); loc.stopKeep.push({ x: p.x, z: p.z, r: 10 }); }
-    return { i0, j, Q, raw, lead: Math.ceil(11 / step), trail: m + Math.ceil(14 / step), polyLen: lenOf(raw, 0, raw.length - 1), hallLen: lenOf(raw, 0, 0) + A.distanceTo(L2W(bx, H.hz)), apronLen: A.distanceTo(S0), piece: null };
+    // (the ring's own berm makes way where the forecourt flares into it: a ring point's place in the garage's frame)
+    const toGarage = (wp) => { const q = this.local(loc, wp, _a), dx = q.x - G.x, dz = q.z - G.z; return { lx: dx * c - dz * sn, lz: dx * sn + dz * c }; };
+    return { i0, j, Q, raw, fc, toGarage, lead: Math.ceil(11 / step), trail: m + Math.ceil(14 / step), polyLen: lenOf(raw, 0, raw.length - 1), hallLen: lenOf(raw, 0, 0) + A.distanceTo(L2W(bx, H.hz)), plinthAt: A.distanceTo(L2W(bx, LZ0)), piece: null };
   }
 
   // After the ring's pieces are finished: link the garage piece onto the lane arc it meets, and set the rover's height over the garage
-  // floor (the hall and the apron stand a little above the ground).
+  // floor (the hall's floor stands a hand's breadth up on its plinth, and the road meets the plinth's edge).
   garageLink(R) {
     const gj = R.garageJoin;
     if (!gj || !gj.piece || !gj.piece.path) return;
@@ -1145,12 +1187,12 @@ export class Traffic {
     gp.next = [host];
     gp.joinTo = host;
     gp.joinS = host.path.cum[bi];
-    // the floor: 0.25 m up inside the hall, 0.12 on the apron, down to the ground over 6 m beyond it
+    // the floor: up inside the hall and over the plinth's lip, then down to the road
     const k = gp.len / Math.max(1, gj.polyLen);
-    const sHall = gj.hallLen * k, sApron = gj.apronLen * k;
+    const sR0 = gj.plinthAt * k, sR1 = sR0 + 1.5 * k;
     gp.path.pts.forEach((p, n) => {
       const s = gp.path.cum[n];
-      const lift = s <= sHall ? 0.25 : s <= sHall + 1 ? 0.25 - 0.13 * (s - sHall) : s <= sApron ? 0.12 : s <= sApron + 6 ? 0.12 * (1 - (s - sApron) / 6) : 0;
+      const lift = s <= sR0 ? GARAGE_FLOOR : s <= sR1 ? GARAGE_FLOOR * (1 - (s - sR0) / (sR1 - sR0)) : 0;
       if (lift > 0) p.addScaledVector(_u.copy(p).normalize(), lift);
     });
   }
@@ -1188,6 +1230,9 @@ export class Traffic {
           const gd = Math.max(-gj.lead - k, k - gj.trail, 0) * R.step;
           bi = smooth((gd - 3) / 8);
           mk = Math.min(mk, smooth((gd - 6) / 10));
+          // (and the forecourt's own berms take over its flared edges: the ring's stops short of them)
+          const q = gj.toGarage(W[wrap(i)]);
+          if (q.lz > 0) bi = Math.min(bi, 1 - smooth(Math.min(q.lx - gj.fc.x0 - 2, gj.fc.x1 - 2 - q.lx) / 6));
         }
         this.stripPush(W[wrap(i)], side[wrap(i)], s, 1, 1, mk, R.din > 0 ? b : bi, R.din > 0 ? bi : b);
       }

@@ -1723,6 +1723,7 @@ export function makeTowerCrane({ color = 0xffd23f, faction = 'kepler', h = CRANE
 // open, `fan` the roof turbine heads (extra `speed`, spun about y) and `blinker` the antenna lamp.
 export const GARAGE_HALL = { main: { hx: 19, hz: 10 }, small: { hx: 16, hz: 8.5 } }; // each hall's half sizes
 export const GARAGE_BAYS = { main: [-10, 0, 10], small: [-8, 8] }; // and where its bays are (x)
+export const GARAGE_FLOOR = 0.08; // the hall's floor above the ground (FY in build_garage.py): the road meets the plinth's edge
 const GARAGE_TOON = {
   body: 0xfff4e0, trim: 0x2ec4ff, navy: 0x1b3a8f, gold: 0xffd23f, dark: 0x2a2540, steel: 0x55607a, metal: 0x8a87a0, concrete: 0x8a8698,
   floor: 0x4a465c, door: 0xc6cbdc, roof: 0x3a3550, panel: 0x1d3a8a, tire: 0x1d1a29, white: 0xf3eee4, label: 0x2a2540,

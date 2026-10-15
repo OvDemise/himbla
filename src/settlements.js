@@ -758,7 +758,9 @@ export function buildMeridian(world, loc) {
     k.sign('MERIDIAN EXCHANGE', 0, 120, { w: 18, y: 6, fg: '#2ec4ff', ry: Math.PI });
     k.lamp(14, 16, 8); k.lamp(-14, 16, 8); k.lamp(16, -4, 8); k.lamp(-16, -4, 8);
     floodMast(k, 30, -84, 14); floodMast(k, -40, -84, 14);
-    world.pad(loc, 100, 60, 16, 0x2ec4ff, true);
+    // the landing pads: a spare one for a shuttle out beyond the dome (the freighter's is laid out by the traffic, which keeps the
+    // pads of two flights clear of each other, so it lands out past the crane), and one on the opposite diagonal
+    world.pad(loc, 94, 98, 12, 0x2ec4ff, true);
     world.pad(loc, -100, -60, 16, 0x2ec4ff, true);
     world.flag(loc, 0, 110, [0x2ec4ff, 0xffffff, 0x2ec4ff], 20);
   });
