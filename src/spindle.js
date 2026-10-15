@@ -49,6 +49,16 @@ function rad(p) { return Math.hypot(p.y, p.z); }
 
 const PAD_DECK = 2.4; // the launch pad stands this high on its plinth
 
+// The mothership's station. It hovers SHIP_LIFT up, climbs to stay SHIP_OVER above you if you go higher than
+// that (jets, a bounce), and swings in on arrival from round the far side of the rock.
+const SHIP_LIFT = 92, SHIP_OVER = 70, SHIP_LIFT_MAX = 420; // m above the rock
+const SHIP_ENTER = 5; // s: its swing in from behind the rock
+const SHIP_HIDE = Math.PI / 3; // how far round the girth it starts: 60°, below the horizon from where you stand
+// Higher than this above the ground, the beam (a track painted on the rock) and the mines (rings on it, 10 m
+// across and a little above) can't touch you: it falls back on the bullet barrage, and spams it.
+const AIR_ALT = 14;
+const DRONE_REBOOT = 10; // s a shot-down drone stays powered down
+
 // The planet interface the physics, camera and effects use (planet.js has the Moon's). Heights are
 // measured from the axis, not a centre.
 class SpindleWorld {
@@ -406,6 +416,9 @@ export class Spindle {
     g.hud.alert('THE SPINDLE', '#7dffd4', 3);
     g.hud.toast('Cross the asteroid to the Quantum Core at the far end. It\'s round: run all the way round it if you like. Don\'t fall off the ends.', 6);
     this.shipArrive = 9; // the mothership turns up a few seconds in
+    this.shipLift = SHIP_LIFT;
+    this.shipEnter = 1;
+    this.shipSide = 1;
     this.ship.root.visible = false;
   }
 
@@ -609,27 +622,42 @@ export class Spindle {
   updateShip(dt, s, w) {
     const g = this.game;
     const P = g.player;
-    if (this.shipArrive > 0) {
-      this.shipArrive -= dt;
-      if (this.shipArrive <= 0) {
-        this.ship.root.visible = true;
-        this.shipS = Math.max(0, s - 400);
-        g.hud.alert('SOMETHING IS FOLLOWING YOU', '#ff2e88', 4);
-        g.audio.tone(70, 1.4, 'sawtooth', 0.3, 0.4);
-        g.cam.shake = 1;
-      }
-      return;
-    }
     // it gets AHEAD of you: it reads your speed along the rock and parks over where you're going,
     // and it follows you round the girth (the short way)
     const along = P.vel.dot(AX);
     // (but never out past the rock's tapered ends: it holds station over the terrain at either end)
     const want = Math.min(L - 260, Math.max(260, s + 60 + Math.max(0, along) * 2.2));
+    if (this.shipArrive > 0) {
+      this.shipArrive -= dt;
+      if (this.shipArrive <= 0) {
+        // it turns up already ahead of you, on one flank of the rock and out of sight round the curve, as if it
+        // had been lying in wait behind it, and swings up over the top onto its station (it used to appear a few
+        // hundred metres behind you and have to catch up, which at running speed took the best part of ten seconds)
+        this.ship.root.visible = true;
+        this.shipS = want;
+        this.shipSide = Math.random() < 0.5 ? -1 : 1;
+        this.shipW = wrapW(w + this.shipSide * SHIP_HIDE * RC);
+        this.shipLift = SHIP_LIFT;
+        this.shipEnter = 0;
+        this.attackT = Math.max(this.attackT, SHIP_ENTER * 0.7); // (no shots from behind the rock: it opens fire as it clears the horizon)
+        g.hud.alert('SOMETHING IS RISING AHEAD', '#ff2e88', 4);
+        g.audio.tone(70, 1.4, 'sawtooth', 0.3, 0.4);
+        g.cam.shake = 1;
+      }
+      return;
+    }
     this.shipS += Math.max(-140, Math.min(140, (want - this.shipS) * 1.4)) * dt;
     this.shipS = Math.min(L - 260, Math.max(200, this.shipS));
+    // (while it swings in its station is round the girth, and that comes in to nothing)
+    this.shipEnter = Math.min(1, this.shipEnter + dt / SHIP_ENTER);
+    const hide = this.shipSide * SHIP_HIDE * RC * (1 - smooth(0, 1, this.shipEnter));
     const round = P.vel.dot(new THREE.Vector3().crossVectors(AX, P.up));
-    this.shipW = wrapW(this.shipW + wrapW(w + round * 1.2 - this.shipW) * Math.min(1, dt * 1.2));
-    bandFrame(this.shipS, this.shipW, this.ship.root, 92);
+    this.shipW = wrapW(this.shipW + wrapW(w + round * 1.2 + hide - this.shipW) * Math.min(1, dt * 1.2));
+    // it tracks your height too: up where you are, not where the rock is. SHIP_LIFT over the rock under it, or
+    // SHIP_OVER above you if you've climbed past that. It rises fast to keep you in range and settles slowly.
+    const need = THREE.MathUtils.clamp(rad(P.pos) + SHIP_OVER - (RC + heightAt(this.shipS, this.shipW)), SHIP_LIFT, SHIP_LIFT_MAX);
+    this.shipLift += THREE.MathUtils.clamp((need - this.shipLift) * 2, -35, 90) * dt;
+    bandFrame(this.shipS, this.shipW, this.ship.root, this.shipLift);
     this.ship.root.rotateY(this.spin * 0.25);
     for (const e of this.eyes) {
       if (e.dead) {
@@ -644,20 +672,22 @@ export class Spindle {
       e.model.root.getWorldPosition(e.center);
       e.model.root.visible = !e.dead;
     }
-    // attacks: each live eye powers one (barrage, beam, mines); after the core, faster
+    // attacks: each live eye powers one (barrage, beam, mines); after the core, faster. Up out of the beam's and
+    // the mines' reach (AIR_ALT) only the barrage can touch you, so that's all it throws, one after another
     this.attackT -= dt;
     if (this.attackT <= 0) {
       const live = this.eyes.filter((e) => !e.dead).map((e) => e.eye);
-      this.attackT = this.gotCore ? 1.8 : 2.6;
+      const air = this.world.altitude(P.pos) > AIR_ALT;
+      this.attackT = air ? (this.gotCore ? 1.1 : 1.5) : (this.gotCore ? 1.8 : 2.6);
       if (live.length) {
-        const kind = live[this.attackN++ % live.length];
+        const kind = air ? (live.includes(0) ? 0 : -1) : live[this.attackN++ % live.length];
         if (kind === 0) this.barrage();
         else if (kind === 1) {
           // past halfway down the rock: two beams at once, one from each side, sweeping toward
           // each other on tracks either side of your line
           if (s > L / 2) { this.sweep(s, w, -5.5, 1); this.sweep(s, w, 5.5, -1); } else this.sweep(s, w);
         }
-        else this.mines(s, w);
+        else if (kind === 2) this.mines(s, w);
       }
     }
     this.droneT -= dt;
@@ -796,7 +826,8 @@ export class Spindle {
   }
 
   // 4: drones: little spiked gunships. They pace you off your flanks (one each side, a little ahead)
-  // and spit short bursts of bolts at you; they keep their distance. They can be shot down.
+  // and spit short bursts of bolts at you; they keep their distance. They can be shot down: one goes dark,
+  // can't fire, and powers back up after DRONE_REBOOT seconds, keeping its place off your flank meanwhile.
   spawnDrone() {
     const g = this.game;
     const m = makeDrone();
@@ -819,9 +850,10 @@ export class Spindle {
     if (sp > 3) fwd.divideScalar(sp); else fwd.copy(AX);
     const right = new THREE.Vector3().crossVectors(fwd, up).normalize();
     for (const d of this.drones) {
-      // shot down: it goes dark and drifts along behind you, powered down, for 15 s, then reboots
+      // shot down: it goes dark and silent for DRONE_REBOOT seconds, then reboots (and all the while it keeps
+      // station off your flank like the live ones; only its guns and its light are off)
       if (d.dead && !(d.downT > 0)) {
-        d.downT = 15;
+        d.downT = DRONE_REBOOT;
         d.model.root.userData.core.material = d.model.root.userData.core.userData.dark;
         this.root.add(d.model.root); // (the kill took it out of the scene)
       }
@@ -835,11 +867,11 @@ export class Spindle {
         }
       }
       const down = d.dead;
-      d.wob += dt * (down ? 0.8 : 2.4);
-      const goal = P.center.clone().addScaledVector(right, d.side * d.slot * (down ? 1.6 : 1)).addScaledVector(up, (down ? 14 : 8) + Math.sin(d.wob) * 3).addScaledVector(fwd, (down ? -20 : 6 + Math.min(40, sp * 0.3)) + Math.cos(d.wob * 0.7) * 5);
-      const want = goal.sub(d.center).multiplyScalar(down ? 1 : 2.4);
-      if (want.length() > (down ? 60 : 95)) want.setLength(down ? 60 : 95);
-      d.vel.lerp(want.add(P.vel.clone().multiplyScalar(0.6)), Math.min(1, dt * (down ? 1 : 3)));
+      d.wob += dt * 2.4;
+      const goal = P.center.clone().addScaledVector(right, d.side * d.slot).addScaledVector(up, 8 + Math.sin(d.wob) * 3).addScaledVector(fwd, 6 + Math.min(40, sp * 0.3) + Math.cos(d.wob * 0.7) * 5);
+      const want = goal.sub(d.center).multiplyScalar(2.4);
+      if (want.length() > 95) want.setLength(95);
+      d.vel.lerp(want.add(P.vel.clone().multiplyScalar(0.6)), Math.min(1, dt * 3));
       d.center.addScaledVector(d.vel, dt);
       const floor = this.world.surface(d.center) + 3;
       if (rad(d.center) < floor) this.world.ground(d.center, d.center, 3);
