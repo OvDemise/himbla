@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { toon, ink, glow, textSprite, setMask } from './toon.js';
 const VEH_DETAIL = 220; // past this, a vehicle's small parts stop drawing
-import { makeFigure, makeShuttle, makeRover, makeHoverCar, makeFreighter, makeLandTrain, LAND_TRAIN_FACTIONS } from './models.js';
+import { makeFigure, makeShuttle, makeRover, makeHoverCar, makeFreighter, makeLandTrain, LAND_TRAIN_FACTIONS, GARAGE_HALL, GARAGE_BAYS } from './models.js';
 import { mulberry32 } from './rng.js';
 import { SUN, frameQuat, arcDist } from './geo.js';
 
@@ -577,6 +577,7 @@ export class Traffic {
     for (const [loc, R] of this.rings) this.buildRing(loc, R);
     this.pieces.forEach((pc, i) => { pc.id = i; this.finishPiece(pc); });
     for (const R of this.rings.values()) this.ringStop(R);
+    for (const R of this.rings.values()) this.garageLink(R);
     const G = this.roadGeo;
     const geo = new THREE.BufferGeometry();
     geo.setAttribute('position', new THREE.Float32BufferAttribute(G.pos, 3));
@@ -614,6 +615,7 @@ export class Traffic {
     this.roadVehicles = [];
     let civil = 0; // (the Vostok road is numbered -1 so the other roads keep their services)
     for (const road of this.roads) this.populateRoad(road, road.A.restricted || (road.B && road.B.restricted) ? -1 : civil++);
+    this.populateGarage();
   }
 
   // Every k-th point of a world-space polyline as a unit direction (the last point always stays).
@@ -1066,6 +1068,93 @@ export class Traffic {
     }
   }
 
+  // The Meridian Exchange's garage road. The main garage (settlements.js garage(), `loc.garage`) stands inside the ring with its bays
+  // facing the ring road. A rover comes out of one bay (the open one with nothing in its way), drives straight out along a road laid
+  // from the apron and turns right onto the ring's inner lane (the lane whose traffic has the town on its right), where it is just
+  // another road buggy. This lays the road's strip and works out the rover's path and where it meets the ring; buildRing calls it
+  // before the ring is drawn, so the ring's inner berm can make way, and the piece itself is made at the end of buildRing.
+  garageRoad(loc, R, W, side, tan) {
+    const G = loc.garage, H = GARAGE_HALL.main, bx = GARAGE_BAYS.main[G.bay], M = R.M, step = R.step, din = R.din;
+    const c = Math.cos(G.yaw), sn = Math.sin(G.yaw);
+    const L2W = (lx, lz) => this.P.ground(this.w.toWorld(loc, G.x + lx * c + lz * sn, 0, G.z - lx * sn + lz * c), new THREE.Vector3());
+    const wrap = (i) => ((i % M) + M) % M;
+    const lane = (i) => W[wrap(i)].clone().addScaledVector(side[wrap(i)], LANE * din);
+    const S0 = L2W(bx, H.hz + 8.6), u = L2W(bx, H.hz + 9.6).sub(S0).normalize(); // the apron's front edge, and the way out
+    // where the line of the road meets the ring's inner lane
+    let i0 = 0, best = Infinity, tLane = 0;
+    for (let i = 0; i < M; i++) {
+      const q = lane(i).sub(S0), t = q.dot(u);
+      if (t <= 0) continue;
+      const lat = q.addScaledVector(u, -t).length();
+      if (lat < best) { best = lat; i0 = i; tLane = t; }
+    }
+    // the road merges onto the lane `m` steps further along it, like an on-ramp: at least 40 m, and well clear of any junction (the
+    // arcs between them start `kd` steps out). The road itself stays inside the ring, so a road leaving the ring there is no obstacle.
+    const gi = R.gates.map((e) => e.i);
+    const clear = (i) => gi.every((g) => { const d = Math.abs(g - wrap(i)); return Math.min(d, M - d) >= R.kd + Math.ceil(14 / step); });
+    let m = Math.max(2, Math.round(40 / step));
+    while (m * step < 120 && !clear(i0 + din * m)) m++;
+    if (!clear(i0 + din * m)) console.warn('[traffic] the garage road meets the ring at a junction');
+    const j = i0 + din * m, Q = lane(j), T = tan[wrap(j)].clone().multiplyScalar(din);
+    const RAD = 22; // the curve's reach in from the ring
+    const S1 = S0.clone().addScaledVector(u, Math.max(2, tLane - RAD));
+    // the rover's path (its right-hand lane): from inside the bay, out of the door, over the apron, along the road, round the curve to the ring
+    const A = L2W(bx, -5), D0 = L2W(bx, H.hz - 0.4);
+    const dense = (a, b, out, gap = 2.5) => { const n = Math.max(1, Math.ceil(a.distanceTo(b) / gap)); for (let k = 1; k <= n; k++) out.push(a.clone().lerp(b, k / n)); };
+    const raw = [A];
+    dense(A, D0, raw); dense(D0, S0, raw);
+    const iS0 = raw.length - 1;                      // (the road proper starts at S0: the apron before it)
+    dense(S0, S1, raw);
+    const iS1 = raw.length - 1;
+    for (const p of this.bez(S1, u, Q, T, 14, 0.55).slice(1)) raw.push(p);
+    const lenOf = (pts, a, b) => { let L = 0; for (let k = a + 1; k <= b; k++) L += pts[k].distanceTo(pts[k - 1]); return L; };
+    // the strip: the same line, its centre RIGHT-lane-width to the left of it, so the rover keeps to the right of the road
+    const path = raw.slice(iS0).map((p) => this.P.ground(p.clone(), new THREE.Vector3()));
+    const { side: ps, cum } = this.frames(path);
+    const total = cum[path.length - 1], straight = cum[iS1 - iS0];
+    const base = this.roadGeo.pos.length / 3;
+    for (let k = 0; k < path.length; k++) {
+      const centre = path[k].clone().addScaledVector(ps[k], -LANE);
+      const s = cum[k];
+      const fade = smooth(s / 6) * smooth((total - s) / 10);
+      const soft = smooth((s - straight * 0.8) / (total - straight * 0.8 + 1e-3));
+      const bR = smooth((straight - s) / 8) * smooth((total - s - 14) / 10); // the inner edge's berm stops where the curve begins
+      const bL = smooth((total - s - 10) / 12);                              // the outer edge's keeps on round the curve
+      this.stripPush(centre, ps[k], s, 1, fade, smooth((s - 6) / 10) * smooth((total - s - 8) / 10), bL, bR, soft);
+    }
+    this.stripIdx(base, path.length);
+    // keep the first stretch free of pads and shelters
+    for (let k = 0; k < path.length; k += 2) { const p = this.local(loc, path[k], _a); loc.stopKeep.push({ x: p.x, z: p.z, r: 10 }); }
+    return { i0, j, Q, raw, lead: Math.ceil(11 / step), trail: m + Math.ceil(14 / step), polyLen: lenOf(raw, 0, raw.length - 1), hallLen: lenOf(raw, 0, 0) + A.distanceTo(L2W(bx, H.hz)), apronLen: A.distanceTo(S0), piece: null };
+  }
+
+  // After the ring's pieces are finished: link the garage piece onto the lane arc it meets, and set the rover's height over the garage
+  // floor (the hall and the apron stand a little above the ground).
+  garageLink(R) {
+    const gj = R.garageJoin;
+    if (!gj || !gj.piece || !gj.piece.path) return;
+    const M = R.M, dirn = R.din, jw = ((gj.j % M) + M) % M;
+    const host = (R.arcs[dirn] || []).find((pc) => {
+      const n = Math.abs(pc.i1 - pc.i0), off = dirn > 0 ? (((jw - pc.i0) % M) + M) % M : (((pc.i0 - jw) % M) + M) % M;
+      return off <= n && pc.path;
+    });
+    if (!host) { console.warn('[traffic] the garage road found no ring lane to join'); gj.piece = null; return; }
+    let bi = 0, bd = Infinity;
+    host.path.pts.forEach((p, k) => { const d = p.distanceToSquared(gj.Q); if (d < bd) { bd = d; bi = k; } });
+    const gp = gj.piece;
+    gp.next = [host];
+    gp.joinTo = host;
+    gp.joinS = host.path.cum[bi];
+    // the floor: 0.25 m up inside the hall, 0.12 on the apron, down to the ground over 6 m beyond it
+    const k = gp.len / Math.max(1, gj.polyLen);
+    const sHall = gj.hallLen * k, sApron = gj.apronLen * k;
+    gp.path.pts.forEach((p, n) => {
+      const s = gp.path.cum[n];
+      const lift = s <= sHall ? 0.25 : s <= sHall + 1 ? 0.25 - 0.13 * (s - sHall) : s <= sApron ? 0.12 : s <= sApron + 6 ? 0.12 * (1 - (s - sApron) / 6) : 0;
+      if (lift > 0) p.addScaledVector(_u.copy(p).normalize(), lift);
+    });
+  }
+
   // The ring itself: one closed strip, a flared join for each road, lanes and junction connectors.
   buildRing(loc, R) {
     const P = this.P, M = R.M, kd = R.kd;
@@ -1078,6 +1167,9 @@ export class Traffic {
     // which way round has the town on its right (the stop goes on that lane); the road joins on the other, outer edge
     const c0 = this.w.toWorld(loc, 0, 0, 0);
     R.din = side[0].dot(_a.copy(c0).sub(W[0])) > 0 ? 1 : -1;
+    // the Meridian Exchange's garage road: laid before the ring so that the ring's inner berm can stop where the road comes in
+    const gj = loc.garage ? this.garageRoad(loc, R, W, side, tan) : null;
+    R.garageJoin = gj;
     // closed strip (the last row repeats the first)
     {
       const base = this.roadGeo.pos.length / 3;
@@ -1089,7 +1181,15 @@ export class Traffic {
         let dg = Infinity;
         for (const e of R.gates) { const d = Math.abs(e.i - wrap(i)); dg = Math.min(dg, Math.min(d, M - d) * R.step); }
         const b = smooth((dg - 12) / 10);
-        this.stripPush(W[wrap(i)], side[wrap(i)], s, 1, 1, smooth((dg - 24) / 14), R.din > 0 ? b : 1, R.din > 0 ? 1 : b);
+        let bi = 1, mk = smooth((dg - 24) / 14); // (the inner berm and the ruts, where the garage road comes in)
+        if (gj) {
+          let k = R.din * (wrap(i) - gj.i0);
+          k = ((k + M * 1.5) % M) - M * 0.5; // (steps along the lane from where the road's line meets the ring: ahead is positive)
+          const gd = Math.max(-gj.lead - k, k - gj.trail, 0) * R.step;
+          bi = smooth((gd - 3) / 8);
+          mk = Math.min(mk, smooth((gd - 6) / 10));
+        }
+        this.stripPush(W[wrap(i)], side[wrap(i)], s, 1, 1, mk, R.din > 0 ? b : bi, R.din > 0 ? bi : b);
       }
       this.stripIdx(base, M + 1);
     }
@@ -1150,6 +1250,7 @@ export class Traffic {
       Object.assign(gt, { entP, entM, exP, exM, thP, thM });
     }
     R.arcs = { 1: arcP, [-1]: arcM };
+    if (gj) gj.piece = this.newPiece('j', gj.raw, { town: loc, vlim: 9, garage: true });
   }
 
   // Smooth the corners (ends stay put so pieces join exactly), drop onto the ground, smoothed normals.
@@ -1196,6 +1297,11 @@ export class Traffic {
       const lo = Math.ceil(STOP_IN / R.step), hi = n - Math.ceil(16 / R.step);
       for (let j = lo; j <= hi; j += 2) {
         const i = wrap(pc.i0 + d * j);
+        if (R.garageJoin) { // (not where the garage road comes in)
+          let kk = R.din * (i - R.garageJoin.i0);
+          kk = ((kk + M * 1.5) % M) - M * 0.5;
+          if (kk > -R.garageJoin.lead - Math.ceil(24 / R.step) && kk < R.garageJoin.trail + Math.ceil(24 / R.step)) continue;
+        }
         const p = this.ringLocal(R, i);
         // shelter 12 m in from the centreline, toward the town (clear of a land-train in the stop lane, 6.5 m out)
         const ux = Math.cos(p.a), uz = Math.sin(p.a);
@@ -1357,6 +1463,12 @@ export class Traffic {
       this.vehicles.push(v);
     }
     // buggy (old-style crawler): queues behind slower traffic
+    const b = add({ ...this.makeBuggyRig(k), kind: 'buggy', vmax: 12 + this.r() * 3, acc: 2.5, front: 3.4, tail: 3.4, waitT: 6, view: 900, wheelR: 1.1, hp: BUGGY_HP, maxHp: BUGGY_HP, hitR: 3.4, credits: 25 });
+    this.crawlers.push(b);
+  }
+
+  // A road buggy's model (a rover with a driver at the wheel), already in the scene; k picks its colour and driver.
+  makeBuggyRig(k) {
     const r = makeRover({ color: [0xffd23f, 0xff9f1c, 0x7dff6a][k % 3], trim: 0xfff4e0, pirate: false, flag: 0x2ec4ff });
     r.gun.visible = false;
     r.root.scale.setScalar(1.3);
@@ -1376,8 +1488,54 @@ export class Traffic {
     col.rotation.x = 1.0;
     r.chassis.add(sw, col);
     this.w.scene.add(r.root);
-    const b = add({ ...r, kind: 'buggy', vmax: 12 + this.r() * 3, acc: 2.5, front: 3.4, tail: 3.4, waitT: 6, view: 900, wheelR: 1.1, hp: BUGGY_HP, maxHp: BUGGY_HP, hitR: 3.4, credits: 25 });
-    this.crawlers.push(b);
+    return r;
+  }
+
+  // The garage's rovers (see garageRoad): two buggies that take turns to come out of the main garage's open bay, drive out along its road
+  // and onto the ring, where they are ordinary road buggies. After a while, once nobody can see them, they go home and wait their turn.
+  populateGarage() {
+    const R = [...this.rings.values()].find((q) => q.garageJoin && q.garageJoin.piece && q.garageJoin.piece.joinTo);
+    if (!R) return;
+    const loc = R.loc;
+    this.garage = { loc, piece: R.garageJoin.piece, rovers: [] };
+    for (let i = 0; i < 2; i++) {
+      const rig = this.makeBuggyRig(90 + i);
+      rig.root.visible = false;
+      const v = Object.assign(rig, {
+        kind: 'buggy', vmax: 12 + this.r() * 3, acc: 2.5, front: 3.4, tail: 3.4, waitT: 6, view: 900, wheelR: 1.1, hp: BUGGY_HP, maxHp: BUGGY_HP, hitR: 3.4, credits: 25,
+        piece: null, s: 0, plan: [], hist: [], dest: null, cur: 0, state: 'bay', timer: 0,
+        pos: new THREE.Vector3(), prevPos: new THREE.Vector3(), vel: new THREE.Vector3(), fwd: new THREE.Vector3(),
+        hintF: { i: 0, f: 0 }, hintR: { i: 0, f: 0 }, hover: 0, smokeT: 0, roll: 0,
+        garage: true, spawnT: 6 + i * 22, retireT: 0,
+      });
+      this.garage.rovers.push(v);
+      this.roadVehicles.push(v);
+      this.crawlers.push(v);
+    }
+  }
+
+  // Each frame: a waiting rover rolls out when the Exchange is in play and the road is clear; one that has been out a while and is
+  // out of everyone's sight goes back to wait.
+  updateGarage(dt) {
+    const G = this.garage;
+    if (!G) return;
+    for (const v of G.rovers) {
+      if (v.state === 'bay') {
+        v.spawnT -= dt;
+        if (v.spawnT > 0 || !G.loc.active || G.piece.vehicles.length) continue;
+        this.move(v, G.piece);
+        v.s = 3; v.hist = []; v.plan = []; v.cur = 1; v.state = 'drive'; v.roll = 0; v.hp = v.maxHp; v.wreckT = 0;
+        v.retireT = 70 + this.r() * 60;
+        this.char(v, false);
+        this.plan(v);
+      } else if (v.state === 'drive' && v.piece && v.piece !== G.piece) {
+        v.retireT -= dt;
+        if (v.retireT <= 0 && !v.root.visible) {
+          this.move(v, null);
+          v.state = 'bay'; v.cur = 0; v.spawnT = 15 + this.r() * 25; v.root.visible = false;
+        }
+      }
+    }
   }
 
   // ================= passengers =================
@@ -1826,6 +1984,7 @@ export class Traffic {
       c.prevPos.copy(c.pos);
       this.updateRoadVehicle(c, dt, camPos);
     }
+    this.updateGarage(dt);
     this.updateWalkers(dt);
   }
 
@@ -2043,6 +2202,7 @@ export class Traffic {
           let next = v.plan.shift();
           if (!next) { this.plan(v); next = v.plan.shift() || v.piece.next[v.piece.next.length - 1]; }
           v.s -= v.piece.len;
+          if (v.piece.joinTo === next) v.s += v.piece.joinS; // (the garage road merges onto the ring part-way along an arc)
           v.hist.unshift(v.piece);
           if (v.hist.length > 6) v.hist.length = 6;
           this.move(v, next);

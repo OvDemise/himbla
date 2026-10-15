@@ -615,7 +615,7 @@ crowd-noise bed for now (the cheering is due a rework), and the race countdown b
 | Location | Type | Notes |
 | --- | --- | --- |
 | International Moon Base (ILMB) | SPACECOM HQ | Fortress walls, turrets, artillery, embassies, job board, repair bay, launch pad |
-| Meridian Exchange · Shackleton Radar Array · Helium-3 Exchange | Meridian | Trade hub (trading tower with a live price ticker, four motor-pool garages, a container gantry and tower cranes at work), radar research (an observatory with a turning cupola), and a working strip-mine (bucket-wheel excavator, ore conveyor, pumping derrick, Horton-sphere tank farm) |
+| Meridian Exchange · Shackleton Radar Array · Helium-3 Exchange | Meridian | Trade hub (trading tower with a live price ticker, a motor-pool garage with its own service road and two small garages, a container gantry and tower cranes at work), radar research (an observatory with a turning cupola), and a working strip-mine (bucket-wheel excavator, ore conveyor, pumping derrick, Horton-sphere tank farm) |
 | Kepler Civic Center · Tranquility Commons · Aldrin Heights · Twilight Waystation · Hertzsprung Refuge | Kepler | Towns, safe rest and repair |
 | Farside Listening Post | SPACECOM (dark side) | Hazard-pay destination |
 | Bastion Vostok-9 · Vostok-4 Outpost | Vostok | Restricted zones: turrets, patrols, artillery |
@@ -704,7 +704,7 @@ src/
   assets/apc.glb     the Vostok BTR-M Moon APC (eight wheels, a turret that yaws and a barrel that elevates)
   assets/landtrain.glb  the Moonliner and Prospector land-trains: two tractors and four trailers, each with a livery for every faction
   assets/crane.glb   the tower crane (lattice mast, ballasted base, slewing head with cab, trolley and hook)
-  assets/garage.glb  the Meridian motor-pool garage (three bays with open and shut doors, workshop fit-outs, service office, fuel yard, roof plant)
+  assets/garage.glb  the Meridian motor-pool garages: the main one (three bays with open and shut doors, workshop fit-outs, service office, fuel yard, roof plant) and a small two-bay one
 tools/
   blender/build_runner.py  builds the runner in Blender and exports src/assets/runner.glb
   blender/build_idles.py   keys the runner's five idles on its pivots -> src/assets/idles.json (headless: `pip install bpy`, then `python3 tools/blender/build_idles.py`; `MOONRUNNER_IDLES_BLEND=idles.blend` also saves the keyed scene)
@@ -714,7 +714,7 @@ tools/
   blender/build_apc.py     builds the Vostok APC and its turret -> src/assets/apc.glb (also runs headless: `pip install bpy`, then `MOONRUNNER_REPO=. python3 tools/blender/build_apc.py`)
   blender/build_landtrain.py builds the Moonliner and Prospector tractors and trailers -> src/assets/landtrain.glb (also runs headless, like build_apc.py)
   blender/build_crane.py   builds the tower crane -> src/assets/crane.glb (also runs headless, like build_apc.py)
-  blender/build_garage.py  builds the motor-pool garage -> src/assets/garage.glb (also runs headless)
+  blender/build_garage.py  builds the main and small motor-pool garages -> src/assets/garage.glb (also runs headless)
   blender/decals.py        flat lettering, emblems, hazard stripes and safety signs (no textures) the land-train builder execs after kit.py
   blender/kit.py           shared geometry/material/export helpers the skimmer, war-rig, APC and land-train builders exec
   viewer.html              dev-only model viewer (npm run dev, then /tools/viewer.html?m=shuttle|freighter|apc|landtrain|crane|garage|mite|lineup…; apc takes &turret=<rad>&barrel=<rad>; landtrain takes &type=moonliner|prospector&faction=spacecom|vostok|kepler|meridian&cars=pax,tank,cargo,blast&unit=<n>)

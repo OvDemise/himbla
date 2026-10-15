@@ -4,7 +4,7 @@ import { FACTIONS } from './locations.js';
 import { pixelFont } from './fonts.js';
 import { glow } from './toon.js';
 import { market, tickerText } from './market.js';
-import { craneModel, craneSlot, CRANE_H, CRANE_LOAD_DROP, CRANE_TROLLEY_MIN, CRANE_TROLLEY_SPAN, garageModel, garageSlot, GARAGE_HX, GARAGE_HZ } from './models.js';
+import { craneModel, craneSlot, CRANE_H, CRANE_LOAD_DROP, CRANE_TROLLEY_MIN, CRANE_TROLLEY_SPAN, garageModel, garageSlot, GARAGE_HALL } from './models.js';
 
 // Settlements, HQs and landmarks built with the outpost Kit (outpostModels.js): every static part
 // of a place bakes into one merged mesh per material plus one ink hull, so a detailed settlement
@@ -203,12 +203,13 @@ export function warehouse(k, x, z, w, d, h, color, yaw, trim) {
   k.at();
 }
 
-// Vehicle garage (built in Blender, tools/blender/build_garage.py): a three-bay motor pool for land-trains and rovers, with a
-// service office built onto one end and a fuel and coolant yard at the other. The shell, roof and yards are baked into the kit;
-// `open` (three booleans, bay 0 first) says which bay doors are rolled up, showing a lit workshop with a rover on a lift, an
-// engine stand or a bench; the roof's turbine vents turn and the antenna lamp blinks. Its doors (+z) face along the yaw.
-export function garage(k, x, z, yaw, open = [true, false, true]) {
-  const M = garageModel(open);
+// Vehicle garage (built in Blender, tools/blender/build_garage.py): the main one (`kind` 'main') is a three-bay motor pool with a
+// service office built onto one end and a fuel and coolant yard at the other; the small one ('small') is a two-bay shed about the
+// size of the old sheds. The shell, roof and yards are baked into the kit; `open` (a boolean per bay) says which bay doors are rolled
+// up, showing a lit workshop with a rover on a lift, an engine stand or a bench; the roof's turbine vents turn and (main) the antenna
+// lamp blinks. Its doors (+z) face along the yaw.
+export function garage(k, x, z, yaw, open = [true, false, true], kind = 'main') {
+  const M = garageModel(open, kind), { hx, hz } = GARAGE_HALL[kind];
   const mat = (slot) => { const c = garageSlot(slot); return c.glow ? G(c.color) : T(c.color); };
   const I = new THREE.Matrix4();
   k.at(x, z, yaw);
@@ -219,12 +220,14 @@ export function garage(k, x, z, yaw, open = [true, false, true]) {
     k.dyn(head, f.pos.x, f.pos.y, f.pos.z);
   }
   for (const b of M.blinkers) k.blinker(b.pos.x, b.pos.y, b.pos.z, 0xffd23f, b.data.radius || 0.25);
-  // solid: the hall (the bays are for show: the doors' plane is a wall), the office, the two tanks and the pump island
-  k.solid(GARAGE_HX + 0.2, 5.4, GARAGE_HZ + 0.2, 0, 0);
-  k.solid(4.4, 2.7, 6.7, 23.25, 3.5);
-  k.hcyl(1.5, 8.2, -23.6, 5.0, 0, 2.0);
-  k.hcyl(1.5, 8.2, -23.6, -4.2, 0, 2.0);
-  k.solid(2.4, 0.9, 0.8, -21.5, GARAGE_HZ + 4.8);
+  // solid: the hall (the bays are for show: the doors' plane is a wall), and on the main one the office, the two tanks and the pump island
+  k.solid(hx + 0.2, kind === 'main' ? 5.4 : 5.0, hz + 0.2, 0, 0);
+  if (kind === 'main') {
+    k.solid(4.4, 2.7, 6.7, 23.25, 3.5);
+    k.hcyl(1.5, 8.2, -23.6, 5.0, 0, 2.0);
+    k.hcyl(1.5, 8.2, -23.6, -4.2, 0, 2.0);
+    k.solid(2.4, 0.9, 0.8, -21.5, hz + 4.8);
+  }
   k.at();
 }
 
@@ -253,6 +256,10 @@ export function lattice(k, x, z, h, w0, w1, bays, legM, braceM, { r = 0.22 } = {
 // objects. The model is 34 m of mast under a 30 m jib; `h` scales it uniformly (the `jib` argument is its own reach, kept for the
 // callers, and follows from the scale). The head slews, the trolley runs in and out, the hook rises and falls. The hook carries
 // the Prospector's cargo container, painted for one of three factions (by `phase`: a mixed yard of Kepler, Meridian and SpaceCom freight).
+// where the Meridian Exchange's main garage stands: out toward the ring road along the south-west diagonal, turned to face it
+// (clear of the landing pad at (-100, -60), 16 m, and the container yard, 6 m; the ring's casino-road junction is just short of where its road leaves); `yaw` turns its +z bays outward
+const GARAGE_R = 128, GARAGE_ANGLE = 236;
+export const GARAGE_AT = { angle: GARAGE_ANGLE, x: Math.cos((GARAGE_ANGLE * Math.PI) / 180) * GARAGE_R, z: Math.sin((GARAGE_ANGLE * Math.PI) / 180) * GARAGE_R, yaw: Math.atan2(Math.cos((GARAGE_ANGLE * Math.PI) / 180), Math.sin((GARAGE_ANGLE * Math.PI) / 180)) };
 const CRANE_CARGO = ['kepler', 'meridian', 'spacecom'];
 export function towerCrane(k, x, z, h, jib, color, { speed = 0.12, phase = 0 } = {}) {
   const C = craneModel(), sc = h / CRANE_H;
@@ -683,12 +690,15 @@ export function buildMeridian(world, loc) {
     crown.userData.spin = 0.4;
     crown.scale.setScalar(1.5);
     k.dyn(crown, 0, y + 3.6, TZ);
-    // four motor-pool garages on the corners, their bays turned in to face the tower across the plaza (a different set of doors up in each)
-    const OPEN = [[true, false, true], [false, true, true], [true, true, false], [false, true, false]];
-    for (let i = 0; i < 4; i++) {
-      const a = (i / 4) * TAU + Math.PI / 4;
-      garage(k, Math.cos(a) * 86, Math.sin(a) * 86, Math.atan2(-Math.cos(a), -Math.sin(a)), OPEN[i]);
+    // the motor pool: one main garage out by the south-west stretch of the ring road, its bays turned out to face it (a service road
+    // runs from its right-hand bay to the ring, traffic.js), and two small sheds on the plaza's north-west and south-east corners,
+    // their bays turned in to face the tower
+    const GA = GARAGE_AT;
+    garage(k, GA.x, GA.z, GA.yaw, [true, false, true], 'main');
+    for (const [sx, sz, open] of [[-60.8, 60.8, [false, true]], [60.8, -60.8, [true, true]]]) {
+      garage(k, sx, sz, Math.atan2(-sx, -sz), open, 'small');
     }
+    loc.garage = { ...GA, bay: 2 }; // (the bay the rovers come out of: it is open and has nothing in the way)
     // container yard under a travelling gantry crane
     const yx = -5, yz = -100;
     k.at(yx, yz);

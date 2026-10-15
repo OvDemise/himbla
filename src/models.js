@@ -1233,6 +1233,9 @@ export async function loadShipParts() {
   const garage = ga.scene.getObjectByName('garage');
   if (!garage) throw new Error('garage.glb has no garage');
   SHIP_PARTS.garage = bakeShip(garage);
+  const shed = ga.scene.getObjectByName('garage_small');
+  if (!shed) throw new Error('garage.glb has no garage_small');
+  SHIP_PARTS.garage_small = bakeShip(shed);
 }
 
 function bakeShip(root) {
@@ -1714,10 +1717,12 @@ export function makeTowerCrane({ color = 0xffd23f, faction = 'kepler', h = CRANE
 }
 
 // ---- The vehicle garage (built in Blender, see build_garage.py) ----
-// 38 m by 20 m, the three bay doors facing +z. The baked tree: the root's own meshes are the shell, roof and yards; its `door`
+// Two buildings in one file: the main garage, 38 m by 20 m with three bays, a service office and a fuel yard, and a small one,
+// 32 m by 17 m with two bays (about the old sheds' size). Bay doors face +z. The baked tree: the root's own meshes are the shell, roof and yards; its `door`
 // pivots hold each bay's closed and open door (extras `bay`, `state`), its `fit` pivots what is working inside a bay that is
 // open, `fan` the roof turbine heads (extra `speed`, spun about y) and `blinker` the antenna lamp.
-export const GARAGE_HX = 19, GARAGE_HZ = 10; // the main hall's half sizes
+export const GARAGE_HALL = { main: { hx: 19, hz: 10 }, small: { hx: 16, hz: 8.5 } }; // each hall's half sizes
+export const GARAGE_BAYS = { main: [-10, 0, 10], small: [-8, 8] }; // and where its bays are (x)
 const GARAGE_TOON = {
   body: 0xfff4e0, trim: 0x2ec4ff, navy: 0x1b3a8f, gold: 0xffd23f, dark: 0x2a2540, steel: 0x55607a, metal: 0x8a87a0, concrete: 0x8a8698,
   floor: 0x4a465c, door: 0xc6cbdc, roof: 0x3a3550, panel: 0x1d3a8a, tire: 0x1d1a29, white: 0xf3eee4, label: 0x2a2540,
@@ -1732,10 +1737,10 @@ export function garageSlot(slot, trim = 0x2ec4ff) {
   return { color: GARAGE_TOON[slot] ?? 0xff00ff, glow: false };
 }
 
-// What to build for a garage whose bays are `open` (three booleans): the baked nodes of the static building, the moving
+// What to build for a garage whose bays are `open` (a boolean for each bay): the baked nodes of the static building, the moving
 // heads and the lamp. Every pivot of the model that isn't picked is left out.
-export function garageModel(open = [true, false, true]) {
-  const root = SHIP_PARTS.garage;
+export function garageModel(open = [true, false, true], kind = 'main') {
+  const root = SHIP_PARTS[kind === 'main' ? 'garage' : 'garage_small'];
   const keep = (n) => (n.role === 'door' ? (n.data.state === 'open') === !!open[n.data.bay] : n.role === 'fit' ? !!open[n.data.bay] : true);
   const flat = [], fans = [], blinkers = [];
   const walk = (n) => {
@@ -1750,8 +1755,8 @@ export function garageModel(open = [true, false, true]) {
 }
 
 // A whole garage as plain meshes (the model viewer's): `open` the bays that are up, the head of each vent turning with `t`.
-export function makeGarage({ open = [true, false, true], trim = 0x2ec4ff } = {}) {
-  const G = garageModel(open);
+export function makeGarage({ open = [true, false, true], kind = 'main', trim = 0x2ec4ff } = {}) {
+  const G = garageModel(open, kind);
   const mats = new Map();
   const matFor = (slot) => {
     if (!mats.has(slot)) { const c = garageSlot(slot, trim); mats.set(slot, c.glow ? glow(c.color) : toon(c.color)); }
