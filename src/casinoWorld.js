@@ -333,6 +333,9 @@ export function buildCasino(w, loc) {
   const CZ = (D + BACK) / 2, DEP = D - BACK;
   const put = (o, x, z, y = 0, yaw = 0, dyn = false) => w.put(o, loc, x, z, y, yaw, dyn);
   const col = (spec) => w.col(loc, spec);
+  // glow materials shared by colour, so a run of trim pieces merges into a draw call or two (glow() makes a new one each time)
+  const sharedGlow = new Map();
+  const glowS = (c) => { let m = sharedGlow.get(c); if (!m) sharedGlow.set(c, m = glow(c)); return m; };
 
   // ---------- the hall: four walls with a wide door gap, a roof, a stepped crown ----------
   const wallM = toon(0x2a1450);
@@ -369,17 +372,32 @@ export function buildCasino(w, loc) {
     neon(new THREE.BoxGeometry(0.6, DOOR_H, 0.6), 0xffd23f, sx * DOOR, D + 1.1, DOOR_H / 2);
   }
   neon(new THREE.BoxGeometry(DOOR * 2 + 0.6, 0.6, 0.6), 0xffd23f, 0, D + 1.1, DOOR_H);
-  // card suits on the facade
-  const suits = ['♠', '♥', '♦', '♣'];
-  suits.forEach((s, i) => {
-    const t = canvasTex(128, 128, (x) => {
+  // ...and the front's gold belt and pink roofline carry on round the sides and the back, so the hall is dressed all the way round
+  const neonS = (geo, color, x, z, y) => put(new THREE.Mesh(geo, glowS(color)), x, z, y);
+  neonS(new THREE.BoxGeometry(W * 2 + 2.4, 0.5, 0.5), 0xff2e88, 0, BACK - 1.2, H - 0.4);
+  neonS(new THREE.BoxGeometry(W * 2 + 2.4, 0.4, 0.4), 0xffd23f, 0, BACK - 1.2, H * 0.62);
+  for (const sx of [-1, 1]) neonS(new THREE.BoxGeometry(0.4, 0.4, DEP + 2.4), 0xffd23f, sx * (W + 1.2), CZ, H * 0.62);
+  // card suits: the four icons run all the way round (the front's two pairs either side of the doors, then six down each side
+  // wall and six along the back), in order, so the sequence carries on round the corners
+  const suitMats = ['♠', '♥', '♦', '♣'].map((s, i) => new THREE.MeshBasicMaterial({
+    transparent: true,
+    map: canvasTex(128, 128, (x) => {
       x.font = '110px serif'; x.textAlign = 'center'; x.textBaseline = 'middle';
       x.lineWidth = 10; x.strokeStyle = '#120a1e'; x.strokeText(s, 64, 70);
       x.fillStyle = i % 3 ? '#ff2a4a' : '#fff4e0'; x.fillText(s, 64, 70);
-    });
-    const p = new THREE.Mesh(new THREE.PlaneGeometry(4, 4), new THREE.MeshBasicMaterial({ map: t, transparent: true }));
-    put(p, [-19, -11, 11, 19][i], D + 1.05, H * 0.8);
-  });
+    }),
+  }));
+  const suitGeo = new THREE.PlaneGeometry(4, 4);
+  // (every suit icon is just a place: they're drawn at the end as four instanced meshes, one per suit, so the 20-odd icons cost four draws)
+  const suitSpots = [[], [], [], []];
+  const suitAt = (i, x, z, yaw, y = H * 0.8, size = 4) => suitSpots[i % 4].push({ x, y, z, yaw, size });
+  [-19, -11, 11, 19].forEach((x, i) => suitAt(i, x, D + 1.05, 0)); // front: ♠ ♥ [doors] ♦ ♣
+  const SUIT_N = 6, rowZ = (j) => BACK + 6 + j * ((DEP - 12) / (SUIT_N - 1)), rowX = (j) => -21 + j * 8.4;
+  for (let j = 0; j < SUIT_N; j++) {
+    suitAt(j, W + 1.05, rowZ(SUIT_N - 1 - j), Math.PI / 2); // right wall, front to back
+    suitAt(j + 2, rowX(SUIT_N - 1 - j), BACK - 1.05, Math.PI); // back, right to left
+    suitAt(j, -(W + 1.05), rowZ(j), -Math.PI / 2); // left wall, back to front
+  }
   // marquee canopy over the open doors
   put(mesh(new THREE.BoxGeometry(14, 0.8, 7), toon(0xff2e88), 0.1), 0, D + 4.5, 9.6);
   for (const sx of [-1, 1]) put(mesh(new THREE.CylinderGeometry(0.3, 0.3, 9.6, 8), toon(0xffd23f), 0.06), sx * 6.5, D + 7.6, 4.8);
@@ -393,6 +411,12 @@ export function buildCasino(w, loc) {
   for (let i = 0; i <= 18; i++) bulb(-7 + i * (14 / 18), D + 8.05, 9.2);
   for (const sx of [-1, 1]) for (let i = 1; i <= 8; i++) bulb(sx * 7.05, D + 8 - i * (7 / 8), 9.2);
   for (let i = 0; i <= 40; i++) bulb(-W + i * (W * 2 / 40), D + 1.5, H + 2.1);
+  // (the same chasing bulbs along the roof's other three edges: a coarser sphere, they're 17 m up)
+  const edgeBulbGeo = new THREE.SphereGeometry(0.28, 6, 4);
+  const edgeBulb = (x, z, y) => put(new THREE.Mesh(edgeBulbGeo, bulbMats[k++ % 3]), x, z, y);
+  const nEdge = Math.round((DEP + 3) / 1.3);
+  for (let i = 1; i <= nEdge; i++) for (const sx of [-1, 1]) edgeBulb(sx * (W + 1.5), D + 1.5 - i * ((DEP + 3) / nEdge), H + 2.1);
+  for (let i = 1; i <= 41; i++) edgeBulb(-(W + 1.5) + i * ((W + 1.5) * 2 / 42), BACK - 1.5, H + 2.1);
   // red carpet + velvet ropes outside, and on inside up to the games
   const carpet = new THREE.Mesh(new THREE.PlaneGeometry(6, 34), toon(0xd7263d));
   carpet.rotation.x = -Math.PI / 2;
@@ -803,21 +827,194 @@ export function buildCasino(w, loc) {
   const vin = nameTag(textSprite('VINNIE "THE VISOR" · PIT BOSS', { color: '#7dff6a', size: 44, scale: 0.22, bg: '#120a1e' }), 'VINNIE "THE VISOR" · PIT BOSS', '#7dff6a');
   vin.position.set(CLASSIC.x - 2.5, 3.4, CLASSIC.zs[0] - 3);
   loc.group.add(vin);
-  // prize counter booth
-  put(mesh(new THREE.BoxGeometry(1.6, 1.4, 7), toon(0xffd23f), 0.06), PRIZE.x, PRIZE.z, 0.7);
-  put(mesh(new THREE.BoxGeometry(1.9, 0.16, 7.3), toon(0xff2e88), 0.04), PRIZE.x, PRIZE.z, 1.48);
+  // ---------- the prize counter: a gold booth against the right-hand wall, with a glass display case, a till, a header with
+  // pennants and a lit prize wall behind the staff. Built in the booth's own frame: pcPut(o, lx, y, lz) takes lx along the
+  // counter and lz out from its back toward the player (the booth faces -x). The collider below is the whole booth. ----------
+  const pcPut = (o, lx, y, lz, yaw = 0, dyn = false) => put(o, PRIZE.x - lz, PRIZE.z + lx, y, yaw - Math.PI / 2, dyn);
+  const pcBox = (sx, sy, sz, mat, lx, y, lz, ol = 0.03) => pcPut(mesh(new THREE.BoxGeometry(sx, sy, sz), mat, ol), lx, y, lz);
+  const pcGlow = (sx, sy, sz, color, lx, y, lz) => pcPut(new THREE.Mesh(new THREE.BoxGeometry(sx, sy, sz), glowS(color)), lx, y, lz);
+  const PCL = 7.2; // counter length (the collider's length)
+  const pm = {
+    gold: toon(0xffd23f), brass: toon(0xc79a1f), plum: toon(0x3b0f4f), dark: toon(0x1a1030), pink: toon(0xff2e88), white: toon(0xfff4e0),
+    red: toon(0xd7263d), green: toon(0x7dff6a), cyan: toon(0x2ee6ff), steel: toon(0xc9c3d9), felt: toon(0x5a1a8f),
+  };
+  const prizeSpin = []; // the prizes that turn on their stands
+
+  // the prizes: small models (about half a metre tall, standing on y = 0) for the display case and the prize wall
+  const PRIZES_3D = ['trophy', 'rocket', 'crown', 'mite', 'duck', 'gem', 'helmet', 'hover', 'star', 'disco', 'rock'];
+  const prize = (kind) => {
+    const g = new THREE.Group();
+    const add = (geo, mat, x = 0, y = 0, z = 0, ol = 0.02) => { const m = mesh(geo, mat, ol); m.position.set(x, y, z); g.add(m); return m; };
+    if (kind === 'trophy') {
+      add(new THREE.BoxGeometry(0.3, 0.06, 0.3), pm.felt, 0, 0.03, 0);
+      add(new THREE.CylinderGeometry(0.035, 0.05, 0.18, 8), pm.gold, 0, 0.15, 0);
+      add(new THREE.CylinderGeometry(0.2, 0.09, 0.26, 12), pm.gold, 0, 0.37, 0);
+      for (const sx of [-1, 1]) add(new THREE.TorusGeometry(0.07, 0.022, 6, 12), pm.gold, sx * 0.22, 0.38, 0, 0.01);
+    } else if (kind === 'rocket') {
+      add(new THREE.CylinderGeometry(0.12, 0.14, 0.05, 10), pm.felt, 0, 0.025, 0);
+      add(new THREE.CylinderGeometry(0.1, 0.1, 0.38, 10), pm.white, 0, 0.24, 0);
+      add(new THREE.ConeGeometry(0.1, 0.2, 10), pm.red, 0, 0.53, 0);
+      for (let i = 0; i < 3; i++) {
+        const a = (i / 3) * Math.PI * 2;
+        add(new THREE.BoxGeometry(0.02, 0.14, 0.12), pm.red, Math.cos(a) * 0.12, 0.14, Math.sin(a) * 0.12, 0.01).rotation.y = Math.PI / 2 - a;
+      }
+      add(new THREE.SphereGeometry(0.045, 8, 6), glowS(0x2ee6ff), 0, 0.32, 0.095, 0);
+    } else if (kind === 'crown') {
+      add(new THREE.CylinderGeometry(0.17, 0.2, 0.1, 12), pm.pink, 0, 0.05, 0);
+      add(new THREE.CylinderGeometry(0.2, 0.17, 0.12, 12), pm.gold, 0, 0.16, 0);
+      for (let i = 0; i < 5; i++) {
+        const a = (i / 5) * Math.PI * 2, cx = Math.cos(a) * 0.17, cz = Math.sin(a) * 0.17;
+        add(new THREE.ConeGeometry(0.05, 0.16, 6), pm.gold, cx, 0.3, cz, 0.01);
+        add(new THREE.SphereGeometry(0.03, 6, 5), glowS(i % 2 ? 0xff2a4a : 0x2ee6ff), cx, 0.4, cz, 0);
+      }
+    } else if (kind === 'mite') { // a moon-mite plush
+      add(new THREE.SphereGeometry(0.2, 12, 10), pm.green, 0, 0.19, 0, 0.025).scale.set(1.1, 0.9, 1);
+      for (const sx of [-1, 1]) {
+        add(new THREE.SphereGeometry(0.05, 8, 6), pm.white, sx * 0.08, 0.26, 0.17, 0.01);
+        add(new THREE.SphereGeometry(0.025, 6, 5), pm.dark, sx * 0.08, 0.26, 0.215, 0);
+        add(new THREE.CylinderGeometry(0.01, 0.01, 0.17, 5), pm.dark, sx * 0.07, 0.43, 0, 0).rotation.z = -sx * 0.35;
+        add(new THREE.SphereGeometry(0.03, 6, 5), glowS(0xff2e88), sx * 0.105, 0.5, 0, 0);
+      }
+    } else if (kind === 'duck') {
+      const d = makeDuck(0xffd23f);
+      d.root.scale.setScalar(0.32);
+      d.root.rotation.y = -Math.PI / 2; // (the duck faces +x; the prizes face the player, +z)
+      g.add(d.root);
+    } else if (kind === 'gem') {
+      add(new THREE.CylinderGeometry(0.08, 0.12, 0.06, 10), pm.felt, 0, 0.03, 0);
+      add(new THREE.OctahedronGeometry(0.2), pm.cyan, 0, 0.3, 0, 0.02).scale.y = 1.3;
+    } else if (kind === 'helmet') {
+      add(new THREE.CylinderGeometry(0.09, 0.13, 0.05, 10), pm.felt, 0, 0.025, 0);
+      add(new THREE.CylinderGeometry(0.15, 0.17, 0.05, 10), pm.steel, 0, 0.09, 0, 0.01);
+      add(new THREE.SphereGeometry(0.2, 14, 10), pm.white, 0, 0.26, 0, 0.025).scale.y = 0.95;
+      add(new THREE.SphereGeometry(0.15, 10, 8), glowS(0xffd23f), 0, 0.27, 0.11, 0).scale.set(1, 0.65, 0.6);
+    } else if (kind === 'hover') { // a toy hover-car
+      add(new THREE.CylinderGeometry(0.1, 0.13, 0.08, 10), pm.felt, 0, 0.04, 0);
+      add(new THREE.BoxGeometry(0.5, 0.1, 0.24), pm.pink, 0, 0.17, 0, 0.02);
+      add(new THREE.SphereGeometry(0.11, 10, 8, 0, Math.PI * 2, 0, Math.PI / 2), pm.cyan, 0.03, 0.22, 0, 0.015);
+      for (const sx of [-1, 1]) for (const sz of [-1, 1]) add(new THREE.CylinderGeometry(0.05, 0.05, 0.02, 8), glowS(0x2ee6ff), sx * 0.18, 0.115, sz * 0.09, 0);
+    } else if (kind === 'star') {
+      const sh = new THREE.Shape();
+      for (let i = 0; i < 10; i++) {
+        const a = (i / 10) * Math.PI * 2 + Math.PI / 2, r = i % 2 ? 0.1 : 0.22;
+        if (i) sh.lineTo(Math.cos(a) * r, Math.sin(a) * r); else sh.moveTo(Math.cos(a) * r, Math.sin(a) * r);
+      }
+      sh.closePath();
+      const geo = new THREE.ExtrudeGeometry(sh, { depth: 0.07, bevelEnabled: false });
+      geo.translate(0, 0, -0.035);
+      add(new THREE.CylinderGeometry(0.03, 0.05, 0.2, 8), pm.brass, 0, 0.1, 0);
+      add(geo, pm.gold, 0, 0.42, 0, 0.015);
+    } else if (kind === 'disco') {
+      add(new THREE.CylinderGeometry(0.02, 0.02, 0.15, 6), pm.steel, 0, 0.075, 0, 0);
+      add(new THREE.IcosahedronGeometry(0.2, 1), pm.steel, 0, 0.35, 0, 0.02);
+    } else { // a certified moon rock on a cushion
+      add(new THREE.CylinderGeometry(0.17, 0.2, 0.08, 10), pm.red, 0, 0.04, 0);
+      add(new THREE.DodecahedronGeometry(0.17), toon(0x6a5a52), 0, 0.2, 0, 0.02).scale.set(1.2, 0.8, 1);
+    }
+    return g;
+  };
+  // (a prize that spins is its own draw call, so only the gem and the star in the display case turn; the rest merge into the building)
+  const stand = (kind, lx, y, lz, spin = false) => {
+    const o = prize(kind);
+    pcPut(o, lx, y, lz, 0, spin);
+    if (spin) prizeSpin.push(o);
+  };
+
+  // the dais, and the counter: kick plate, gold body with five recessed panels (a card suit in each), neon and a pink top
+  pcBox(PCL + 1.0, 0.08, 5.0, pm.felt, 0, 0.04, -1.1, 0.02);
+  pcBox(PCL + 1.0, 0.1, 0.12, pm.gold, 0, 0.05, 1.4, 0.01);
+  pcBox(PCL, 0.3, 1.5, pm.dark, 0, 0.23, 0);
+  pcBox(PCL, 1.1, 1.6, pm.gold, 0, 0.93, 0, 0.06);
+  pcBox(PCL + 0.4, 0.16, 1.95, pm.pink, 0, 1.56, 0, 0.04);
+  pcBox(PCL + 0.5, 0.06, 0.1, pm.gold, 0, 1.67, 0.9, 0.01);
+  pcGlow(PCL - 0.2, 0.06, 0.06, 0xff2e88, 0, 1.44, 0.83);
+  pcGlow(PCL - 0.2, 0.05, 0.05, 0x2ee6ff, 0, 0.42, 0.78);
+  for (let i = 0; i < 5; i++) {
+    const lx = (i - 2) * 1.44;
+    pcBox(1.22, 0.84, 0.04, pm.brass, lx, 0.93, 0.8, 0.01);
+    pcBox(1.04, 0.68, 0.05, pm.plum, lx, 0.93, 0.81, 0);
+    suitAt(i, PRIZE.x - 0.845, PRIZE.z + lx, -Math.PI / 2, 0.93, 0.6);
+  }
+
+  // the glass display case on the counter: two lit tiers of prizes
+  const CX = -0.5;
+  pcBox(3.6, 0.12, 0.9, pm.felt, CX, 1.70, 0, 0.02);
+  pcPut(new THREE.Mesh(new THREE.BoxGeometry(3.5, 1.4, 0.8), new THREE.MeshBasicMaterial({ color: 0xbff8ff, transparent: true, opacity: 0.16, depthWrite: false, side: THREE.DoubleSide })), CX, 2.46, 0);
+  for (const sx of [-1, 1]) for (const sz of [-1, 1]) pcBox(0.07, 1.44, 0.07, pm.gold, CX + sx * 1.77, 2.46, sz * 0.42, 0.01);
+  pcBox(3.65, 0.07, 0.95, pm.gold, CX, 3.2, 0, 0.02);
+  pcBox(3.45, 0.04, 0.7, pm.felt, CX, 2.46, 0, 0);
+  pcGlow(3.4, 0.04, 0.04, 0xfff6a8, CX, 3.14, 0.4);
+  ['trophy', 'rocket', 'crown', 'helmet'].forEach((kind, i) => stand(kind, CX - 1.35 + i * 0.9, 1.76, 0));
+  ['duck', 'mite', 'gem', 'star'].forEach((kind, i) => stand(kind, CX - 1.35 + i * 0.9, 2.48, 0, kind === 'gem' || kind === 'star'));
+
+  // the till at the clerk's end, a service bell and the chip stacks at the shark's end
+  const till = new THREE.Group();
+  till.add(mesh(new THREE.BoxGeometry(0.7, 0.34, 0.55), pm.steel, 0.03));
+  const screen = new THREE.Mesh(new THREE.PlaneGeometry(0.42, 0.21), new THREE.MeshBasicMaterial({ map: screenTex('CHIPS', '#16703d') }));
+  const screenTilt = new THREE.Group();
+  screen.rotation.x = -0.5;
+  screenTilt.add(screen);
+  screenTilt.position.set(0, 0.34, -0.05);
+  till.add(screenTilt);
+  [pm.red, pm.green, pm.cyan, pm.gold].forEach((m, i) => { const key = mesh(new THREE.BoxGeometry(0.1, 0.04, 0.1), m, 0); key.position.set(-0.24 + i * 0.16, 0.18, 0.17); till.add(key); });
+  pcPut(till, -3.05, 1.82, 0);
+  const bell = new THREE.Group();
+  const bellBase = mesh(new THREE.CylinderGeometry(0.16, 0.18, 0.04, 12), pm.dark, 0.01);
+  bellBase.position.y = 0.02;
+  const bellDome = mesh(new THREE.SphereGeometry(0.13, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2), pm.gold, 0.01);
+  bellDome.position.y = 0.04;
+  const bellKnob = mesh(new THREE.SphereGeometry(0.03, 6, 5), pm.steel, 0);
+  bellKnob.position.y = 0.18;
+  bell.add(bellBase, bellDome, bellKnob);
+  pcPut(bell, 1.95, 1.64, 0.4);
+  [5, 8, 3].forEach((n, i) => {
+    for (let s = 0; s < n; s++) pcPut(mesh(new THREE.CylinderGeometry(0.17, 0.17, 0.06, 12), toon(chipCols[(s + i) % chipCols.length]), 0.01), 2.6 + i * 0.36, 1.67 + s * 0.065, 0.25);
+  });
+
+  // the header: two gold posts, a plum bar with a PRIZES board over the clerk and a LOANS board over the shark, chase bulbs, pennants
+  for (const sx of [-1, 1]) pcPut(mesh(new THREE.CylinderGeometry(0.09, 0.09, 3.0, 8), pm.gold, 0.04), sx * 3.45, 3.14, -0.1);
+  pcBox(PCL, 0.9, 0.26, pm.plum, 0, 4.25, -0.1, 0.04);
+  pcBox(PCL + 0.1, 0.07, 0.3, pm.gold, 0, 4.72, -0.1, 0.01);
+  pcBox(PCL + 0.1, 0.07, 0.3, pm.gold, 0, 3.8, -0.1, 0.01);
+  const board = (text, opts, lx) => pcPut(new THREE.Mesh(new THREE.PlaneGeometry(2.7, 0.7), new THREE.MeshBasicMaterial({ map: neonTex(text, { w: 512, h: 128, ...opts }) })), lx, 4.25, 0.05);
+  board('PRIZES', { color: '#ffd23f', edge: '#ff2e88' }, -1.8);
+  board('RUSTY\'S LOANS', { color: '#7dff3a', edge: '#ff2a4a' }, 1.8);
+  const smallBulb = new THREE.SphereGeometry(0.07, 6, 5);
+  for (let i = 0; i <= 22; i++) {
+    const lx = -3.45 + i * 0.3;
+    put(new THREE.Mesh(smallBulb, bulbMats[k++ % 3]), PRIZE.x - 0.1, PRIZE.z + lx, 4.82);
+  }
+  const flagGeo = new THREE.ShapeGeometry(new THREE.Shape([new THREE.Vector2(-0.17, 0), new THREE.Vector2(0.17, 0), new THREE.Vector2(0, -0.38)]));
+  const flagMats = [0xff2e88, 0x2ee6ff, 0xffd23f, 0x7dff6a].map((c) => toon(c)); // (seen from the front only)
+  for (let i = 0; i < 15; i++) pcPut(mesh(flagGeo, flagMats[i % 4], 0), -3.3 + i * 0.47, 3.77, 0.06);
+
+  // the prize wall: three lit shelves of prizes against the wall behind the staff
+  pcBox(PCL - 0.2, 3.9, 0.1, pm.plum, 0, 2.0, -2.93, 0.02);
+  for (const sx of [-1, 1]) pcBox(0.14, 3.9, 0.6, pm.gold, sx * 3.45, 2.0, -2.65, 0.02);
+  [1.5, 2.4, 3.3].forEach((y, row) => {
+    pcBox(PCL - 0.6, 0.07, 0.56, pm.felt, 0, y, -2.62, 0.015);
+    pcBox(PCL - 0.6, 0.1, 0.05, pm.gold, 0, y + 0.01, -2.34, 0.01);
+    pcGlow(PCL - 0.7, 0.035, 0.035, row % 2 ? 0xff2e88 : 0x2ee6ff, 0, y - 0.07, -2.35);
+    for (let i = 0; i < 6; i++) stand(PRIZES_3D[(row * 5 + i * 3) % PRIZES_3D.length], -2.75 + i * 1.1, y + 0.04, -2.62);
+  });
   col({ type: 'box', x: PRIZE.x + 1.5, y: 1.5, z: PRIZE.z, hx: 2.4, hy: 1.5, hz: 3.6 });
+  suitSpots.forEach((spots, i) => {
+    const inst = new THREE.InstancedMesh(suitGeo, suitMats[i], spots.length);
+    const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), sc = new THREE.Vector3(), at = new THREE.Vector3(), Y = new THREE.Vector3(0, 1, 0);
+    spots.forEach((sp, j) => inst.setMatrixAt(j, m4.compose(at.set(sp.x, sp.y, sp.z), q.setFromAxisAngle(Y, sp.yaw), sc.setScalar(sp.size / 4))));
+    inst.instanceMatrix.needsUpdate = true;
+    inst.frustumCulled = false; // (spread right round the building: always one draw)
+    put(inst, 0, 0);
+  });
   const prSign = new THREE.Mesh(new THREE.PlaneGeometry(8, 2), new THREE.MeshBasicMaterial({ map: neonTex('PRIZE COUNTER', { color: '#ffd23f', edge: '#ff2e88', sub: 'CHIPS → DRIP · RUSTY\'S LOANS IN THE BACK' }) }));
   put(prSign, W - 1.15, PRIZE.z, 6.5, -Math.PI / 2);
   const shark = makeFigure({ suit: 0x6d7a8f, helmet: 0x9aa7bb, visor: 0xff2a4a });
   const fin = mesh(new THREE.ConeGeometry(0.3, 0.8, 3), toon(0x6d7a8f), 0.03);
   fin.position.set(0, 2.6, -0.1);
   shark.root.add(fin);
-  put(shark.root, PRIZE.x + 1.8, PRIZE.z + 1.5, 0, -Math.PI / 2);
+  put(shark.root, PRIZE.x + 1.5, PRIZE.z + 1.5, 0, -Math.PI / 2);
   const clerk = makeFigure({ suit: 0xff7ad9, helmet: 0xfff4e0, visor: 0x2ee6ff });
-  put(clerk.root, PRIZE.x + 1.8, PRIZE.z - 1.5, 0, -Math.PI / 2);
-  // prize shelves behind
-  for (let i = 0; i < 3; i++) put(new THREE.Mesh(new THREE.TorusKnotGeometry(0.35, 0.12, 40, 6), glow([0xffd23f, 0xc77dff, 0x7dff6a][i])), W - 1.8, PRIZE.z - 2.2 + i * 2.2, 3.4);
+  put(clerk.root, PRIZE.x + 1.5, PRIZE.z - 1.5, 0, -Math.PI / 2);
 
   // a handful of spectators who bob along
   const crowd = [];
@@ -926,6 +1123,7 @@ export function buildCasino(w, loc) {
       bandMats[1].color.setRGB(0.18 * (1.75 - pulse), 0.9 * (1.75 - pulse), 1 * (1.75 - pulse));
       water.offset.x -= dt * 0.25;
       for (const t of toppers) t.rotation.y += dt * 0.6;
+      for (const o of prizeSpin) o.rotation.y += dt * 0.9;
       updatePatrons(dt, time);
       for (const c of crowd) {
         c.cheer = Math.max(0, c.cheer - dt);
