@@ -305,3 +305,36 @@ CODES = {"spacecom": "SPC", "vostok": "VOS", "kepler": "KPL", "meridian": "MRD"}
 def side_dec(side, x, y=0.0, z=0.0, lift=0.01):
     """A page on the +x (side > 0) or -x flank at distance x from the centreline."""
     return Dec("+x" if side > 0 else "-x", (side * x, y, z), lift)
+
+
+# ---------------- the cargo container's flank markings (the Prospector's cargo car and the tower crane's load) ----------------
+# The box is centred on z = 0 and y = 3.3 in its own frame. Everything printed on a flank is centred on that middle: the plate
+# (an emblem and the faction's name over LOGISTICS, centred as a group on the plate) and, above it, the container number, with the
+# two stacked so the pair is centred vertically on the box.
+CARGO_PLATE_HALF = (1.8, 0.62)                 # half width and height of the dark plate
+CARGO_GAP = 0.2                                # between the plate and the number above it
+CARGO_NUM_PS = 0.04                            # the number's pixel size: 7 pixels tall
+_CARGO_STACK = 2 * CARGO_PLATE_HALF[1] + CARGO_GAP + 7 * CARGO_NUM_PS
+CARGO_PLATE_Y = 3.3 - _CARGO_STACK / 2 + CARGO_PLATE_HALF[1]
+CARGO_NUM_Y = 3.3 - _CARGO_STACK / 2 + 2 * CARGO_PLATE_HALF[1] + CARGO_GAP
+
+
+def cargo_decals(f, piv, prefix):
+    """The faction's plate and container number on both flanks of a cargo container, built under `piv`."""
+    s = NAMES[f]
+    code = f"{CODES[f]} 204117 6"
+    ps, ps2 = 0.045, 0.035
+    r = 0.4
+    total = 2 * r + 0.15 + max(text_width(s, ps), text_width("LOGISTICS", ps2))
+    u0 = -total / 2
+    for side in (-1, 1):
+        d = side_dec(side, 1.68, CARGO_PLATE_Y, 0.0)
+        d.rect(-1.7, -0.56, 1.7, 0.56, "stripe", 0)
+        d.rect(-1.66, -0.52, 1.66, 0.52, "dark", 1)
+        emblem(d, f, u0 + r, 0.0, r, 2)
+        d.text(s, u0 + 2 * r + 0.15, 0.06, ps, "stripe", 2)
+        d.text("LOGISTICS", u0 + 2 * r + 0.15, -0.4, ps2, "white", 2)
+        d.build(f"{prefix}plate{'P' if side > 0 else 'S'}_{f}", piv)
+        d2 = side_dec(side, 1.6, CARGO_NUM_Y, 0.0)
+        d2.text(code, -text_width(code, CARGO_NUM_PS) / 2, 0, CARGO_NUM_PS, "label", 0)
+        d2.build(f"{prefix}id{'P' if side > 0 else 'S'}_{f}", piv)

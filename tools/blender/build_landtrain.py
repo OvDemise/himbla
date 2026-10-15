@@ -644,27 +644,11 @@ for k, x in enumerate((-1.0, -0.35, 0.35, 1.0)):
     rb(f"cam{k}", 0.12, 0.05, 0.05, (x, 2.7, -3.7), "steel", CG, 0.01, 0.3, nu=6, nv=4)
 rb("doorSeam", 0.02, 1.35, 0.02, (0, 3.3, -3.65), "dark", CG, 0, 0.3, nu=6, nv=4)
 for sx in (-1, 1):
-    rb(f"plate{sx}", 0.04, 0.62, 1.8, (sx * 1.64, 3.5, 0.3), "dark", CG, 0.03, 0.08)
+    rb(f"plate{sx}", 0.04, CARGO_PLATE_HALF[1], CARGO_PLATE_HALF[0], (sx * 1.64, CARGO_PLATE_Y, 0.0), "dark", CG, 0.03, 0.08)
 
 
-def cg_livery(f, piv):
-    s = NAMES[f]
-    code = f"{CODES[f]} 204117 6"
-    for side in (-1, 1):
-        d = side_dec(side, 1.68, 3.5, 0.3)
-        d.rect(-1.7, -0.56, 1.7, 0.56, "stripe", 0)
-        d.rect(-1.66, -0.52, 1.66, 0.52, "dark", 1)
-        emblem(d, f, -1.1, 0.0, 0.4, 2)
-        d.text(s, -0.55, 0.06, 0.045, "stripe", 2)
-        d.text("LOGISTICS", -0.55, -0.4, 0.035, "white", 2)
-        d.build(f"{PFX}plate{'P' if side > 0 else 'S'}_{f}", piv)
-        # the container number, stencilled on the body above the plate
-        d2 = side_dec(side, 1.6, 4.3, 0.3)
-        d2.text(code, -1.55, 0, 0.04, "label", 0)
-        d2.build(f"{PFX}id{'P' if side > 0 else 'S'}_{f}", piv)
-
-
-ident(CG, "livery", cg_livery)
+# the plate and the container number stencilled above it: centred on the box (decals.py cargo_decals, shared with the crane's load)
+ident(CG, "livery", lambda f, piv: cargo_decals(f, piv, PFX))
 CG["radius"] = 4.4
 
 # ---- the explosives container: a smooth red armoured magazine, OSHA / DOT signs, strobes and a lightning rod ----
@@ -690,28 +674,36 @@ M("rodBase", xf(lathe([(0.12, 0), (0.12, 0.1), (0.05, 0.14)], 8), (1.3, 4.72, -3
 bm("earthStrap", (1.52, 4.7, -3.4), (1.52, 1.95, -3.4), 0.025, "metal", BL, 0)
 
 
+# The flank markings are centred on the box: left-right on its middle (z = 0, the signs and the band kept clear of the corner
+# castings, which reach in to |z| 3.33) and up-down, the band's top and the hazard stripe's bottom the same distance in from the
+# roof and the deck.
+BLV = 0.075        # (the stack runs from v -1.35 to +1.2 about the box's middle; this lifts its middle onto it)
+BLH = 3.25         # half the band and the stripe
+
+
 def bl_static():
     """The signs that are the same for every faction: a DANGER sign, a DOT 1.1 placard and two prohibition signs on
-    each flank; the EXPLOSIVES band across the top and the hazard stripe along the bottom; and the ends."""
+    each flank, the placard in the middle with the DANGER sign and the pair of prohibition signs the same width either side;
+    the white band across the top (the EXPLOSIVES lettering is in the livery, centred with the faction's mark) and the
+    hazard stripe along the bottom; and the ends."""
     for side in (-1, 1):
-        d = side_dec(side, 1.55, 3.3, 0.0)
-        d.rect(-3.45, 0.75, 3.45, 1.2, "white", 0)
-        d.text("EXPLOSIVES", -3.3, 0.78, 0.06, "redsafe", 1)
-        d.hazard(-3.45, -1.35, 3.45, -1.0, "dark", "hazard", 0, 0.2)
-        danger_sign(d, -3.25, -0.65, 1.9, 1.25, 0)
-        placard(d, -0.2, -0.05, 0.62, 0)
-        prohibition(d, 1.25, -0.05, 0.42, "smoke", 0)
-        prohibition(d, 2.25, -0.05, 0.42, "flame", 0)
+        d = side_dec(side, 1.55, 3.3 + BLV, 0.0)
+        d.rect(-BLH, 0.75, BLH, 1.2, "white", 0)
+        d.hazard(-BLH, -1.35, BLH, -1.0, "dark", "hazard", 0, 0.2)
+        danger_sign(d, -3.1, -0.65, 1.9, 1.25, 0)       # (-3.14 .. -1.12 with its border)
+        placard(d, 0.0, -0.05, 0.62, 0)
+        prohibition(d, 1.54, -0.05, 0.42, "smoke", 0)   # (1.12 .. 3.1: as wide as the DANGER sign)
+        prohibition(d, 2.68, -0.05, 0.42, "flame", 0)
         d.build(f"{PFX}signs{'P' if side > 0 else 'S'}", BL)
     # rear: a DANGER sign over a placard between two prohibition signs
-    d = Dec("-z", (0, 3.3, -3.62))
+    d = Dec("-z", (0, 3.3 - 0.035, -3.62))
     danger_sign(d, -1.1, 0.05, 2.2, 1.3, 0)
     placard(d, 0, -0.72, 0.6, 0)
     prohibition(d, -1.18, -0.72, 0.33, "smoke", 0)
     prohibition(d, 1.18, -0.72, 0.33, "flame", 0)
     d.build(f"{PFX}signsRear", BL)
     # front: the placard, with a hazard stripe under it
-    d = Dec("+z", (0, 3.3, 3.62))
+    d = Dec("+z", (0, 3.3 + 0.125, 3.62))
     placard(d, 0, 0.2, 0.85, 0)
     d.hazard(-1.45, -1.3, 1.45, -1.0, "dark", "hazard", 0, 0.2)
     d.build(f"{PFX}signsFront", BL)
@@ -721,12 +713,17 @@ bl_static()
 
 
 def bl_livery(f, piv):
-    """The faction's mark and name at the right-hand end of the white band."""
+    """EXPLOSIVES, then the faction's mark and name, across the white band: the lot centred on the box (its width depends on the name)."""
     s = NAMES[f]
+    ps_e, ps_n, r, gap = 0.06, 0.035, 0.21, 0.1
+    total = text_width("EXPLOSIVES", ps_e) + 0.3 + 2 * r + gap + text_width(s, ps_n)
+    u0 = -total / 2
     for side in (-1, 1):
-        d = side_dec(side, 1.55, 3.3, 0.0)
-        emblem(d, f, 0.8, 0.975, 0.21, 1)
-        d.text(s, 1.12, 0.975 - 3.5 * 0.035, 0.035, "dark", 1)
+        d = side_dec(side, 1.55, 3.3 + BLV, 0.0)
+        d.text("EXPLOSIVES", u0, 0.78, ps_e, "redsafe", 1)
+        cu = u0 + text_width("EXPLOSIVES", ps_e) + 0.3 + r
+        emblem(d, f, cu, 0.975, r, 1)
+        d.text(s, cu + r + gap, 0.975 - 3.5 * ps_n, ps_n, "dark", 1)
         d.build(f"{PFX}band{'P' if side > 0 else 'S'}_{f}", piv)
 
 

@@ -356,7 +356,7 @@ M("doorBars", join([beam((x, 1.95, -3.66), (x, 4.6, -3.66), 0.05, 6) for x in (-
 M("doorCams", rbj([(0.12, 0.05, 0.05, (x, 2.7, -3.7)) for x in (-1.0, -0.35, 0.35, 1.0)]), "steel", load, 0.01)
 rb("doorSeam", 0.02, 1.35, 0.02, (0, 3.3, -3.65), "dark", load, 0, e=0.3, nu=6, nv=4)
 for sx in (-1, 1):
-    rb(f"plate{sx}", 0.04, 0.62, 1.8, (sx * 1.64, 3.5, 0.3), "dark", load, 0.03, e=0.08)
+    rb(f"plate{sx}", 0.04, CARGO_PLATE_HALF[1], CARGO_PLATE_HALF[0], (sx * 1.64, CARGO_PLATE_Y, 0.0), "dark", load, 0.03, e=0.08)
 
 # the spreader: four beams in a frame on the top castings (a twist-lock stub in each), a spine with a lifting eye, a lug at each corner
 SY = 5.05
@@ -369,24 +369,8 @@ M("liftEye", join([xf(torus(0.2, 0.05, 12, 6), (0, SY + 0.35, 0), (PI / 2, 0, 0)
 M("slings", join([B((0, -2.0, 0), (sz * 3.55, LOAD_Y + SY + 0.3, -sx * 1.5), 0.04, 4, True) for sx in (-1, 1) for sz in (-1, 1)]), "dark", hook, 0)
 
 
-def cg_livery(f, piv):
-    s = NAMES[f]
-    code = f"{CODES[f]} 204117 6"
-    for side in (-1, 1):
-        d = side_dec(side, 1.68, 3.5, 0.3)
-        d.rect(-1.7, -0.56, 1.7, 0.56, "stripe", 0)
-        d.rect(-1.66, -0.52, 1.66, 0.52, "dark", 1)
-        emblem(d, f, -1.1, 0.0, 0.4, 2)
-        d.text(s, -0.55, 0.06, 0.045, "stripe", 2)
-        d.text("LOGISTICS", -0.55, -0.4, 0.035, "white", 2)
-        d.build(f"crane_plate{'P' if side > 0 else 'S'}_{f}", piv)
-        d2 = side_dec(side, 1.6, 4.3, 0.3)
-        d2.text(code, -1.55, 0, 0.04, "label", 0)
-        d2.build(f"crane_id{'P' if side > 0 else 'S'}_{f}", piv)
-
-
 for f in FACTIONS:
-    cg_livery(f, pivot(f"crane_livery_{f}", (0, 0, 0), load, role="livery", faction=f))
+    cargo_decals(f, pivot(f"crane_livery_{f}", (0, 0, 0), load, role="livery", faction=f), "crane_")
 hook["drop"] = round(LOAD_DROP, 3)
 
 # ---------------------------------------------------------------------------------------------------------------
