@@ -680,6 +680,7 @@ src/
   chimerastats.js chimera racing stats and the race model (distance, going, cheers) the bookie simulates
   physics.js     collider hash + shared skater movement model (player and pirate skaters)
   player.js      input → movement, weapon, animation, style events
+  idles.js       the courier's standing idles (the breath and four occasional ones), played over the rest pose
   enemies.js     pirates (skaters/rovers), military bases, turrets, artillery, theft/recovery
   missions.js    contract generation, pickup/delivery, integrity, payouts
   world.js       sky, settlement layout, colliders, ambient life
@@ -692,6 +693,7 @@ src/
   post.js        comic post-processing shader
   fx.js, hud.js, audio.js, input.js, toon.js, locations.js, rng.js
   assets/runner.glb  the Moon-runner model (player, pirate skaters, story leaders)
+  assets/idles.json  the runner's five idle animations (10 poses a second per pivot, keyed in Blender)
   assets/ships.glb   the shuttle-bus and freighter, with folding gear, ramps and thruster flames
   assets/skimmer.glb the Daedalus Phase Skimmer (hover-racer with spinning phase coils)
   assets/warrig.glb  the Rustmoon pirate war-rig (patchwork mad-max rover with a spiked ram plow)
@@ -699,6 +701,7 @@ src/
   assets/landtrain.glb  the Moonliner and Prospector land-trains: two tractors and four trailers, each with a livery for every faction
 tools/
   blender/build_runner.py  builds the runner in Blender and exports src/assets/runner.glb
+  blender/build_idles.py   keys the runner's five idles on its pivots -> src/assets/idles.json (headless: `pip install bpy`, then `python3 tools/blender/build_idles.py`; `MOONRUNNER_IDLES_BLEND=idles.blend` also saves the keyed scene)
   blender/build_ships.py   builds both transit ships in Blender and exports src/assets/ships.glb
   blender/build_skimmer.py builds the Daedalus skimmer -> src/assets/skimmer.glb
   blender/build_warrig.py  builds the pirate war-rig -> src/assets/warrig.glb
@@ -712,4 +715,5 @@ tools/
 **Editing the runner:** run `tools/blender/build_runner.py` in Blender (Scripting tab, or
 `exec(open(r"<repo>/tools/blender/build_runner.py").read())`); it rebuilds the model and re-exports
 `src/assets/runner.glb`. Each part's material name is a colour slot (suit, accent, helmet, visor, scarf…)
-that outfits recolour, and the scarf stays a 4-link chain driven by `ScarfSim`.
+that outfits recolour, and the scarf stays a 4-link chain driven by `ScarfSim`. The standing idles are keyed
+on the same pivots by `tools/blender/build_idles.py` and played by `src/idles.js`.

@@ -4,6 +4,7 @@ import { makeBody, stepSkater } from './physics.js';
 import { makeRunner, makeCrate, ScarfSim } from './models.js';
 import { frameQuat, upAt } from './geo.js';
 import { Ragdoll } from './ragdoll.js';
+import { Idle } from './idles.js';
 import { WEAPONS, weaponUnlocked, fireWeapon } from './weapons.js';
 
 const SPEED_MARKS = [
@@ -43,6 +44,7 @@ export class Player {
     this.impacts = [];
     this.params = { ...PHYS };
     this.trick = { flip: 0, spin: 0, active: false, tucked: false };
+    this.idle = new Idle(); // (the breath and the occasional idles once you've stopped: idles.js)
 
     // helmet lamp + a faint suit glow; intensities are driven by how dark it is
     this.lamp = new THREE.SpotLight(0xfff2c8, 0, 170, 0.5, 0.55, 1.2);
@@ -153,12 +155,13 @@ export class Player {
     const up = b.up;
 
     // grinding a snake rock's crest (rails.js): the rail carries you
-    if (g.grind && g.grind.update(this, dt, input)) { if (this.trick.active) this.clearTrick(); return; } // (a half-done trick doesn't wait on the rail to flip you when you pop off)
+    if (g.grind && g.grind.update(this, dt, input)) { this.idle.cancel(this.model); if (this.trick.active) this.clearTrick(); return; } // (a half-done trick doesn't wait on the rail to flip you when you pop off)
 
     // riding something (a transit ship, a carousel horse, a ferris-wheel gondola: rides.js): the
     // seat carries you, no physics; the ride decides where you get off
     if (this.seat) {
       const s = this.seat;
+      this.idle.cancel(this.model);
       if (this.trick.active) this.clearTrick();
       if (this.rag) { this.rag.release(); this.rag = null; } // (a ragdoll that was still tumbling when you hopped on: its camera focus would stay behind, and it only updates in the physics step below)
       s.obj.updateMatrixWorld(true);
@@ -232,6 +235,7 @@ export class Player {
 
     // driving a faction vehicle: the garage does the physics, you can still shoot
     if (this.vehicle) {
+      this.idle.cancel(this.model);
       g.garage.drive(dt, input, cam);
       this.center.copy(b.pos).addScaledVector(b.up, 1.3);
       this.updateWeapons(dt, input, cam);
@@ -515,6 +519,7 @@ export class Player {
   // first, or you come out of it frozen in whatever pose you were in, scarf streaming, as if still moving.
   restPose() {
     const m = this.model;
+    this.idle.cancel(m);
     m.torso.rotation.set(0, 0, 0);
     m.legL.rotation.set(0, 0, 0); m.legR.rotation.set(0, 0, 0);
     m.armL.rotation.set(0, 0, -0.15); m.armR.rotation.set(0, 0, 0.15); // (arms a little out from the sides: the idle pose in animate)
@@ -561,6 +566,7 @@ export class Player {
     this.anim += dt * (2 + Math.min(sp, 10) * 1.1);
     const s = Math.sin(this.anim);
     const base = m.bodyBase;
+    this.idle.begin(m); // (last frame's idle off the figure: the poses below only set the angles they use)
     if (!b.grounded && ctrl && ctrl.dive) {
       // dive: tuck, lean hard forward, arms swept back
       m.torso.rotation.x = 0.85;
@@ -590,6 +596,8 @@ export class Player {
       m.armL.rotation.x = -s * 0.8 * run; m.armR.rotation.x = s * 0.8 * run;
       m.armL.rotation.z = -0.15; m.armR.rotation.z = 0.15;
     }
+    // stopped: the breath, and now and then another idle (idles.js), laid over the rest pose
+    this.idle.apply(m, dt, b.grounded && !b.skating && !this.rag && !!ctrl && ctrl.wish.lengthSq() === 0, sp, !b.grounded || !!this.rag);
     if (this.rag) {
       if (!this.rag.update(dt)) { this.rag.release(); this.rag = null; }
     }
