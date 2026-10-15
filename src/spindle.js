@@ -496,6 +496,7 @@ export class Spindle {
     r.dispose();
     this.exit(true); // (quiet: no teleport flash, you came by shuttle)
     g.story.retrySpindle();
+    g.hud.eventPanel(g.story.panel()); // (the chip stays hidden now: don't let the stale Spindle one show for a frame as the HUD comes back)
     g.state = 'play';
     g.updateCamera(0.016, true);
     const bars = g.recall.bars;

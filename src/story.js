@@ -1478,6 +1478,9 @@ export class Story {
     const A = this.active;
     if (!A) return null;
     const s = A.steps[A.si];
+    // just carried off the Spindle: no chip while you walk back to the launch complex (you're set down beside it, and the
+    // arrival note and the marker say the rest). It's back when the Spindle step starts again
+    if (A.recovered && s && s.t === 'goto') return null;
     let bar = 0;
     if (s) {
       if (s.t === 'capture' && s.phase === 'hold') bar = s.prog / s.hold;
@@ -1588,6 +1591,7 @@ export class Story {
     if (i < 0) return;
     delete A.steps[i].started;
     delete A.steps[i].done;
+    A.recovered = true; // (panel(): no event chip on the walk back to the launch complex)
     A.si = Math.max(-1, i - 2); // (next() steps on from here)
     this.next();
   }
