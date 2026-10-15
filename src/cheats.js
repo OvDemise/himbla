@@ -12,6 +12,7 @@ import { MUTATIONS } from './alchemy.js';
 import { InputMonitor } from './inputmon.js';
 
 const DEV_KEY = 'mr-dev-unlocked';
+const METEOR_KEY = 'mr-dev-meteor-power';
 
 // Testing menu on the ` (backtick) key. Everything goes through the normal dialog, so number
 // keys pick options and Esc closes.
@@ -33,6 +34,8 @@ export class Cheats {
     this.speed = 1; // player speed multiplier, 1 to 10 (player.js)
     // once the dev menu has been opened (F8 / controller combo) it gets a button on the pause card, remembered across launches
     try { this.unlocked = localStorage.getItem(DEV_KEY) === '1'; } catch { this.unlocked = false; }
+    // the first time the dev menu's SPAWN A METEOR ON ME is used it becomes a power (powers.js), remembered across launches too
+    try { this.meteorPower = localStorage.getItem(METEOR_KEY) === '1'; } catch { this.meteorPower = false; }
     this.showPauseButton();
   }
 
@@ -51,7 +54,7 @@ export class Cheats {
     }
     g.dialog('DEV MENU', '<small>Hidden. Toggles last until you reload.</small>', [
       { label: '1 · UNLIMITED JET, HEALTH & SPEED…', fn: () => this.boostMenu() },
-      { label: '2 · SPAWN A METEOR ON ME', fn: () => this.spawnMeteor() },
+      { label: '2 · SPAWN A METEOR ON ME', fn: () => this.meteorFromMenu() },
       { label: '3 · DISPLAY & DEBUG…', fn: () => this.displayMenu() },
       { label: `4 · CLICK MAP TO TELEPORT: ${this.mapTeleport ? 'ON' : 'OFF'}`, fn: () => { this.mapTeleport = !this.mapTeleport; this.dev(); } },
       { label: '5 · FULL CHEAT MENU…', fn: () => this.open() },
@@ -91,12 +94,29 @@ export class Cheats {
   // every frame, whatever the screen (a pause or a menu is when you'd want to read it)
   updateInputMon() { if (this.inputMon && this.inputMon.on) this.inputMon.update(); }
 
-  // A rock that comes down on the spot you're standing on (meteors.js spawnOnPlayer): a few seconds' warning from the ring
-  spawnMeteor() {
+  // The dev menu's meteor button. The first time it also becomes a power (the power wheel's METEOR SPAWN, equipped straight
+  // away), so from then on Z / RB drops one on you without the menu.
+  meteorFromMenu() {
     const g = this.game;
-    if (g.spindle && g.spindle.active) { g.hud.toast('No meteors out on the Spindle.', 2); return; }
+    const first = !this.meteorPower;
+    if (first) {
+      this.meteorPower = true;
+      try { localStorage.setItem(METEOR_KEY, '1'); } catch { /* unavailable */ }
+      g.powers.select('meteor');
+    }
+    const ok = this.spawnMeteor(!first);
+    if (first) g.hud.toast(`${ok ? 'Meteor inbound. ' : ''}Meteor Spawn is now one of your powers, and equipped: Z / RB drops another on you.`, 5);
+  }
+
+  // A rock that comes down on the spot you're standing on (meteors.js spawnOnPlayer): a few seconds' warning from the ring.
+  // (`long`: the full note; the power's repeat uses show a short one.) False when there's no place for one (the Spindle).
+  spawnMeteor(long = true) {
+    const g = this.game;
+    if (g.spindle && g.spindle.active) { g.hud.toast('No meteors out on the Spindle.', 2); return false; }
     g.meteors.spawnOnPlayer();
-    g.hud.toast('Meteor inbound: it lands where you stand in a few seconds. Move, or go and land on it.', 4);
+    if (long) g.hud.toast('Meteor inbound: it lands where you stand in a few seconds. Move, or go and land on it.', 4);
+    else g.hud.toast('Meteor inbound!', 1.5);
+    return true;
   }
 
   // On-screen readouts and effects: frame rate, draw calls and polygons, the cracked visor, the AI paths

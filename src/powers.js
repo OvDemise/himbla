@@ -6,6 +6,7 @@
 //   vanes     Meridian Quantum Slipstream Vanes (story tech: steer in the air for 10 s, story.js)
 //   winch     Kepler Hitch-Line Winch (hold Z: winch.js)
 //   pen       Dr. Zbornak's holding-pen link (P still works)
+//   meteor    dev: drops a meteor on you (granted the first time the dev menu's SPAWN A METEOR ON ME is used: cheats.js)
 //
 // On a controller, d-pad ↓ opens the radial menu and its POWERS wedge opens the power wheel (below): the
 // right stick picks one, A equips it (what a notch of the mouse wheel does), and RB / Z then uses it.
@@ -19,6 +20,7 @@ const POWERS = {
   vanes: { name: 'Slipstream Vanes', has: (g) => g.story.tech.includes('vanes'), cd: (g) => (g.story.vanesActive() ? 0 : g.story.techCd.vanes || 0), status: (g) => (g.story.vanesActive() ? `ON ${Math.ceil(g.story.vanesT)} s` : null) },
   winch: { name: 'Hitch-Line Winch', has: (g) => (g.upgrades.winch || 0) > 0, cd: (g) => (g.winch.on ? 0 : g.winch.cd), status: (g) => g.winch.status() },
   pen: { name: 'Pen Link', has: (g) => (g.upgrades.penlink || 0) > 0, cd: () => 0 },
+  meteor: { name: 'Meteor Spawn (dev)', has: (g) => !!(g.cheats && g.cheats.meteorPower), cd: () => 0 },
 };
 
 export class Powers {
@@ -150,6 +152,7 @@ export class Powers {
     if (k === 'dash' || k === 'teleport' || k === 'vanes') g.story.useTech(k);
     else if (k === 'winch') g.winch.fire();
     else if (k === 'pen') g.alchemy.penMenu();
+    else if (k === 'meteor') g.cheats.spawnMeteor(false);
   }
 
   // each frame in play (input is the game's)
