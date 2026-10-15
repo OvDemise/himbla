@@ -254,6 +254,7 @@ class Game {
     this.cosmetics = new Cosmetics(this);
     this.cosmetics.apply();
     this.cheats = new Cheats(this);
+    this.devOverlay = this.cheats.overlay; // (F3 dev overlay: frame() and updatePlay() time their stages through it)
     this.casino = new Casino(this); // casino
     this.territory = new Territory(this);
     this.story = new Story(this);
@@ -382,7 +383,8 @@ class Game {
     document.addEventListener('pointerlockerror', () => {
       if (this.state === 'play' && !this.input.padActive) this.hud.show('clickhint', true);
     });
-    this.input.onKey = (code) => {
+    this.input.onKey = (code, e) => {
+      if (code === 'F3' && this.cheats.unlocked) { e.preventDefault?.(); this.devOverlay.toggle(); return; } // dev overlay (any screen)
       const esc = code === 'Escape';
       if (this.state === 'board') {
         if (esc || code === 'KeyF') { this.closeModal(esc); return; }
@@ -1110,14 +1112,15 @@ class Game {
   frame() {
     const now = performance.now();
     if (this.settings && this.settings.skip(now)) return; // settings: frame-rate cap
-    this.cheats.frameStart(now); // (dev overlay: CPU / GPU timing)
+    const dbg = this.devOverlay;
+    dbg.begin(); // (dev overlay: frame times, CPU stages, CPU / GPU load)
     if (this.settings) this.settings.perfSample(now - this.last, this.state === 'play'); // (first launch: is the preset too much?)
     let rdt = Math.min(0.05, (now - this.last) / 1000);
     this.last = now;
     if (this.trailer) rdt = this.trailer.pre(rdt); // trailer: shot clock, staged input
     // paused, map, menus and dialogs freeze the whole world: traffic, the satellite, particles, clocks
     if (this.pad) { this.pad.update(rdt); this.pad.crosshair(rdt); } // (before anything reads input this frame)
-    this.cheats.updateInputMon(); // (dev overlay: controller map and held keys)
+    dbg.updateInput(); // (dev overlay: controller map and held keys)
     const frozen = FROZEN_STATES.has(this.state);
     const dt = frozen ? 0 : rdt;
     this.time += dt;
@@ -1138,20 +1141,24 @@ class Game {
     if (this.state === 'title') this.updateTitleTour(rdt);
     else if (this.state !== 'cutscene' && this.state !== 'derby') this.updateCamera(dt);
     if (this.trailer) this.trailer.camera(rdt); // trailer: the shot owns the camera
+    dbg.lap('other');
     // the Monolith's time dilation: the world crawls, you don't
     const wdt = playing && this.alchemy.buffs.dilate > 0 ? dt * DILATE_RATE : dt;
     if (!this.spindle.active) this.world.update(wdt, this.time, this.camera.position);
     this.fx.update(wdt);
+    dbg.lap('world');
     this.hud.update(rdt);
     if (!this.spindle.active) this.updateLighting(dt);
     const P = this.player;
     this.audio.setZone(this.musicZone());
     this.audio.update(P.dead ? 0 : P.speed, P.body.skating, P.body.grounded, P.body.thrusting && playing, frozen); // (frozen: a pause, the map, a dialog: no wind, skate hum or thrusters)
+    dbg.lap('hud');
 
     const dark = darkness(P.up);
     // (build-ahead: the terrain workers start on the chunks round where you'll be in ~1.5 s)
     _ahead.copy(this.player.body.vel).clampLength(0, 200).multiplyScalar(1.5).add(this.camera.position);
     this.planet.update(this.camera.position, { budgetMs: 4, ahead: _ahead, maxDist: (dark > 0.7 ? 1500 : 3200) * (this.settings ? this.settings.v.viewDist : 1) }); // settings
+    dbg.lap('terrain');
 
     const u = this.post.material.uniforms;
     u.time.value = this.time;
@@ -1165,13 +1172,12 @@ class Game {
     if (this.trailer) this.trailer.post(u);
     this.renderer.setViewport(0, 0, window.innerWidth, window.innerHeight);
     this.syncLocalLights();
-    this.cheats.beforeRender();
-    this.cheats.renderStart();
+    dbg.renderStart();
     if (this.cheats.debugView) this.cheats.renderDebug(); // (dev menu: polygons / draw calls laid bare)
     else this.post.render(this.scene, this.camera);
-    this.cheats.renderEnd();
-    this.cheats.drawStats();
+    dbg.renderEnd();
     this.input.endFrame();
+    dbg.end();
   }
 
   openHelp() {
@@ -1372,6 +1378,7 @@ class Game {
     this.cheats.tick();
     this.updateIndoors();
     P.update(dt, this.input, c);
+    this.devOverlay.lap('player');
     this.secrets.update(dt);
     this.missions.update(dt);
     this.events.update(dt);
@@ -1425,8 +1432,10 @@ class Game {
     if (this.input.pressed('KeyN')) { const on = this.audio.toggleMusic(); this.hud.toast(this.audio.muted ? `Music ${on ? 'on' : 'off'} (all audio is muted: Settings → Audio)` : on ? '♪ Music on' : 'Music off', this.audio.muted ? 3 : 1.5); }
     this.cosmetics.update(dt);
     this.updateScanner(dt);
+    this.devOverlay.lap('systems');
     this.enemies.update(wdt, this.time);
     this.projectiles.update(dt, wdt);
+    this.devOverlay.lap('enemies');
 
     for (let i = this.timers.length - 1; i >= 0; i--) {
       const t = this.timers[i];

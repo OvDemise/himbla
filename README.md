@@ -663,6 +663,7 @@ src/
   alchemy.js     containment jar, reactor recipes, wild mites, followers, splice-pod mutations, Mega Mite
   chimera.js     gene splicing + procedural chimera models
   cheats.js      testing menu (backtick)
+  devoverlay.js  dev overlay (F3): every on-screen dev readout in one panel (frame times, CPU / GPU graphs, CPU time by stage, draw calls, world counts, pirate spawns, AI paths, input monitor); perfgraph.js has its graphs
   story.js       faction leaders, chapters, outposts you found, tech, Captain Kade
   storyAssets.js faction troops, boss war machines, mission props, founded-outpost compounds
   hometown.js    your town (Kepler finale): its plots and buildings, the Moon Council and its votes

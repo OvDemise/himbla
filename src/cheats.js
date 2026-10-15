@@ -6,10 +6,8 @@ import { VEHICLES } from './vehicles.js';
 import { TECH } from './story.js';
 import * as THREE from 'three';
 import { greatCircle } from './geo.js';
-import { AIPaths, EnemyMarkers } from './aipaths.js';
-import { TimeGraph, GpuTimer } from './perfgraph.js';
 import { MUTATIONS } from './alchemy.js';
-import { InputMonitor } from './inputmon.js';
+import { DevOverlay, SECTIONS } from './devoverlay.js';
 
 const DEV_KEY = 'mr-dev-unlocked';
 const METEOR_KEY = 'mr-dev-meteor-power';
@@ -22,23 +20,20 @@ export class Cheats {
     this.god = false; // unlimited health
     this.infJet = false; // unlimited jet (thruster energy)
     this.mapTeleport = false; // click a location (or press A with the controller cursor on it) in the full map to go there
-    this.aiPaths = false; // draw every AI's current path / steering goal
-    this.showFps = false; // frame-rate readout under the minimap
-    this.fpsGraph = false; // 30 s log graph behind the FPS readout
-    this.perfGraphs = false; // CPU + GPU load graphs under the FPS chip
-    this.showStats = false; // draw calls + polygons rendered per frame, under the minimap
     this.debugView = null; // 'poly' (every polygon outlined) | 'draw' (every draw call its own flat colour): the scene drawn bare, without the comic post pass
     this.ragdoll = true; // wipeouts and hard crashes turn the runner limp (player.js startRagdoll); off: you stay on your feet
     this.crackedVisor = true; // the cracks that spread over the screen as hull drops (hud.js)
-    this.spawnDebug = false; // bottom-right pirate counts + spawn timers overlay (no menu entry for now: set game.cheats.spawnDebug = true from the console)
-    this.inputMon = null; // controller map + held keys + trick state (inputmon.js), bottom right
     this.speed = 1; // player speed multiplier, 1 to 10 (player.js)
     // once the dev menu has been opened (F8 / controller combo) it gets a button on the pause card, remembered across launches
     try { this.unlocked = localStorage.getItem(DEV_KEY) === '1'; } catch { this.unlocked = false; }
     // the first time the dev menu's SPAWN A METEOR ON ME is used it becomes a power (powers.js), remembered across launches too
     try { this.meteorPower = localStorage.getItem(METEOR_KEY) === '1'; } catch { this.meteorPower = false; }
+    this.overlay = new DevOverlay(game, this); // (F3: every on-screen readout in one panel: devoverlay.js)
     this.showPauseButton();
   }
+
+  // (read by enemies.js: whether to record each AI's steering goal for the AI paths drawing)
+  get aiPaths() { return this.overlay.shows('paths'); }
 
   showPauseButton() {
     const b = document.getElementById('dev-btn-pause');
@@ -56,10 +51,10 @@ export class Cheats {
     g.dialog('DEV MENU', '<small>Hidden. Toggles last until you reload.</small>', [
       { label: '1 · UNLIMITED JET, HEALTH & SPEED…', fn: () => this.boostMenu() },
       { label: '2 · SPAWN A METEOR ON ME', fn: () => this.meteorFromMenu() },
-      { label: '3 · DISPLAY & DEBUG…', fn: () => this.displayMenu() },
-      { label: `4 · CLICK MAP TO TELEPORT: ${this.mapTeleport ? 'ON' : 'OFF'}`, fn: () => { this.mapTeleport = !this.mapTeleport; this.dev(); } },
-      { label: '5 · FULL CHEAT MENU…', fn: () => this.open() },
-      { label: `6 · INPUT & CONTROLLER MONITOR: ${this.inputMon && this.inputMon.on ? 'ON' : 'OFF'}`, fn: () => { this.toggleInputMon(); this.dev(); } },
+      { label: `3 · DEBUG OVERLAY: ${this.overlay.on ? 'ON' : 'OFF'}  (F3)…`, fn: () => this.overlayMenu() },
+      { label: '4 · DISPLAY TESTS…', fn: () => this.displayMenu() },
+      { label: `5 · CLICK MAP TO TELEPORT: ${this.mapTeleport ? 'ON' : 'OFF'}`, fn: () => { this.mapTeleport = !this.mapTeleport; this.dev(); } },
+      { label: '6 · FULL CHEAT MENU…', fn: () => this.open() },
       { label: `7 · RAGDOLL: ${this.ragdoll ? 'ON' : 'OFF'}`, fn: () => { this.toggleRagdoll(); this.dev(); } },
       { label: 'CLOSE' },
     ]);
@@ -95,15 +90,6 @@ export class Cheats {
     if (!this.ragdoll && P.rag) { P.rag.release(); P.rag = null; }
   }
 
-  // The input monitor: the pad drawn as it is now, what the game thinks is held, the trick state (inputmon.js)
-  toggleInputMon() {
-    const m = this.inputMon ||= new InputMonitor(this.game);
-    m.setOn(!m.on);
-  }
-
-  // every frame, whatever the screen (a pause or a menu is when you'd want to read it)
-  updateInputMon() { if (this.inputMon && this.inputMon.on) this.inputMon.update(); }
-
   // The dev menu's meteor button. The first time it also becomes a power (the power wheel's METEOR SPAWN, equipped straight
   // away), so from then on Z / RB drops one on you without the menu.
   meteorFromMenu() {
@@ -129,21 +115,17 @@ export class Cheats {
     return true;
   }
 
-  // On-screen readouts and effects: frame rate, draw calls and polygons, the cracked visor, the AI paths
+  // The display tests: effects and render modes you switch on to look at something (the on-screen readouts
+  // are in the debug overlay)
   displayMenu() {
     const g = this.game;
     const on = (v) => (v ? 'ON' : 'OFF');
-    g.dialog('DISPLAY & DEBUG', '<small>Toggles last until you reload.</small>', [
-      { label: `1 · SHOW FPS: ${on(this.showFps)}`, fn: () => { this.showFps = !this.showFps; this.tick(); this.displayMenu(); } },
-      { label: `2 · FPS LOG GRAPH (30 s): ${on(this.fpsGraph)}`, fn: () => { this.fpsGraph = !this.fpsGraph; this.tick(); this.displayMenu(); } },
-      { label: `3 · CPU & GPU GRAPHS: ${on(this.perfGraphs)}`, fn: () => { this.perfGraphs = !this.perfGraphs; this.tick(); this.displayMenu(); } },
-      { label: `4 · DRAW CALLS & POLYGONS: ${on(this.showStats)}`, fn: () => { this.setStats(!this.showStats); this.displayMenu(); } },
-      { label: `5 · CRACKED VISOR: ${on(this.crackedVisor)}`, fn: () => { this.crackedVisor = !this.crackedVisor; g.hud.crackKey = -1; this.displayMenu(); } },
-      { label: `6 · SHOW EACH POLYGON: ${on(this.debugView === 'poly')}`, fn: () => { this.setDebugView(this.debugView === 'poly' ? null : 'poly'); this.displayMenu(); } },
-      { label: `7 · SHOW EACH DRAW CALL: ${on(this.debugView === 'draw')}`, fn: () => { this.setDebugView(this.debugView === 'draw' ? null : 'draw'); this.displayMenu(); } },
-      { label: `8 · STATIC SHADOW CACHE: ${g.shadowCache.failed ? 'FAILED (see console)' : on(g.shadowCache.enabled)}`, fn: () => { g.shadowCache.enabled = !g.shadowCache.enabled; g.shadowCache.failed = false; g.shadowCache.invalidate(); this.displayMenu(); } },
-      { label: `9 · SHOW AI PATHS: ${on(this.aiPaths)}`, fn: () => { this.aiPaths = !this.aiPaths; this.tick(); this.displayMenu(); } },
-      { label: 'BACK', fn: () => this.dev() }, // (a tenth row: the number keys stop at 9, so BACK is mouse / pad; Esc closes)
+    g.dialog('DISPLAY TESTS', '<small>Toggles last until you reload.</small>', [
+      { label: `1 · CRACKED VISOR: ${on(this.crackedVisor)}`, fn: () => { this.crackedVisor = !this.crackedVisor; g.hud.crackKey = -1; this.displayMenu(); } },
+      { label: `2 · SHOW EACH POLYGON: ${on(this.debugView === 'poly')}`, fn: () => { this.setDebugView(this.debugView === 'poly' ? null : 'poly'); this.displayMenu(); } },
+      { label: `3 · SHOW EACH DRAW CALL: ${on(this.debugView === 'draw')}`, fn: () => { this.setDebugView(this.debugView === 'draw' ? null : 'draw'); this.displayMenu(); } },
+      { label: `4 · STATIC SHADOW CACHE: ${g.shadowCache.failed ? 'FAILED (see console)' : on(g.shadowCache.enabled)}`, fn: () => { g.shadowCache.enabled = !g.shadowCache.enabled; g.shadowCache.failed = false; g.shadowCache.invalidate(); this.displayMenu(); } },
+      { label: '5 · BACK', fn: () => this.dev() },
       { label: 'CLOSE' },
     ]);
   }
@@ -202,34 +184,6 @@ export class Cheats {
     g.scene.overrideMaterial = null;
   }
 
-  // three.js resets its counters on every render call, and a frame renders twice (the scene, then the
-  // post-processing quad), so while the readout is up the game resets them once per frame instead
-  setStats(on) {
-    this.showStats = on;
-    this.game.renderer.info.autoReset = !on;
-    if (!on && this.statsEl) this.statsEl.classList.add('hidden');
-  }
-
-  beforeRender() { if (this.showStats) this.game.renderer.info.reset(); }
-
-  // after the frame is drawn: draw calls and triangles for the scene (the post quad's one call and two triangles left out)
-  drawStats() {
-    if (!this.showStats) return;
-    let el = this.statsEl;
-    if (!el) {
-      el = this.statsEl = document.createElement('div');
-      el.id = 'render-readout';
-      (document.getElementById('undermap') || document.body).appendChild(el);
-    }
-    el.classList.remove('hidden');
-    const now = performance.now();
-    if (now - (this.statsT || 0) < 250) return; // (a few times a second is plenty to read)
-    this.statsT = now;
-    const r = this.game.renderer.info.render;
-    const tris = Math.max(0, r.triangles - (this.debugView ? 0 : 2));
-    el.textContent = `${Math.max(0, r.calls - (this.debugView ? 0 : 1)).toLocaleString('en-US')} DRAWS · ${tris >= 1e6 ? (tris / 1e6).toFixed(2) + 'M' : tris.toLocaleString('en-US')} POLYS${this.game.shadowCache.failed ? ' · SHADOW CACHE FAILED' : this.game.shadowCache.enabled ? ` · SHADOWS ${this.game.shadowCache.stats.mode.toUpperCase()}` : ''}`;
-  }
-
   speedLabel() { return `3 · SPEED: ×${this.speed}  (◄ ►)`; }
 
   setSpeed(v) { this.speed = Math.max(1, Math.min(10, Math.round(v))); }
@@ -239,160 +193,23 @@ export class Cheats {
     const P = this.game.player;
     if (this.infJet) P.body.energy = P.body.maxEnergy;
     if (this.god && !P.dead) P.health = P.maxHealth;
-    this.updateSpawnDebug();
-    this.updateFps();
-    if (this.aiPaths) (this.paths ||= new AIPaths(this.game)).update();
-    else if (this.paths) this.paths.hide();
+    this.overlay.tick();
   }
 
-  // --- frame timing, called from Game.frame() (main.js) ---
-  frameStart(now) { this.cpuT0 = now; }
+  // (enemies.js: the Kade roll note under the squad alert, shown with the overlay's pirate spawns section)
+  alertNote(text, secs) { this.overlay.alertNote(text, secs); }
 
-  renderStart() {
-    if (!this.perfGraphs) return;
-    if (!this.gpuT) this.gpuT = new GpuTimer(this.game.renderer);
-    this.gpuT.begin();
-  }
-
-  // CPU load = main-thread time spent on this frame (update + submitting the draw calls)
-  renderEnd() {
-    if (this.gpuT) this.gpuT.end();
-    if (!this.perfGraphs) return;
-    this.cpuSum = (this.cpuSum || 0) + (performance.now() - this.cpuT0);
-    this.cpuN = (this.cpuN || 0) + 1;
-  }
-
-  perfEls() {
-    if (this.perfWrap) return;
-    const w = this.perfWrap = document.createElement('div');
-    w.id = 'perf-wrap';
-    const el = this.fpsEl = document.createElement('div');
-    el.id = 'fps-readout';
-    el.innerHTML = '<canvas></canvas><span class="fps-val"></span>';
-    this.fpsVal = el.querySelector('.fps-val');
-    this.fpsG = new TimeGraph(el.querySelector('canvas'));
-    w.appendChild(el);
-    const bars = this.perfBars = document.createElement('div');
-    bars.id = 'perf-bars';
-    this.perfRows = {};
-    for (const k of ['cpu', 'gpu']) {
-      const r = document.createElement('div');
-      r.className = 'perf-row';
-      r.innerHTML = `<canvas></canvas><span class="perf-lab">${k.toUpperCase()}</span><span class="perf-val">--</span>`;
-      bars.appendChild(r);
-      this.perfRows[k] = { val: r.querySelector('.perf-val'), g: new TimeGraph(r.querySelector('canvas'), 420, 56) };
-    }
-    w.appendChild(bars);
-    (document.getElementById('undermap') || document.body).appendChild(w);
-  }
-
-  // Frame rate (and the optional graphs) under the minimap; sampled every quarter second
-  updateFps() {
-    const show = this.showFps || this.perfGraphs;
-    if (!show) { if (this.perfWrap) this.perfWrap.classList.add('hidden'); this.fpsN = 0; return; }
-    this.perfEls();
-    this.perfWrap.classList.remove('hidden');
-    this.fpsEl.classList.toggle('hidden', !this.showFps);
-    this.fpsEl.classList.toggle('graph', this.fpsGraph);
-    this.perfBars.classList.toggle('hidden', !this.perfGraphs);
-    const now = performance.now();
-    if (!this.fpsN) { this.fpsN = 0; this.fpsT = now; }
-    this.fpsN++;
-    const dt = now - this.fpsT;
-    if (dt < 250) return;
-    const frames = this.fpsN;
-    this.fpsN = 0; this.fpsT = now;
-    const cpuMs = this.cpuN ? this.cpuSum / this.cpuN : null;
-    this.cpuSum = this.cpuN = 0;
-    if (dt > 1000) return; // a pause / menu gap: don't log a bogus sample (the graphs show it as a break)
-    const fps = (frames * 1000) / dt;
-    const frameMs = 1000 / fps;
-    const gpuMs = this.gpuT ? this.gpuT.take() : null;
-    this.fpsG.push(now, fps);
-    // text refreshes every other sample (about twice a second) from the last two
-    this.sampleN = (this.sampleN || 0) + 1;
-    const prev = this.lastFps ?? fps;
-    this.lastFps = fps;
-    if (this.sampleN % 2 === 0) {
-      const f = (fps + prev) / 2;
-      this.fpsVal.textContent = `${Math.round(f)} FPS`;
-      // plain, no graph: colour says how healthy it is. Over the graph: white with a dark outline, which stays readable on any line colour
-      this.fpsVal.style.color = this.fpsGraph ? '#ffffff' : f >= 55 ? '#7dff3a' : f >= 30 ? '#ffd23f' : '#ff4a4a';
-    }
-    if (this.fpsGraph) {
-      const peak = Math.max(60, ...this.fpsG.pts.map((p) => p[1]));
-      this.fpsG.draw(now, Math.ceil(peak / 30) * 30, [30, 60, 120], fps >= 55 ? '#7dff3a' : fps >= 30 ? '#ffd23f' : '#ff4a4a');
-    }
-    if (this.perfGraphs) {
-      const load = (ms) => Math.min(100, (ms / frameMs) * 100);
-      const rows = [['cpu', cpuMs == null ? null : load(cpuMs), cpuMs], ['gpu', gpuMs == null ? null : load(gpuMs), gpuMs]];
-      for (const [k, pct, ms] of rows) {
-        const r = this.perfRows[k];
-        if (pct != null) r.g.push(now, pct);
-        r.val.textContent = pct == null ? (k === 'gpu' && this.gpuT && !this.gpuT.ok ? 'N/A' : '--') : `${Math.round(pct)}% · ${ms.toFixed(1)}ms`;
-        r.g.draw(now, 100, [50], pct == null || pct < 70 ? '#4fd8ff' : pct < 90 ? '#ffd23f' : '#ff4a4a');
-      }
-    }
-  }
-
-  // Spawn-debug note under the big alert banner (only while the pirate spawn debug is on)
-  alertNote(text, secs) {
-    if (!this.spawnDebug) return;
-    let el = this.noteEl;
-    if (!el) {
-      el = this.noteEl = document.createElement('div');
-      el.id = 'alert-note';
-      document.body.appendChild(el);
-    }
-    const a = document.getElementById('alert');
-    const r = a ? a.getBoundingClientRect() : null;
-    el.style.top = `${r ? r.bottom + 8 : 120}px`;
-    el.textContent = text;
-    el.classList.remove('hidden');
-    clearTimeout(this.noteT);
-    this.noteT = setTimeout(() => el.classList.add('hidden'), secs * 1000);
-  }
-
-  // Dev overlay (bottom right): pirates alive per pool and when the next patrol spawn is attempted
-  updateSpawnDebug() {
-    let el = this.dbgEl;
-    if (!this.spawnDebug) { if (el) el.classList.add('hidden'); if (this.marks) this.marks.hide(); return; }
-    (this.marks ||= new EnemyMarkers(this.game)).update(); // (rings + beacons on every enemy)
-    const E = this.game.enemies;
-    if (!el) {
-      el = this.dbgEl = document.createElement('div');
-      el.id = 'spawn-debug';
-      document.body.appendChild(el);
-    }
-    el.classList.remove('hidden');
-    const d = E.dbg || {};
-    const t = (v) => `${Math.max(0, v).toFixed(1)}s`;
-    const kinds = (list) => `${list.filter((e) => e.kind === 'rover').length} rover · ${list.filter((e) => e.kind !== 'rover').length} skater`;
-    const alive = E.list.filter((e) => e.faction === 'pirate' && e.kind !== 'core' && !e.dead);
-    const roam = E.hunterList();
-    const den = alive.filter((e) => e.home);
-    const raid = alive.filter((e) => !e.home && e.targetObj);
-    const rows = [`<b>PIRATES</b>`,
-      `roaming ${roam.length}/${E.maxRoamers()}  (${kinds(roam)})`,
-      `dens ${den.length}/${E.maxDen()}  (${kinds(den)})`];
-    if (raid.length) rows.push(`event raiders ${raid.length}`);
-    const S = this.game.story;
-    if (S) rows.push(`Kade chance next squad ${Math.round((S.kadeChance ?? 0.08) * 100)}%`);
-    const gp = this.game.pad && this.game.pad.gyro;
-    if (gp && gp.dev) rows.push(gp.debug());
-    rows.push(`total hunters ${roam.length} (dark-side spawns skip at 3+)`);
-    rows.push(`<b>NEXT PATROL</b>`);
-    if (!d.squadsOn) rows.push(`blocked: ${d.why || '?'}`);
-    else {
-      rows.push(`dark side ${d.dark ? t(E.darkTimer) : 'idle (not dark)'}`);
-      rows.push(`cargo run ${d.carrying ? t(E.pirateTimer) : 'idle (no cargo)'}`);
-    }
-    rows.push(`den check ${t(E.lairTimer)}`);
-    const dt = E.dbgDarkTry, s = E.dbgSpawn;
-    rows.push(`<b>LAST SQUAD ATTEMPT</b>`);
-    rows.push(dt ? `dark-side timer fired ×${dt.n}, last ${t(this.game.time - dt.at)} ago${dt.skip ? ` (skipped: ${dt.hunters} hunters out, needs <3)` : ` (${dt.hunters} hunters out)`}` : 'dark-side timer has not fired yet');
-    rows.push(s ? `spawner ${t(this.game.time - s.at)} ago: wanted ${s.want} · tries ${s.tries} · in a settlement zone ${s.zoned} · spawned ${s.spawned}` : 'spawner has not run yet');
-    el.innerHTML = rows.join('<br>');
+  // Dev menu → Debug overlay: the master switch (F3 does the same in play) and which sections are in it.
+  // Each toggle re-opens the menu, like the other submenus.
+  overlayMenu() {
+    const g = this.game, o = this.overlay;
+    const on = (v) => (v ? 'ON' : 'OFF');
+    g.dialog('DEBUG OVERLAY', '<small>Every on-screen readout in one panel. F3 shows or hides it in play; the sections you pick are remembered.</small>', [
+      { label: `1 · OVERLAY: ${on(o.on)}`, fn: () => { o.toggle(); this.overlayMenu(); } },
+      ...SECTIONS.map((s, i) => ({ label: `${i + 2} · ${s.name}: ${on(o.sec[s.key])}`, fn: () => { o.setSection(s.key, !o.sec[s.key]); this.overlayMenu(); } })),
+      { label: 'BACK', fn: () => this.dev() }, // (a tenth row: the number keys stop at 9, so BACK is mouse / pad; Esc closes)
+      { label: 'CLOSE' },
+    ]);
   }
 
   open() {
