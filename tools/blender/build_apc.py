@@ -76,8 +76,10 @@ CH = pivot("apc_chassis", (0, LIFT, 0), ROOT, role="chassis")
 
 # ---- hull: a boxy loft, sloped at the nose, with a skid plate and belly under it ----
 HULL = [
-    dict(z=-2.95, w=1.30, t=0.48, b=0.40, yc=1.50, eT=3.4, eB=3.4),
-    dict(z=-2.55, w=1.50, t=0.62, b=0.50, yc=1.50, eT=3.4, eB=3.4),
+    # the rear: full height and width back to the end of the engine deck, then a short taper to the tail plate
+    dict(z=-3.3, w=1.25, t=0.36, b=0.36, yc=1.44, eT=3.4, eB=3.4),
+    dict(z=-3.1, w=1.42, t=0.62, b=0.46, yc=1.49, eT=3.4, eB=3.4),
+    dict(z=-2.8, w=1.52, t=0.72, b=0.52, yc=1.50, eT=3.4, eB=3.4),
     dict(z=-1.0, w=1.52, t=0.72, b=0.52, yc=1.50, eT=3.4, eB=3.4),
     dict(z=1.2, w=1.52, t=0.72, b=0.52, yc=1.50, eT=3.4, eB=3.4),
     dict(z=2.35, w=1.45, t=0.56, b=0.50, yc=1.43, eT=3.4, eB=3.4),
@@ -94,7 +96,7 @@ for sx in (-1, 1):
     mesh(f"cabSide{sx}", xf(rbox(0.03, 0.07, 0.25, 0.3, 6, 4), (sx * 1.0, 2.2, 1.85)), "glass", CH, 0)
 
 # engine deck: a plate with louvres, and two roof hatches behind the turret
-mesh("deck", xf(rbox(1.1, 0.045, 1.55, 0.2, 14, 4), (0, 2.24, -1.55)), "steel", CH, 0.03)
+mesh("deck", xf(rbox(1.1, 0.045, 1.35, 0.2, 14, 4), (0, 2.24, -1.5)), "steel", CH, 0.03)
 for k in range(7):
     mesh(f"louvre{k}", xf(rbox(0.8, 0.02, 0.045, 0.3, 8, 4), (0, 2.285, -2.15 + k * 0.22)), "dark", CH, 0)
 for sx in (-1, 1):
@@ -118,12 +120,27 @@ for sx in (-1, 1):
     mesh(f"lampGuard{sx}", xf(rbox(0.24, 0.16, 0.025, 0.2, 8, 4), (sx * 0.8, 1.2, 3.04), (0.6, 0, 0)), "dark", CH, 0)
 # rear: tail lights, a tow pintle, jerry cans on the deck
 for sx in (-1, 1):
-    mesh(f"tail{sx}", xf(rbox(0.2, 0.1, 0.04, 0.2, 8, 4), (sx * 1.0, 1.5, -2.97)), "tail", CH, 0.02)
-mesh("pintle", xf(lathe([(0.12, 0), (0.12, 0.16), (0.07, 0.2)], 8), (0, 1.2, -3.0), (math.pi / 2, 0, 0)), "steel", CH, 0.02)
-mesh("exhaust", tube([(1.3, 1.1, -2.75), (1.55, 1.1, -3.05)], [0.1, 0.1], 8), "steel", CH, 0.02)
-mesh("exhaustTip", xf(torus(0.1, 0.03, 10, 4), (1.55, 1.1, -3.06), (math.pi / 2, 0, 0)), "hot", CH, 0)
+    mesh(f"tail{sx}", xf(rbox(0.2, 0.1, 0.04, 0.2, 8, 4), (sx * 0.85, 1.45, -3.31)), "tail", CH, 0.02)
+mesh("pintle", xf(lathe([(0.12, 0), (0.12, 0.16), (0.07, 0.2)], 8), (0, 1.3, -3.3), (-math.pi / 2, 0, 0)), "steel", CH, 0.02)
+# the exhaust: a stack standing on the back of the engine deck, straight up, then bending over and running
+# back and down at 45 degrees, with a hot mouth
+EX, EY, EZ = 0.8, 2.26, -2.7           # where it stands
+BEND_Y, R = EY + 0.75, 0.22            # the end of the vertical run, and the radius of the elbow
+elbow = [(EX, EY, EZ)]
+for deg in (0, 45, 90, 135):
+    a = math.radians(deg)
+    elbow.append((EX, BEND_Y + R * math.sin(a), EZ - R + R * math.cos(a)))
+d = (0.0, -math.sqrt(0.5), -math.sqrt(0.5))                     # 45 degrees down and back
+tip = tuple(elbow[-1][i] + d[i] * 0.45 for i in range(3))
+elbow.append(tip)
+mesh("exhaust", tube(elbow, [0.1] * len(elbow), 8), "steel", CH, 0.03)
+mesh("exhaustBase", xf(rbox(0.16, 0.05, 0.16, 0.3, 8, 4), (EX, EY + 0.02, EZ)), "dark", CH, 0.02)
+for k, y in enumerate((EY + 0.25, EY + 0.55)):
+    mesh(f"exhaustBand{k}", xf(torus(0.1, 0.028, 12, 4), (EX, y, EZ)), "dark", CH, 0)
+mesh("exhaustMouth", xf(lathe([(0.1, 0.0), (0.135, 0.07), (0.115, 0.1)], 10), tip, (-3 * math.pi / 4, 0, 0)), "dark", CH, 0.02)
+mesh("exhaustGlow", xf(torus(0.085, 0.022, 12, 4), tuple(tip[i] + d[i] * 0.06 for i in range(3)), (-3 * math.pi / 4, 0, 0)), "hot", CH, 0)
 for i, x in enumerate((-0.75, 0.0)):
-    mesh(f"can{i}", xf(rbox(0.2, 0.26, 0.11, 0.2), (x, 2.5, -2.75), (0, 0, 0.05 * (1 - 2 * i))), "olive", CH, 0.03)
+    mesh(f"can{i}", xf(rbox(0.2, 0.26, 0.11, 0.2), (x, 2.5, -2.62), (0, 0, 0.05 * (1 - 2 * i))), "olive", CH, 0.03)
 # antennas on the rear deck: each whip is its own pivot at its base (role "antenna") so the game can lay it
 # back with speed; the stub it stands in stays on the hull
 for sx, lean in ((-1, -0.12), (1, 0.12)):
