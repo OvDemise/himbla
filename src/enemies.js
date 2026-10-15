@@ -1,12 +1,16 @@
 import * as THREE from 'three';
 import { PHYS } from './config.js';
 import { makeBody, stepSkater } from './physics.js';
+import { Ragdoll } from './ragdoll.js';
 import { makeRunner, makeRover, makeTurret, makeCrate, makePylon, ScarfSim } from './models.js';
 import { randRange } from './rng.js';
 import { FACTIONS } from './locations.js';
 import { frameQuat, greatCircle, arcDist, darkness, tangent } from './geo.js';
 import { FOES, BOSS_MODELS } from './storyAssets.js';
 
+// m/s a rover can hit a wall, a building or a deck at without being hurt: the same for the vehicles you drive
+// (vehicles.js) and the ones that hunt you (crashRover)
+export const CRASH_SAFE = 18;
 const PIRATE_SKATER = { ...PHYS, skatePushMax: 34, thrustAccel: 13, maxEnergy: 120, handling: 2.2 };
 // two separate pirate pools: roaming hunters (squads that chase you) and den guards (which keep to
 // their lair). Event raiders (spawnWave) belong to neither. Each pool always has a rover in it.
@@ -275,7 +279,10 @@ export class Enemies {
     const lead = T.routePoint(r, Math.min(1, Math.max(0, R.t + R.dir * 70 / Math.max(50, r.len))), new THREE.Vector3());
     const goal = this.ground(lead);
     this.dbgGoal(e, goal);
-    stepRover(e, dt, g.planet, g.colliders, goal.sub(b.pos), 16, { engine: 16, grip: 8, turn: 2, stick: Infinity });
+    const crash = { speed: 0 };
+    stepRover(e, dt, g.planet, g.colliders, goal.sub(b.pos), 16, { engine: 16, grip: 8, turn: 2, stick: Infinity, crash });
+    this.crashRover(e, crash);
+    if (e.dead) return;
     this.poseVehicle(e, dt);
     // keep the roads clear of pirates, and shoot you if their faction counts you an enemy
     if (R.provoked > 0) R.provoked -= dt;
@@ -664,9 +671,31 @@ export class Enemies {
     if (e.hp <= 0) this.kill(e, fromPlayer);
   }
 
+  // A meteor lands (meteors.js): whatever is under the rock (core: its footprint) is crushed, and the blast beyond
+  // that, out to `reach`, hurts less the further it goes and flings runners and rovers clear. Pirates, troops,
+  // patrols and guns all take it; bosses, lair cores, the Mega Mite and your backup are left to their stories.
+  meteorBlast(pos, core, reach, r) {
+    for (const t of this.targets()) {
+      if (t.kind === 'core' || t.kind === 'megamite' || t.bossName || t.faction === 'ally') continue;
+      const d = t.center.distanceTo(pos) - (t.radius || 1);
+      if (d > reach) continue;
+      const crushed = d <= core;
+      const f = crushed ? 1 : 1 - (d - core) / (reach - core);
+      this.damage(t, crushed ? 150 + r * 12 : (60 + 8 * r) * f, false);
+      if (!t.dead && t.body) {
+        const away = t.center.clone().sub(pos);
+        away.addScaledVector(t.body.up, -away.dot(t.body.up));
+        if (away.lengthSq() < 0.01) away.copy(tangent(new THREE.Vector3(1, 0, 0), t.body.up));
+        t.body.vel.addScaledVector(away.normalize(), 10 + 22 * f).addScaledVector(t.body.up, 4 + 6 * f);
+        t.body.grounded = false;
+      }
+    }
+  }
+
   kill(e, byPlayer = true) {
     const g = this.game;
     e.dead = true;
+    if (e.rag) { e.rag.release(); e.rag = null; }
     const big = e.kind !== 'skater';
     g.fx.explosion(e.center, big ? 11 : 6, true);
     g.fx.pop(e.kind === 'skater' ? 'KA-POW!' : e.kind === 'core' ? 'KRA-KA-BOOOM!' : 'KA-BOOM!', e.center.clone().addScaledVector(e.center.clone().normalize(), 4), { color: '#ff4f2e', size: e.kind === 'core' ? 100 : 80 });
@@ -1142,6 +1171,7 @@ export class Enemies {
   updateSkater(e, dt, time) {
     const g = this.game;
     const b = e.body;
+    if (e.rag) { this.updateRag(e, dt); return; } // (limp after a hard landing: the ragdoll carries the body)
     const friendly = this.friendly(e);
     let target = this.targetFor(e, 2.5);
     const up = b.up.copy(b.pos).normalize();
@@ -1183,8 +1213,11 @@ export class Enemies {
       thrustDir: wish.clone().addScaledVector(up, 0.2).normalize(),
     };
     const steps = Math.ceil(dt / (1 / 60));
-    for (let i = 0; i < steps; i++) { stepSkater(b, ctrl, dt / steps, g.planet, g.colliders, PIRATE_SKATER, e.impacts); ctrl.jump = false; }
+    // (stepSkater clears its impact list every step: gather the frame's from each)
+    const hits = [];
+    for (let i = 0; i < steps; i++) { stepSkater(b, ctrl, dt / steps, g.planet, g.colliders, PIRATE_SKATER, e.impacts); for (const it of e.impacts) hits.push(it); ctrl.jump = false; }
     e.center.copy(b.pos).addScaledVector(up, 1.3);
+    const skating = ctrl.skates;
 
     if (dazed) {
       // spin in place, seeing stars
@@ -1216,12 +1249,65 @@ export class Enemies {
     e.scarfSim.update(dt, b.vel, up, e.carrying ? { back: 1.14, top: 1.0 } : undefined);
     m.glowM.color.setHex(e.flash > 0 ? 0xffffff : dazed ? 0xffd23f : friendly ? 0x2ee6ff : e.glowColor || 0x7dff3a);
     if (e.carrying && !m.loot) { m.loot = makeCrate(g.missions.active ? g.missions.active.cargo.color : 0xffd23f, 0.7); m.cargoSlot.add(m.loot); }
+    this.impactSkater(e, skating, hits); // (last, once the runner is posed: a ragdoll starts from that pose)
+  }
+
+  // A runner in a ragdoll: posed standing first (what it gets back up into), then the ragdoll takes over
+  // the model and carries the body until it has come to rest and stood up.
+  updateRag(e, dt) {
+    const b = e.body, m = e.model;
+    const up = b.up.copy(b.pos).normalize();
+    m.root.position.copy(b.pos);
+    frameQuat(up, e.heading, m.root.quaternion);
+    m.torso.rotation.set(0.5, 0, 0);
+    m.armL.rotation.z = -0.5; m.armR.rotation.z = 0.5;
+    m.body.position.y = m.bodyBase - 0.15;
+    if (!e.rag.update(dt)) { e.rag.release(); e.rag = null; } else e.rag.sync(dt);
+    e.center.copy(b.pos).addScaledVector(up, 1.3);
+    if (!e.scarfSim) e.scarfSim = new ScarfSim(m);
+    e.scarfSim.update(dt, b.vel, up);
+    m.glowM.color.setHex(e.flash > 0 ? 0xffffff : this.friendly(e) ? 0x2ee6ff : e.glowColor || 0x7dff3a);
   }
 
   fence(e) {
     e.dead = true;
     e.model.root.removeFromParent();
     this.game.missions.onFenced(e.home);
+  }
+
+  // A rover (not a boss or your backup) that hits a wall, a building or a deck hard enough is hurt the same
+  // way the vehicles you drive are (vehicles.js): damage from the closing speed over CRASH_SAFE, at most half
+  // its health at a time, at most once every 0.4 s.
+  crashRover(e, crash) {
+    const g = this.game;
+    if (crash.speed <= CRASH_SAFE || e.dead || e.boss || e.faction === 'ally' || (e.crashT || 0) > g.time) return;
+    e.crashT = g.time + 0.4;
+    if (e.center.distanceTo(g.player.pos) < 300) {
+      g.audio.thud(crash.speed);
+      g.fx.pop('CRASH!', e.center.clone().addScaledVector(e.body.up, 4), { color: '#ff4f2e', size: 46, life: 0.7 });
+    }
+    this.damage(e, Math.min((crash.speed - CRASH_SAFE) * 2.5, e.maxHp * 0.5), false);
+  }
+
+  // A runner's hard landing or crash (the player's onImpact, on the runner's own health): over the safe speed
+  // it hurts, on the same soft-capped curve (up to half its health), and the runner goes limp in a ragdoll
+  // (ragdoll.js) until it has tumbled to rest and got back up.
+  impactSkater(e, skates, hits) {
+    const g = this.game;
+    const safe = skates ? PIRATE_SKATER.skateSafeImpact : PIRATE_SKATER.bootSafeImpact;
+    let worst = null;
+    for (const it of hits) if (it.speed > safe && (!worst || it.speed > worst.speed)) worst = it;
+    if (!worst || e.dead || e.rag) return;
+    const glancing = worst.kind === 'ground' ? 1 / (1 + (worst.glide || 0) / 30) : 1;
+    const dmg = 0.5 * e.maxHp * (1 - Math.exp(-(worst.speed - safe) / 60)) * (PIRATE_SKATER.impactDamage / 1.3) * glancing;
+    const near = e.center.distanceTo(g.player.pos) < 300;
+    if (near) {
+      g.audio.thud(worst.speed);
+      g.fx.pop(worst.speed - safe > 12 ? 'KRA-KOOM!' : 'KRAK!', e.center.clone().addScaledVector(e.body.up, 2), { color: '#ff4f2e', size: 44, life: 0.7 });
+    }
+    this.damage(e, dmg, false);
+    // (the tumble only where you can see it: a runner far off just takes the damage)
+    if (!e.dead && e.kind === 'skater' && e.center.distanceTo(g.camera.position) < 400) e.rag = new Ragdoll(g, e.model, e.body, worst.kind === 'ground' ? 1 : -1);
   }
 
   updateRover(e, dt) {
@@ -1265,7 +1351,10 @@ export class Enemies {
       }
     } else e.ram = null;
     this.dbgGoal(e, aim, b.pos);
-    stepRover(e, dt, g.planet, g.colliders, aim, max, { engine, grip: 14, turn: e.ram && e.ram.phase === 'line' ? 2.8 : 2.2, radius: 3.6, stick: 62 });
+    const crash = { speed: 0 };
+    stepRover(e, dt, g.planet, g.colliders, aim, max, { engine, grip: 14, turn: e.ram && e.ram.phase === 'line' ? 2.8 : 2.2, radius: 3.6, stick: 62, crash });
+    this.crashRover(e, crash);
+    if (e.dead) return;
     this.poseVehicle(e, dt);
     if (e.state === 'chase' && !friendly) {
       this.tryGrab(e, dt);
@@ -1353,7 +1442,10 @@ export class Enemies {
       maxSp = 16;
     }
     this.dbgGoal(e, target);
-    stepRover(e, dt, g.planet, g.colliders, target.sub(b.pos), maxSp, { engine: 16, grip: 8, turn: 2, stick: Infinity });
+    const crash = { speed: 0 };
+    stepRover(e, dt, g.planet, g.colliders, target.sub(b.pos), maxSp, { engine: 16, grip: 8, turn: 2, stick: Infinity, crash });
+    this.crashRover(e, crash);
+    if (e.dead) return;
     this.poseVehicle(e, dt);
     if (base.hostile) {
       e.fireCd -= dt;

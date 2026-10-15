@@ -853,8 +853,9 @@ class Game {
       }
     }
     // other things that can be blown up (outposts, road traffic) register here: fn(pos, radius, damage, owner)
-    for (const fn of this.blastHooks || []) fn(pos, radius, damage, owner);
-    for (const t of this.enemies.targets()) {
+    // (a meteor's landing hurts the NPCs on its own terms: meteors.js hurtNpcs)
+    if (owner !== 'meteor') for (const fn of this.blastHooks || []) fn(pos, radius, damage, owner);
+    for (const t of owner === 'meteor' ? [] : this.enemies.targets()) {
       if (owner === t.faction) continue;
       // your backup takes no harm from you; its own blasts only hurt what it's fighting; a base's
       // guns don't shell the troops defending it

@@ -271,6 +271,11 @@ export class Player {
     if (this.rag) {
       if (this.trick.active) this.clearTrick(); // (limp: no trick left to finish; updateTricks doesn't run in here)
       b.jumped = false;
+      // the tank refills while you're limp too (stepSkater's regen doesn't run in here), and a drained one
+      // unlocks the thrusters again on the same terms
+      b.thrusting = false;
+      b.energy = Math.min(b.maxEnergy, b.energy + this.params.energyRegen * dt);
+      if (b.jetLocked && b.energy >= b.maxEnergy * 0.25) b.jetLocked = false;
       this.updateWeapons(dt, input, cam);
       this.center.copy(b.pos).addScaledVector(b.up, 1.3);
       this.animate(dt, cam, ctrl);

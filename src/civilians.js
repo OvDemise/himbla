@@ -126,6 +126,17 @@ export class Civilians {
     }
   }
 
+  // A meteor lands (meteors.js): whoever is under it is killed, and the blast beyond hurts less the further it
+  // reaches. Nobody is blamed for it.
+  meteorBlast(pos, core, reach) {
+    const hits = [];
+    this.each(pos, reach, (f, src, ref, c) => hits.push({ f, src, ref, d: c.distanceTo(pos) }));
+    for (const h of hits) {
+      const f = h.d <= core ? 1 : 1 - (h.d - core) / (reach - core);
+      this.hurt(h.f, h.src, h.ref, h.d <= core ? 400 : 40 + 90 * f, pos, f, false);
+    }
+  }
+
   // Take a person out of their scripted routine; returns the controller.
   grab(f, src, ref) {
     if (f.civ) return f.civ;
@@ -150,7 +161,7 @@ export class Civilians {
     return c;
   }
 
-  hurt(f, src, ref, dmg, from, k) {
+  hurt(f, src, ref, dmg, from, k, blame = true) {
     const g = this.g;
     if (f.civ && f.civ.dead) return;
     const c = this.grab(f, src, ref);
@@ -178,7 +189,7 @@ export class Civilians {
       g.fx.pop(OOF[Math.floor(Math.random() * OOF.length)], c.center.clone().addScaledVector(up, 2), { color: '#fff4e0', size: 36, life: 0.8 });
     }
     // reputation + settlement aggro: every knock-out counts, plain hits once per blast
-    this.witnessed(c.center, killed ? REP_KILL : REP_HIT, killed, f.loc);
+    if (blame) this.witnessed(c.center, killed ? REP_KILL : REP_HIT, killed, f.loc); // (not a meteor's doing)
     this.panic(c.center, f);
   }
 

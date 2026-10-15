@@ -4,6 +4,7 @@ import { mulberry32, smoothstep, clamp } from './rng.js';
 import { gradientMap } from './toon.js';
 import { SUN, darkness } from './geo.js';
 import { shapedRocks } from './rocks.js';
+import { rayCollider } from './physics.js';
 import { TerrainField, faceDir, dirToGrid, N, CH, CPF, N1, R, MAX_LOD } from './terrainField.js';
 
 export { faceDir };
@@ -559,6 +560,20 @@ diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.93, 0.9, 0.86), rimChip * rimCor
     }
   }
 
+  // How far along the ray o + t*d (d unit) the first rock stands, or Infinity: every boulder and shaped
+  // rock that is drawn (not just the ones near enough to have colliders), for hitscan beams.
+  rockRay(o, d, tmax) {
+    let best = Infinity;
+    for (const ch of this.chunks) {
+      if (!ch.boulderSpec || !ch.boulders || !ch.boulders.visible) continue;
+      for (const c of ch.boulderSpec) {
+        const t = rayCollider(c, o, d, Math.min(tmax, best));
+        if (t < best) best = t;
+      }
+    }
+    return best;
+  }
+
   buildBoulders(ch) {
     const rr = mulberry32((ch.f * 7919 + ch.cy * 131 + ch.cx) * 2654435761);
     const count = 4 + Math.floor(rr() * 6);
@@ -612,6 +627,7 @@ diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.93, 0.9, 0.86), rimChip * rimCor
     g.matrixAutoUpdate = false;
     g.visible = false;
     this.scene.add(g);
+    for (const c of cols) c.rock = true; // (the Rail Lance's beam stops at these: rockRay)
     ch.boulders = g;
     ch.boulderSpec = cols;
   }

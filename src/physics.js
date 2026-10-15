@@ -135,6 +135,58 @@ export class Colliders {
   }
 }
 
+// Distance t along the ray o + t*d (d a unit vector) to the first surface of collider c, or Infinity
+// when it misses within tmax. A ray that starts inside c passes out through it (it is not stopped at
+// the origin). For hitscan beams (the Rail Lance), which can't use contact()'s fat-sphere test.
+export function rayCollider(c, o, d, tmax) {
+  const ox = o.x - c.c.x, oy = o.y - c.c.y, oz = o.z - c.c.z;
+  if (c.type === 'sphere') {
+    const b = ox * d.x + oy * d.y + oz * d.z;
+    const disc = b * b - (ox * ox + oy * oy + oz * oz - c.r * c.r);
+    if (disc < 0) return Infinity;
+    const t = -b - Math.sqrt(disc);
+    return t >= 0 && t <= tmax ? t : Infinity;
+  }
+  if (c.type === 'cyl') {
+    const a = c.axis;
+    const oh = ox * a.x + oy * a.y + oz * a.z, dh = d.x * a.x + d.y * a.y + d.z * a.z;
+    const rx = ox - a.x * oh, ry = oy - a.y * oh, rz = oz - a.z * oh;
+    const ux = d.x - a.x * dh, uy = d.y - a.y * dh, uz = d.z - a.z * dh;
+    const A = ux * ux + uy * uy + uz * uz, B = rx * ux + ry * uy + rz * uz, C = rx * rx + ry * ry + rz * rz - c.r * c.r;
+    let best = Infinity;
+    if (A > 1e-12) {
+      const disc = B * B - A * C;
+      if (disc >= 0) {
+        const t = (-B - Math.sqrt(disc)) / A, h = oh + t * dh;
+        if (t >= 0 && h >= c.y0 && h <= c.y1) best = t;
+      }
+    }
+    if (Math.abs(dh) > 1e-9) {
+      for (const y of [c.y0, c.y1]) {
+        const t = (y - oh) / dh;
+        if (t < 0 || t >= best) continue;
+        const px = rx + ux * t, py = ry + uy * t, pz = rz + uz * t;
+        if (px * px + py * py + pz * pz <= c.r * c.r) best = t;
+      }
+    }
+    return best <= tmax ? best : Infinity;
+  }
+  // oriented box: the slab test in its own frame
+  const lo = [ox * c.ax.x + oy * c.ax.y + oz * c.ax.z, ox * c.ay.x + oy * c.ay.y + oz * c.ay.z, ox * c.az.x + oy * c.az.y + oz * c.az.z];
+  const ld = [d.x * c.ax.x + d.y * c.ax.y + d.z * c.ax.z, d.x * c.ay.x + d.y * c.ay.y + d.z * c.ay.z, d.x * c.az.x + d.y * c.az.y + d.z * c.az.z];
+  const h = [c.hx, c.hy, c.hz];
+  let t0 = 0, t1 = Infinity, entered = false;
+  for (let i = 0; i < 3; i++) {
+    if (Math.abs(ld[i]) < 1e-9) { if (Math.abs(lo[i]) > h[i]) return Infinity; continue; }
+    let a = (-h[i] - lo[i]) / ld[i], b = (h[i] - lo[i]) / ld[i];
+    if (a > b) { const x = a; a = b; b = x; }
+    if (a > t0) { t0 = a; entered = true; }
+    if (b < t1) t1 = b;
+    if (t0 > t1) return Infinity;
+  }
+  return entered && t0 <= tmax ? t0 : Infinity;
+}
+
 const _n = new THREE.Vector3();
 const _sn = new THREE.Vector3();
 const _tmp = new THREE.Vector3();

@@ -160,7 +160,8 @@ an arrow showing which way it lies from where you're looking; the event you're r
 **Style** pays half what it used to and can at most double a contract's base reward (a ₵400 job tops out at
 ₵800 before condition). The package's condition then scales the whole payout.
 
-**Rail Lance scope:** with the Rail Lance equipped, hold right mouse to scope in (E still fires thrusters).
+**Rail Lance scope:** with the Rail Lance equipped, hold right mouse to scope in (E still fires thrusters). The beam pierces
+pirates, troops, buildings and traffic, but the ground and any rock (boulders, ramps, arches, spires, ridges) stop it, so nothing behind a rock is hit.
 
 **First shift:** a new game offers to send **BOLT**, a courier-school drone, along with you. It hovers at your
 shoulder and teaches the controls (each step waits until you've actually done it), chipping in as you ride: big
@@ -187,7 +188,8 @@ restricted military zones work (their turrets open fire without clearance). Afte
 - **Deliveries:** pick a contract at a job board. Each one has a cargo type, fragility,
   pirate risk, distance and time limit. Some start with a pickup somewhere else. You're paid
   for cargo integrity, time left and **style** (big air, speed milestones, recoveries).
-- **Pirate war-rigs:** pirate rovers are big, fast, and grip the ground. They ram you hard. Your
+- **Pirate war-rigs:** pirate rovers are big, fast, and grip the ground. They ram you hard (and wreck themselves on walls and buildings at speed: the same crash
+  damage as the vehicles you drive; bosses and your backup excepted). Pirate skaters that hit the ground or a wall hard enough are hurt the way you are, and go limp in a ragdoll. Your
   Pulse Spinner homes in slightly to even the odds; the SPACECOM Seeker Module makes it home harder.
 - **Moon Pirates:** "hot" cargo draws Scrapjaw pirates on skates and armed Moon-Rovers. If one
   stays close for about a second, they **steal the cargo** and run for Scrapjaw Gulch. Blast
@@ -202,7 +204,8 @@ from about 280 m up, so you can see one coming for half a minute and plan a jump
   with a red warning ring where it will land. They're real colliders on the way down: land on one and it flings you
   high (about 110 m of air) and away from it for a METEOR BOUNCE (style), so you can chain them: bounce again within
   14 s for a bigger METEOR CHAIN ×n. Landing on the same one again pogos you off it. Hit one from the side or below and it hurts. On impact they explode into tumbling chunks and leave a smouldering
-  scorch mark; everything fades away afterwards.
+  scorch mark; everything fades away afterwards. A landing kills whatever is under the rock (pirates, troops, patrol rovers, gun turrets, townsfolk, road traffic: nobody blames you for it)
+  and batters what's near, less the further out, and flings runners and rovers clear. Bosses, lair cores and your backup are left alone.
 - **Military zones:** Fort Meridian (Atlantic Accord) and Bastion Vostok-9 (Pan-Pacific
   Directorate) sit inside red striped walls. If you enter without a contract that grants
   clearance, you get a 4-second warning. After that, turrets and patrol rovers open fire,
@@ -340,7 +343,8 @@ slow-motion, a comic splash panel and a close-up. He rolls in on a mad-max monst
 ground and never rams: it skirts round you at 45-80 m, swapping direction, while a lackey works the roof
 turret. On the ground the turret is a **gatling** (fast bursts of small rounds). Get well off the ground
 and it switches to **flak** (FLAK! GET LOW): shells that burst in mid-air around you, stinging and nudging
-you (bleeding your speed and pulling you down) rather than blasting you clear; each burst leaves a
+you (a shove of up to 20 m/s away from the burst, less with a Flak Weave, plus bleeding your speed and pulling you down)
+rather than blasting you clear; each burst leaves a
 cloud of white-hot phosphor embers that hangs and drifts for a moment before burning out. Wreck the truck for a
 ₵800 bounty; the first time, his **Rustmoon Junk Mortar** tumbles out in a green-beamed crate (it's also
 yours if you swear in with Rustmoon). Lose him by getting 1.5 km away. Not while you ride with Rustmoon.

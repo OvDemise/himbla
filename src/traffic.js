@@ -1688,10 +1688,22 @@ export class Traffic {
     }
   }
 
-  damage(v, amount) {
+  damage(v, amount, blame = true) {
     v.hp -= amount;
     v.hurt = 0.2;
-    if (v.hp <= 0) this.wreck(v);
+    if (v.hp <= 0) this.wreck(v, blame);
+  }
+
+  // A meteor lands (meteors.js): whatever is under it is wrecked, whatever is near is battered by the blast
+  // (less the further out), and nobody is blamed for it.
+  meteorBlast(pos, core, reach) {
+    for (const v of this.roadVehicles || []) {
+      if (!v.maxHp || v.hp <= 0 || v.state === 'dead' || !v.root.visible) continue;
+      let d = this.centre(v, _a).distanceTo(pos) - v.hitR;
+      if (v.trailers) for (const t of v.trailers) d = Math.min(d, _a.copy(t.plat.pos).addScaledVector(_u.copy(t.plat.pos).normalize(), 2.6).distanceTo(pos) - 4.6);
+      if (d > reach) continue;
+      this.damage(v, d <= core ? v.maxHp * 2 : v.maxHp * 0.9 * (1 - (d - core) / (reach - core)), false);
+    }
   }
 
   // Burnt look: swap every surface (not the ink hulls) to one charred material, and back.
@@ -1706,7 +1718,7 @@ export class Traffic {
     }
   }
 
-  wreck(v) {
+  wreck(v, blame = true) {
     const g = this.g;
     v.hp = 0;
     v.state = 'wreck';
@@ -1731,7 +1743,7 @@ export class Traffic {
     // the town whose road it was isn't happy about it
     const pc = v.piece;
     let town = pc.kind === 'e' ? (pc.fromLoc.dir.distanceTo(up) < pc.toLoc.dir.distanceTo(up) ? pc.fromLoc : pc.toLoc) : pc.town;
-    if (town && town.faction && g.rep) g.rep.add(town.faction, -3, 'Wrecked civilian traffic');
+    if (blame && town && town.faction && g.rep) g.rep.add(town.faction, -3, 'Wrecked civilian traffic');
   }
 
   // Back on the road later, somewhere the camera can't see it appear.

@@ -35,13 +35,21 @@ export function fireWeapon(g, w, muzzle, dir, inherit, mult, homing) {
     g.audio.burst(0.25, 2400, 0.4);
     g.cam.shake = Math.max(g.cam.shake, 0.25);
   } else if (w.key === 'rail') {
-    // hitscan: stops at the ground, pierces everything in between
+    // hitscan: it pierces targets, buildings and traffic, but the ground and any rock stop it
+    // (and so nothing behind them is hit). The ground is marched in 4 m steps then narrowed down.
     let len = 650;
-    for (let i = 1; i <= 80; i++) {
-      const t = (i / 80) * 650;
-      _v.copy(muzzle).addScaledVector(dir, t);
-      if (g.planet.altitude(_v) < 0) { len = t; break; }
+    for (let t = 4; t <= 650; t += 4) {
+      if (g.planet.altitude(_v.copy(muzzle).addScaledVector(dir, t)) >= 0) continue;
+      let lo = t - 4, hi = t;
+      for (let i = 0; i < 7; i++) {
+        const mid = (lo + hi) / 2;
+        if (g.planet.altitude(_v.copy(muzzle).addScaledVector(dir, mid)) < 0) hi = mid; else lo = mid;
+      }
+      len = lo;
+      break;
     }
+    const rock = g.planet.rockRay(muzzle, dir, len);
+    if (rock < len) len = Math.max(0, rock - 0.05);
     const end = muzzle.clone().addScaledVector(dir, len);
     for (const t of g.enemies.targets()) {
       const rel = t.center.clone().sub(muzzle);

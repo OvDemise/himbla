@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { makeRover, makeApc, makeHoverCar, makeSkimmer, makeLightBike, LightTrail } from './models.js';
 import { fireCannon } from './weapons.js';
 import { makeBody } from './physics.js';
-import { stepRover } from './enemies.js';
+import { stepRover, CRASH_SAFE } from './enemies.js';
 import { frameQuat, tangent } from './geo.js';
 import { toon, glow, ink } from './toon.js';
 import { glyphHtml } from './glyphs.js';
@@ -23,7 +23,6 @@ const _ap = new THREE.Vector3(), _am = new THREE.Vector3(), _ad = new THREE.Vect
 const _ex = new THREE.Vector3(), _exv = new THREE.Vector3();
 const RIDE_LIFT = 0.2; // the wheeled ones ride a touch above the physics ground: the tyres (and their ink outlines) reach below the model's origin, and sank into the terrain on slopes
 const REBUILD = 90; // seconds the orbital crane needs to replace a wrecked vehicle
-const CRASH_SAFE = 18; // m/s you can hit a wall at without hurting the vehicle
 const TURRET_YAW_RATE = 2.6; // rad/s the turret can swing
 const TURRET_PITCH_RATE = 1.7; // rad/s the barrel can elevate
 const TURRET_DOWN = -0.12, TURRET_UP = 0.75; // barrel travel (rad): a little depression, ~43 degrees up

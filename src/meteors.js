@@ -296,7 +296,12 @@ export class Meteors {
     const blast = rock.blast;
     const near = g.player.pos.distanceTo(rock.gp) < 1000;
     if (!near) return;
-    g.explode(rock.gp.clone().addScaledVector(up, 1), blast, 20 + rock.r * 2, 'meteor', 2);
+    const at = rock.gp.clone().addScaledVector(up, 1);
+    g.explode(at, blast, 20 + rock.r * 2, 'meteor', 2);
+    // the NPCs: whatever is under the rock is crushed, and the blast beyond it batters the rest
+    g.enemies.meteorBlast(at, rock.r + 1, blast, rock.r);
+    if (g.civilians) g.civilians.meteorBlast(at, rock.r + 1, blast);
+    if (g.world.traffic) g.world.traffic.meteorBlast(at, rock.r + 1, blast);
     if (g.player.pos.distanceTo(rock.gp) < 250) g.cam.shake = Math.min(1.5, g.cam.shake + 0.6);
     g.fx.dust(rock.gp, new THREE.Vector3(), 18, up, 0x8a7a70);
     // the rock bursts into chunks that tumble out and bounce
