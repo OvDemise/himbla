@@ -65,7 +65,7 @@ const RADIAL = [
 ];
 // the panels a highlight can work in, topmost first
 const UI_ROOTS = ['settings', 'dialog', 'board', 'replog', 'wardrobe', 'casino', 'help', 'pause', 'death', 'globe-wrap'];
-const FOCUSABLE = 'button, [data-i], [data-k], [data-f], [data-tab], a[href], input, select, .wd-tile, [role="button"]';
+const FOCUSABLE = 'button, [data-i], [data-k], [data-f], [data-tab], [data-buy], a[href], input, select, .wd-tile, [role="button"]'; // ([data-i]: a contract on a job terminal, [data-buy]: one of its upgrades)
 
 // which glyph set to show: PlayStation (Sony 054c) and Switch (Nintendo 057e) pads, else Xbox
 export function padKind(id = '') {
@@ -624,7 +624,9 @@ export class Gamepad {
       const side = dir === 'left' || dir === 'right' ? Math.abs(dy) : Math.abs(dx);
       if (along <= 2) continue;
       // (up / down take the next row first, then the closest across it: a slider's centre is far from a button at the row's end)
-      const s = dir === 'up' || dir === 'down' ? along * 6 + side * 0.5 : along + side * 2.2;
+      let s = dir === 'up' || dir === 'down' ? along * 6 + side * 0.5 : along + side * 2.2;
+      // (and up / down stay in their own column when there is one: the next upgrade on a terminal, not the contract beside it)
+      if ((dir === 'up' || dir === 'down') && Math.min(r.right, a.right) - Math.max(r.left, a.left) <= 0) s += 1e5;
       if (s < bestS) { bestS = s; best = el; }
     }
     return best;

@@ -392,7 +392,7 @@ export class HUD {
     html += `</div>`;
     html += `</div>`;
     // (the footer stays on screen while the board scrolls; with a controller in use it names the pad's buttons)
-    html += `<div class="board-foot"><span class="foot-kb">&gt; Click a contract or press 1-${Math.max(1, offers.length)} · F / ESC to log off</span><span class="foot-pad">&gt; Press ${glyphHtml(['A'])} on a contract · ${glyphHtml(['B'])} to log off</span><span class="term-cursor">_</span></div>`;
+    html += `<div class="board-foot"><span class="foot-kb">&gt; Click a contract or press 1-${Math.max(1, offers.length)} · F / ESC to log off</span><span class="foot-pad">&gt; Press ${glyphHtml(['A'])} on a contract or an upgrade · ${glyphHtml(['B'])} to log off</span><span class="term-cursor">_</span></div>`;
     el.innerHTML = html;
     el.classList.add('term');
     el.style.setProperty('--fc', f.color);
