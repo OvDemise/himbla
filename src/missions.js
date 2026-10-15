@@ -372,17 +372,17 @@ export class Missions {
     if (a.clearance) { const L = this.game.locations.find((l) => l.id === a.clearance); if (L) g.enemies.grantGrace(L); }
   }
 
-  fail(reason) {
+  // quiet: the caller has its own message for it (an emergency recall lists everything it failed in one panel)
+  fail(reason, quiet = false) {
     const g = this.game;
-    g.hud.failed(reason);
-    g.audio.hurt();
+    if (!quiet) { g.hud.failed(reason); g.audio.hurt(); }
     this.clear();
   }
 
   // everything on your back is lost (you went down, an emergency recall)
-  failAll(reason) {
-    this.extra = null;
-    if (this.active) this.fail(reason);
+  failAll(reason, quiet = false) {
+    this.extra = null; // (first, so clear() doesn't promote it to the main contract)
+    if (this.active) this.fail(reason, quiet);
   }
 
   clear() {

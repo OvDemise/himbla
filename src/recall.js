@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { makeShuttle } from './models.js';
 import { frameQuat, tangent } from './geo.js';
+import { FACTIONS } from './locations.js';
 
 // Emergency recall: ₵100, and a little cutscene. A transport shuttle drops out of the sky at your
 // home base, lands, drops its ramp, and you stroll out.
@@ -32,6 +33,7 @@ export class Recall {
   constructor(game) {
     this.game = game;
     this.active = false;
+    this.failed = []; // what this recall failed ([{ line, short }]): listed for the whole scene, then again in a toast
     this.leaving = null; // the shuttle flying off after the scene ends
     this.bars = document.createElement('div');
     this.bars.id = 'cinebars';
@@ -43,18 +45,56 @@ export class Recall {
   request() {
     const g = this.game;
     if (this.active) return;
+    if (g.credits < RECALL_COST) { g.hud.toast(`Emergency recall costs ₵${RECALL_COST}. You can't afford the shuttle.`, 2.5); return; }
     if (g.player.vehicle) g.garage.exit();
     if (g.rides.ride) g.rides.exit();
-    if (g.credits < RECALL_COST) { g.hud.toast(`Emergency recall costs ₵${RECALL_COST}. You can't afford the shuttle.`, 2.5); return; }
     g.credits -= RECALL_COST;
     g.audio.cash();
-    if (g.missions.active) g.missions.failAll('Emergency recall — contract forfeited.');
     this.start();
+  }
+
+  // What taking the shuttle fails: your contracts (both, on a Twin Cradle), the timed event you're in the middle of and
+  // the faction story chapter you're on. One entry each: `line` for the list panel, `short` for the toast after.
+  // (The Spindle's chapter is left alone: it has its own retry, and the recall can't be called up there anyway.)
+  activeWork() {
+    const g = this.game;
+    const M = g.missions, E = g.events, S = g.story;
+    const rows = [];
+    if (M.active) rows.push({ line: `Contract: ${M.active.cargo.name} → ${M.active.to.name}`, short: M.active.cargo.name });
+    if (M.extra) rows.push({ line: `Second contract: ${M.extra.a.cargo.name} → ${M.extra.a.to.name}`, short: M.extra.a.cargo.name });
+    if (E.active) {
+      const f = FACTIONS[E.active.faction];
+      rows.push({ line: `${f ? f.name + ' event' : 'Event'}: ${E.active.title}`, short: E.active.title });
+      if (E.active.type === 'wreck') rows.push({ line: "The pirate didn't make it: Rustmoon is closed to you for good.", short: null });
+    }
+    if (S.active && !(g.spindle && g.spindle.active)) {
+      rows.push({ line: `Story: ${S.active.def.title} (${FACTIONS[S.active.f].name}, chapter ${S.active.idx + 1})`, short: S.active.def.title });
+    }
+    return rows;
+  }
+
+  // Fails all of it, quietly (the list is the message), and clears the story chip and its hold meter, which only a
+  // frame of play would otherwise refresh. Returns what it failed. Called first in start(), so the work is already
+  // gone when the scene begins: the shuttle has taken time, and nothing ticks while it plays (a contract or event
+  // clock would otherwise be frozen mid-run).
+  failActiveWork() {
+    const g = this.game;
+    const rows = this.activeWork();
+    if (!rows.length) return [];
+    const M = g.missions, E = g.events, S = g.story;
+    M.failAll('Emergency recall: contract forfeited.', true);
+    if (E.active) E.fail(E.active, 'Emergency recall: event failed.', true);
+    if (S.active && !(g.spindle && g.spindle.active)) S.fail('Emergency recall: chapter failed.', true);
+    g.hud.eventPanel(S.panel()); // (null now: hides the story/event chip and the fluid canvas)
+    S.renderMeter();
+    g.audio.hurt();
+    return rows;
   }
 
   start() {
     const g = this.game;
     const P = g.player;
+    this.failed = this.failActiveWork(); // (the tutorial's free shuttle comes through here too)
     const home = g.home();
     this.home = home;
     this.active = true;
@@ -75,6 +115,7 @@ export class Recall {
     // (the stroll from the ramp's foot to your spot takes as long as that distance needs, a jog or so)
     this.walkT = LEG_A + Math.max(0.54, Math.min(3, Math.max(0, this.land.distanceTo(home.point) - RAMP_FOOT) / WALK_SPEED));
     this.endAt = 3.4 + this.walkT + 0.6;
+    if (this.failed.length) g.hud.failedList('SHUTTLE RECALL: WORK FAILED', this.failed.map((r) => r.line), this.endAt + 0.5); // (up for the whole scene)
     // the shuttle sits behind where you'll stand, nose away, so its rear door drops toward you
     const s = makeShuttle({ color: 0xfff4e0, stripe: g.rep.aligned() ? 0x7dff3a : 0x2ec4ff });
     s.root.scale.setScalar(SCALE);
@@ -255,6 +296,13 @@ export class Recall {
     this.bars.classList.add('cb-out');
     setTimeout(() => this.bars.classList.add('hidden'), 400);
     g.state = 'play';
+    if (this.failed.length) {
+      // (the list sits where the arrival banner is about to appear: it goes, and a toast carries the reminder, which also
+      // covers a scene that was skipped a moment after it started)
+      g.hud.hideResult();
+      g.hud.toast(`Recall: failed ${[...new Set(this.failed.map((r) => r.short).filter(Boolean))].join(' · ')}`, 6);
+      this.failed = [];
+    }
     g.hud.banner(this.home.loc);
     this.leaving = { root: this.shuttle.root, t: 0, vel: 0 };
   }

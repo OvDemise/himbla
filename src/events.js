@@ -355,10 +355,10 @@ export class Events {
     if (ev.type === 'wreck') g.wreckChoice();
   }
 
-  fail(ev, reason) {
+  // quiet: the caller has its own message for it (an emergency recall lists everything it failed in one panel)
+  fail(ev, reason, quiet = false) {
     const g = this.game;
-    g.hud.eventResult(ev, false, reason);
-    g.audio.hurt();
+    if (!quiet) { g.hud.eventResult(ev, false, reason); g.audio.hurt(); }
     if (ev.type === 'wreck') {
       g.rep.rustmoon = 'locked';
       g.rep.save();

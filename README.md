@@ -28,7 +28,7 @@ its lip curves up out of it like a kicker, so riding up onto the lip at up to ~6
 Once on, you lock on and ride it round, lap after lap, until you jump
 off. Where craters overlap, the shared outline is the rail, and you pop off where it meets a neighbour.
 
-**Landings:** hard landings hurt half as much as they used to (the cargo still takes the full jolt), and a landing
+**Landings:** hard landings hurt half as much as they used to (the cargo still takes the full jolt; prefab parts are far more fragile than contract cargo), and a landing
 with plenty of speed along the ground is a glancing blow: at 30 m/s of glide it hurts half as much again. Past the terminator lies the **dark side**: almost
 pitch black, lit only by your helmet lamp, and full of pirate dens.
 
@@ -102,7 +102,7 @@ Vite's hot reload restarts the page.
 | `F` | Job board / upgrades (inside hubs and settlements) |
 | `M` | Globe map: drag to spin, scroll to zoom. Fog of war covers anywhere you haven't been |
 | `J` | Reputation Log |
-| `R` (hold 1.5 s) | Emergency recall (₵100): a shuttle flies you to your HQ (the ILMB, the HQ of the faction whose story you've committed to, or Rustmoon Hold if you ride with the pirates); forfeits the current contract |
+| `R` (hold 1.5 s) | Emergency recall (₵100): a shuttle flies you to your HQ (the ILMB, the HQ of the faction whose story you've committed to, or Rustmoon Hold if you ride with the pirates); fails everything you have running (your contracts, a live event, your story chapter) before the scene plays, with one list of what was failed (the hold bar warns you first) |
 
 ### Controller
 
@@ -152,7 +152,7 @@ around on foot stays floaty and harmless.
 ## How it plays
 
 **Events** wait for you: each posts a beacon with a start prop (orders terminal, sample tubes, convoy radio,
-supply drop…) at a safe staging point. Walk up and press F to begin. Going down during an event fails it.
+supply drop…) at a safe staging point. Walk up and press F to begin. Going down, or taking the recall shuttle, during an event fails it.
 New postings are spaced out (the first comes about 40 s in, then at least 45–75 s apart). The **distress log**
 above the speed tracker lists every open signal, newest on top, each in its faction's colour with its distance and
 an arrow showing which way it lies from where you're looking; the event you're running is highlighted.
@@ -273,7 +273,7 @@ and appear on the globe map and the Reputation Log. Ride up to a beacon to start
   nearest lit outpost and get back before the pirate's air runs out.
   - **If you save them:** you can swear in with Rustmoon. Pirates then treat you as crew, dens open their
     job boards and gear to you, and raids unlock. SPACECOM will notice.
-  - **If you fail:** you're locked out of Rustmoon for good.
+  - **If you fail:** you're locked out of Rustmoon for good (going down or taking the recall shuttle mid-wreck counts as failing).
 
 ## Economy
 
@@ -313,8 +313,12 @@ Trade, a Militia Pact) reshapes the Moon and puts other factions' vehicles, weap
   kill the guards and hold the ground; the outpost flips to your faction and the territory border moves.
   Daedalus rewrites posts with a phase jammer instead. Captures unlock **vehicles**. Vostok and Daedalus
   fight each other (captures cost the rival rep). SPACECOM hunts down Kade, then storms his Hold.
-- **Civilian (Kepler):** haul prefab parts (crack them with a hard landing and you go back for more) to
-  **found homesteads** you own. Each outpost terminal builds up to 6 modules: Greenhouse (heals nearby),
+- **Civilian (Kepler):** haul prefab parts (light bumps only dent them, a thruster-speed crash of about 140 km/h
+  smashes them and you go back for more) to **found homesteads** you own. Survey three sites for your town (stand
+  inside the ground ring, 40 m round each point, for 3 s), and in the finale, **The Charter**, ride to every faction HQ
+  but Rustmoon's (Kepler, the ILMB, Meridian Exchange, Bastion Vostok-9 and the Daedalus Citadel) for the Moon Council's
+  votes: the story panel lists each HQ and the tally, and Gran's letter of introduction clears you through the
+  Vostok and Daedalus gates (whatever you stand at with them, unless you're already FRIENDLY) until the Charter is signed. Each outpost terminal builds up to 6 modules: Greenhouse (heals nearby),
   Clinic (you redeploy there after a K.O.), Beacon (charts 1.5 km and links beacons for fast travel),
   Militia Turret (shoots pirates), Market (₵40/min to collect) and Garage (hauler vehicle).
 - **Research (Meridian, plus Daedalus):** plant sensor relays, survive **phase-field experiments**

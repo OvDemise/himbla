@@ -1003,7 +1003,9 @@ export class Enemies {
       const inside = !P.dead && d < loc.zoneR;
       // a delivery you just made here keeps you cleared until you leave (or start shooting)
       if (!inside) base.grace = false;
-      const authorized = base.grace || (!hostileRep && (g.missions.hasClearance(loc.id) || rep.cleared(base.faction) || g.events.hasClearance(loc.id)));
+      // (a story pass, like a fresh delivery's grace, lets you in even if the faction counts you an enemy: otherwise a player who is
+      // hostile with Daedalus for taking Vostok's side could never finish the Charter)
+      const authorized = base.grace || (g.story && g.story.hasClearance(loc.id)) || (!hostileRep && (g.missions.hasClearance(loc.id) || rep.cleared(base.faction) || g.events.hasClearance(loc.id)));
       base.inside = inside;
       base.authorized = authorized;
       if (inside && !authorized) {
@@ -1040,13 +1042,14 @@ export class Enemies {
   }
 
   // You just delivered to (or picked up from) this restricted base: its guns hold until you're out.
-  grantGrace(loc) {
+  grantGrace(loc, why = 'delivery signed for') {
     const base = this.bases.find((b) => b.loc === loc && b.restricted);
     if (!base) return;
     base.grace = true;
+    base.graceWhy = why; // (the zone banner says it too)
     base.time = 0;
     if (base.aggro <= 0) base.hostile = false;
-    if (base.inside) this.game.hud.toast(`${base.loc.name}: delivery signed for. Your clearance holds until you leave the zone. Don't shoot anything.`, 4);
+    if (base.inside) this.game.hud.toast(`${base.loc.name}: ${why}. Your clearance holds until you leave the zone. Don't shoot anything.`, 4);
   }
 
   artillery(base, dt) {

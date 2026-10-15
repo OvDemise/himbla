@@ -305,6 +305,31 @@ export class HUD {
     this.resultT = 4;
   }
 
+  // One panel listing everything that was failed at once (an emergency recall), held for `dur` seconds so it
+  // stays up through the cutscene. Rows are built as text: they carry names, not markup.
+  failedList(title, lines, dur = 8) {
+    const el = $('result');
+    el.className = 'panel result lose';
+    el.replaceChildren();
+    const t = document.createElement('div');
+    t.className = 'r-title';
+    t.textContent = title;
+    el.appendChild(t);
+    for (const l of lines) {
+      const r = document.createElement('div');
+      r.className = 'r-sub r-fail';
+      r.textContent = `✖ ${l}`;
+      el.appendChild(r);
+    }
+    this.resultT = dur;
+  }
+
+  // (resultT has to go to zero as well as the class: update() shows the panel every frame while it's above it)
+  hideResult() {
+    this.resultT = 0;
+    $('result').classList.add('hidden');
+  }
+
   death(cause, hint = null) {
     $('death-cause').textContent = cause;
     $('death-hint').textContent = hint || 'Click or press ENTER to redeploy at your home base.';
@@ -800,7 +825,7 @@ export class HUD {
     const t = ev.timer !== undefined ? `<span class="m-timer ${ev.timer < 20 ? 'low' : ''}">${Math.floor(Math.max(0, ev.timer) / 60)}:${String(Math.floor(Math.max(0, ev.timer) % 60)).padStart(2, '0')}</span>` : '';
     const html = `<div class="m-head" style="background:${f.color}">EVENT · ${f.name}</div>
       <div class="m-cargo">${ev.title}</div>
-      <div class="m-obj">${ev.status || ''}</div>
+      <div class="m-obj">${ev.status || ''}</div>${(ev.list || []).map((r) => `<div class="ev-row ${r.state}"><b>${r.state === 'done' ? '✔' : r.state === 'next' ? '►' : '○'}</b>${r.label}<span>${r.note || ''}</span></div>`).join('')}
       <div class="m-row">${t}<div class="track ev-bar"><div class="fill" style="width:${Math.round((ev.bar ?? 0) * 100)}%;background:${f.color}"></div></div></div>`;
     if (html !== this.lastEventHtml) { el.innerHTML = html; this.lastEventHtml = html; }
     const fc = $('fluid');

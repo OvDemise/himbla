@@ -1459,7 +1459,7 @@ class Game {
         : `⚠ RESTRICTED ZONE — ${base.loc.name.toUpperCase()} — LEAVE IN ${left.toFixed(1)}s ⚠`;
     } else if (base) {
       zw.classList.remove('hidden');
-      zw.innerHTML = base.grace ? `✔ DELIVERY SIGNED — ${base.loc.name.toUpperCase()} · CLEARED UNTIL YOU LEAVE` : `✔ CLEARANCE ACCEPTED — ${base.loc.name.toUpperCase()}`;
+      zw.innerHTML = base.grace ? `✔ ${(base.graceWhy || 'delivery signed for').toUpperCase()} — ${base.loc.name.toUpperCase()} · CLEARED UNTIL YOU LEAVE` : `✔ CLEARANCE ACCEPTED — ${base.loc.name.toUpperCase()}`;
     } else zw.classList.add('hidden');
 
     // settlements patch you up, unless their defences are currently shooting at you
@@ -1511,7 +1511,8 @@ class Game {
     // emergency recall: hold R for 1.5 s (so it can't be fat-fingered mid-run)
     if (this.input.down('KeyR') && !this.recall.active && !this.player.dead) {
       this.recallHold = (this.recallHold || 0) + dt;
-      this.hud.recallHold(this.recallHold / 1.5, this.home().loc);
+      const loc = this.home().loc;
+      this.hud.recallHold(this.recallHold / 1.5, loc, this.recall.activeWork().length ? `HOLD R · RECALL TO ${loc.short || loc.name.toUpperCase()} · 100 CR · FAILS YOUR JOBS${this.events.active && this.events.active.type === 'wreck' ? ' · LOSES RUSTMOON FOR GOOD' : ''}` : null);
       if (this.recallHold >= 1.5) { this.recallHold = 0; this.hud.recallHold(0); this.recall.request(); }
     } else if (this.recallHold) { this.recallHold = 0; this.hud.recallHold(0); }
 
