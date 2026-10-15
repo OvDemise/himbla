@@ -266,18 +266,28 @@ export class Enemies {
     const R = e.roam;
     const r = R.route;
     const T = g.territory;
-    // follow the route: pick the next point a little way along it, flip at the ends (or turn round
-    // if the car has been wedged against something for a while)
+    // follow the route: aim at a waypoint 70 m along it; once the car is within 40 m of it (or has chased it for too long) the
+    // waypoint moves on, and at either end of the route the car turns round. (It turns in about 8 m at speed, so a waypoint
+    // 40 m wide can always be arrived at: the car can never circle one it cannot reach, which is what it did when the marker
+    // it was waiting for sat behind it after the turn at an end.)
+    const step = 70 / Math.max(50, r.len);
     const here = _sv.copy(b.pos).normalize();
-    const cur = T.routePoint(r, R.t, _sn);
-    if (here.distanceTo(cur) * b.pos.length() < 40) R.t += (R.dir * 70) / Math.max(50, r.len);
-    if (r.b) { if (R.t > 1 || R.t < 0) { R.t = Math.min(1, Math.max(0, R.t)); R.dir *= -1; } }
-    else R.t = (R.t + 1) % 1;
+    const wp = T.routePoint(r, R.t, _sn);
+    R.wpT = (R.wpT || 0) + dt;
+    if (here.distanceTo(wp) * b.pos.length() < 40 || R.wpT > 20) {
+      R.wpT = 0;
+      if (r.b && (R.dir > 0 ? R.t >= 1 : R.t <= 0)) R.dir *= -1; // (it has reached the waypoint at the end)
+      R.t += R.dir * step;
+      R.t = r.b ? Math.min(1, Math.max(0, R.t)) : ((R.t % 1) + 1) % 1;
+    }
     R.stuck = b.pos.distanceToSquared(R.lastPos) < 0.25 * dt ? R.stuck + dt : 0;
     R.lastPos.copy(b.pos);
-    if (R.stuck > 5) { R.stuck = 0; R.dir *= -1; b.vel.multiplyScalar(0); }
-    const lead = T.routePoint(r, Math.min(1, Math.max(0, R.t + R.dir * 70 / Math.max(50, r.len))), new THREE.Vector3());
-    const goal = this.ground(lead);
+    if (R.stuck > 5) { // (wedged against something: back the other way)
+      R.stuck = 0; R.dir *= -1; R.wpT = 0; b.vel.multiplyScalar(0);
+      R.t += R.dir * 2 * step;
+      R.t = r.b ? Math.min(1, Math.max(0, R.t)) : ((R.t % 1) + 1) % 1;
+    }
+    const goal = this.ground(T.routePoint(r, R.t, new THREE.Vector3()));
     this.dbgGoal(e, goal);
     const crash = { speed: 0 };
     stepRover(e, dt, g.planet, g.colliders, goal.sub(b.pos), 16, { engine: 16, grip: 8, turn: 2, stick: Infinity, crash });

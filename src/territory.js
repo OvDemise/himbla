@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { FACTIONS } from './locations.js';
 import { toon, glow, ink } from './toon.js';
-import { arcDist, tangent, frameQuat, greatCircle, SUN } from './geo.js';
+import { arcDist, tangent, frameQuat, greatCircle, SUN, R as PLANET_R } from './geo.js';
 import { mulberry32 } from './rng.js';
 import { ITEMS } from './alchemy.js';
 import { outpostTemplate, SMALL_KINDS, FLAT_R } from './outpostModels.js';
@@ -12,6 +12,7 @@ import { foundedTemplate, TERMINAL_Z } from './storyAssets.js';
 // and military patrols run between them.
 const KEY = 'moonrunner-territory-v1';
 const MILITARY = ['spacecom', 'vostok', 'daedalus'];
+const LOOP_ARC = 0.024; // the radius (radians of the Moon) of the little loop a patrol drives round a lone outpost: about 86 m
 const KINDS = {
   spacecom: ['tower', 'depot'], vostok: ['tower', 'depot'], daedalus: ['tower', 'depot'],
   kepler: ['farm', 'mast'], meridian: ['kiosk', 'mast'], rustmoon: ['shack', 'junk'],
@@ -460,7 +461,7 @@ export class Territory {
       }
       if (best && !this.routes.some((r) => (r.a === best && r.b === a))) this.routes.push({ a, b: best, faction: a.faction, len: bd, unit: null });
       // lone outposts still get a little loop of their own
-      else if (!best) this.routes.push({ a, b: null, faction: a.faction, len: 300, unit: null });
+      else if (!best) this.routes.push({ a, b: null, faction: a.faction, len: Math.round(Math.PI * 2 * LOOP_ARC * PLANET_R), unit: null });
     }
     for (const p of this.patrols) this.game.enemies.removeRoamer(p);
     this.patrols = [];
@@ -487,7 +488,7 @@ export class Territory {
     const a = t * Math.PI * 2;
     const tA = tangent(_v.set(1, 0, 0), r.a.dir).normalize();
     const tB = new THREE.Vector3().crossVectors(r.a.dir, tA);
-    return out.copy(r.a.dir).addScaledVector(tA, Math.cos(a) * 0.024).addScaledVector(tB, Math.sin(a) * 0.024).normalize();
+    return out.copy(r.a.dir).addScaledVector(tA, Math.cos(a) * LOOP_ARC).addScaledVector(tB, Math.sin(a) * LOOP_ARC).normalize();
   }
 
   // A route gets one patrol car while you're about. It is an ordinary enemy entity (solid, shootable,
