@@ -185,9 +185,11 @@ export class Gamepad {
     }
   }
 
-  // the crosshair (pad or mouse) shows while firing and fades away AIM_SHOW seconds after the last shot
+  // the crosshair (pad or mouse) shows while firing and fades away AIM_SHOW seconds after the last shot; in a
+  // vehicle with a turret (the APC) it stays up the whole time, since that is where the turret is pointing
   crosshair(dt) {
-    const firing = this.game.state === 'play' && this.input.mouse[0];
+    const P = this.game.player;
+    const firing = this.game.state === 'play' && (this.input.mouse[0] || !!(P && P.vehicle && P.vehicle.def.turret));
     this.aimT = firing ? 0 : Math.min(this.aimT + dt, AIM_SHOW);
     document.body.classList.toggle('aim', this.aimT < AIM_SHOW);
   }

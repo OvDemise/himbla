@@ -355,6 +355,7 @@ export class Garage {
     model.root.quaternion.slerp(q, Math.min(1, dt * 8));
     const sp = b.vel.length();
     for (const w of model.wheels) w.rotation.x += (along >= 0 ? 1 : -1) * sp * dt / (model.wheelR || 0.85);
+    model.along = along;
     if (model.anim) model.anim(g.time, sp);
     this.trail(model, dt, true);
     // the runner sits in the seat, in the model's own frame (its tilt, its hover bob), so rider and

@@ -68,7 +68,11 @@ def star(r_out, r_in, n=5):
 
 
 ROOT = pivot("apc", (0, 0, 0), None)
-CH = pivot("apc_chassis", (0, 0, 0), ROOT, role="chassis")
+# The hull rides LIFT above where it is modelled below (the numbers in the hull section are measured from its
+# own pivot), so its belly and the fenders clear the tops of the wheels; the underbody block, axles and
+# differentials sit on the root, on the wheels' own heights.
+LIFT = 0.35
+CH = pivot("apc_chassis", (0, LIFT, 0), ROOT, role="chassis")
 
 # ---- hull: a boxy loft, sloped at the nose, with a skid plate and belly under it ----
 HULL = [
@@ -99,8 +103,8 @@ for sx in (-1, 1):
 
 # wheel fenders: long boxes over each wheel row, the faction stripe and star on the flanks
 for sx in (-1, 1):
-    mesh(f"fender{sx}", xf(rbox(0.2, 0.2, 3.4, 0.2, 14, 6), (sx * 1.64, 1.4, 0.05)), "body", CH, 0.05)
-    mesh(f"stripe{sx}", xf(rbox(0.025, 0.07, 3.0, 0.3, 8, 4), (sx * 1.85, 1.43, 0.05)), "stripe", CH, 0)
+    mesh(f"fender{sx}", xf(rbox(0.2, 0.2, 3.4, 0.2, 14, 6), (sx * 1.64, 1.21, 0.05)), "body", CH, 0.05)
+    mesh(f"stripe{sx}", xf(rbox(0.025, 0.07, 3.0, 0.3, 8, 4), (sx * 1.85, 1.24, 0.05)), "stripe", CH, 0)
     mesh(f"star{sx}", xf(extrude(star(0.34, 0.14), 0.03, "x"), (sx * 1.53, 1.72, 0.55)), "stripe", CH, 0)
     # a side door and a firing port
     mesh(f"door{sx}", xf(rbox(0.025, 0.34, 0.42, 0.15, 6, 4), (sx * 1.535, 1.7, -0.7)), "steel", CH, 0.02)
@@ -120,14 +124,19 @@ mesh("exhaust", tube([(1.3, 1.1, -2.75), (1.55, 1.1, -3.05)], [0.1, 0.1], 8), "s
 mesh("exhaustTip", xf(torus(0.1, 0.03, 10, 4), (1.55, 1.1, -3.06), (math.pi / 2, 0, 0)), "hot", CH, 0)
 for i, x in enumerate((-0.75, 0.0)):
     mesh(f"can{i}", xf(rbox(0.2, 0.26, 0.11, 0.2), (x, 2.5, -2.75), (0, 0, 0.05 * (1 - 2 * i))), "olive", CH, 0.03)
-# antennas on the rear deck
+# antennas on the rear deck: each whip is its own pivot at its base (role "antenna") so the game can lay it
+# back with speed; the stub it stands in stays on the hull
 for sx, lean in ((-1, -0.12), (1, 0.12)):
-    mesh(f"ant{sx}", tube([(sx * 1.15, 2.25, -2.45), (sx * 1.15 + lean, 4.1, -2.7)], [0.035, 0.012], 5), "dark", CH, 0)
+    A = pivot(f"antenna{sx}", (sx * 1.15, 2.26, -2.45), CH, role="antenna")
+    mesh(f"ant{sx}", tube([(0, 0, 0), (lean, 1.85, -0.25)], [0.035, 0.012], 5), "dark", A, 0)
     mesh(f"antBase{sx}", xf(lathe([(0.1, 0), (0.07, 0.12)], 8), (sx * 1.15, 2.24, -2.45)), "steel", CH, 0.01)
 
-# underbody axles, one under each wheel pair
+# the underbody: a solid block from the hull's belly down to the axle line, so the axles run out of it to
+# the wheels instead of hanging in the air, with a differential housing on each axle
+mesh("underbody", xf(rbox(1.3, 0.5, 2.65, 0.18, 16, 6), (0, 0.93, 0.0)), "dark", ROOT, 0.05)
 for i, z in enumerate((2.15, 0.75, -0.75, -2.15)):
-    mesh(f"axle{i}", beam((-1.72, 0.62, z), (1.72, 0.62, z), 0.09, 8), "dark", CH, 0)
+    mesh(f"axle{i}", beam((-1.72, 0.62, z), (1.72, 0.62, z), 0.09, 8), "dark", ROOT, 0)
+    mesh(f"diff{i}", xf(superquad(0.26, 0.26, 0.26, 1, 1, 10, 6), (0, 0.62, z)), "steel", ROOT, 0.02)
 
 # ---- the turret: a low angular cap on the roof, a cupola, smoke launchers and a bustle ----
 T = pivot("apc_turret", (0, 2.22, 0.55), CH, role="turret")

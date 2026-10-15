@@ -1492,7 +1492,7 @@ export function makeApc({ color = 0x6b6f78, trim = 0xff3b5c } = {}) {
     }
     return mats.get(slot);
   };
-  const out = { chassis: null, turret: null, barrel: null, muzzle: null, wheels: [] };
+  const out = { chassis: null, turret: null, barrel: null, muzzle: null, wheels: [], antennas: [] };
   const build = (node) => {
     const g = new THREE.Group();
     g.name = node.name;
@@ -1510,6 +1510,7 @@ export function makeApc({ color = 0x6b6f78, trim = 0xff3b5c } = {}) {
       g.add(h);
     }
     if (node.role === 'wheel') out.wheels.push(g);
+    else if (node.role === 'antenna') out.antennas.push(g);
     else if (node.role && node.role in out) out[node.role] = g;
     for (const k of node.kids) g.add(build(k));
     return g;
@@ -1520,7 +1521,27 @@ export function makeApc({ color = 0x6b6f78, trim = 0xff3b5c } = {}) {
   out.barrelRest = out.barrel.position.clone(); // (the recoil slides it back from here)
   // dust is kicked from the four corners, not from all eight wheels
   const dustSpots = [[-1.72, 2.15], [1.72, 2.15], [-1.72, -2.15], [1.72, -2.15]];
-  return { root, chassis: out.chassis, gun: out.turret, turret: out.turret, barrel: out.barrel, barrelRest: out.barrelRest, muzzle: out.muzzle, wheels: out.wheels, wheelR: 0.62, dustSpots };
+  // the whip antennas lie back with speed, like they were dragged: a damped spring on each, driven by the speed
+  // along the hull (vehicles.js sets `along` before calling anim; reversing leans them forward)
+  const whips = out.antennas.map((g, i) => ({ g, a: 0, v: 0, ph: i * 2.1 }));
+  let lastT = null;
+  const model = {
+    root, chassis: out.chassis, gun: out.turret, turret: out.turret, barrel: out.barrel, barrelRest: out.barrelRest, muzzle: out.muzzle,
+    wheels: out.wheels, wheelR: 0.62, dustSpots, antennas: out.antennas, along: 0,
+    anim(t, sp) {
+      const dt = lastT == null ? 0 : Math.min(0.05, Math.max(0, t - lastT));
+      lastT = t;
+      if (!dt) return;
+      const k = sp < 0.5 ? 0 : Math.max(-0.3, Math.min(1, model.along / 60)); // (1 = flat out)
+      for (const w of whips) {
+        const target = -(0.45 * k) - 0.02 * Math.abs(k) * Math.sin(t * 17 + w.ph); // (a little flutter at speed)
+        w.v += (90 * (target - w.a) - 9 * w.v) * dt; // spring and damping: a lag, a small overshoot when you floor it
+        w.a += w.v * dt;
+        w.g.rotation.x = w.a; // (+z is forward: a negative turn about x lays the tip back)
+      }
+    },
+  };
+  return model;
 }
 
 // Shuttle-bus: a fat lifting-body hopper with a wraparound windscreen, porthole windows, two
