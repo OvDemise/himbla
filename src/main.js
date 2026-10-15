@@ -1330,7 +1330,10 @@ class Game {
     const glowK = voidSight ? 4 : k * 1.2;
     P.glowLight.intensity += (glowK - P.glowLight.intensity) * 0.2;
     if (!glowK && P.glowLight.intensity < 0.005) P.glowLight.intensity = 0;
-    const isDark = dark > 0.6;
+    // The banner and the minimap tint follow the terminator line itself (the one on the globe map,
+    // sun-dot = 0), with ~22 m of slack each way so riding along the line doesn't flicker them.
+    // (darkness() is a soft ramp that sits further in, so keying off it fired about 390 m late.)
+    const isDark = this.wasDark ? e < 0.006 : e < -0.006;
     if (isDark !== this.wasDark && this.state === 'play') {
       this.wasDark = isDark;
       if (isDark) this.hud.alert('☾ ENTERING THE DARK SIDE ☾', '#3a2b6f', 3.5);
