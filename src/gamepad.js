@@ -69,6 +69,7 @@ const FOCUSABLE = 'button, [data-i], [data-k], [data-f], [data-tab], a[href], in
 
 // which glyph set to show: PlayStation (Sony 054c) and Switch (Nintendo 057e) pads, else Xbox
 export function padKind(id = '') {
+  if (/xbox|045e|xinput|microsoft/i.test(id)) return 'xbox'; // (before the PlayStation test: "Xbox Wireless Controller" would match its "wireless controller")
   if (/054c|dualsense|dualshock|playstation|wireless controller/i.test(id)) return 'ps';
   if (/057e|nintendo|switch|pro controller|joy-?con/i.test(id)) return 'switch';
   return 'xbox';
