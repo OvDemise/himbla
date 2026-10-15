@@ -46,7 +46,7 @@ or failing that from the name up to the first `_` or digit.
 - Custom property `ink` (number, metres) on a mesh = outline thickness (smoothed-normal shell). Absent or 0 = none. It
   belongs to that mesh alone: a mesh parented under an inked one gets no outline of its own.
 - Flat colours only. The look is the game's 3-step toon ramp over the material's **base colour**.
-- Do not use alpha blending (not supported in the pilot: the checker warns, the mesh renders opaque).
+- Do not use alpha blending, except on an `additive…` material (see below): anywhere else the checker warns and the mesh renders opaque.
 
 ### Materials
 
@@ -57,6 +57,7 @@ The material **name** (a trailing `.NNN` is ignored) picks the treatment; everyt
 | `faction…` (`faction`, `faction_cloth`, …) | lit toon in the owning faction's accent colour |
 | `faction_glow…` | unlit, in the faction's accent colour |
 | `glow…` (`glow`, `glow_red`, …) | unlit, in the material's own base colour (lamps, screens) |
+| `additive…` (`additive_searchlight`) | a light beam: unlit, additive and see-through, in the base colour, with the material's **alpha** as its opacity. Double-sided, writes no depth, casts no shadow, gets no outline |
 | anything else | lit toon in the material's own base colour |
 
 Turn **backface culling off** on a material to make it double-sided (dishes, cloth).

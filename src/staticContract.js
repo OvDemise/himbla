@@ -16,11 +16,13 @@ export const stripSuffix = (name) => String(name || '').replace(/\.\d{3,}$/, '')
 // What a material name means. Everything else about a material (its flat colour) comes from the file.
 //   faction*       lit toon in the faction's accent colour      faction_glow*  the same, unlit
 //   glow*          unlit, in the material's own colour          anything else  lit toon, own colour
+//   additive*      a light beam: unlit, additive and see-through, in the material's own colour, its alpha the opacity
 export function slotOf(materialName) {
   const n = stripSuffix(materialName).toLowerCase();
   if (n.startsWith('faction_glow')) return { kind: 'glow', faction: true };
   if (n.startsWith('faction')) return { kind: 'toon', faction: true };
   if (n.startsWith('glow')) return { kind: 'glow', faction: false };
+  if (n.startsWith('additive')) return { kind: 'additive', faction: false };
   return { kind: 'toon', faction: false };
 }
 

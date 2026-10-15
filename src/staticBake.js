@@ -108,6 +108,7 @@ function addPart(group, mesh, groupInv, warn) {
     slot: slotOf(mat.name),
     side: mat.side === THREE.DoubleSide ? THREE.DoubleSide : THREE.FrontSide,
     color: mat.color ? mat.color.clone() : new THREE.Color(0xffffff),
+    opacity: mat.transparent ? mat.opacity : 1, // (only an `additive…` material uses it)
     ink: ink > 0 ? ink : 0,
   });
 }
@@ -178,12 +179,27 @@ const proto = (kind, side) => {
   return PROTO.get(k);
 };
 
+// A light beam (an `additive…` material): see-through, additive, unlit and not written to depth, like the Kit's
+// BEAM. One shared material per colour and opacity.
+const ADDITIVE = new Map();
+function additiveMaterial(color, opacity) {
+  const k = `${color.getHexString()}|${opacity.toFixed(3)}`;
+  if (!ADDITIVE.has(k)) ADDITIVE.set(k, new THREE.MeshBasicMaterial({ color: color.clone(), transparent: true, opacity, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
+  return ADDITIVE.get(k);
+}
+
 // parts -> merged meshes: one vertex-coloured mesh per (lit | unlit, side), plus one outline hull.
 // `fixed` is the static body, standing on the ground (y = 0): like a Kit built onGround, the downward-facing
 // faces lying on it (and their outline shells') can never be seen, so they are left out (toon.dropFloorFaces).
 function bakeParts(parts, faction, fixed) {
-  const buckets = new Map(), shells = [], out = [];
+  const buckets = new Map(), beams = new Map(), shells = [], out = [];
   for (const p of parts) {
+    if (p.slot.kind === 'additive') { // (a beam: its own material, no vertex colours, no outline)
+      const mat = additiveMaterial(p.color, p.opacity);
+      if (!beams.has(mat)) beams.set(mat, []);
+      beams.get(mat).push(p.geo.clone());
+      continue;
+    }
     const g = p.geo.clone();
     paintVertices(g, p.slot.faction ? faction : p.color);
     const k = `${p.slot.kind}|${p.side}`;
@@ -199,6 +215,13 @@ function bakeParts(parts, faction, fixed) {
     m.receiveShadow = fixed && b.kind === 'toon';
     if (fixed) m.userData.kitMesh = true; // (fixed in its structure's frame: world.mergeLocation may fold it in)
     for (const g of b.list) g.dispose();
+    out.push(m);
+  }
+  for (const [mat, list] of beams) {
+    const m = new THREE.Mesh(mergeGeometries(list), mat);
+    m.renderOrder = 3; // (after the lit scenery, as the Kit's beams are)
+    m.castShadow = m.receiveShadow = false;
+    for (const g of list) g.dispose();
     out.push(m);
   }
   if (shells.length) {

@@ -155,17 +155,26 @@ function mesh(n, x, group, e, w, st) {
     if (!mn) w('a material has no name: it renders as a plain toon colour', 'unnamed');
     const pbr = mat.pbrMetallicRoughness || {};
     if (pbr.baseColorTexture) w(`material "${label}": a texture: ignored (flat base colour only)`, `tex:${label}`);
-    if (mat.alphaMode === 'BLEND' || mat.alphaMode === 'MASK') w(`material "${label}": ${mat.alphaMode} is not supported: it renders opaque`, `alpha:${label}`);
+    const alpha = (pbr.baseColorFactor || [1, 1, 1, 1])[3];
+    if (slot.kind === 'additive') {
+      if (mat.alphaMode !== 'BLEND') w(`material "${label}": an additive beam needs alpha blending (alphaMode BLEND), or it draws at full strength`, `addblend:${label}`);
+      else if (!(alpha > 0 && alpha < 1)) w(`material "${label}": an additive beam with alpha ${alpha} draws at full strength or not at all`, `addalpha:${label}`);
+    } else if (mat.alphaMode === 'BLEND' || mat.alphaMode === 'MASK') w(`material "${label}": ${mat.alphaMode} is not supported: it renders opaque (only an additive… material may be see-through)`, `alpha:${label}`);
     if (mat.emissiveFactor && mat.emissiveFactor.some((v) => v > 0)) w(`material "${label}": emission is ignored (use a glow* material for unlit)`, `emit:${label}`);
-    st.materials[label] = { treatment: `${slot.faction ? 'faction ' : ''}${slot.kind}`, color: slot.faction ? null : (pbr.baseColorFactor || [1, 1, 1, 1]).slice(0, 3).map((v) => +v.toFixed(3)), doubleSided: !!mat.doubleSided };
-    st.buckets.add(`${group}|${slot.kind}|${side}`);
+    const rgb = (pbr.baseColorFactor || [1, 1, 1, 1]).slice(0, 3).map((v) => +v.toFixed(3));
+    st.materials[label] = { treatment: `${slot.faction ? 'faction ' : ''}${slot.kind}${slot.kind === 'additive' ? ` (alpha ${+alpha.toFixed(3)})` : ''}`, color: slot.faction ? null : rgb, doubleSided: !!mat.doubleSided };
+    st.buckets.add(slot.kind === 'additive' ? `${group}|additive|${rgb.join(',')}|${alpha.toFixed(3)}` : `${group}|${slot.kind}|${side}`);
   }
   st.meshes++;
   if (x.ink !== undefined) {
     if (typeof x.ink !== 'number') { if (Number.isFinite(Number(x.ink))) w(`mesh "${nm}": ink is the text "${x.ink}" (the game accepts it, but make it a number)`, 'inktext'); else e(`mesh "${nm}": ink must be a number`); }
     else if (x.ink < 0) w(`mesh "${nm}": a negative ink is ignored`, 'inkneg');
   }
-  if (Number(x.ink) > 0) { st.inkMeshes++; st.buckets.add(`${group}|ink`); }
+  if (Number(x.ink) > 0) {
+    const onBeam = md.primitives.every((p) => p.material !== undefined && slotOf(j.materials[p.material]?.name).kind === 'additive');
+    if (onBeam) w(`mesh "${nm}": a beam gets no outline: its ink is ignored`, 'beamink');
+    else { st.inkMeshes++; st.buckets.add(`${group}|ink`); }
+  }
 }
 
 function gameplay(role, n, m, x, e, w, st) {
