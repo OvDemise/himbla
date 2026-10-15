@@ -17,6 +17,9 @@ import { SUN, frameQuat, arcDist } from './geo.js';
 const _a = new THREE.Vector3(), _b = new THREE.Vector3(), _c = new THREE.Vector3(), _d = new THREE.Vector3();
 const _n = new THREE.Vector3(), _u = new THREE.Vector3(), _f = new THREE.Vector3();
 const _q = new THREE.Quaternion(), _m4 = new THREE.Matrix4();
+const _fp = new THREE.Vector3(), _rp = new THREE.Vector3(); // (the lane's ground points under a unit's front and rear axles)
+const _g0 = new THREE.Vector3(), _g1 = new THREE.Vector3(), _g2 = new THREE.Vector3(), _g3 = new THREE.Vector3();
+const _gx = new THREE.Vector3(), _gy = new THREE.Vector3(), _gz = new THREE.Vector3(), _gt = new THREE.Vector3();
 const smooth = (t) => { t = Math.min(1, Math.max(0, t)); return t * t * (3 - 2 * t); };
 const clamp01 = (t) => Math.min(1, Math.max(0, t));
 const SAFE_ROAD = 2500; // connect safe outposts closer than this (plus each one's nearest neighbour < 3 km)
@@ -2047,8 +2050,9 @@ export class Traffic {
         pc = v.piece;
       }
     }
-    // place it: chord between the two axles, normals smoothed along the road
-    const up = this.roadFrame(v, v.s, v.front * 0.7, Math.max(2, v.front * 0.7), v.hintF, v.hintR, v.pos, _f);
+    // place it: chord between the two axles, normals smoothed along the road (a land-train's outer axles are 2.9 m out)
+    const lt = v.kind === 'landtrain';
+    const up = this.roadFrame(v, v.s, lt ? 2.9 : v.front * 0.7, lt ? 2.9 : Math.max(2, v.front * 0.7), v.hintF, v.hintR, v.pos, _f, _fp, _rp);
     if (v.kind === 'car') {
       v.hover += ((over || 0) - v.hover) * Math.min(1, dt * 2.5);
       // (a wreck has lost its lift: it sits on the road)
@@ -2064,8 +2068,17 @@ export class Traffic {
     v.root.visible = vis;
     if (v.trailers) for (const t of v.trailers) t.root.visible = vis;
     if (!vis) { this.hide(v); return; }
-    v.root.position.copy(v.pos);
-    frameQuat(up, _f, v.root.quaternion);
+    if (lt) {
+      // (clamped to the ground under its six tyres: and, as it has moved a little from the lane, its speed again)
+      if (v.tug) { _fp.add(v.tug); _rp.add(v.tug); }
+      this.groundPose(_fp, _rp, up, 2.15, v.pos, v.root.quaternion);
+      if (dt > 0) v.vel.copy(v.pos).sub(v.prevPos).divideScalar(dt);
+      if (v.vel.lengthSq() > 3600 || v.state === 'wreck') v.vel.set(0, 0, 0);
+      v.root.position.copy(v.pos);
+    } else {
+      v.root.position.copy(v.pos);
+      frameQuat(up, _f, v.root.quaternion);
+    }
     if (v.roll) { v.root.quaternion.multiply(_q.setFromAxisAngle(_z, v.roll)); v.root.position.addScaledVector(up, -0.4); }
     if (v.wheels) {
       const spin = (v.cur * dt) / (v.wheelR || 1);
@@ -2076,10 +2089,10 @@ export class Traffic {
       v.trailers.forEach((t, i) => {
         const p = t.plat;
         p.prevPos.copy(p.pos);
-        const tu = this.roadFrame(v, v.s - t.offset, 2.7, 2.7, t.hintF, t.hintR, p.pos, _d);
-        if (v.tug) p.pos.add(v.tug); // (dragged along with the engine by the winch)
+        const tu = this.roadFrame(v, v.s - t.offset, 2.7, 2.7, t.hintF, t.hintR, p.pos, _d, _fp, _rp);
+        if (v.tug) { _fp.add(v.tug); _rp.add(v.tug); } // (dragged along with the engine by the winch)
+        this.groundPose(_fp, _rp, tu, 1.95, p.pos, t.root.quaternion);
         t.root.position.copy(p.pos);
-        frameQuat(tu, _d, t.root.quaternion);
         if (v.roll) t.root.quaternion.multiply(_q.setFromAxisAngle(_z, v.roll * (i % 2 ? -0.7 : 0.8)));
         if (dt > 0) p.vel.copy(p.pos).sub(p.prevPos).divideScalar(dt);
         if (p.vel.lengthSq() > 3600 || v.state === 'wreck') p.vel.set(0, 0, 0);
@@ -2118,13 +2131,37 @@ export class Traffic {
   }
 
   // Ground point midway between front and rear axle, travel direction and smoothed up.
-  roadFrame(v, s, front, rear, hF, hR, outPos, outFwd) {
+  // (outF / outR, when given, get the two ground points themselves)
+  roadFrame(v, s, front, rear, hF, hR, outPos, outFwd, outF = null, outR = null) {
     const nf = this.at(v, s + front, _b, hF, _n);
     const nr = this.at(v, s - rear, _c, hR, _u);
     outPos.copy(_b).add(_c).multiplyScalar(0.5);
     outFwd.copy(_b).sub(_c);
+    if (outF) outF.copy(_b);
+    if (outR) outR.copy(_c);
     if (outFwd.lengthSq() < 1e-6) outFwd.set(1, 0, 0);
     return nf.add(nr).normalize();
+  }
+
+  // Lay a land-train unit on the ground: `fp` / `rp` are the lane's ground points under its front and rear axles, `up` the
+  // smoothed ground normal there, `half` its half track. The ground is sampled under all four tyres (the two axles, `half`
+  // either side of the lane) and the unit sits on the plane through those points: pitched along the chord between the
+  // axles, rolled across any camber, its origin the middle of the four, so every wheel touches the ground on slopes,
+  // crests and dips instead of the smoothed normal leaving one axle in the air.
+  groundPose(fp, rp, up, half, outPos, outQuat) {
+    const P = this.P;
+    _gz.subVectors(fp, rp).normalize();
+    _gt.crossVectors(_gz, up).normalize(); // (the right-hand side, level with the ground)
+    const lf = P.ground(_g0.copy(fp).addScaledVector(_gt, -half), _g0);
+    const rf = P.ground(_g1.copy(fp).addScaledVector(_gt, half), _g1);
+    const lr = P.ground(_g2.copy(rp).addScaledVector(_gt, -half), _g2);
+    const rr = P.ground(_g3.copy(rp).addScaledVector(_gt, half), _g3);
+    outPos.copy(lf).add(rf).add(lr).add(rr).multiplyScalar(0.25);
+    _gz.copy(lf).add(rf).sub(lr).sub(rr).normalize(); // along: the front pair over the rear pair
+    _gx.copy(lf).add(lr).sub(rf).sub(rr); // across: left over right (the model's +x is its left)
+    _gx.addScaledVector(_gz, -_gx.dot(_gz)).normalize();
+    _gy.crossVectors(_gz, _gx);
+    return outQuat.setFromRotationMatrix(_m4.makeBasis(_gx, _gy, _gz));
   }
 
   // Take a vehicle's deck colliders out of the spatial hash.
