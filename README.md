@@ -320,9 +320,14 @@ Trade, a Militia Pact) reshapes the Moon and puts other factions' vehicles, weap
   within 40 m of each point, the ground ring, for 3 s), and in the finale, **The Charter**, ride to every faction HQ
   but Rustmoon's (Kepler, the ILMB, Meridian Exchange, Bastion Vostok-9 and the Daedalus Citadel) for the Moon Council's
   votes: the story panel lists each HQ and the tally, and Gran's letter of introduction clears you through the
-  Vostok and Daedalus gates (whatever you stand at with them, unless you're already FRIENDLY) until the Charter is signed. Each outpost terminal builds up to 6 modules: Greenhouse (heals nearby),
-  Clinic (you redeploy there after a K.O.), Beacon (charts 1.5 km and links beacons for fast travel),
-  Militia Turret (shoots pirates), Market (₵40/min to collect) and Garage (hauler vehicle).
+  Vostok and Daedalus gates (whatever you stand at with them, unless you're already FRIENDLY) until the Charter is signed. Each outpost terminal is an interactive page: a pixel-icon tile for every building (click one, or arrow
+  to it, for what it does and a button to collect, patch up, travel or build; the number keys still work). It builds up
+  to 6 modules on the six plots: Greenhouse (heals nearby), Clinic (you redeploy there after a K.O.), Beacon (charts
+  1.5 km and links beacons for fast travel), Militia Turret (a manned gun on a tall stand that turns and fires from its
+  own barrel at pirates within 300 m), Market (₵40/min to collect) and Garage (hauler vehicle); and a **Second Militia
+  Turret** (₵900, needs the first) on a stand of its own by the gate, which is not one of the six plots. The
+  Kepler chapter *Raiders at the Gate* gives a free Militia Turret at Pike's Hope: the second one if the first is
+  already built, or its price in credits if both are.
 - **Research (Meridian, plus Daedalus):** plant sensor relays, survive **phase-field experiments**
   (anomalies strike where the warning rings appear), carry unstable antimatter without cracking it, and
   build a research station. Rewards are **tech**: Phase Dash (`Z`, swings all your momentum, plus a kick, to where you
@@ -472,7 +477,8 @@ fishbowl helmets, hoodies, and kids in bubble helmets, with varied skin, hair, b
 Outposts you found for a faction story sit on flattened ground: a hab dome with an airlock (or a research
 block with a dish and an observatory for a lab), a paved apron, the terminal at the end of the path, and six
 plots round it. Each module is a proper building: a glass greenhouse with planting rows, a clinic cabin, a
-beacon lattice tower, a manned turret behind sandbags, a market stall and a garage quonset.
+beacon lattice tower, a manned turret on an 8 m armoured stand (ladder, railed deck, sandbags round the foot, so its
+guns clear the hub dome), a market stall and a garage quonset. A seventh stand beside the gate holds the second turret.
 
 ## Defences
 
