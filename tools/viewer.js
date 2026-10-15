@@ -1,7 +1,7 @@
 // Dev-only model viewer: renders one model through the game's comic post pass on a turntable.
 import * as THREE from 'three';
 import { loadFonts } from '../src/fonts.js';
-import { loadRunnerParts, loadShipParts, makeShuttle, makeFreighter, makeHoverCar, makeApc } from '../src/models.js';
+import { loadRunnerParts, loadShipParts, makeShuttle, makeFreighter, makeHoverCar, makeApc, makeLandTrain } from '../src/models.js';
 import { makeChimera, makeMite, LIVING, MODIFIERS, spliceGenes } from '../src/chimera.js';
 import { ComicPost } from '../src/post.js';
 
@@ -45,6 +45,20 @@ if (m === 'shuttle' || m === 'freighter') {
   model.scale.setScalar(1.35);
   model.position.y = 0.2;
   height = 4;
+} else if (m === 'landtrain') {
+  // &type=moonliner|prospector  &faction=spacecom|vostok|kepler|meridian  &cars=pax,pax,pax | tank,cargo,blast
+  // &unit=0 for the tractor alone, 1..n for that trailer alone
+  const lt = makeLandTrain({ faction: Q.get('faction') || 'kepler', type: Q.get('type') || 'moonliner', cars: Q.has('cars') ? Q.get('cars').split(',').filter(Boolean) : undefined });
+  model = new THREE.Group();
+  const only = Q.has('unit') ? num('unit', 0) : -1; // (alone: the camera frames just that unit)
+  if (only <= 0) model.add(lt.root);
+  lt.trailers.forEach((t, i) => {
+    t.root.position.set(0, 0, only > 0 ? 0 : -9.9 * (i + 1));
+    t.rod.scale.z = 1.5;
+    t.eye.position.z = 1.5;
+    if (only < 0 || only === i + 1) model.add(t.root);
+  });
+  height = 3;
 } else if (m === 'hovercar') {
   model = makeHoverCar({}).root;
   model.position.y = 2;

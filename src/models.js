@@ -9,6 +9,7 @@ import shipsGlb from './assets/ships.glb?inline';
 import skimmerGlb from './assets/skimmer.glb?inline';
 import warrigGlb from './assets/warrig.glb?inline';
 import apcGlb from './assets/apc.glb?inline';
+import landtrainGlb from './assets/landtrain.glb?inline';
 import { Kit, T as KT, G as KG, D as KD, crate } from './outpostModels.js';
 
 function part(geo, mat, x = 0, y = 0, z = 0, outline = 0.05) {
@@ -1197,7 +1198,7 @@ const SHIP_FX = new Set(['plume', 'plumeCore', 'lift', 'engine', 'core']); // pe
 const FLAMES = new Set(['plume', 'plumeCore', 'lift']);
 export async function loadShipParts() {
   const loader = new GLTFLoader();
-  const [gltf, sk, wr, ap] = await Promise.all([loader.loadAsync(shipsGlb), loader.loadAsync(skimmerGlb), loader.loadAsync(warrigGlb), loader.loadAsync(apcGlb)]);
+  const [gltf, sk, wr, ap, lt] = await Promise.all([loader.loadAsync(shipsGlb), loader.loadAsync(skimmerGlb), loader.loadAsync(warrigGlb), loader.loadAsync(apcGlb), loader.loadAsync(landtrainGlb)]);
   SHIP_PARTS = {};
   for (const name of ['shuttle', 'freighter']) {
     const root = gltf.scene.getObjectByName(name);
@@ -1216,6 +1217,12 @@ export async function loadShipParts() {
   const apc = ap.scene.getObjectByName('apc');
   if (!apc) throw new Error('apc.glb has no apc');
   SHIP_PARTS.apc = bakeShip(apc);
+  // the land-trains: the Moonliner passenger express and the Prospector freight rig (tools/blender/build_landtrain.py)
+  for (const name of LT_UNITS) {
+    const unit = lt.scene.getObjectByName(name);
+    if (!unit) throw new Error('landtrain.glb has no ' + name);
+    SHIP_PARTS['lt_' + name] = bakeShip(unit);
+  }
 }
 
 function bakeShip(root) {
@@ -1542,6 +1549,78 @@ export function makeApc({ color = 0x6b6f78, trim = 0xff3b5c } = {}) {
     },
   };
   return model;
+}
+
+// ---- Land-trains (built in Blender, see build_landtrain.py) ----
+// Two services, each its own tractor and cars: the MOONLINER is the passenger express (a streamlined tractor
+// pulling capsule coaches, nothing else), the PROSPECTOR is the freight rig (a heavy dozer-bladed tractor pulling
+// a cryogenic Helium-3 tanker, a cargo container and an explosives magazine). A train is painted for the faction
+// it serves: body, trim, accent and lettering colours below; the faction's emblem and name are in the model
+// (one `livery` pivot per faction) and only the matching one is built.
+const LT_UNITS = ['moonliner', 'moonliner_coach', 'prospector', 'prospector_tank', 'prospector_cargo', 'prospector_blast'];
+const LT_CAR = { pax: 'moonliner_coach', tank: 'prospector_tank', cargo: 'prospector_cargo', blast: 'prospector_blast' };
+export const LAND_TRAIN_FACTIONS = {
+  spacecom: { body: 0xf2ecdc, stripe: 0xffd23f, accent: 0x2a3a6b, label: 0x2a3a6b }, // white and yellow, navy lettering
+  vostok: { body: 0x6b6f78, stripe: 0xff3b5c, accent: 0x2c2f38, label: 0xf3eee4 }, // the APC's slate and red
+  kepler: { body: 0xff9f1c, stripe: 0xfff4e0, accent: 0x6a8f3a, label: 0x2a2540 }, // orange and cream, the Mule's green
+  meridian: { body: 0x2ec4ff, stripe: 0xfff4e0, accent: 0xffd23f, label: 0x16385e }, // cyan and cream, gold pin-stripes
+};
+const LT_TOON = { dark: 0x2a2540, steel: 0x55607a, metal: 0x8a87a0, tire: 0x1d1a29, white: 0xf3eee4, hazard: 0xffd23f, tank: 0xc6d6ea, brand: 0x14a3b8, redsafe: 0xc9202e, orange: 0xff7a1a, blue: 0x1d63d6 };
+const LT_GLOW = { glass: 0x9be7ff, window: 0xfff6a8, lamp: 0xfff6a8, tail: 0xff2a4a, green: 0x7dff6a, hot: 0xff9f1c };
+
+// One unit of the train, painted. Returns its root and the pivots the traffic code drives.
+function ltUnit(name, pal, faction) {
+  const B = SHIP_PARTS['lt_' + name];
+  const mats = new Map();
+  const matFor = (slot) => {
+    if (!mats.has(slot)) mats.set(slot, slot in pal ? toon(pal[slot]) : LT_GLOW[slot] !== undefined ? glow(LT_GLOW[slot]) : toon(LT_TOON[slot] ?? 0xff00ff));
+    return mats.get(slot);
+  };
+  const out = { wheels: [], beacon: null, bar: null, rod: null, eye: null };
+  const build = (node) => {
+    if (node.role === 'livery' && node.data.faction !== faction) return null; // (the other factions' marks never exist)
+    const g = new THREE.Group();
+    g.name = node.name;
+    g.position.copy(node.pos);
+    g.quaternion.copy(node.quat);
+    for (const { slot, geo } of node.parts) {
+      const m = new THREE.Mesh(geo, matFor(slot));
+      m.castShadow = LT_GLOW[slot] === undefined && node.role !== 'livery';
+      g.add(m);
+    }
+    if (node.ink) {
+      const h = new THREE.Mesh(node.ink, inkMat);
+      h.castShadow = false;
+      h.userData.isInk = true;
+      g.add(h);
+    }
+    if (node.role === 'wheel') out.wheels.push(g);
+    else if (node.role && node.role in out) out[node.role] = g;
+    for (const k of node.kids) {
+      const c = build(k);
+      if (c) g.add(c);
+    }
+    return g;
+  };
+  const root = build(B);
+  root.position.set(0, 0, 0);
+  root.quaternion.identity();
+  // the solid boxes you can stand on: (hx, hy, hz, y, z) groups in the unit's frame
+  const flat = B.data.decks || [];
+  const decks = [];
+  for (let i = 0; i + 4 < flat.length; i += 5) decks.push({ hx: flat[i], hy: flat[i + 1], hz: flat[i + 2], y: flat[i + 3], z: flat[i + 4] });
+  return { root, decks, ...out };
+}
+
+// type: 'moonliner' (passenger) or 'prospector' (freight); cars: 'pax' for the Moonliner's coaches, 'tank' (Helium-3),
+// 'cargo' and 'blast' (explosives) for the Prospector's trailers
+export function makeLandTrain({ faction = 'kepler', type = 'moonliner', cars } = {}) {
+  const pal = LAND_TRAIN_FACTIONS[faction] || LAND_TRAIN_FACTIONS.kepler;
+  const fac = LAND_TRAIN_FACTIONS[faction] ? faction : 'kepler';
+  cars = cars || (type === 'prospector' ? ['tank', 'cargo', 'blast'] : ['pax', 'pax', 'pax']);
+  const tractor = ltUnit(type, pal, fac);
+  const trailers = cars.map((kind) => ({ ...ltUnit(LT_CAR[kind], pal, fac), kind }));
+  return { root: tractor.root, wheels: tractor.wheels, beacon: tractor.beacon, decks: tractor.decks, trailers, type, faction: fac };
 }
 
 // Shuttle-bus: a fat lifting-body hopper with a wraparound windscreen, porthole windows, two

@@ -1,8 +1,7 @@
 import * as THREE from 'three';
 import { toon, ink, glow, textSprite, setMask } from './toon.js';
 const VEH_DETAIL = 220; // past this, a vehicle's small parts stop drawing
-import { makeFigure, makeShuttle, makeRover, makeHoverCar, makeFreighter } from './models.js';
-import { Kit, T as KT, G as KG } from './outpostModels.js';
+import { makeFigure, makeShuttle, makeRover, makeHoverCar, makeFreighter, makeLandTrain, LAND_TRAIN_FACTIONS } from './models.js';
 import { mulberry32 } from './rng.js';
 import { SUN, frameQuat, arcDist } from './geo.js';
 
@@ -12,7 +11,7 @@ import { SUN, frameQuat, arcDist } from './geo.js';
 // hover-cars and buggies driving routes over it. Land-trains and buggies can be wrecked.
 //
 // Vehicle kinds in world.vehicles: 'ship' (freighter), 'bus' (shuttle), 'car' (hover-car, on
-// roads; alchemy can jar these), 'landtrain' (big six-wheeled road-train with trailers).
+// roads; alchemy can jar these), 'landtrain' (the Moonliner passenger express or the Prospector freight rig, with trailers).
 // Ground buggies live in world.crawlers (main.js bumps the player with those).
 
 const _a = new THREE.Vector3(), _b = new THREE.Vector3(), _c = new THREE.Vector3(), _d = new THREE.Vector3();
@@ -33,6 +32,8 @@ function segDist2(a, b, c) {
   const dx = a.x + abx * t - c.x, dy = a.y + aby * t - c.y, dz = a.z + abz * t - c.z;
   return dx * dx + dy * dy + dz * dz;
 }
+// what a Prospector can pull: Helium-3 tankers, plain containers and the explosives magazine (always last)
+const FREIGHT = [['tank', 'cargo', 'blast'], ['cargo', 'tank', 'blast'], ['tank', 'tank', 'blast'], ['tank', 'cargo', 'cargo']];
 const TRAIN_HP = 400, BUGGY_HP = 120, CAR_HP = 90;
 const _z = new THREE.Vector3(0, 0, 1);
 // ring roads round each connected town
@@ -59,96 +60,6 @@ function part(geo, mat, x = 0, y = 0, z = 0, outline = 0.05) {
 }
 
 // ---------------- models ----------------
-
-// Big balloon-tyred road-train: a six-wheeled tractor pulling passenger and cargo trailers.
-// Every unit has its origin on the ground, +Z forward.
-function makeLandTrain({ color = 0xff9f1c, trim = 0xfff4e0, cars = ['pax', 'cargo', 'pax'] } = {}) {
-  const bodyM = toon(color), trimM = toon(trim), dark = toon(0x1d1a29), hubM = toon(0x8a87a0);
-  const tyre = (parent, x, z, r, w, list) => {
-    const t = part(new THREE.CylinderGeometry(r, r, w, 14).rotateZ(Math.PI / 2), dark, x, r, z, 0.06);
-    t.add(part(new THREE.CylinderGeometry(r * 0.45, r * 0.45, w * 1.04, 8).rotateZ(Math.PI / 2), hubM, 0, 0, 0, 0));
-    parent.add(t);
-    list.push(t);
-  };
-  const root = new THREE.Group();
-  const wheels = [];
-  // tractor: frame, a cab with a wraparound windscreen, a grille and bumper, a sleeper/engine
-  // box behind, exhaust stacks, side tanks, mirrors and a roof light bar (baked in one Kit)
-  const tk = new Kit(color, 21, false);
-  tk.box(3.2, 1.0, 8.6, KT(0x1d1a29), 0, 1.25, 0, { outline: 0.08 });
-  tk.box(3.9, 2.9, 3.4, KT(color), 0, 2.15, 2.3, { outline: 0.14 });
-  tk.add(new THREE.BoxGeometry(3.96, 1.0, 1.6), KG(0x9be7ff), 0, 4.0, 3.55, { rx: -0.35, outline: 0 });
-  for (const sx of [-1, 1]) tk.box(0.06, 0.9, 1.8, KG(0x9be7ff), sx * 1.98, 3.55, 2.6, { outline: 0 });
-  tk.box(3.4, 1.0, 0.25, KT(0x2a2540), 0, 2.2, 4.06, { outline: 0.03 });
-  for (let i = 0; i < 6; i++) tk.box(3.2, 0.08, 0.3, KT(0x8a87a0), 0, 2.32 + i * 0.15, 4.08, { outline: 0 });
-  tk.box(4.1, 0.5, 0.5, KT(0x8a87a0), 0, 1.6, 4.3, { outline: 0.04 });
-  for (const sx of [-1, 1]) tk.box(0.7, 0.45, 0.2, KG(0xfff6a8), sx * 1.3, 2.3, 4.12, { outline: 0 });
-  tk.box(3.4, 1.9, 4.4, KT(trim), 0, 2.2, -2.1, { outline: 0.1 });
-  tk.box(3.5, 0.5, 4.5, KT(color), 0, 4.05, -2.1, { outline: 0.06 });
-  for (const sx of [-1, 1]) {
-    tk.cyl(0.18, 0.2, 3.4, 8, KT(0x8a87a0), sx * 1.7, 2.3, 0.4, { outline: 0.03 });
-    tk.cyl(0.22, 0.22, 0.25, 8, KT(0x1d1a29), sx * 1.7, 5.7, 0.4, { outline: 0 });
-    tk.add(new THREE.CylinderGeometry(0.45, 0.45, 1.8, 10).rotateX(Math.PI / 2), KT(0xd8d4e8), sx * 1.75, 1.6, -1.2, { outline: 0.03 });
-    tk.box(0.1, 0.6, 0.4, KT(0x1d1a29), sx * 2.2, 3.6, 3.6, { outline: 0.02 });
-    tk.beam([sx * 1.95, 3.4, 3.5], [sx * 2.2, 3.5, 3.6], 0.04, KT(0x1d1a29), { outline: 0 });
-  }
-  tk.box(3.2, 0.25, 0.4, KT(0x1d1a29), 0, 5.05, 3.2, { outline: 0.02 });
-  for (const sx of [-1.2, -0.4, 0.4, 1.2]) tk.box(0.5, 0.18, 0.12, KG(0xfff6a8), sx, 5.08, 3.42, { outline: 0 });
-  tk.cyl(0.05, 0.05, 2.2, 4, KT(0x1d1a29), -1.5, 5.0, 1.0, { outline: 0 });
-  // the hitch: a coupling block and pin at the back of the frame
-  tk.box(0.9, 0.6, 0.5, KT(0x2a2540), 0, 1.1, -4.5, { outline: 0.03 });
-  tk.cyl(0.16, 0.16, 0.8, 8, KT(0x8a87a0), 0, 1.0, -4.55, { outline: 0 });
-  root.add(tk.finish().root);
-  const beacon = part(new THREE.SphereGeometry(0.32, 8, 6), glow(0xff9f1c), 0, 5.25, 2.0, 0.03);
-  root.add(beacon);
-  for (const z of [2.9, 0, -2.9]) for (const sx of [-1, 1]) tyre(root, sx * 2.15, z, 1.2, 1.05, wheels);
-  const trailers = [];
-  for (const kind of cars) {
-    const tr = new THREE.Group();
-    const tw = [];
-    const q = new Kit(color, 22, false);
-    q.box(3.0, 0.6, 8.0, KT(0x1d1a29), 0, 1.25, 0, { outline: 0.06 });
-    q.box(0.9, 0.6, 0.5, KT(0x2a2540), 0, 1.1, -4.2, { outline: 0.03 }); // (rear coupling, for the next car)
-    q.cyl(0.16, 0.16, 0.8, 8, KT(0x8a87a0), 0, 1.0, -4.25, { outline: 0 });
-    q.box(1.2, 0.5, 0.4, KT(0x2a2540), 0, 1.15, 4.05, { outline: 0.03 }); // (the drawbar's yoke)
-    if (kind === 'pax') {
-      // passenger car: a windowed cabin with pillars, a door on the right, roof units
-      q.box(3.6, 2.7, 7.6, KT(trim), 0, 1.85, 0, { outline: 0.12 });
-      for (let i = 0; i < 5; i++) for (const sx of [-1, 1]) {
-        const z = -3 + i * 1.5;
-        if (sx < 0 && i === 2) continue;
-        q.box(0.06, 0.9, 1.1, KG(0xfff6a8), sx * 1.81, 3.2, z, { outline: 0 });
-      }
-      for (const sx of [-1, 1]) q.box(0.08, 0.25, 7.4, KT(color), sx * 1.82, 2.55, 0, { outline: 0 });
-      q.box(3.8, 0.45, 7.8, KT(color), 0, 4.55, 0, { outline: 0.06 });
-      q.box(1.6, 0.5, 2.2, KT(0xd8d4e8), 0, 5.0, -1.8, { outline: 0.03 });
-      q.box(0.12, 2.1, 1.5, KT(color), -1.82, 1.85, 0, { outline: 0 }); // door on the right (-x)
-      q.box(0.14, 0.3, 1.0, KG(0x7dff6a), -1.84, 4.1, 0, { outline: 0 });
-    } else {
-      // cargo car: a ribbed pressure tank on a cradle with a catwalk
-      q.box(3.4, 0.4, 7.8, KT(color), 0, 1.85, 0, { outline: 0.06 });
-      q.add(new THREE.CylinderGeometry(1.35, 1.35, 6.6, 16).rotateX(Math.PI / 2), KT(0x9be7ff), 0, 3.6, 0, { outline: 0.1 });
-      q.add(new THREE.SphereGeometry(1.35, 14, 8), KT(0x9be7ff), 0, 3.6, 3.3, { outline: 0 });
-      q.add(new THREE.SphereGeometry(1.35, 14, 8), KT(0x9be7ff), 0, 3.6, -3.3, { outline: 0 });
-      for (const z of [-2.2, 0, 2.2]) q.add(new THREE.TorusGeometry(1.4, 0.12, 6, 16), KT(color), 0, 3.6, z, { outline: 0 });
-      for (const z of [-2.6, 2.6]) q.box(2.6, 0.9, 0.5, KT(0x1d1a29), 0, 2.25, z, { outline: 0.02 });
-      q.box(0.8, 0.1, 6, KT(0x8a87a0), 0, 5.0, 0, { outline: 0.02 });
-      q.ring(0.5, 0.08, KG(0x7dff6a), 0, 5.06, 1.5);
-    }
-    tr.add(q.finish().root);
-    // the drawbar: a real link from this car's yoke to the coupling of the car in front, re-aimed
-    // every frame (traffic.js linkBar) so the train stays joined over crests and dips
-    const bar = new THREE.Group();
-    bar.position.set(0, 1.4, 4.3);
-    const rod = part(new THREE.BoxGeometry(0.32, 0.32, 1).translate(0, 0, 0.5), dark, 0, 0, 0, 0.03);
-    const eye = part(new THREE.TorusGeometry(0.22, 0.08, 4, 10).rotateY(Math.PI / 2), hubM, 0, 0, 1, 0);
-    bar.add(rod, eye);
-    tr.add(bar);
-    for (const z of [2.7, -2.7]) for (const sx of [-1, 1]) tyre(tr, sx * 1.95, z, 1.0, 0.9, tw);
-    trailers.push({ root: tr, wheels: tw, kind, bar, rod, eye });
-  }
-  return { root, wheels, trailers, beacon };
-}
 
 // ---------------- path helpers ----------------
 
@@ -537,7 +448,6 @@ export class Traffic {
       minWait: ship ? 12 : 6, maxWait: ship ? 34 : 18, pax: ship ? [3, 5] : [1, 3],
       view: ship ? 4200 : 1600, quat: model.root.quaternion, boarding: 0, heading: new THREE.Vector3(),
       pos: new THREE.Vector3(), prevPos: new THREE.Vector3(), vel: new THREE.Vector3(), fwd: new THREE.Vector3(),
-      col: null,
     };
     // spread them out: some parked at either end, most somewhere along the route
     const r = this.r();
@@ -1295,6 +1205,21 @@ export class Traffic {
     if (pc) pc.vehicles.push(v);
   }
 
+  // Which service runs a road, and in whose colours: the livery of whichever of the four factions' towns it
+  // joins (taking turns where two meet; Kepler's orange where neither is). Vostok's own bastions are
+  // restricted ground with no road to them, so its trains work the roads out of the ILMB, which hands out
+  // Vostok contracts. The freight Prospector runs roads to the Helium-3 exchange and half of the rest; the
+  // passenger Moonliner takes the others.
+  trainSpec(road, k) {
+    const ends = [road.A, road.B].filter(Boolean);
+    const owners = ends.map((l) => l.faction).filter((f) => LAND_TRAIN_FACTIONS[f]);
+    if (ends.some((l) => l.jobs && l.jobs.includes('vostok'))) owners.push('vostok');
+    const faction = owners.length ? owners[(k >> 1) % owners.length] : 'kepler';
+    const type = ends.some((l) => l.type === 'industrial') || (k >> 1) % 2 ? 'prospector' : 'moonliner';
+    const cars = type === 'moonliner' ? ['pax', 'pax', 'pax'] : FREIGHT[(k >> 1) % FREIGHT.length];
+    return { faction, type, cars };
+  }
+
   // Put a land-train, two hover-cars and a buggy on each road, each with somewhere to go.
   populateRoad(road, k) {
     const add = (v) => {
@@ -1309,20 +1234,21 @@ export class Traffic {
       this.roadVehicles.push(v);
       return v;
     };
-    // land-train
-    const cars = k % 2 ? ['pax', 'cargo', 'cargo'] : ['pax', 'pax', 'cargo'];
-    const lt = makeLandTrain({ color: [0xff9f1c, 0x2ec4ff, 0x7dff6a, 0xffd23f, 0xff7ad9][k % 5], cars });
+    // land-train: the Moonliner passenger express or the Prospector freight rig, in the colours of the
+    // faction whose towns it joins
+    const spec = this.trainSpec(road, k);
+    const lt = makeLandTrain(spec);
     this.w.scene.add(lt.root);
     for (const t of lt.trailers) this.w.scene.add(t.root);
     const train = add({
-      ...lt, kind: 'landtrain', vmax: 11, acc: 1.4, front: 4.6, tail: 4.4 + lt.trailers.length * 9.9, waitT: 16,
-      deck: [1.95, 2.45, 4.3], deckY: 2.45, col: null, quat: lt.root.quaternion, view: 1200, radius: 6, boarding: 0, wheelR: 1.2,
-      pax: [1, 3], hp: TRAIN_HP, maxHp: TRAIN_HP, hitR: 4.8, credits: 60,
+      ...lt, kind: 'landtrain', vmax: 11, acc: 1.4, front: 4.6, tail: 4.4 + lt.trailers.length * 9.9, waitT: spec.type === 'moonliner' ? 16 : 12,
+      quat: lt.root.quaternion, view: 1200, radius: 6, boarding: 0, wheelR: 1.2,
+      pax: spec.type === 'moonliner' ? [1, 3] : null, hp: TRAIN_HP, maxHp: TRAIN_HP, hitR: 4.8, credits: 60,
     });
     train.trailers.forEach((t, i) => {
       t.offset = 4.3 + 1.6 + 4.0 + i * 9.9;
       t.hintF = { i: 0, f: 0 }; t.hintR = { i: 0, f: 0 };
-      t.plat = { pos: new THREE.Vector3(), prevPos: new THREE.Vector3(), vel: new THREE.Vector3(), deck: [1.9, 2.4, 4.2], deckY: 2.4, quat: t.root.quaternion, col: null };
+      t.plat = { pos: new THREE.Vector3(), prevPos: new THREE.Vector3(), vel: new THREE.Vector3(), decks: t.decks, quat: t.root.quaternion };
       this.platforms.push(t.plat);
     });
     this.vehicles.push(train);
@@ -1331,7 +1257,7 @@ export class Traffic {
       const m = makeHoverCar({ color: [0xff7ad9, 0x2ec4ff, 0x7dff6a, 0xffd23f][(k + i) % 4] });
       m.root.matrixAutoUpdate = true;
       this.w.scene.add(m.root);
-      const v = add({ ...m, kind: 'car', vmax: 22 + this.r() * 6, acc: 4, front: 2, tail: 2, waitT: 4, deck: [1.45, 1.1, 3.1], deckY: 0, col: null, quat: m.root.quaternion, view: 800, radius: 2.8, hoverH: 1.8, hp: CAR_HP, maxHp: CAR_HP, hitR: 3.0, credits: 30 });
+      const v = add({ ...m, kind: 'car', vmax: 22 + this.r() * 6, acc: 4, front: 2, tail: 2, waitT: 4, deck: [1.45, 1.1, 3.1], deckY: 0, quat: m.root.quaternion, view: 800, radius: 2.8, hoverH: 1.8, hp: CAR_HP, maxHp: CAR_HP, hitR: 3.0, credits: 30 });
       this.vehicles.push(v);
     }
     // buggy (old-style crawler): queues behind slower traffic
@@ -1782,7 +1708,7 @@ export class Traffic {
     this.t = (this.t || 0) + dt;
     for (const v of this.vehicles) {
       v.prevPos.copy(v.pos);
-      if (v.captured > 0) { v.root.visible = false; if (v.col) { this.C.remove(v.col); v.col = null; } v.vel.set(0, 0, 0); continue; }
+      if (v.captured > 0) { v.root.visible = false; this.dropDeck(v); v.vel.set(0, 0, 0); continue; }
       if (v.piece || v.offroad) this.updateRoadVehicle(v, dt, camPos);
       else this.updateFlyer(v, dt, camPos);
     }
@@ -1868,7 +1794,7 @@ export class Traffic {
     }
     const vis = this.seen(v, camPos);
     v.root.visible = vis;
-    if (!vis) { if (v.col) { this.C.remove(v.col); v.col = null; } return; }
+    if (!vis) { this.dropDeck(v); return; }
     v.root.position.copy(v.pos);
     const up = _u.copy(v.pos).normalize();
     frameQuat(up, v.heading, _q);
@@ -1881,8 +1807,8 @@ export class Traffic {
 
   hide(v) {
     v.root.visible = false;
-    if (v.col) { this.C.remove(v.col); v.col = null; }
-    if (v.trailers) for (const t of v.trailers) { t.root.visible = false; if (t.plat.col) { this.C.remove(t.plat.col); t.plat.col = null; } }
+    this.dropDeck(v);
+    if (v.trailers) for (const t of v.trailers) { t.root.visible = false; this.dropDeck(t.plat); }
   }
 
   // A hover-car tipped out of a jar at `from`: it drives cross-country to the nearest point on
@@ -2056,7 +1982,7 @@ export class Traffic {
         this.linkBar(t, i ? v.trailers[i - 1].root : v.root, i ? -4.25 : -4.55);
       });
     }
-    if (v.deck) this.syncDeck(v, camPos);
+    if (v.deck || v.decks) this.syncDeck(v, camPos);
     if (v.maxHp) this.smoke(v, dt);
   }
 
@@ -2095,16 +2021,31 @@ export class Traffic {
     return nf.add(nr).normalize();
   }
 
-  // Keep a vehicle's deck collider in the spatial hash while it is near the camera.
+  // Take a vehicle's deck colliders out of the spatial hash.
+  dropDeck(s) {
+    if (!s.deckLive) return;
+    for (const c of s.deckCols) this.C.remove(c);
+    s.deckLive = false;
+  }
+
+  // Keep a vehicle's deck colliders in the spatial hash while it is near the camera: one box for a
+  // flyer or hover-car (deck / deckY / deckZ), or the list of boxes in the model's own frame for a
+  // land-train unit (decks: hx, hy, hz, y, z each).
   syncDeck(s, camPos) {
     const near = s.pos.distanceToSquared(camPos) < 350 * 350;
-    if (s.col) { this.C.remove(s.col); if (!near) { s.col = null; return; } }
+    this.dropDeck(s);
     if (!near || s.pos.lengthSq() < 1) return;
+    const boxes = s.decks || (s.deckOne = s.deckOne || [{ hx: s.deck[0], hy: s.deck[1], hz: s.deck[2], y: s.deckY || 0, z: s.deckZ || 0 }]);
+    if (!s.deckCols) s.deckCols = boxes.map(() => ({ type: 'box', platform: s, c: new THREE.Vector3(), ax: new THREE.Vector3(), ay: new THREE.Vector3(), az: new THREE.Vector3() }));
     const q = s.quat;
-    const c = s.col || { type: 'box', platform: s, c: new THREE.Vector3(), ax: new THREE.Vector3(), ay: new THREE.Vector3(), az: new THREE.Vector3() };
-    c.ax.set(1, 0, 0).applyQuaternion(q); c.ay.set(0, 1, 0).applyQuaternion(q); c.az.set(0, 0, 1).applyQuaternion(q);
-    c.c.copy(s.pos).addScaledVector(c.ay, s.deckY || 0).addScaledVector(c.az, s.deckZ || 0);
-    c.hx = s.deck[0]; c.hy = s.deck[1]; c.hz = s.deck[2];
-    s.col = this.C.add(c);
+    _a.set(1, 0, 0).applyQuaternion(q); _b.set(0, 1, 0).applyQuaternion(q); _c.set(0, 0, 1).applyQuaternion(q);
+    boxes.forEach((d, i) => {
+      const c = s.deckCols[i];
+      c.ax.copy(_a); c.ay.copy(_b); c.az.copy(_c);
+      c.c.copy(s.pos).addScaledVector(_b, d.y).addScaledVector(_c, d.z);
+      c.hx = d.hx; c.hy = d.hy; c.hz = d.hz;
+      this.C.add(c);
+    });
+    s.deckLive = true;
   }
 }
