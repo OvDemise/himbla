@@ -42,7 +42,7 @@ export class Player {
     this.upSmooth = spawn.clone().normalize();
     this.impacts = [];
     this.params = { ...PHYS };
-    this.trick = { flip: 0, spin: 0, active: false };
+    this.trick = { flip: 0, spin: 0, active: false, tucked: false };
 
     // helmet lamp + a faint suit glow; intensities are driven by how dark it is
     this.lamp = new THREE.SpotLight(0xfff2c8, 0, 170, 0.5, 0.55, 1.2);
@@ -110,12 +110,17 @@ export class Player {
     }
   }
 
-  resetTrick() {
+  // the trick state and the model's trick pivot back to rest (nothing else)
+  clearTrick() {
     const t = this.trick;
     t.flip = t.spin = 0;
-    t.active = false;
+    t.active = t.tucked = false;
     this.model.trick.rotation.set(0, 0, 0);
     this.model.trick.position.y = 1.2;
+  }
+
+  resetTrick() {
+    this.clearTrick();
     if (this.rag) { this.rag.release(); this.rag = null; }
   }
 
@@ -147,12 +152,13 @@ export class Player {
     const up = b.up;
 
     // grinding a snake rock's crest (rails.js): the rail carries you
-    if (g.grind && g.grind.update(this, dt, input)) return;
+    if (g.grind && g.grind.update(this, dt, input)) { if (this.trick.active) this.clearTrick(); return; } // (a half-done trick doesn't wait on the rail to flip you when you pop off)
 
     // riding something (a transit ship, a carousel horse, a ferris-wheel gondola: rides.js): the
     // seat carries you, no physics; the ride decides where you get off
     if (this.seat) {
       const s = this.seat;
+      if (this.trick.active) this.clearTrick();
       if (this.rag) { this.rag.release(); this.rag = null; } // (a ragdoll that was still tumbling when you hopped on: its camera focus would stay behind, and it only updates in the physics step below)
       s.obj.updateMatrixWorld(true);
       const p = s.obj.localToWorld(_sp.copy(s.local));
@@ -262,6 +268,7 @@ export class Player {
 
     // ragdolling: the ragdoll (ragdoll.js) carries your body until it comes to rest; no skater physics
     if (this.rag) {
+      if (this.trick.active) this.clearTrick(); // (limp: no trick left to finish; updateTricks doesn't run in here)
       b.jumped = false;
       this.updateWeapons(dt, input, cam);
       this.center.copy(b.pos).addScaledVector(b.up, 1.3);
@@ -410,6 +417,11 @@ export class Player {
         t.flip += (tf - t.flip) * Math.min(1, dt * 5);
         t.spin += (ts - t.spin) * Math.min(1, dt * 5);
       }
+      // the tuck pose lasts while you hold the trick button, then until the model has levelled back out.
+      // (It used to test flip || spin for non-zero, which never goes back to exactly 0 once you've
+      // flipped, so the tuck stayed on for the rest of the air time after you let go.)
+      const lf = Math.abs(t.flip - Math.round(t.flip / TAU) * TAU), ls = Math.abs(t.spin - Math.round(t.spin / TAU) * TAU);
+      t.tucked = t.active && (held || lf > 0.2 || ls > 0.2);
       this.model.trick.rotation.set(t.flip, t.spin, 0, 'YXZ');
     }
     let wiped = false;
@@ -443,8 +455,10 @@ export class Player {
       const ragFlip = t.flip;
       this.resetTrick();
       if (wiped) this.startRagdoll(ragFlip < 0 ? -1 : 1);
-    } else if (b.grounded && !t.active) {
-      this.model.trick.rotation.set(0, 0, 0);
+    } else if (b.grounded) {
+      // on the ground with a trick still marked active (a landing updateTricks never saw): nothing left to score
+      if (t.active || t.flip || t.spin) this.clearTrick();
+      else this.model.trick.rotation.set(0, 0, 0);
     }
   }
 
@@ -522,7 +536,7 @@ export class Player {
       m.armL.rotation.z = -1.1; m.armR.rotation.z = 1.1;
       m.armL.rotation.x = m.armR.rotation.x = 0;
       m.body.position.y = base;
-      if (this.trick.active && (this.trick.flip || this.trick.spin)) { m.legL.rotation.x = m.legR.rotation.x = -1.2; m.torso.rotation.x = 0.6; }
+      if (this.trick.tucked) { m.legL.rotation.x = m.legR.rotation.x = -1.2; m.torso.rotation.x = 0.6; }
     } else if (b.skating) {
       const crouch = Math.min(1, sp / 40);
       m.body.position.y = base - 0.18 * crouch;
