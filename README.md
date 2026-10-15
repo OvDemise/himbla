@@ -314,8 +314,8 @@ Trade, a Militia Pact) reshapes the Moon and puts other factions' vehicles, weap
   Daedalus rewrites posts with a phase jammer instead. Captures unlock **vehicles**. Vostok and Daedalus
   fight each other (captures cost the rival rep). SPACECOM hunts down Kade, then storms his Hold.
 - **Civilian (Kepler):** haul prefab parts (light bumps only dent them, a thruster-speed crash of about 140 km/h
-  smashes them and you go back for more) to **found homesteads** you own. Survey three sites for your town (stand
-  inside the ground ring, 40 m round each point, for 3 s), and in the finale, **The Charter**, ride to every faction HQ
+  smashes them and you go back for more) to **found homesteads** you own. Survey three sites for your town (stay
+  within 40 m of each point, the ground ring, for 3 s), and in the finale, **The Charter**, ride to every faction HQ
   but Rustmoon's (Kepler, the ILMB, Meridian Exchange, Bastion Vostok-9 and the Daedalus Citadel) for the Moon Council's
   votes: the story panel lists each HQ and the tally, and Gran's letter of introduction clears you through the
   Vostok and Daedalus gates (whatever you stand at with them, unless you're already FRIENDLY) until the Charter is signed. Each outpost terminal builds up to 6 modules: Greenhouse (heals nearby),

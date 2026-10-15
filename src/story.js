@@ -334,10 +334,10 @@ const SURVEY_R = 40; // m: how close you must be to a survey point for its hold 
 // round the near side and out to the two military zones)
 const HQ_ROUTE = ['kepler', 'spacecom', 'meridian', 'vostok', 'daedalus'];
 // Prefab parts (the 'build' steps' loads): impacts up to PARTS_SAFE m/s cost nothing, then PARTS_RATE % of their condition
-// per m/s over, so a fresh load survives anything under PARTS_SAFE + 100 / PARTS_RATE = 39 m/s (140 km/h; 44 with the Kepler
-// Dampers I, 59 with III) and a thruster-speed crash smashes it. That is about 5.5 x as fragile as the most fragile contract
-// cargo (0.72 % per m/s over 14 on skates: missions.jostle), and a light bump (a cruise-speed 18 m/s knock is 16%) leaves it
-// dented but whole. (The 'carry' steps keep their own per-step numbers.)
+// per m/s over, so a fresh load is smashed at 39 m/s (140 km/h): and at 44 with the Kepler Dampers I, 50 with II, 60 with III.
+// That is about 5.5 x as fragile as the most fragile contract cargo on skates (0.72 % per m/s over 14: missions.jostle; about 3 x
+// on boots), and a light bump (a cruise-speed 18 m/s knock is a 16% dent) leaves it dented but whole. (The 'carry' steps keep
+// their own per-step damage numbers.)
 const PARTS_SAFE = 14;
 const PARTS_RATE = 4;
 const PARTS_LOW = 35; // % condition below which the readout goes red, and a warning is shown once
@@ -613,6 +613,14 @@ export class Story {
   next() {
     const g = this.game;
     const A = this.active;
+    // a story pass ends with its step (the last vote cast, or the step skipped): whoever is still inside a restricted HQ they were let
+    // into stays cleared until they leave, or its guns would open up the instant the pass lapses. Only here, not in clearStep(): a
+    // chapter that is FAILED (a recall, a K.O., abandoning it) is no signing, and a grace left on a base that then falls asleep
+    // would be a free pass for a later teleport. Only for a base you are inside right now, for the same reason.
+    const cs = A.steps[A.si];
+    if (cs && cs.t === 'relays' && cs.pass && cs.locs) {
+      for (const l of cs.locs) { const b = l && g.enemies.bases.find((x) => x.loc === l && x.restricted); if (b && b.inside) g.enemies.grantGrace(l, 'the Charter is signed'); }
+    }
     this.clearStep();
     A.si++;
     if (A.si >= A.steps.length) { this.complete(); return; }
@@ -675,13 +683,6 @@ export class Story {
     const g = this.game;
     const A = this.active;
     if (!A) return;
-    // a story pass ends with the step: whoever is still inside a restricted HQ they were let into stays cleared until they
-    // leave, or its guns would open up the instant the last vote is cast (only for a base you are inside right now: a stale
-    // grace on a sleeping base would be a free pass for a later teleport)
-    const cs = A.steps[A.si];
-    if (cs && cs.t === 'relays' && cs.pass && cs.locs) {
-      for (const l of cs.locs) { const b = l && g.enemies.bases.find((x) => x.loc === l && x.restricted); if (b && b.inside) g.enemies.grantGrace(l, 'the Charter is signed'); }
-    }
     for (const p of A.props) { p.removeFromParent(); if (p.userData.ring) { p.geometry.dispose(); p.material.dispose(); } }
     A.props = [];
     if (A.obj) { g.events.protect = g.events.protect.filter((o) => o !== A.obj); A.obj = null; }
@@ -1186,14 +1187,14 @@ export class Story {
       if (speed < soft) return;
       dmg = (speed - soft) * 7 * shield;
     }
-    const was = A.cargoHp ?? 100;
-    A.cargoHp = was - dmg;
+    const was = condPct(A.cargoHp);
+    A.cargoHp = (A.cargoHp ?? 100) - dmg;
     if (A.cargoHp > 0) {
-      if (s.t === 'carry') g.fx.pop(`CAREFUL! ${condPct(A.cargoHp)}%`, null, { color: '#ff9f1c', size: 40, life: 0.8 });
+      const c = condPct(A.cargoHp); // (what's shown: the labels and the warning go by the same number the chip reads)
+      if (s.t === 'carry') g.fx.pop(`CAREFUL! ${c}%`, null, { color: '#ff9f1c', size: 40, life: 0.8 });
       else {
-        const hp = A.cargoHp;
-        g.fx.pop(`${hp < PARTS_LOW ? 'FALLING APART!' : hp < 60 ? 'CRACKING!' : 'DENTED!'} ${condPct(hp)}%`, null, { color: hp < PARTS_LOW ? '#ff2a4a' : hp < 60 ? '#ff6a1c' : '#ff9f1c', size: hp < PARTS_LOW ? 46 : 40, life: 0.8 });
-        if (was >= PARTS_LOW && hp < PARTS_LOW) g.hud.toast('The parts are barely holding together. Take it easy.', 2.5);
+        g.fx.pop(`${c < PARTS_LOW ? 'FALLING APART!' : c < 60 ? 'CRACKING!' : 'DENTED!'} ${c}%`, null, { color: c < PARTS_LOW ? '#ff2a4a' : c < 60 ? '#ff6a1c' : '#ff9f1c', size: c < PARTS_LOW ? 46 : 40, life: 0.8 });
+        if (was >= PARTS_LOW && c < PARTS_LOW) g.hud.toast('The parts are barely holding together. Take it easy.', 2.5);
       }
       return;
     }
@@ -1207,10 +1208,15 @@ export class Story {
     this.setMarker(this.stepTarget(s));
   }
 
-  // 'condition 63%' for the status line (the event chip and the leader's dialog both render it as HTML): red once it's low
-  condText() {
-    const c = condPct(this.active.cargoHp);
-    return c < PARTS_LOW ? `<span style="color:#ff5a5a">condition ${c}%</span>` : `condition ${c}%`;
+  // 'condition 63%' for the status line
+  condText() { return `condition ${condPct(this.active.cargoHp)}%`; }
+
+  // a hauled load that's in a bad way: the event chip goes red (panel().warn; the status line is a flex row, so the colour goes on
+  // the whole line, not on a span inside it)
+  loadLow() {
+    const A = this.active;
+    const s = A && A.steps[A.si];
+    return !!(s && A.carrying && (s.t === 'build' || s.t === 'carry') && condPct(A.cargoHp) < PARTS_LOW);
   }
 
   // spawn enemies around a point
@@ -1496,8 +1502,7 @@ export class Story {
     }
   }
 
-  // a planted prop (storyAssets): a sensor pylon, a ballot stand, a demolition charge...
-  // The Charter's stops: every faction HQ except those `skip`ped (Rustmoon's), as leader selectors, in HQ_ROUTE order. A faction
+    // The Charter's stops: every faction HQ except those `skip`ped (Rustmoon's), as leader selectors, in HQ_ROUTE order. A faction
   // the story has ended (conquered, dismantled, fallen), or an HQ that is only a ruin now, has nobody left to vote.
   hqSites(s) {
     const g = this.game;
@@ -1570,6 +1575,7 @@ export class Story {
     A.props.push(s.ring);
   }
 
+  // a planted prop (storyAssets): a sensor pylon, a ballot stand, a demolition charge...
   relayProp(pos, kind) {
     const g = this.game;
     const root = makeProp(kind);
@@ -1639,7 +1645,7 @@ export class Story {
     }
     // the Charter's tour lists every HQ with its vote (static notes, so the chip only repaints when something changes)
     const list = s && s.t === 'relays' && s.names ? s.names.map((n, i) => ({ state: i < s.k ? 'done' : i === s.k ? 'next' : 'todo', label: n, note: i < s.k ? 'AYE' : s.gate[i] ? 'PASS' : '' })) : null;
-    return { faction: A.f, title: `★ CH.${A.idx + 1} · ${A.def.title}`, status: this.status(), bar, list };
+    return { faction: A.f, title: `★ CH.${A.idx + 1} · ${A.def.title}`, status: this.status(), bar, list, warn: this.loadLow() };
   }
 
   objective() {

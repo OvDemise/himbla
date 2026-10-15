@@ -825,7 +825,7 @@ export class HUD {
     const t = ev.timer !== undefined ? `<span class="m-timer ${ev.timer < 20 ? 'low' : ''}">${Math.floor(Math.max(0, ev.timer) / 60)}:${String(Math.floor(Math.max(0, ev.timer) % 60)).padStart(2, '0')}</span>` : '';
     const html = `<div class="m-head" style="background:${f.color}">EVENT · ${f.name}</div>
       <div class="m-cargo">${ev.title}</div>
-      <div class="m-obj">${ev.status || ''}</div>${(ev.list || []).map((r) => `<div class="ev-row ${r.state}"><b>${r.state === 'done' ? '✔' : r.state === 'next' ? '►' : '○'}</b>${r.label}<span>${r.note || ''}</span></div>`).join('')}
+      <div class="m-obj${ev.warn ? ' warn' : ''}">${ev.status || ''}</div>${(ev.list || []).map((r) => `<div class="ev-row ${r.state}"><b>${r.state === 'done' ? '✔' : r.state === 'next' ? '►' : '○'}</b>${r.label}<span>${r.note || ''}</span></div>`).join('')}
       <div class="m-row">${t}<div class="track ev-bar"><div class="fill" style="width:${Math.round((ev.bar ?? 0) * 100)}%;background:${f.color}"></div></div></div>`;
     if (html !== this.lastEventHtml) { el.innerHTML = html; this.lastEventHtml = html; }
     const fc = $('fluid');

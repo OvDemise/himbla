@@ -352,6 +352,7 @@ body:has(#title:not(.hidden)) #hud { visibility: hidden; }
 /* ---------- events, fluid, dialogs, rep log, globe ---------- */
 #eventpanel { width: 320px; padding: 0 0 8px; }
 #eventpanel .m-obj { font-size: 14px; }
+#eventpanel .m-obj.warn { color: #ff5a5a; }
 /* a checklist under the status line (the Charter's HQ tour) */
 #eventpanel .ev-row { display: flex; gap: 6px; padding: 1px 10px; font-size: 13px; color: var(--ui-muted); }
 #eventpanel .ev-row b { width: 14px; color: var(--ui-dim); font-weight: normal; }
