@@ -593,7 +593,7 @@ crowd-noise bed for now (the cheering is due a rework), and the race countdown b
   leader, grandstand and blimp cameras, the mouse orbits the chase cam, and `SPACE` spends one of three **crowd
   cheers** for a short surge that burns stamina (a dim creature may get spooked instead). Chaos as ever: stumbles,
   zooms, wrong-way runs, giant hops, and the occasional explosion and reassembly.
-- **The Monolith:** touch it (90 s cooldown) and it casts one of three spells, never the same twice running: **Low-G** (30 s at under half gravity), **Time Dilation** (20 s with pirates, their shots, traffic and meteors at 40 % speed while you keep full speed) or **Echo Decoys** (30 s with three holograms of you skating alongside; anyone shooting at you picks one of the four at random, and a hologram shatters when hit).
+- **The Monolith:** touch it (90 s cooldown) and it casts one of three spells, never the same twice running: **Time Dilation** (20 s with pirates, their shots, traffic and meteors at 40 % speed while you keep full speed), **Echo Followers** (one or two holograms of you that retrace your every move a moment late, mid-air jumps and all, for up to ten minutes or until one takes a shot for you; anyone shooting at you picks one of you at random) or **Teleport** (a random spot on the Moon, on flat safe ground away from settlements and lakes, where you land at a standstill one time in four and otherwise running at a random 1–300 km/h; you keep your health and fuel, and a launch comes with a few seconds of Soft Landing so the arrival can't wipe you out).
 - **Bounce Dome Funpark:** inflatable domes, a turreted bouncy castle and a row of trampolines that throw you back
   up harder than you landed, plus a **skate park**: a volcano bowl (ride up the outside and drop in, or hit it fast and
   fly clean over), a kicker line with a big launch off the plateau edge, a big **half-pipe** (two matching ~7 m walls
@@ -661,7 +661,7 @@ src/
   medevac.js     the Spindle's K.O. cutscene: a recovery craft, two medics and a stretcher carry you off the rock
   worldstate.js  what the story finales changed for good, applied before the world is built
   kade.js        Captain Kade's gun truck: orbit driving, gatling and flak turret, Junk Mortar drop
-  monolith.js    the Monolith's spells: low-G, time dilation, echo decoys
+  monolith.js    the Monolith's spells: time dilation, echo followers, teleport
   territory.js   faction territory, small outposts, patrols
   vehicles.js    drivable faction vehicles
   settings.js    settings menu + key remapping

@@ -990,7 +990,7 @@ export class Alchemy {
       for (let i = used; i < this.slots; i++) cells.push('<span class="empty-slot">·</span>');
       parts.push(`JAR ${cells.join('')}${this.jar.length >= 2 ? ' <i>stewing…</i>' : ''}${this.jar.length ? ' <i>· X empty · ⇧X dump</i>' : ''}`);
     }
-    const buff = Object.entries(this.buffs).filter(([, v]) => v > 0).map(([k, v]) => `${BUFF_NAMES[k]} ${Math.ceil(v)}s`).join(' · ');
+    const buff = Object.entries(this.buffs).filter(([, v]) => v > 0).map(([k, v]) => `${BUFF_NAMES[k]} ${v >= 120 ? `${Math.floor(Math.ceil(v) / 60)}:${String(Math.ceil(v) % 60).padStart(2, '0')}` : `${Math.ceil(v)}s`}`).join(' · '); // (the long ones as m:ss)
     if (buff) parts.push(`<div class="buffs">${buff}</div>`);
     if (this.mutations.length) parts.push(`<div class="muts">${this.mutations.map((k) => MUTATIONS[k].name).join(' · ')}</div>`);
     return parts.join('');
@@ -1021,7 +1021,7 @@ export function makeJarMesh(jar = [], artifact = false) {
   return g;
 }
 
-const BUFF_NAMES = { lowGrav: 'LOW-G', slick: 'MOON MUD', bouncy: 'SPRINGY', invert: 'NEGATIVE', rain: 'BLACK RAIN', cushion: 'SOFT LANDING', dilate: 'TIME DILATION', echo: 'ECHO DECOYS' };
+const BUFF_NAMES = { lowGrav: 'LOW-G', slick: 'MOON MUD', bouncy: 'SPRINGY', invert: 'NEGATIVE', rain: 'BLACK RAIN', cushion: 'SOFT LANDING', dilate: 'TIME DILATION', echo: 'ECHO FOLLOWERS' };
 
 // Reactor recipes, keyed by the sorted item kinds fed in together.
 const RECIPES = {
