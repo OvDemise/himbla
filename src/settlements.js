@@ -3,6 +3,8 @@ import { Kit, T, G, D, GLASS, BEAM, prism, sandbags, container, crate, tank, lig
 import { FACTIONS } from './locations.js';
 import { pixelFont } from './fonts.js';
 import { glow } from './toon.js';
+import { market, tickerText } from './market.js';
+import { exchangeTexture } from './exchangeBoard.js';
 
 // Settlements, HQs and landmarks built with the outpost Kit (outpostModels.js): every static part
 // of a place bakes into one merged mesh per material plus one ink hull, so a detailed settlement
@@ -312,15 +314,24 @@ export function ticker(k, x, y, z, r, h, text, { fg = '#7dff6a', bg = '#0d0a1a',
   W = parts.reduce((a, s) => a + g0.measureText(s).width, 0);
   c.width = Math.ceil(W); c.height = 128;
   const g = c.getContext('2d');
-  g.fillStyle = bg; g.fillRect(0, 0, c.width, c.height);
+  // (re)paint the text; a replacement is squeezed or stretched a little to fill the same canvas, so
+  // a feed whose prices change length keeps whole passes round the drum
+  const paint = (items) => {
+    const w = items.reduce((a, s) => a + g.measureText(s).width, 0);
+    g.setTransform(1, 0, 0, 1, 0, 0);
+    g.fillStyle = bg; g.fillRect(0, 0, c.width, c.height);
+    g.font = pixelFont(fs);
+    g.textBaseline = 'middle';
+    g.scale(Math.max(0.7, Math.min(1.4, c.width / w)), 1);
+    let px = 0;
+    for (const s of items) {
+      g.fillStyle = s.includes('▼') ? '#ff3b5c' : fg;
+      g.fillText(s, px, 68);
+      px += g.measureText(s).width;
+    }
+  };
   g.font = pixelFont(fs);
-  g.textBaseline = 'middle';
-  let px = 0;
-  for (const s of parts) {
-    g.fillStyle = s.includes('▼') ? '#ff3b5c' : fg;
-    g.fillText(s, px, 68);
-    px += g.measureText(s).width;
-  }
+  paint(parts);
   const tex = new THREE.CanvasTexture(c);
   tex.colorSpace = THREE.SRGBColorSpace;
   tex.wrapS = THREE.RepeatWrapping;
@@ -328,9 +339,11 @@ export function ticker(k, x, y, z, r, h, text, { fg = '#7dff6a', bg = '#0d0a1a',
   tex.repeat.set(Math.max(1, Math.round((TAU * r) / ((h * c.width) / c.height))), 1);
   const drum = new THREE.Mesh(new THREE.CylinderGeometry(r, r, h, 40, 1, true), new THREE.MeshBasicMaterial({ map: tex }));
   drum.userData.tick = (o, dt) => { tex.offset.x = (tex.offset.x + dt * speed) % 1; };
+  drum.userData.retext = (t) => { paint(t.split('|').map((q) => q.trim() + '   ')); tex.needsUpdate = true; };
   k.dyn(drum, x, y + h / 2, z);
   k.ring(r + 0.1, 0.25, T(ring), x, y + h + 0.1, z);
   k.ring(r + 0.1, 0.25, T(ring), x, y - 0.1, z);
+  return drum;
 }
 
 // Elevated conveyor on trestles along a polyline, with lumps of ore riding it.
@@ -551,6 +564,45 @@ export function buildHelium(world, loc) {
   });
 }
 
+// The Exchange's big board: two screens crowning the top tier (one over the plaza, one on the far
+// side), each a framed panel standing on posts off the roof below, hinged at its foot and leaning
+// out towards the viewer, braced back to the wall. Both show one live canvas (exchangeBoard.js);
+// only the plaza-side screen's tick repaints it, and only while the player is within sight.
+function stockBoard(k, loc, tz, apothem, roofY, w, h) {
+  const tex = exchangeTexture();
+  const mat = new THREE.MeshBasicMaterial({ map: tex, toneMapped: false });
+  const screen = new THREE.Mesh(new THREE.PlaneGeometry(w, h), mat);
+  screen.position.z = 0.01;
+  const tilt = 0.25, fh = h + 1.2, fw = w + 1.2, yb = roofY + 3, off = apothem + 2.6;
+  const body = part(0x2ec4ff, (q) => {
+    q.box(fw, fh, 0.5, T(DARK), 0, -fh / 2, -0.55, { outline: 0.08 });
+    for (const y0 of [-fh / 2, fh / 2 - 0.16]) q.box(fw, 0.16, 0.12, G(0x2ec4ff), 0, y0, -0.1, { outline: 0 });
+    for (const sx of [-1, 1]) q.box(0.16, fh - 0.3, 0.12, G(0x2ec4ff), sx * (fw / 2 - 0.16), -(fh - 0.3) / 2, -0.1, { outline: 0 });
+  });
+  body.add(screen);
+  // hinged at the bottom edge: the body turns about its centre, then sits so its foot stays on the hinge
+  const cs = Math.cos(tilt), sn = Math.sin(tilt);
+  body.rotation.x = tilt;
+  body.position.set(0, (fh / 2) * cs, (fh / 2) * sn);
+  const front = new THREE.Group(); front.add(body);
+  const back = new THREE.Group(); back.add(body.clone());
+  front.userData.tick = (o, dt, t) => { if (loc.camDist < 450) tex.userData.redraw(t); };
+  k.dyn(front, 0, yb, tz + off);
+  k.dyn(back, 0, yb, tz - off, Math.PI);
+  // a point on the back of the frame, `v` of the way up it, as [y, z] from the hinge
+  const rear = (v) => { const y = (v - 0.5) * fh, z = -0.8; return [(fh / 2) * cs + y * cs - z * sn, (fh / 2) * sn + y * sn + z * cs]; };
+  // posts up from the roof of the tier below, and struts from high on the frame back to the wall
+  k.at(0, tz);
+  const [sy, sz0] = rear(0.82);
+  for (const sg of [-1, 1]) {
+    for (const sx of [-1, 1]) {
+      k.cyl(0.32, 0.42, yb - roofY + 0.3, 6, T(DARK), sx * w * 0.36, roofY, sg * (off - 0.4), { outline: 0.04 });
+      k.beam([sx * 3.4, yb + sy - 3.5, sg * apothem], [sx * 3.4, yb + sy, sg * (off + sz0)], 0.22, T(DARK), { outline: 0.03 });
+    }
+  }
+  k.at();
+}
+
 // =============================================================================================
 // Meridian Exchange: the trade HQ. A stepped glass trading tower wearing a price ticker, four
 // sawtooth warehouses with docks, a container yard under a travelling gantry crane, two tower
@@ -590,7 +642,17 @@ export function buildMeridian(world, loc) {
     k.add(new THREE.RingGeometry(13.9, 20.0, 48, 1).rotateX(-Math.PI / 2), T(blue), 0, TY + 3.75, 0, { outline: 0 });
     k.add(new THREE.RingGeometry(13.9, 20.0, 48, 1).rotateX(Math.PI / 2), T(0x1b3a8f), 0, TY + 3.7, 0, { outline: 0 });
     k.at();
-    ticker(k, 0, TY + 1.0, TZ, 19.8, 2.6, 'MERIDIAN COMPOSITE ▲ 1,204.5 | HE-3 ▲ 412.70 | WATER ICE ▲ 19.95 | KEPLER BONDS ▼ 98.10 | VOSTOK SCRAP ▼ 12.40 | DAEDALUS PHASE-TECH ▲ 777.00', { fg: '#ffd23f', speed: 0.014 });
+    // the ticker and the big board both read the market (market.js): one price list, refreshed together
+    const drum = ticker(k, 0, TY + 1.0, TZ, 19.8, 2.6, tickerText(), { fg: '#ffd23f', speed: 0.014 });
+    const scroll = drum.userData.tick;
+    let seen = market.version;
+    drum.userData.tick = (o, dt, t) => {
+      scroll(o, dt, t);
+      market.update(t);
+      if (market.version !== seen) { seen = market.version; drum.userData.retext(tickerText()); }
+    };
+    // the big board: two screens on the top tier (its flat sides face the plaza and the far side)
+    stockBoard(k, loc, TZ, 10.5 * Math.cos(Math.PI / 8), tierTop[1] + 0.9, 20, 13.33);
     // the entrance: a columned portico on the plaza side, steps up to it, glass doors and the
     // exchange's name over them, banners either side
     {
