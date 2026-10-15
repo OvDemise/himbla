@@ -1120,7 +1120,9 @@ class Game {
     if (this.trailer) rdt = this.trailer.pre(rdt); // trailer: shot clock, staged input
     // paused, map, menus and dialogs freeze the whole world: traffic, the satellite, particles, clocks
     if (this.pad) { this.pad.update(rdt); this.pad.crosshair(rdt); } // (before anything reads input this frame)
+    dbg.lap('pad');
     dbg.updateInput(); // (dev overlay: controller map and held keys)
+    dbg.lap('debug');
     const frozen = FROZEN_STATES.has(this.state);
     const dt = frozen ? 0 : rdt;
     this.time += dt;
@@ -1359,6 +1361,7 @@ class Game {
     if (this.garage && this.garage.radial) { this.garage.radialMove(mx, my); mx = my = 0; }
     const c = this.cam;
     const P = this.player;
+    const dbg = this.devOverlay;
     // parallel-transport the camera heading as you move around the sphere
     upAt(P.pos, c.up);
     c.fwd.addScaledVector(c.up, -c.fwd.dot(c.up));
@@ -1377,24 +1380,38 @@ class Game {
     if (this.spindle.active) { this.updateAway(dt, c); return; }
     this.cheats.tick();
     this.updateIndoors();
-    P.update(dt, this.input, c);
-    this.devOverlay.lap('player');
+    dbg.lap('indoors');
+    P.update(dt, this.input, c); // (player.js times its own parts: rail, physics, tricks, weapons, animation)
     this.secrets.update(dt);
+    dbg.lap('secrets');
     this.missions.update(dt);
+    dbg.lap('missions');
     this.events.update(dt);
     if (!this.events.active) this.hud.eventPanel(this.story.panel());
+    dbg.lap('events');
     this.globe.update(dt);
+    dbg.lap('globe');
     this.territory.update(dt);
+    dbg.lap('territory');
     this.story.update(dt);
+    dbg.lap('story');
     this.town.update(dt);
+    dbg.lap('town');
     this.tutorial.update(dt);
+    dbg.lap('tutorial');
     this.garage.update(dt);
+    dbg.lap('garage');
     document.getElementById('techchip').innerHTML = this.story.hudTech();
+    dbg.lap('techchip');
     this.alchemy.update(dt);
+    dbg.lap('alchemy');
     this.race.update(dt);
+    dbg.lap('race');
     this.rides.update();
+    dbg.lap('rides');
     const wdt = this.alchemy.buffs.dilate > 0 ? dt * DILATE_RATE : dt; // the Monolith's time dilation
     this.meteors.update(wdt);
+    dbg.lap('meteors');
     if (this.input.pressed('KeyG')) this.alchemy.scoop();
     // X is a hold (like the recall shuttle, but free), so a stray tap never throws away a jar
     // you've been stewing; a tap with nothing in it still says so
@@ -1427,15 +1444,18 @@ class Game {
         this.vHold = 0;
       }
     }
+    dbg.lap('keys');
     this.powers.update(dt);
+    dbg.lap('powers');
     if (this.input.pressed('KeyT') && this.boardCooldown <= 0 && !this.player.rag) this.story.useTech('teleport');
     if (this.input.pressed('KeyN')) { const on = this.audio.toggleMusic(); this.hud.toast(this.audio.muted ? `Music ${on ? 'on' : 'off'} (all audio is muted: Settings → Audio)` : on ? '♪ Music on' : 'Music off', this.audio.muted ? 3 : 1.5); }
     this.cosmetics.update(dt);
+    dbg.lap('cosmetics');
     this.updateScanner(dt);
-    this.devOverlay.lap('systems');
+    dbg.lap('scanner');
     this.enemies.update(wdt, this.time);
     this.projectiles.update(dt, wdt);
-    this.devOverlay.lap('enemies');
+    dbg.lap('enemies');
 
     for (let i = this.timers.length - 1; i >= 0; i--) {
       const t = this.timers[i];

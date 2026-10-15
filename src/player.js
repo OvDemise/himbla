@@ -140,9 +140,11 @@ export class Player {
     this.rag = new Ragdoll(this.game, this.model, this.body, sign);
   }
 
+  // (the dev overlay's stage detail: laps at the end of each part. Every path out of step() ends in the animation lap below)
   update(dt, input, cam) {
     this.step(dt, input, cam);
     this.updateLamp(cam);
+    this.game.devOverlay.lap('animate');
   }
 
   // helmet lamp follows your gaze (every frame, whichever way you're moving: skating, grinding, riding)
@@ -161,7 +163,9 @@ export class Player {
     const up = b.up;
 
     // grinding a snake rock's crest (rails.js): the rail carries you
-    if (g.grind && g.grind.update(this, dt, input)) { this.idle.cancel(this.model); if (this.trick.active) this.clearTrick(); return; } // (a half-done trick doesn't wait on the rail to flip you when you pop off)
+    const grinding = g.grind && g.grind.update(this, dt, input);
+    g.devOverlay.lap('rail');
+    if (grinding) { this.idle.cancel(this.model); if (this.trick.active) this.clearTrick(); return; } // (a half-done trick doesn't wait on the rail to flip you when you pop off)
 
     // riding something (a transit ship, a carousel horse, a ferris-wheel gondola: rides.js): the
     // seat carries you, no physics; the ride decides where you get off
@@ -243,8 +247,10 @@ export class Player {
     if (this.vehicle) {
       this.idle.cancel(this.model);
       g.garage.drive(dt, input, cam);
+      g.devOverlay.lap('physics');
       this.center.copy(b.pos).addScaledVector(b.up, 1.3);
       this.updateWeapons(dt, input, cam);
+      g.devOverlay.lap('weapons');
       const m = this.model;
       m.root.position.copy(b.pos);
       // the vehicle's own orientation (set by the garage this frame), so you never wobble on it
@@ -286,10 +292,14 @@ export class Player {
       b.thrusting = false;
       b.energy = Math.min(b.maxEnergy, b.energy + this.params.energyRegen * dt);
       if (b.jetLocked && b.energy >= b.maxEnergy * 0.25) b.jetLocked = false;
+      g.devOverlay.lap('physics');
       this.updateWeapons(dt, input, cam);
+      g.devOverlay.lap('weapons');
       this.center.copy(b.pos).addScaledVector(b.up, 1.3);
       this.animate(dt, cam, ctrl);
+      g.devOverlay.lap('animate');
       if (this.rag) this.rag.sync(dt);
+      g.devOverlay.lap('ragdoll');
       return;
     }
 
@@ -318,6 +328,7 @@ export class Player {
       for (const it of imp) this.onImpact(it, ctrl.skates);
       ctrl.jump = false;
     }
+    g.devOverlay.lap('physics');
     if (b.jumped) { g.audio.jump(); g.fx.dust(b.pos, b.vel, 6, up); }
     // the Vanes at work: teal and violet sparks shed off the skates and a rising shimmer
     this.vaneCarve = vanes && !b.grounded ? b.airCarve || 0 : 0;
@@ -383,7 +394,9 @@ export class Player {
       } else if (this.speedMarks[i] && kmh < m.kmh - 60) this.speedMarks[i] = false;
     });
 
+    g.devOverlay.lap('tricks');
     this.updateWeapons(dt, input, cam);
+    g.devOverlay.lap('weapons');
 
     if (b.onLake && b.grounded && !b.skating) b.vel.multiplyScalar(1 - Math.min(1, 2.5 * dt)); // wading
     if (b.onLake && b.grounded && this.speed > 8 && Math.random() < dt * 20) g.fx.spawn(b.pos, up.clone().multiplyScalar(3), { color: 0x2a1f4f, size: 0.4, life: 0.6, gravity: 2, count: 2, spread: 3 });
@@ -614,7 +627,9 @@ export class Player {
     // stopped: the breath, and now and then another idle (idles.js), laid over the rest pose
     this.idle.apply(m, dt, b.grounded && !b.skating && !this.rag && !!ctrl && ctrl.wish.lengthSq() === 0, sp, !b.grounded || !!this.rag);
     if (this.rag) {
+      this.game.devOverlay.lap('animate');
       if (!this.rag.update(dt)) { this.rag.release(); this.rag = null; }
+      this.game.devOverlay.lap('ragdoll');
     }
     this.updateScarf(dt);
 

@@ -24,28 +24,47 @@ export const SECTIONS = [
   { key: 'frame', name: 'FRAME TIMES', box: 'perf' }, // FPS, frame ms, p99, hitches, 30 s FPS graph
   { key: 'load', name: 'CPU & GPU GRAPHS', box: 'perf' }, // 30 s load graphs
   { key: 'stages', name: 'CPU TIME BY STAGE', box: 'perf' },
+  { key: 'detail', name: 'STAGE DETAIL (player, systems)', box: null, sub: true }, // (rows under the stages: part of that section)
   { key: 'render', name: 'DRAW CALLS & POLYGONS', box: 'perf' },
   { key: 'world', name: 'WORLD COUNTS', box: 'perf' },
   { key: 'pirates', name: 'PIRATE SPAWNS', box: 'game' },
   { key: 'paths', name: 'AI PATHS', box: null },
   { key: 'input', name: 'INPUT & CONTROLLER MONITOR', box: null },
 ];
-const DEFAULTS = { frame: true, load: false, stages: true, render: true, world: true, pirates: false, paths: false, input: false };
+const DEFAULTS = { frame: true, load: false, stages: true, detail: true, render: true, world: true, pirates: false, paths: false, input: false };
 
-// the stages of a frame, in the order main.js reaches them (debug and overlay are this overlay's own cost)
-const LAPS = [
-  ['player', 'player + input'],
-  ['systems', 'game systems'],
+// The stages of a frame, in the order main.js reaches them (debug and overlay are this overlay's own cost).
+// A stage with a third entry is a group: its row is the sum of its parts, and the parts (each a lap() of its
+// own, where main.js and player.js call them) show under it with STAGE DETAIL on.
+const STAGES = [
+  ['player', 'player + input', [
+    ['pad', 'pad + input'], ['look', 'mouse look'], ['indoors', 'indoors check'], ['rail', 'rail grind'], ['physics', 'move + physics'],
+    ['tricks', 'tricks + fx'], ['weapons', 'weapons'], ['animate', 'animation'], ['ragdoll', 'ragdoll'],
+  ]],
+  ['systems', 'game systems', [
+    ['secrets', 'secrets'], ['missions', 'missions'], ['events', 'events + panel'], ['globe', 'globe map'], ['territory', 'territory'],
+    ['story', 'story'], ['town', 'town'], ['tutorial', 'tutorial'], ['garage', 'garage'], ['techchip', 'tech chip DOM'], ['alchemy', 'alchemy'],
+    ['race', 'race'], ['rides', 'rides'], ['meteors', 'meteors'], ['keys', 'key presses'], ['powers', 'powers'], ['cosmetics', 'cosmetics'], ['scanner', 'scanner'],
+  ]],
   ['enemies', 'enemies + shots'],
   ['other', 'camera + misc'],
   ['world', 'world + fx'],
   ['hud', 'hud + audio'],
   ['terrain', 'terrain stream'],
   ['render', 'render submit'],
-  ['debug', 'debug drawing'], // (AI paths, enemy markers)
+  ['debug', 'debug drawing'], // (AI paths, enemy markers, the input monitor)
   ['overlay', 'this overlay'], // (its own text and graphs: nonzero only on the frames that refresh them)
 ];
-const LAP_IX = Object.fromEntries(LAPS.map(([k], i) => [k, i]));
+const LAPS = []; // { key, label, parent (index, or -1), kids (indexes) }: groups and their parts, flat
+for (const [key, label, parts] of STAGES) {
+  const g = { key, label, parent: -1, kids: [] };
+  LAPS.push(g);
+  for (const [k, l] of parts || []) { g.kids.push(LAPS.length); LAPS.push({ key: k, label: l, parent: LAPS.indexOf(g), kids: [] }); }
+}
+const LAP_IX = Object.fromEntries(LAPS.map((L, i) => [L.key, i]));
+export const LAP_KEYS = Object.keys(LAP_IX); // (every name lap() takes: the stage-timing call sites in main.js and player.js are checked against it)
+const GROUPS = LAPS.filter((L) => L.kids.length);
+const DETAIL_AVG = 0.1, DETAIL_MAX = 0.5; // ms: a part shows under its group when it averages this much, or spiked to this
 
 const GOOD = '#7dff3a', WARN = '#ffd23f', BAD = '#ff4a4a', LOAD = '#4fd8ff';
 const f1 = (v, w = 5) => v.toFixed(1).padStart(w);
@@ -117,7 +136,7 @@ export class DevOverlay {
       let any = false;
       for (const s of SECTIONS) {
         const on = this.sec[s.key];
-        any ||= on;
+        any ||= on && !s.sub;
         if (!s.box) continue;
         this.dom[s.key].root.classList.toggle('hidden', !on);
         used[s.box] ||= on;
@@ -200,8 +219,10 @@ export class DevOverlay {
   // end of a stage: the time since the last lap() is that stage's
   lap(name) {
     if (!this.live) return;
+    const i = LAP_IX[name];
+    if (i === undefined) { if (!this.warned) { this.warned = true; console.warn(`[dev overlay] no stage called "${name}" (devoverlay.js STAGES)`); } return; }
     const t = performance.now();
-    this.cur[LAP_IX[name]] += t - this.tLap;
+    this.cur[i] += t - this.tLap;
     this.tLap = t;
   }
 
@@ -233,6 +254,7 @@ export class DevOverlay {
 
   end() {
     if (!this.live) return;
+    for (const G of GROUPS) for (const k of G.kids) this.cur[LAP_IX[G.key]] += this.cur[k]; // (a group's frame is the sum of its parts)
     for (let i = 0; i < LAPS.length; i++) {
       this.sum[i] += this.cur[i];
       if (this.cur[i] > this.max[i]) this.max[i] = this.cur[i];
@@ -248,7 +270,7 @@ export class DevOverlay {
 
   // every frame while playing (Cheats.tick): the in-world debug drawing
   tick() {
-    this.lap('player'); // (what ran before this goes to the player's stage, the drawing below to its own)
+    this.lap('look'); // (what ran before this is the mouse look and prep; the drawing below gets its own stage)
     if (this.shows('paths')) (this.paths ||= new AIPaths(this.game)).update();
     else if (this.paths) this.paths.hide();
     if (this.shows('pirates')) (this.marks ||= new EnemyMarkers(this.game)).update(); // (rings + beacons on every enemy)
@@ -323,13 +345,21 @@ export class DevOverlay {
   publishStages(el) {
     const fr = Math.max(1, this.winFrames);
     const avg = this.winN ? this.winMs / this.winN : 0;
+    const bar = (m) => '█'.repeat(Math.min(14, Math.round((m / this.targetMs) * 14)));
+    const detail = this.sec.detail;
     let cpu = 0;
     const rows = [];
     for (let i = 0; i < LAPS.length; i++) {
+      const L = LAPS[i];
+      if (L.parent >= 0) continue;
       const m = this.sum[i] / fr;
       cpu += m;
-      const bar = '█'.repeat(Math.min(14, Math.round((m / this.targetMs) * 14)));
-      rows.push(`${LAPS[i][1].padEnd(16)}${f1(m)}  ${bar.padEnd(14)} max ${f1(this.max[i])}`);
+      rows.push(`${L.label.padEnd(16)}${f1(m)}  ${bar(m).padEnd(14)} max ${f1(this.max[i])}`);
+      if (!detail) continue;
+      for (const k of L.kids) { // (only the parts worth a row: the rest are in the group's number)
+        const pm = this.sum[k] / fr, px = this.max[k];
+        if (pm >= DETAIL_AVG || px >= DETAIL_MAX) rows.push(`  ${LAPS[k].label.slice(0, 14).padEnd(14)}${f1(pm)}  ${bar(pm).padEnd(14)} max ${f1(px)}`);
+      }
     }
     rows.push(`${'main thread'.padEnd(16)}${f1(cpu)}   idle / GPU / vsync ${f1(Math.max(0, avg - cpu))} ms`);
     el.textContent = rows.join('\n');

@@ -207,7 +207,7 @@ export class Cheats {
     g.dialog('DEBUG OVERLAY', '<small>Every on-screen readout in one panel. F3 shows or hides it in play; the sections you pick are remembered.</small>', [
       { label: `1 · OVERLAY: ${on(o.on)}`, fn: () => { o.toggle(); this.overlayMenu(); } },
       ...SECTIONS.map((s, i) => ({ label: `${i + 2} · ${s.name}: ${on(o.sec[s.key])}`, fn: () => { o.setSection(s.key, !o.sec[s.key]); this.overlayMenu(); } })),
-      { label: 'BACK', fn: () => this.dev() }, // (a tenth row: the number keys stop at 9, so BACK is mouse / pad; Esc closes)
+      { label: 'BACK', fn: () => this.dev() }, // (rows past the ninth are mouse / pad: the number keys stop at 9; Esc closes)
       { label: 'CLOSE' },
     ]);
   }
