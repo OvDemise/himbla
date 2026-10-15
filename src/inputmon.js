@@ -1,31 +1,28 @@
 import { padKind } from './gamepad.js';
+import xboxImg from './assets/pads/xbox.webp?inline';
+import psImg from './assets/pads/ps.webp?inline';
 
-// Dev overlay (dev menu → INPUT & CONTROLLER MONITOR): the connected pad drawn live next to what the game
-// thinks is held, plus the trick state. For chasing stuck inputs: if the game has Q down while neither the
-// keyboard's Q nor the pad's Circle / B is, the readout goes red.
+// Dev overlay (dev menu → INPUT & CONTROLLER MONITOR): a photo of the connected pad with its live state
+// lit on top, next to what the game thinks is held, plus the trick state. For chasing stuck inputs: if the
+// game has Q down while neither the keyboard's Q nor the pad's Circle / B is, the readout goes red.
 //
 // The pad is read straight from navigator.getGamepads() (standard mapping), so it shows even when the game
 // is ignoring it. Button indexes: 0-3 face (bottom, right, left, top), 4/5 bumpers, 6/7 triggers, 8 View /
-// Create, 9 Start / Options, 10/11 stick clicks, 12-15 d-pad, 16 Home, 17 PlayStation touchpad.
+// Create, 9 Start / Options, 10/11 stick clicks, 12-15 d-pad, 16 Home, 17 Share / PlayStation touchpad.
 
 // what each standard-mapping button does in play (gamepad.js)
 const ACTION = {
   0: 'jump / dive', 1: 'trick (Q)', 2: 'interact', 3: 'vehicle', 4: 'skates', 5: 'power', 6: 'thrust / scope', 7: 'fire',
   8: 'map / recall', 9: 'pause', 10: 'thrust', 11: 'scoop', 12: 'next power', 13: 'radial menu', 14: 'prev weapon', 15: 'next weapon',
 };
-// button names per pad family (the face buttons are drawn as symbols on the pad itself)
+// button names per pad family
 const NAMES = {
-  xbox: ['A', 'B', 'X', 'Y', 'LB', 'RB', 'LT', 'RT', 'View', 'Menu', 'L3', 'R3', '↑', '↓', '←', '→', 'Guide'],
+  xbox: ['A', 'B', 'X', 'Y', 'LB', 'RB', 'LT', 'RT', 'View', 'Menu', 'L3', 'R3', '↑', '↓', '←', '→', 'Guide', 'Share'],
   ps: ['✕', '○', '□', '△', 'L1', 'R1', 'L2', 'R2', 'Create', 'Options', 'L3', 'R3', '↑', '↓', '←', '→', 'PS', 'Touchpad'],
-  switch: ['B', 'A', 'Y', 'X', 'L', 'R', 'ZL', 'ZR', '−', '+', 'LS', 'RS', '↑', '↓', '←', '→', 'Home'],
+  switch: ['B', 'A', 'Y', 'X', 'L', 'R', 'ZL', 'ZR', '−', '+', 'LS', 'RS', '↑', '↓', '←', '→', 'Home', 'Capture'],
 };
 const KEYS = [['KeyQ', 'Q'], ['KeyW', 'W'], ['KeyA', 'A'], ['KeyS', 'S'], ['KeyD', 'D'], ['ShiftLeft', 'Shift'], ['Space', 'Space'], ['KeyE', 'E']];
-const FACE_COL = {
-  xbox: ['#62d84e', '#ff4d4d', '#4da3ff', '#ffd23f'], // A, B, X, Y
-  ps: ['#6aa8ff', '#ff5470', '#ff8ad8', '#4ff0a0'], // cross, circle, square, triangle
-};
 const NS = 'http://www.w3.org/2000/svg';
-const STICK = 11; // how far a stick cap travels at full tilt, in drawing units
 const DEAD = 0.18;
 const TAU = Math.PI * 2;
 const f2 = (v) => (v >= 0 ? '+' : '−') + Math.abs(v).toFixed(2);
@@ -36,21 +33,38 @@ const padName = (id = '') => {
   return id.replace(/\s*\(.*$/, '').slice(0, 30) + (m ? ` · ${m[1]}:${m[2]}` : '');
 };
 
-// ---- shapes (drawing space 360 x 240; the right-hand shoulder pieces are the left ones mirrored) ----
-const SHAPE = {
-  trigger: 'M92 40 C94 24 112 14 138 14 L138 36 C120 34 104 36 92 40 Z',
-  bumper: 'M68 76 C80 58 112 50 152 50 L152 60 C120 60 96 66 82 84 Z',
-  xbox: 'M104 60 C140 50 220 50 256 60 C292 66 326 96 338 150 C346 190 336 220 312 222 C290 224 274 204 258 184 C250 174 240 170 228 170 L132 170 C120 170 110 174 102 184 C86 204 70 224 48 222 C24 220 14 190 22 150 C34 96 68 66 104 60 Z',
-  ps: 'M100 66 C140 56 220 56 260 66 C296 72 328 98 340 152 C348 196 334 226 310 226 C288 226 274 206 260 186 C252 174 242 170 230 170 L130 170 C118 170 108 174 100 186 C86 206 72 226 50 226 C26 226 12 196 20 152 C32 98 64 72 100 66 Z',
-  psCore: 'M122 60 C150 55 210 55 238 60 C262 68 270 118 258 162 C252 176 240 178 228 177 L132 177 C120 178 108 176 102 162 C90 118 98 68 122 60 Z',
+// ---- the two photos ----
+// Every position is in the original picture's own pixels (the files in assets/pads are crops of them, drawn back at
+// `box`). Shapes: ['c', cx, cy, r] circle · ['r', x, y, w, h, rx] rounded rect · ['p', [[x, y], ...]] polygon.
+// `face` are the coloured buttons (bottom, right, left, top); `sticks` are [button index, cx, cy, radius, travel, x axis, y axis].
+const mirror = (pts, axis) => pts.map(([x, y]) => [axis - x, y]);
+const XBOX_L1 = [[320, 418], [382, 360], [482, 332], [577, 335], [582, 352], [492, 362], [414, 392], [347, 440]];
+const PADS = {
+  xbox: {
+    img: xboxImg, box: [82, 290, 1520, 1313], head: 130,
+    face: [[0, 1154, 675, 46, '#62d84e'], [1, 1248, 583, 46, '#ff4d4d'], [2, 1060, 583, 46, '#4da3ff'], [3, 1154, 494, 46, '#ffd23f']],
+    hit: {
+      4: ['p', XBOX_L1], 5: ['p', mirror(XBOX_L1, 1602)],
+      8: ['c', 700, 579, 34], 9: ['c', 900, 580, 34], 16: ['c', 801, 437, 54], 17: ['r', 760, 635, 80, 52, 24],
+      12: ['r', 589, 700, 60, 78, 10], 13: ['r', 589, 832, 60, 78, 10], 14: ['r', 514, 775, 78, 60, 10], 15: ['r', 648, 775, 78, 60, 10],
+    },
+    sticks: [[10, 453, 577, 100, 42, 0, 1], [11, 975, 795, 100, 42, 2, 3]],
+    trig: { 6: [300, 300], 7: [1002, 300] }, // meter x and width, above the shoulders
+  },
+  ps: {
+    img: psImg, box: [363, 193, 1638, 1060], head: 130,
+    face: [[0, 1375, 548, 48, '#6aa8ff'], [1, 1463, 458, 48, '#ff5470'], [2, 1288, 458, 48, '#ff8ad8'], [3, 1375, 368, 48, '#4ff0a0']],
+    hit: {
+      4: ['p', [[531, 291], [663, 275], [751, 269], [751, 295], [535, 318]]], 5: ['p', [[1253, 269], [1338, 275], [1468, 293], [1463, 318], [1253, 295]]],
+      6: ['r', 541, 225, 167, 62, 14], 7: ['r', 1292, 225, 168, 62, 14],
+      8: ['r', 700, 295, 36, 58, 18], 9: ['r', 1262, 295, 36, 58, 18], 16: ['c', 1000, 610, 34], 17: ['r', 775, 250, 460, 250, 40],
+      12: ['r', 591, 361, 68, 72, 10], 13: ['r', 591, 491, 68, 68, 10], 14: ['r', 526, 426, 80, 67, 10], 15: ['r', 646, 426, 77, 67, 10],
+    },
+    sticks: [[10, 809, 624, 95, 36, 0, 1], [11, 1191, 624, 95, 36, 2, 3]],
+    trig: { 6: [530, 190], 7: [1280, 190] },
+  },
 };
-// PlayStation symbols, centred on 0,0 (stroked, ~±4.6)
-const SYM = {
-  0: 'M-4.4 -4.4L4.4 4.4M4.4 -4.4L-4.4 4.4',
-  1: 'M4.6 0A4.6 4.6 0 1 1 -4.6 0A4.6 4.6 0 1 1 4.6 0Z',
-  2: 'M-4.2 -4.2H4.2V4.2H-4.2Z',
-  3: 'M0 -5.2L5 3.6H-5Z',
-};
+PADS.switch = PADS.xbox; // (a Switch pad is drawn as the Xbox photo; its letters differ, see the header note)
 
 export class InputMonitor {
   constructor(game) {
@@ -92,7 +106,6 @@ export class InputMonitor {
     return gp;
   }
 
-  // ---- the drawing ----
   mk(tag, attrs, parent) {
     const n = document.createElementNS(NS, tag);
     for (const k in attrs) n.setAttribute(k, attrs[k]);
@@ -100,82 +113,40 @@ export class InputMonitor {
     return n;
   }
 
+  // a highlight shape from a PADS entry
+  shape(s, cls, parent) {
+    if (s[0] === 'c') return this.mk('circle', { cx: s[1], cy: s[2], r: s[3], class: cls }, parent);
+    if (s[0] === 'r') return this.mk('rect', { x: s[1], y: s[2], width: s[3], height: s[4], rx: s[5], class: cls }, parent);
+    return this.mk('polygon', { points: s[1].map((p) => p.join(',')).join(' '), class: cls }, parent);
+  }
+
+  // the photo with a highlight layer over every control
   build(kind) {
     this.kind = kind;
-    const ps = kind === 'ps';
-    const mk = (t, a, p) => this.mk(t, a, p);
-    const svg = mk('svg', { viewBox: '0 0 360 240', class: `im-svg im-${ps ? 'ps' : 'xbox'}` });
-    const defs = mk('defs', {}, svg);
-    const grad = (id, a, b) => { const g = mk('linearGradient', { id, x1: 0, y1: 0, x2: 0, y2: 1 }, defs); mk('stop', { offset: 0, 'stop-color': a }, g); mk('stop', { offset: 1, 'stop-color': b }, g); };
-    grad('im-g-xbox', '#3a3e4b', '#1b1d25');
-    grad('im-g-ps', '#f6f8fc', '#c9cfdb');
-    grad('im-g-core', '#252733', '#12131a');
+    const P = PADS[kind], [x0, y0, x1, y1] = P.box, w = x1 - x0, h = y1 - y0;
+    const svg = this.mk('svg', { viewBox: `${x0} ${y0 - P.head} ${w} ${h + P.head}`, class: `im-svg im-${kind}` });
+    this.mk('image', { href: P.img, x: x0, y: y0, width: w, height: h }, svg);
     this.btn = {};
     this.trig = {};
-
-    // triggers and bumpers: a left piece and its mirror
-    const side = (parent, mirror) => mk('g', mirror ? { transform: 'translate(360 0) scale(-1 1)' } : {}, parent);
-    for (const [i, mirror] of [[6, false], [7, true]]) {
-      const g = side(svg, mirror), id = `im-clip-${i}`;
-      mk('path', { d: SHAPE.trigger, class: 'im-trig' }, g);
-      const cp = mk('clipPath', { id }, g); mk('path', { d: SHAPE.trigger }, cp);
-      this.trig[i] = mk('rect', { x: 60, y: 40, width: 100, height: 0, class: 'im-fill', 'clip-path': `url(#${id})` }, g);
+    for (const [i, s] of Object.entries(P.hit)) this.btn[i] = this.shape(s, 'im-hit', svg);
+    for (const [i, cx, cy, r, col] of P.face) {
+      const c = this.mk('circle', { cx, cy, r, class: 'im-hit im-hit-face', style: `--c:${col}` }, svg);
+      this.btn[i] = c;
     }
-    mk('path', { d: ps ? SHAPE.ps : SHAPE.xbox, class: ps ? 'im-body-ps' : 'im-body-xbox' }, svg);
-    if (ps) {
-      mk('path', { d: SHAPE.psCore, class: 'im-core' }, svg);
-      // the light bar either side of the touchpad
-      mk('path', { d: 'M126 64 C122 84 122 106 130 126 M234 64 C238 84 238 106 230 126', class: 'im-bar' }, svg);
+    // trigger meters in the margin above the pad
+    const fs = Math.round(w / 31), mh = Math.round(w / 26), my = y0 - P.head + Math.round(P.head * 0.3);
+    for (const i of [6, 7]) {
+      const [mx, mw] = P.trig[i];
+      this.mk('rect', { x: mx, y: my, width: mw, height: mh, rx: mh / 2, class: 'im-meter' }, svg);
+      const fill = this.mk('rect', { x: mx, y: my, width: 0, height: mh, rx: mh / 2, class: 'im-meter-fill' }, svg);
+      const t = this.mk('text', { x: mx + mw / 2, y: my + mh / 2, 'font-size': fs, class: 'im-meter-t' }, svg);
+      this.trig[i] = { fill, t, x: mx, w: mw, label: NAMES[kind][i] };
     }
-    for (const [i, mirror] of [[4, false], [5, true]]) {
-      const g = side(svg, mirror);
-      this.btn[i] = { el: mk('path', { d: SHAPE.bumper, class: 'im-key' }, g) };
-    }
-    const text = (s, x, y, size) => { const t = mk('text', { x, y, 'font-size': size, class: 'im-lab' }, svg); t.textContent = s; };
-    const N = NAMES[kind] || NAMES.xbox;
-    text(N[6], 116, 26, 8.5); text(N[7], 244, 26, 8.5);
-    text(N[4], 112, 56, 7.5); text(N[5], 248, 56, 7.5);
-
-    // d-pad: a plus of four arms
-    const [dx, dy] = ps ? [88, 104] : [142, 146];
-    mk('circle', { cx: dx, cy: dy, r: 22, class: 'im-well' }, svg);
-    for (const [i, x, y, w, h] of [[12, -6, -21, 12, 15], [13, -6, 6, 12, 15], [14, -21, -6, 15, 12], [15, 6, -6, 15, 12]]) {
-      this.btn[i] = { el: mk('rect', { x: dx + x, y: dy + y, width: w, height: h, rx: 2.5, class: 'im-key' }, svg) };
-    }
-    // face buttons (bottom, right, left, top)
-    const [fx, fy] = ps ? [272, 104] : [262, 100];
-    const cols = FACE_COL[ps ? 'ps' : 'xbox'];
-    for (const [i, ox, oy] of [[0, 0, 19], [1, 19, 0], [2, -19, 0], [3, 0, -19]]) {
-      const g = mk('g', { class: 'im-face', style: `--c:${cols[i]}`, transform: `translate(${fx + ox} ${fy + oy})` }, svg);
-      mk('circle', { r: 10, class: 'im-cap' }, g);
-      if (ps) mk('path', { d: SYM[i], class: 'im-sym' }, g);
-      else { const t = mk('text', { y: 0.5, 'font-size': 11, class: 'im-sym-t' }, g); t.textContent = N[i]; }
-      this.btn[i] = { el: g };
-    }
-    // View / Menu (Create / Options), Guide (PS), touchpad
-    if (ps) {
-      this.btn[17] = { el: mk('rect', { x: 146, y: 66, width: 68, height: 40, rx: 9, class: 'im-pad' }, svg) };
-      this.btn[8] = { el: mk('rect', { x: 112, y: 78, width: 14, height: 7, rx: 3.5, class: 'im-key' }, svg) };
-      this.btn[9] = { el: mk('rect', { x: 234, y: 78, width: 14, height: 7, rx: 3.5, class: 'im-key' }, svg) };
-      this.btn[16] = { el: mk('circle', { cx: 180, cy: 146, r: 6, class: 'im-key' }, svg) };
-      mk('rect', { x: 174, y: 160, width: 12, height: 4, rx: 2, class: 'im-dim' }, svg); // mic mute, not a pad button
-    } else {
-      this.btn[8] = { el: mk('circle', { cx: 152, cy: 100, r: 6, class: 'im-key' }, svg) };
-      this.btn[9] = { el: mk('circle', { cx: 208, cy: 100, r: 6, class: 'im-key' }, svg) };
-      this.btn[16] = { el: mk('circle', { cx: 180, cy: 78, r: 10, class: 'im-key' }, svg) };
-      mk('circle', { cx: 180, cy: 78, r: 5, class: 'im-guide' }, svg);
-    }
-    // sticks: a well, a cap that follows the axes, and a ring that lights when the stick is clicked
-    const spec = ps ? [[10, 142, 146, 0, 1], [11, 218, 146, 2, 3]] : [[10, 100, 100, 0, 1], [11, 218, 146, 2, 3]];
-    this.sticks = spec.map(([i, x, y, ax, ay]) => {
-      mk('circle', { cx: x, cy: y, r: 22, class: 'im-well' }, svg);
-      const ring = mk('circle', { cx: x, cy: y, r: 22, class: 'im-ring' }, svg);
-      mk('circle', { cx: x, cy: y, r: STICK * DEAD * 3, class: 'im-dead' }, svg);
-      const g = mk('g', {}, svg);
-      const cap = mk('circle', { cx: x, cy: y, r: 14, class: 'im-stick' }, g);
-      mk('circle', { cx: x, cy: y, r: 8, class: 'im-stick-in' }, g);
-      this.btn[i] = { el: ring };
-      return { g, cap, x, y, ax, ay };
+    // sticks: the click ring and a dot that follows the axes
+    this.sticks = P.sticks.map(([i, cx, cy, r, travel, ax, ay]) => {
+      this.btn[i] = this.mk('circle', { cx, cy, r, class: 'im-hit im-hit-ring' }, svg);
+      const dot = this.mk('circle', { cx, cy, r: Math.round(r * 0.3), class: 'im-dot' }, svg);
+      return { dot, cx, cy, travel, ax, ay };
     });
     this.mapEl.replaceChildren(svg);
   }
@@ -197,6 +168,7 @@ export class InputMonitor {
     this.sub.innerHTML = (gp
       ? (gp.mapping === 'standard' ? 'standard mapping' : '<span class="bad">non-standard mapping: the buttons below may be wrong</span>')
       : 'press a button on the pad (browsers hide pads until one is used)')
+      + (kind === 'switch' ? ' · drawn as an Xbox pad, the letters differ' : '')
       + ` · <span class="${I.padActive ? 'src-on' : ''}">${I.padActive ? 'pad in control' : 'keyboard / mouse in control'}</span>`;
     this.mapEl.classList.toggle('empty', !gp);
 
@@ -205,16 +177,19 @@ export class InputMonitor {
     if (gp) {
       gp.buttons.forEach((bt, i) => {
         const v = bt.value || (bt.pressed ? 1 : 0), on = !!bt.pressed || v > 0.5;
-        if (i === 6 || i === 7) {
-          const c = this.trig[i];
-          if (c) { const h = 28 * Math.min(1, v); c.setAttribute('y', (42 - h).toFixed(1)); c.setAttribute('height', h.toFixed(1)); }
-        } else if (this.btn[i]) this.btn[i].el.classList.toggle('on', on);
+        if (this.btn[i]) {
+          if (i === 6 || i === 7) this.btn[i].style.fill = `rgba(125,255,58,${(v * 0.7).toFixed(2)})`; // (the L2 / R2 caps fill with the pull)
+          else this.btn[i].classList.toggle('on', on);
+        }
+        const t = this.trig[i];
+        if (t) { t.fill.setAttribute('width', (t.w * Math.min(1, v)).toFixed(1)); t.t.textContent = `${t.label}  ${v.toFixed(2)}`; }
         if (on) pressed.push(i);
       });
       for (const s of this.sticks) {
         const ax = gp.axes[s.ax] || 0, ay = gp.axes[s.ay] || 0, m = Math.hypot(ax, ay), k = m > 1 ? 1 / m : 1;
-        s.g.setAttribute('transform', `translate(${(ax * k * STICK).toFixed(1)} ${(ay * k * STICK).toFixed(1)})`);
-        s.cap.classList.toggle('live', m > DEAD);
+        s.dot.setAttribute('cx', (s.cx + ax * k * s.travel).toFixed(1));
+        s.dot.setAttribute('cy', (s.cy + ay * k * s.travel).toFixed(1));
+        s.dot.classList.toggle('live', m > DEAD);
       }
     }
 

@@ -165,36 +165,18 @@ button { font-family: var(--comic); }
 #input-mon .hot { color: #7dff3a; }
 #input-mon .bad { color: #ff5470; font-weight: bold; }
 #input-mon .im-alert { margin-top: 8px; padding: 5px 7px; border: 1px solid #ff5470; border-radius: 3px; background: rgba(255, 84, 112, .14); color: #ff8a9d; font-weight: bold; }
-/* the pad drawing */
-#input-mon .im-body-xbox { fill: url(#im-g-xbox); stroke: #565c70; stroke-width: 1.4; }
-#input-mon .im-body-ps { fill: url(#im-g-ps); stroke: #8f97aa; stroke-width: 1.4; }
-#input-mon .im-core { fill: url(#im-g-core); }
-#input-mon .im-bar { fill: none; stroke: #4da3ff; stroke-width: 2.4; stroke-linecap: round; opacity: .7; }
-#input-mon .im-trig { fill: #20222c; stroke: #565c70; stroke-width: 1.2; }
-#input-mon .im-ps .im-trig { fill: #2a2d3a; }
-#input-mon .im-fill { fill: #7dff3a; }
-#input-mon .im-key { fill: #20222c; stroke: #646b82; stroke-width: 1.2; }
-#input-mon .im-ps .im-key { fill: #2a2d3a; stroke: #7e869c; }
-#input-mon .im-key.on, #input-mon .im-pad.on { fill: #7dff3a; stroke: #eaffd9; }
-#input-mon .im-pad { fill: #3a3d4e; stroke: #5a6078; stroke-width: 1.2; }
-#input-mon .im-dim { fill: #3a3d4e; }
-#input-mon .im-guide { fill: #d6dbe8; }
-#input-mon .im-well { fill: #101117; stroke: #3a3e50; stroke-width: 1; }
-#input-mon .im-ring { fill: none; stroke: transparent; stroke-width: 2.4; }
-#input-mon .im-ring.on { stroke: #7dff3a; }
-#input-mon .im-dead { fill: none; stroke: #4a5068; stroke-width: .7; stroke-dasharray: 1.5 1.5; }
-#input-mon .im-stick { fill: #2b2e3b; stroke: #6f7790; stroke-width: 1.2; }
-#input-mon .im-stick.live { fill: #3d4630; stroke: #ffd23f; }
-#input-mon .im-stick-in { fill: none; stroke: #6f7790; stroke-width: .8; }
-#input-mon .im-face .im-cap { fill: #15161d; stroke: #5a6078; stroke-width: 1.2; }
-#input-mon .im-ps .im-face .im-cap { fill: #20222c; }
-#input-mon .im-face .im-sym { fill: none; stroke: var(--c); stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
-#input-mon .im-face .im-sym-t { fill: var(--c); text-anchor: middle; dominant-baseline: central; font-family: sans-serif; font-weight: bold; }
-#input-mon .im-face.on .im-cap { fill: var(--c); stroke: #fff; }
-#input-mon .im-face.on .im-sym { stroke: #0b0b12; }
-#input-mon .im-face.on .im-sym-t { fill: #0b0b12; }
-#input-mon .im-lab { fill: #aab3c8; text-anchor: middle; dominant-baseline: central; font-family: sans-serif; font-weight: bold; pointer-events: none; }
-#input-mon .im-ps .im-lab { fill: #d6dbe8; }
+/* the pad photo and the highlights over it */
+#input-mon .im-map { background: #fff; border-radius: 5px; padding: 4px 2px 2px; }
+#input-mon .im-hit { fill: rgba(125, 255, 58, 0); stroke: none; }
+#input-mon .im-hit.on { fill: rgba(125, 255, 58, .62); stroke: #0c7a2a; stroke-width: 7; }
+#input-mon .im-hit-face.on { fill: var(--c); fill-opacity: .8; stroke: #fff; }
+#input-mon .im-hit-ring { fill: none; }
+#input-mon .im-hit-ring.on { fill: none; stroke: #1bd14b; stroke-width: 14; }
+#input-mon .im-dot { fill: rgba(60, 70, 90, .55); stroke: #fff; stroke-width: 6; }
+#input-mon .im-dot.live { fill: #ffd23f; stroke: #7a5a00; }
+#input-mon .im-meter { fill: #e3e6ee; stroke: #aab1c3; stroke-width: 4; }
+#input-mon .im-meter-fill { fill: #3fd15f; }
+#input-mon .im-meter-t { fill: #1c2030; text-anchor: middle; dominant-baseline: central; font-family: monospace; font-weight: bold; }
 #tip {
   position: absolute; bottom: 18px; left: 50%; transform: translateX(-50%); max-width: min(620px, 60vw);
   background: var(--ui-bg); color: var(--ui-text); font-size: 17px; line-height: 1.35; padding: 10px 16px; border: 2px solid var(--ui-edge);
