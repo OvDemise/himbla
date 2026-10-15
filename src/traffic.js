@@ -128,18 +128,17 @@ function roadMaterial() {
         return mix(mix(h2(i), h2(i + vec2(1.0, 0.0)), f.x), mix(h2(i + vec2(0.0, 1.0)), h2(i + vec2(1.0, 1.0)), f.x), f.y);
       }
       // A track cut into the regolith: a graded bed of churned, compacted soil (scraped in long streaks where the dozer
-      // blade ran, worn into a pair of ruts under each lane's tyres), with a dark cut line along each edge and a ridge of
-      // pale pushed-up dust and cleared rocks outside it, which melts into the surface. It is drawn translucent, so the
-      // craters and the colour of the ground show through. Metres across (X) and along (s) the road.
+      // blade ran, worn into a pair of ruts under each lane's tyres), with a dark cut line along each edge and a smooth
+      // ridge of pale pushed-up dust outside it, which melts into the surface. It is drawn translucent, so the craters and
+      // the colour of the ground show through. Metres across (X) and along (s) the road.
       void main(){
         float X = vUv.x * ${ROAD_HALF.toFixed(1)}, s = vUv.y, ax = abs(X), sg = sign(X);
-        float lap = fract(s / 12.0);
         float ne = n1(s * 0.29 + sg * 41.0);
         // churned soil: broad mottling, finer clods, and the blade's streaks running along the road
         float mot = n2(vec2(X * 0.8, s * 0.2)) * 0.5 + n2(vec2(X * 2.3, s * 0.9)) * 0.3 + n2(vec2(X * 6.0, s * 2.6)) * 0.2;
         float scr = n2(vec2(X * 5.5 + n1(s * 0.04) * 9.0, s * 0.045));
         float scr2 = n2(vec2(X * 15.0 + n1(s * 0.07 + 9.0) * 6.0, s * 0.14));
-        float edgeR = 7.3 + (ne - 0.5) * 0.8;
+        float edgeR = 7.3 + (ne - 0.5) * 0.15;
         float bed = 1.0 - smoothstep(edgeR - 0.3, edgeR + 0.1, ax);
         vec3 soil = mix(vec3(0.09, 0.085, 0.115), vec3(0.25, 0.24, 0.28), mot);
         soil *= 0.88 + 0.28 * (scr - 0.5) + 0.12 * (scr2 - 0.5);
@@ -154,34 +153,17 @@ function roadMaterial() {
         float lip = smoothstep(0.4, 0.6, rd) * (1.0 - smoothstep(0.6, 1.0, rd)) * vMark;
         soil = mix(soil, vec3(0.03, 0.028, 0.045), groove * 0.9);
         soil = mix(soil, vec3(0.5, 0.48, 0.54), lip * 0.32 * (0.5 + 0.5 * n1(s * 0.5 + 7.0)));
-        // the cut: a dark line where the bed drops away, then the berm of pushed-up regolith, lumpy, pale at the crest
-        float cut = smoothstep(edgeR - 0.15, edgeR + 0.2, ax) * (1.0 - smoothstep(edgeR + 0.45, edgeR + 1.0, ax));
-        float crest = smoothstep(edgeR + 0.45, edgeR + 0.95, ax) * (1.0 - smoothstep(edgeR + 1.3, 9.0, ax));
-        float lump = n2(vec2(s * 0.8, ax * 1.6 + sg * 7.0));
+        // the cut: a dark line where the bed drops away, then a smooth berm of pushed-up regolith, palest at the crest
+        float cut = smoothstep(edgeR - 0.2, edgeR + 0.25, ax) * (1.0 - smoothstep(edgeR + 0.4, edgeR + 1.1, ax));
+        float crest = smoothstep(edgeR + 0.3, edgeR + 1.1, ax) * (1.0 - smoothstep(edgeR + 1.1, 9.0, ax));
         vec3 col = soil;
         col = mix(col, vec3(0.03, 0.028, 0.045), cut * 0.92);
-        col = mix(col, vec3(0.86, 0.83, 0.88) * (0.7 + 0.5 * lump), crest * 0.92);
-        // stones: a few left in the bed, plenty bulldozed into the berm, each with a dark rim
-        vec2 cell = vec2(X * 1.6, s * 0.9), id = floor(cell);
-        vec2 cc = (fract(cell) - 0.5 + (vec2(h2(id + 3.1), h2(id + 7.7)) - 0.5) * 0.5) * vec2(0.625, 1.11);
-        float inBerm = smoothstep(edgeR + 0.2, edgeR + 0.8, ax);
-        float rock = step(0.985 - 0.07 * inBerm, h2(id)) * (1.0 - smoothstep(edgeR + 1.7, edgeR + 2.0, ax));
-        float rr = 0.07 + 0.14 * h2(id + 1.7);
-        float rd2 = length(cc);
-        float stone = rock * (1.0 - smoothstep(rr * 0.85, rr, rd2));
-        float rim = rock * (1.0 - smoothstep(rr, rr * 1.35, rd2)) - stone;
-        col = mix(col, vec3(0.1, 0.09, 0.12), clamp(rim, 0.0, 1.0) * 0.85);
-        col = mix(col, vec3(0.52, 0.5, 0.57) * (0.8 + 0.4 * h2(id + 9.0)), stone);
-        // reflector studs set in the crown, one every 12 m
-        float stud = 1.0 - smoothstep(0.1, 0.2, length(vec2(ax, (lap - 0.5) * 12.0)));
-        // translucent, so the ground shows through; ragged where it melts into the surface
+        col = mix(col, vec3(0.82, 0.79, 0.85) * (0.94 + 0.06 * n1(s * 0.05 + sg * 11.0)), crest * 0.9);
+        // translucent, so the ground shows through, and soft where it melts into the surface
         float a = max(bed * 0.84, max(cut * 0.9, crest * 0.8));
         a = max(a, groove * 0.9);
-        a = max(a, max(clamp(rim, 0.0, 1.0), stone) * 0.8 * (1.0 - smoothstep(8.4, 9.0, ax)));
-        a *= 1.0 - smoothstep(8.45 + ne * 0.4, 9.0, ax);
+        a *= 1.0 - smoothstep(8.3, 9.0, ax);
         col *= 0.22 + 0.85 * vLit;
-        col = mix(col, vec3(1.0, 0.62, 0.16), stud * vMark);
-        a = max(a, stud * vMark);
         gl_FragColor = vec4(col, a * vFade * vEnd);
       }`,
   });
@@ -754,7 +736,7 @@ export class Traffic {
 
   // Visible track: a strip of 5 ground-hugging samples across 10 m along a ground polyline.
   // `fade` (0..1) lets a strip melt into another one it overlaps (junction flares, road ends).
-  // `mark` (0..1) is how much of the wheel ruts and studs show (none on junction flares and where roads meet rings).
+  // `mark` (0..1) is how much of the wheel ruts show (none on junction flares and where roads meet rings).
   stripPush(centre, sideV, s, vScale = 1, fade = 1, mark = 1) {
     const G = this.roadGeo;
     for (const o of ROAD_LAT) {
@@ -1060,7 +1042,7 @@ export class Traffic {
       let s = 0;
       for (let i = 0; i <= M; i++) {
         if (i) s += W[wrap(i)].distanceTo(W[i - 1]);
-        // (no ruts or studs for ~30 m either side of a junction, where the road's flare takes over)
+        // (no ruts for ~30 m either side of a junction, where the road's flare takes over)
         let dg = Infinity;
         for (const e of R.gates) { const d = Math.abs(e.i - wrap(i)); dg = Math.min(dg, Math.min(d, M - d) * R.step); }
         this.stripPush(W[wrap(i)], side[wrap(i)], s, 1, 1, smooth((dg - 24) / 14));

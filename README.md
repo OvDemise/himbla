@@ -430,7 +430,7 @@ it's headed). You ride inside while the camera hangs back to watch the ship; pre
 or bail out mid-flight through the side hatch (keeping the ship's speed, with a little style for the nerve). Passengers walk off toward town, the queue
 at the shelter walks up and boards, and the doors close before it leaves; arriving passengers walk to real
 building entrances. Safe settlements are joined by a network of 14 pre-driven **roads** (an 18 m track cut into the
-regolith: a scraped, rutted bed between two berms of pushed-up dust, with reflector studs and delineator posts, wide enough for two
+regolith: a scraped, rutted bed between two smooth berms of pushed-up dust, with delineator posts, wide enough for two
 land-trains to pass) that merge into a big **ring road** around each town, with one stop shelter on the ring. Big six-wheeled **land-trains**,
 hover-cars and buggies each pick a destination town: some pass straight through towns, others stop to
 swap passengers and then head somewhere new. There are two land-train services, each painted for the faction whose
