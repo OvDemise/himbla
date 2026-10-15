@@ -2,6 +2,8 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { toon, glow, inkMat, textSprite, vcMaterial, vcable, paintVertices, dropFloorFaces } from './toon.js';
 import { mulberry32 } from './rng.js';
+import { bakeStatic } from './staticBake.js';
+import { outpostAsset } from './outpostGlb.js';
 
 // The small faction structures that dot the countryside (watchtowers, depots, farm domes, relay
 // masts, kiosks, scrap shacks, junk piles). Each is a ~50 m compound on its own flattened plateau.
@@ -1223,10 +1225,24 @@ const templates = new Map();
 //   smoke - Vector3 where the wreck smoulders (the main building's centre)
 //   drop  - Vector3 open apron spot 10-16 m from the main building where loot can land
 // wreck = true gives the same compound with the main building reduced to rubble.
-export function outpostTemplate(kind, color, variant = 0, wreck = false) {
+// src: 'auto' (a Blender-authored GLB if one is switched on, loaded and has this kind: outpostGlb.js;
+// otherwise the Kit build), 'kit', or 'glb' (throws if there isn't one: for the viewer).
+export function outpostTemplate(kind, color, variant = 0, wreck = false, src = 'auto') {
   variant %= VARIANTS;
-  const key = `${kind}|${color}|${variant}|${wreck ? 1 : 0}`;
+  const asset = src === 'kit' ? null : outpostAsset(kind, wreck);
+  if (src === 'glb' && !asset) throw new Error(`no GLB outpost for ${kind}${wreck ? ' wreck' : ''}`);
+  const key = `${kind}|${color}|${variant}|${wreck ? 1 : 0}|${asset ? 'glb' : 'kit'}`;
   let t = templates.get(key);
+  if (!t && asset) {
+    try {
+      t = bakeStatic(asset, { color, textMat });
+    } catch (e) {
+      if (src === 'glb') throw e;
+      console.warn(`GLB ${kind}${wreck ? ' wreck' : ''} failed to bake, using the Kit-built one`, e);
+      t = outpostTemplate(kind, color, variant, wreck, 'kit');
+    }
+    templates.set(key, t);
+  }
   if (!t) {
     const k = new Kit(color, KIND_SEED[kind] * 977 + variant * 131, wreck);
     k.onGround = true;

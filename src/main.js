@@ -12,6 +12,7 @@ import { Colliders } from './physics.js';
 import { World } from './world.js';
 import { Player } from './player.js';
 import { loadRunnerParts, loadShipParts } from './models.js';
+import { loadOutpostParts } from './outpostGlb.js';
 import { Enemies } from './enemies.js';
 import { Projectiles } from './projectiles.js';
 import { Missions } from './missions.js';
@@ -1631,7 +1632,8 @@ class Game {
 const game = new Game();
 window.game = game;
 // canvas text (signs, maps) is drawn during init, so the pixel fonts must be loaded first
-Promise.all([loadFonts(), loadRunnerParts(), loadShipParts()]).then(() => game.init()).catch((e) => {
+// (loadOutpostParts never rejects, and only fetches anything when the outpostGlb pilot is switched on)
+Promise.all([loadFonts(), loadRunnerParts(), loadShipParts(), loadOutpostParts()]).then(() => game.init()).catch((e) => {
   console.error(e);
   document.getElementById('load-status').textContent = 'Failed to start: ' + e.message;
 });

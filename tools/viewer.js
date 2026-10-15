@@ -2,13 +2,15 @@
 import * as THREE from 'three';
 import { loadFonts } from '../src/fonts.js';
 import { loadRunnerParts, loadShipParts, makeShuttle, makeFreighter, makeHoverCar, makeApc, makeLandTrain, makeTowerCrane, CRANE_TROLLEY_MIN, CRANE_TROLLEY_SPAN } from '../src/models.js';
+import { outpostTemplate } from '../src/outpostModels.js';
+import { loadOutpostParts, GLB_KINDS } from '../src/outpostGlb.js';
 import { makeChimera, makeMite, LIVING, MODIFIERS, spliceGenes } from '../src/chimera.js';
 import { ComicPost } from '../src/post.js';
 
 const Q = new URLSearchParams(location.search);
 const num = (k, d) => (Q.has(k) ? parseFloat(Q.get(k)) : d);
 
-await Promise.all([loadFonts(), loadRunnerParts(), loadShipParts()]);
+await Promise.all([loadFonts(), loadRunnerParts(), loadShipParts(), loadOutpostParts({ force: true })]);
 
 const renderer = new THREE.WebGLRenderer({ antialias: false });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -26,6 +28,61 @@ const ground = new THREE.Mesh(new THREE.CircleGeometry(400, 48).rotateX(-Math.PI
 ground.receiveShadow = true;
 scene.add(ground);
 const post = new ComicPost(renderer, camera);
+
+// ---- outposts: what a template holds, drawn: colliders, blast boxes and the gameplay points ----
+const lineMat = (c) => new THREE.LineBasicMaterial({ color: c, depthTest: false, transparent: true });
+function outpostOverlay(t) {
+  const g = new THREE.Group();
+  const edges = (geo, mat) => { const l = new THREE.LineSegments(new THREE.EdgesGeometry(geo), mat); l.renderOrder = 10; return l; };
+  for (const c of t.cols) {
+    let l;
+    if (c.type === 'box') { l = edges(new THREE.BoxGeometry(c.hx * 2, c.hy * 2, c.hz * 2), lineMat(0x2ee6ff)); l.position.set(c.x, c.y, c.z); l.rotation.y = c.yaw; }
+    else if (c.type === 'cyl') { l = edges(new THREE.CylinderGeometry(c.r, c.r, c.y1 - c.y0, 20), lineMat(0x2ee6ff)); l.position.set(c.x, (c.y0 + c.y1) / 2, c.z); }
+    else { l = edges(new THREE.SphereGeometry(c.r, 12, 8), lineMat(0x2ee6ff)); l.position.set(c.x, c.y, c.z); }
+    g.add(l);
+  }
+  for (const h of t.hits) {
+    const l = edges(new THREE.BoxGeometry(h.hx * 2, h.hy * 2, h.hz * 2), lineMat(0xff9f1c));
+    l.position.set(h.x, h.y, h.z); l.rotation.y = h.yaw;
+    g.add(l);
+  }
+  const mark = (p, color, r) => { if (!p) return; const l = edges(new THREE.OctahedronGeometry(r), lineMat(color)); l.position.copy(p); g.add(l); };
+  mark(t.raid, 0x7dff3a, 1.2); mark(t.smoke, 0xff2a4a, 1.2); mark(t.drop, 0x5a8bff, 1.2);
+  return g;
+}
+// Does template b hold the same gameplay data as template a (within tol metres)? A box may be written
+// as (hx, hz, yaw) or turned a quarter: both count as the same box.
+function outpostParity(a, b, tol = 0.01) {
+  const same = (x, y) => Math.abs(x - y) <= tol;
+  const turn = (p, q) => { const d = Math.abs(Math.sin(p - q)); return d <= tol; };
+  const eq = {
+    box: (p, q) => same(p.x, q.x) && same(p.y, q.y) && same(p.z, q.z) && same(p.hy, q.hy) &&
+      ((same(p.hx, q.hx) && same(p.hz, q.hz) && turn(p.yaw, q.yaw)) || (same(p.hx, q.hz) && same(p.hz, q.hx) && turn(p.yaw + Math.PI / 2, q.yaw))),
+    cyl: (p, q) => same(p.r, q.r) && same(p.y0, q.y0) && same(p.y1, q.y1) && same(p.x, q.x) && same(p.z, q.z),
+    sphere: (p, q) => same(p.r, q.r) && same(p.x, q.x) && same(p.y, q.y) && same(p.z, q.z),
+  };
+  const lists = (what, xs, ys, typed) => {
+    const left = ys.slice(), miss = [];
+    for (const p of xs) {
+      const k = left.findIndex((q) => (typed ? p.type === q.type : true) && eq[typed ? p.type : 'box'](p, q));
+      if (k < 0) miss.push(p); else left.splice(k, 1);
+    }
+    return { what, of: xs.length, matched: xs.length - miss.length, missing: miss, extra: left };
+  };
+  const pt = (what, p, q) => { const ok = !!(p && q && p.distanceTo(q) <= tol); return { what, of: p ? 1 : 0, matched: ok ? 1 : 0, missing: p && !ok ? [p] : [], extra: q && !ok ? [q] : [] }; };
+  const rows = [lists('colliders', a.cols, b.cols, true), lists('hit boxes', a.hits, b.hits, false), pt('raid', a.raid, b.raid), pt('smoke', a.smoke, b.smoke), pt('drop', a.drop, b.drop)];
+  return { ok: rows.every((r) => !r.missing.length && !r.extra.length), rows };
+}
+function outpostStats(t) {
+  let draws = 0, tris = 0, verts = 0;
+  t.root.traverse((o) => {
+    if (!o.isMesh) return;
+    draws++;
+    verts += o.geometry.attributes.position.count;
+    tris += (o.geometry.index ? o.geometry.index.count : o.geometry.attributes.position.count) / 3;
+  });
+  return { draws, verts, tris };
+}
 
 const m = Q.get('m') || 'shuttle';
 let model, rig = null, anim = null, height = 2;
@@ -86,6 +143,43 @@ if (m === 'shuttle' || m === 'freighter') {
     anims.push(c.anim);
   });
   anim = (t, sp) => anims.forEach((a) => a(t, sp));
+} else if (m === 'outpost') {
+  // &kind=mast  &src=kit|glb|both (default both, side by side)  &wreck=1  &color=rrggbb  &cols=0 hides the colliders
+  const kind = Q.get('kind') || 'mast', wreck = Q.get('wreck') === '1', color = Q.has('color') ? parseInt(Q.get('color'), 16) : 0x2ec4ff;
+  const srcs = Q.get('src') === 'kit' ? ['kit'] : Q.get('src') === 'glb' ? ['glb'] : ['kit', 'glb'];
+  model = new THREE.Group();
+  const lines = [];
+  const stats = {}, tpls = {};
+  srcs.forEach((s, i) => {
+    let t;
+    try { t = outpostTemplate(kind, color, 0, wreck, s); } catch (e) { lines.push(`${s}: ${e.message}${GLB_KINDS.has(kind) ? '' : ' (not a GLB kind: see GLB_KINDS in src/outpostGlb.js)'}`); return; }
+    const g = new THREE.Group();
+    g.position.x = (i - (srcs.length - 1) / 2) * 70;
+    g.add(t.root.clone());
+    if (Q.get('cols') !== '0') g.add(outpostOverlay(t));
+    model.add(g);
+    tpls[s] = t;
+    stats[s] = outpostStats(t);
+    lines.push(`${s}: ${stats[s].draws} draws, ${stats[s].tris} tris, ${t.cols.length} colliders, ${t.hits.length} hit boxes`);
+  });
+  if (tpls.kit && tpls.glb) {
+    const par = outpostParity(tpls.kit, tpls.glb);
+    window.outpostParity = par;
+    lines.push(`GLB vs Kit gameplay data: ${par.ok ? 'same' : 'DIFFERENT'} (${par.rows.map((r) => `${r.what} ${r.matched}/${r.of}${r.extra.length ? ' +' + r.extra.length : ''}`).join(', ')})`);
+  }
+  document.getElementById('ui').innerHTML = `${kind}${wreck ? ' (wreck)' : ''}<br>${lines.join('<br>')}<br>cyan = collider, orange = blast box, green = raid, red = smoke, blue = drop`;
+  const swing = [];
+  model.traverse((o) => { if (o.userData.spin || o.userData.blink || o.userData.flag) swing.push(o); });
+  anim = (t) => { // (what territory.js does to a placed outpost)
+    for (const o of swing) {
+      if (o.userData.spin) o.rotation.y = t * 0.6;
+      if (o.userData.blink) o.visible = Math.sin(t * 4) > -0.3;
+      if (o.userData.flag) o.rotation.y = Math.sin(t * 2) * 0.25;
+    }
+  };
+  Object.assign(sun.shadow.camera, { left: -90, right: 90, top: 90, bottom: -90, far: 400 });
+  sun.shadow.camera.updateProjectionMatrix();
+  window.outpostStats = stats;
 } else {
   let genes;
   if (m === 'mite') genes = null;
