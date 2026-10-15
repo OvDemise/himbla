@@ -56,9 +56,59 @@ export class Cheats {
       { label: `5 · CLICK MAP TO TELEPORT: ${this.mapTeleport ? 'ON' : 'OFF'}`, fn: () => { this.mapTeleport = !this.mapTeleport; this.dev(); } },
       { label: '6 · FULL CHEAT MENU…', fn: () => this.open() },
       { label: `7 · RAGDOLL: ${this.ragdoll ? 'ON' : 'OFF'}`, fn: () => { this.toggleRagdoll(); this.dev(); } },
+      { label: '8 · GIT: FETCH & PULL UPSTREAM…', fn: () => this.gitMenu() },
       { label: 'CLOSE' },
     ]);
     g.dialogButtons.dev = true;
+  }
+
+  // Fetch and pull this checkout's upstream without leaving the game. The dev server runs git (tools/devGit.mjs: a fast-forward
+  // pull only), so this works from `npm run dev` and nowhere else. The dev server notices the pulled files and reloads the page.
+  async gitMenu() {
+    const g = this.game;
+    const esc = (t) => String(t).replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+    const back = { label: 'BACK', fn: () => this.dev() };
+    const show = (text, buttons) => {
+      const list = [...buttons, back, { label: 'CLOSE' }].map((b, i) => ({ ...b, label: `${i + 1} · ${b.label}` }));
+      g.dialog('GIT: FETCH & PULL', text, list);
+      return list;
+    };
+    if (!import.meta.env.DEV) { show('<small>Only available when the game runs from the dev server (npm run dev).</small>', []); return; }
+    const call = async (act) => {
+      try {
+        const r = await fetch(`/__dev/git/${act}`, { method: 'POST', headers: { 'X-Dev-Git': '1' } });
+        return await r.json();
+      } catch (e) { return { ok: false, err: String(e && e.message || e) }; }
+    };
+    const mine = show('<small>Fetching…</small>', []);
+    const st = await call('status');
+    if (g.dialogButtons !== mine) return; // (closed or changed while it was working)
+    if (!st.ok) { show(`<small>${esc(st.err || 'The dev server did not answer.')}</small>`, [{ label: 'TRY AGAIN', fn: () => this.gitMenu() }]); return; }
+    if (st.noUpstream) { show(`<small>${esc(st.branch)} has no upstream branch. In a terminal: git branch -u origin/${esc(st.branch)}</small>`, []); return; }
+    const lines = [`<b>${esc(st.branch)}</b> → ${esc(st.upstream)} · now at ${esc(st.head)}`];
+    lines.push(st.behind ? `${st.behind} new commit${st.behind === 1 ? '' : 's'} upstream${st.ahead ? `, ${st.ahead} of yours not pushed` : ''}` : st.ahead ? `Up to date; ${st.ahead} commit${st.ahead === 1 ? '' : 's'} of yours not pushed` : 'Up to date.');
+    if (st.dirty) lines.push(`${st.dirty} uncommitted change${st.dirty === 1 ? '' : 's'} here (kept: a pull that would overwrite them stops)`);
+    if (st.fetchError) lines.push(`Fetch failed: ${esc(st.fetchError.split('\n')[0])}`);
+    for (const c of st.incoming.slice(0, 8)) lines.push(`&nbsp;· ${esc(c.length > 90 ? c.slice(0, 89) + '…' : c)}`);
+    if (st.incoming.length > 8) lines.push(`&nbsp;· …and ${st.behind - 8} more`);
+    const buttons = [];
+    if (st.behind && !st.ahead) buttons.push({ label: `PULL ${st.behind} COMMIT${st.behind === 1 ? '' : 'S'}`, fn: () => this.gitPull(show, call, esc) });
+    else if (st.behind) lines.push('Diverged from upstream: pull it by hand (a merge or rebase is not for the game to choose).');
+    buttons.push({ label: 'CHECK AGAIN', fn: () => this.gitMenu() });
+    show(`<small>${lines.join('<br>')}</small>`, buttons);
+  }
+
+  async gitPull(show, call, esc) {
+    const g = this.game;
+    try { g.save(); } catch { /* the pull goes ahead without a fresh save */ }
+    const mine = show('<small>Pulling…</small>', []);
+    const r = await call('pull');
+    if (g.dialogButtons !== mine) return;
+    if (!r.ok) { show(`<small>Pull stopped: ${esc((r.err || r.out || 'git said no').split('\n').filter((l) => l && !/^hint:/.test(l)).slice(0, 4).join(' · '))}<br>Nothing was changed.</small>`, [{ label: 'CHECK AGAIN', fn: () => this.gitMenu() }]); return; }
+    const lines = [r.from === r.to ? 'Already up to date.' : `Pulled ${esc(r.from)} → ${esc(r.to)} · ${r.changed} file${r.changed === 1 ? '' : 's'} changed.`];
+    if (r.deps) lines.push('package.json changed: run npm install, then restart the dev server.');
+    if (r.from !== r.to) lines.push('Your progress was saved. The page reloads by itself when the dev server sees the new files.');
+    show(`<small>${lines.join('<br>')}</small>`, [{ label: 'RELOAD NOW', fn: () => location.reload() }]);
   }
 
   // Unlimited jet and health, and the speed multiplier
