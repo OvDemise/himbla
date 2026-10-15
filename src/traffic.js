@@ -139,8 +139,10 @@ function roadMaterial() {
         float scr = n2(vec2(X * 5.5 + n1(s * 0.04) * 9.0, s * 0.045));
         float scr2 = n2(vec2(X * 15.0 + n1(s * 0.07 + 9.0) * 6.0, s * 0.14));
         float edgeR = 7.3 + (ne - 0.5) * 0.15;
-        // (a junction flare has no berm and a soft edge, so it melts into the road or ring under it)
-        float bed = 1.0 - smoothstep(edgeR - 0.3 - vSoft * 1.2, edgeR + 0.1 + vSoft * 0.6, ax);
+        // (a junction flare keeps the road's crisp edge and berm on the outside of its curve, and a soft, bermless edge on the
+        // inside, where it melts into the neighbouring flare and the ring)
+        float es = vSoft * (1.0 - vBerm);
+        float bed = 1.0 - smoothstep(edgeR - 0.3 - es * 1.2, edgeR + 0.1 + es * 0.6, ax);
         vec3 soil = mix(vec3(0.09, 0.085, 0.115), vec3(0.25, 0.24, 0.28), mot);
         soil *= (0.88 + 0.28 * (scr - 0.5) + 0.12 * (scr2 - 0.5)) * (1.0 - 0.14 * vSoft);
         // dust that has drifted back over the bed, and the crown between the lanes where nothing runs
@@ -161,11 +163,11 @@ function roadMaterial() {
         col = mix(col, vec3(0.03, 0.028, 0.045), cut * 0.92);
         col = mix(col, vec3(0.82, 0.79, 0.85) * (0.94 + 0.06 * n1(s * 0.05 + sg * 11.0)), crest * 0.9);
         // translucent, so the ground shows through, and soft where it melts into the surface
-        float a = max(bed * mix(0.84, 0.96, vSoft), max(cut * 0.9, crest * 0.8));
-        a = max(a, groove * 0.9);
+        float bedA = max(bed * mix(0.84, 0.96, vSoft), groove * 0.9);
+        float a = max(bedA * vEnd, max(cut * 0.9, crest * 0.8)); // (the end fade is the bed's: a berm only stops where its strip says)
         a *= 1.0 - smoothstep(8.3, 9.0, ax);
         col *= 0.22 + 0.85 * vLit;
-        gl_FragColor = vec4(col, a * vFade * vEnd);
+        gl_FragColor = vec4(col, a * vFade);
       }`,
   });
 }
@@ -782,10 +784,20 @@ export class Traffic {
     return { side, tan, cum };
   }
 
-  drawLine(g, s0 = 0, vScale = 1, fadeAt = null) {
+  // `flare`: a junction sweep from a road into a ring or another road. It is as wide as the road, so its edges meet the road's
+  // and the ring's, and its berm runs along the outside of its curve (round from the road's edge to the ring's outer edge)
+  // while the inside of the curve, facing the next sweep, stays bare.
+  drawLine(g, s0 = 0, vScale = 1, fadeAt = null, flare = false) {
     const { side, cum } = this.frames(g);
     const base = this.roadGeo.pos.length / 3;
-    for (let i = 0; i < g.length; i++) this.stripPush(g[i], side[i], s0 + cum[i], vScale, fadeAt ? fadeAt(i / (g.length - 1)) : 1, 0, 0, 0, 1);
+    let bL = 0, bR = 0;
+    if (flare) {
+      const n = g.length - 1, up = new THREE.Vector3().copy(g[n >> 1]).normalize();
+      const t0 = new THREE.Vector3().subVectors(g[1], g[0]), t1 = new THREE.Vector3().subVectors(g[n], g[n - 1]);
+      // (the berm goes on the side the curve turns toward: a left turn bends round its left edge, a right turn its right)
+      if (new THREE.Vector3().crossVectors(t0, t1).dot(up) > 0) bL = 1; else bR = 1;
+    }
+    for (let i = 0; i < g.length; i++) this.stripPush(g[i], side[i], s0 + cum[i], vScale, fadeAt ? fadeAt(i / (g.length - 1)) : 1, 0, bL, bR, flare ? 1 : 0);
     this.stripIdx(base, g.length);
   }
 
@@ -886,7 +898,7 @@ export class Traffic {
     const base = this.roadGeo.pos.length / 3;
     for (let i = i0; i <= i1; i++) {
       const e = Math.min(cum[i], cum[N] - cum[i]);
-      const b = smooth((e - 22) / 12); // (the berms stop short of where the flare takes over)
+      const b = smooth((e - 22) / 4); // (the berms run on to where the sweeps start, 24 m out, and the sweeps carry them)
       this.stripPush(g[i], side[i], cum[i], 1, smooth((e - 2.5) / 7), smooth((e - 12) / 16), b, b);
     }
     this.stripIdx(base, i1 - i0 + 1);
@@ -976,11 +988,12 @@ export class Traffic {
     RA.gates.push(eA);
     const line = this.roadCentreline(A, null, [this.ringExit(eA, 0), this.ringExit(eA, 24), this.ringExit(eA, 52)], [dirX, at(24), at(52)]);
     this.layRoad(line, [[A, true]]);
-    // the main road's berm on the side the spur joins would run across the spur's mouth: fade it out either side of the T
+    // the main road's berm on the side the spur joins would run across the spur's mouth: it stops where the sweeps meet it (24 m
+    // either side of the T) and they carry it round into the spur
     {
       const st = G.strip, GG = this.roadGeo, n = ROAD_LAT.length, spurSide = perp.dot(G.side[jx]) > 0 ? 1 : -1;
       for (let i = st.i0; i <= st.i1; i++) {
-        const b = smooth((Math.abs(G.cum[i] - G.cum[jx]) - 40) / 18);
+        const b = smooth((Math.abs(G.cum[i] - G.cum[jx]) - 12) / 10);
         if (b >= 1) continue;
         for (let k = 0; k < n; k++) {
           if (Math.sign(ROAD_LAT[k]) !== spurSide) continue;
@@ -1046,7 +1059,7 @@ export class Traffic {
     const mf = Math.max(2, Math.round(FILLET / G.step));
     for (const d of [1, -1]) {
       const j = jx + d * mf;
-      this.drawLine(this.bez(q, tIn, G.g[j], G.tan[j].clone().multiplyScalar(d), 10, 0.5), 0, 0.85, (t) => smooth(t / 0.3) * smooth((1 - t) / 0.3));
+      this.drawLine(this.bez(q, tIn, G.g[j], G.tan[j].clone().multiplyScalar(d), 10, 0.5), 0, 1, (t) => smooth(t / 0.3) * smooth((1 - t) / 0.3), true);
     }
   }
 
@@ -1068,11 +1081,11 @@ export class Traffic {
       let s = 0;
       for (let i = 0; i <= M; i++) {
         if (i) s += W[wrap(i)].distanceTo(W[i - 1]);
-        // (no ruts for ~30 m either side of a junction, where the road's flare takes over, and the outer berm,
-        // which the road would cross, stops ~48 m short of it)
+        // (no ruts for ~30 m either side of a junction, where the road's sweeps take over, and the outer berm, which
+        // they replace, picks up again from 12 m out, overlapping the sweeps' last stretch)
         let dg = Infinity;
         for (const e of R.gates) { const d = Math.abs(e.i - wrap(i)); dg = Math.min(dg, Math.min(d, M - d) * R.step); }
-        const b = smooth((dg - 32) / 18);
+        const b = smooth((dg - 12) / 10);
         this.stripPush(W[wrap(i)], side[wrap(i)], s, 1, 1, smooth((dg - 24) / 14), R.din > 0 ? b : 1, R.din > 0 ? 1 : b);
       }
       this.stripIdx(base, M + 1);
@@ -1091,7 +1104,7 @@ export class Traffic {
       const m = Math.max(2, Math.round(FILLET / R.step));
       for (const d of [1, -1]) {
         const j = e.i + d * m;
-        this.drawLine(this.bez(q, tIn, W[wrap(j)], laneT(d, j), 10, 0.5), 0, 0.85, (t) => smooth(t / 0.3) * smooth((1 - t) / 0.3));
+        this.drawLine(this.bez(q, tIn, W[wrap(j)], laneT(d, j), 10, 0.5), 0, 1, (t) => smooth(t / 0.3) * smooth((1 - t) / 0.3), true);
       }
     }
     // delineator posts on the outside of the ring, away from the junctions
