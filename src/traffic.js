@@ -48,6 +48,9 @@ const FILLET = 16; // drawn flare at each junction
 // meets the Meridian-Tranquility road side-on, and traffic splits there.
 const CUT_ROADS = [['ilmb', 'aldrin'], ['ilmb', 'meridian'], ['ilmb', 'tranq']];
 const TEES = [{ from: 'ilmb', on: ['meridian', 'tranq'] }];
+// Roads laid by hand to places the network above leaves out: the Vostok supply road, from the Helium-3 exchange
+// into the restricted zone round Bastion Vostok-9 (the only road that reaches a restricted base)
+const EXTRA_ROADS = [['mine', 'vostok']];
 const T_ARM = 24; // metres from a T's centre where the lanes stop and the turning connectors take over
 const STOP_IN = 50; // the stop is at least this far along its stretch of ring (room for a land-train)
 
@@ -516,6 +519,7 @@ export class Traffic {
       if (!detour) pairs.add(key(a, n1.b));
     }
     for (const [a, b] of CUT_ROADS) if (this.L[a] && this.L[b]) pairs.delete(key(this.L[a], this.L[b]));
+    for (const [a, b] of EXTRA_ROADS) if (this.L[a] && this.L[b]) pairs.add(key(this.L[a], this.L[b]));
     this.roadGeo = { pos: [], uv: [], fade: [], idx: [] };
     this.posts = [];
     this.pieces = [];
@@ -568,7 +572,8 @@ export class Traffic {
     }
     this.posts = null;
     this.roadVehicles = [];
-    this.roads.forEach((road, k) => this.populateRoad(road, k));
+    let civil = 0; // (the Vostok road is numbered -1 so the other roads keep their services)
+    for (const road of this.roads) this.populateRoad(road, road.A.restricted || (road.B && road.B.restricted) ? -1 : civil++);
   }
 
   // Every k-th point of a world-space polyline as a unit direction (the last point always stays).
@@ -1185,8 +1190,11 @@ export class Traffic {
   // Somewhere new to go: a neighbouring town half the time, otherwise anywhere on the network.
   pickDest(v) {
     const here = v.piece.kind === 'e' ? v.piece.toLoc : v.piece.town;
-    const towns = [...this.towns.keys()].filter((l) => l !== here && l.ringStop);
-    const nbrs = (this.towns.get(here) || []).map((g) => g.other).filter((l) => l.ringStop);
+    // the Vostok supply trains only ever work their own road, end to end
+    if (v.shuttle) return v.piece.kind === 'e' && v.shuttle.includes(here) ? here : v.shuttle.find((l) => l !== here) || v.shuttle[0];
+    // (and nobody else drives into a restricted zone)
+    const towns = [...this.towns.keys()].filter((l) => l !== here && l.ringStop && !l.restricted);
+    const nbrs = (this.towns.get(here) || []).map((g) => g.other).filter((l) => l.ringStop && !l.restricted);
     const list = nbrs.length && this.r() < 0.5 ? nbrs : towns;
     return list[Math.floor(this.r() * list.length)] || here;
   }
@@ -1206,24 +1214,25 @@ export class Traffic {
   }
 
   // Which service runs a road, and in whose colours: the livery of whichever of the four factions' towns it
-  // joins (taking turns where two meet; Kepler's orange where neither is). Vostok's own bastions are
-  // restricted ground with no road to them, so its trains work the roads out of the ILMB, which hands out
-  // Vostok contracts. The freight Prospector runs roads to the Helium-3 exchange and half of the rest; the
-  // passenger Moonliner takes the others.
+  // joins (taking turns where two meet; Kepler's orange where neither is). The freight Prospector runs roads to
+  // the Helium-3 exchange and half of the rest; the passenger Moonliner takes the others. (The Vostok road has
+  // its own pair, below.)
   trainSpec(road, k) {
     const ends = [road.A, road.B].filter(Boolean);
     const owners = ends.map((l) => l.faction).filter((f) => LAND_TRAIN_FACTIONS[f]);
-    if (ends.some((l) => l.jobs && l.jobs.includes('vostok'))) owners.push('vostok');
     const faction = owners.length ? owners[(k >> 1) % owners.length] : 'kepler';
     const type = ends.some((l) => l.type === 'industrial') || (k >> 1) % 2 ? 'prospector' : 'moonliner';
     const cars = type === 'moonliner' ? ['pax', 'pax', 'pax'] : FREIGHT[(k >> 1) % FREIGHT.length];
     return { faction, type, cars };
   }
 
-  // Put a land-train, two hover-cars and a buggy on each road, each with somewhere to go.
+  // Put a land-train, two hover-cars and a buggy on each road, each with somewhere to go. The road into a
+  // restricted base (Vostok-9) carries only that faction's own pair of trains, a Moonliner and a Prospector
+  // running from the Helium-3 exchange to the bastion and back, one on each lane.
   populateRoad(road, k) {
-    const add = (v) => {
-      const pc = road.lanes[Math.floor(this.r() * road.lanes.length)];
+    const military = k < 0;
+    const add = (v, lane) => {
+      const pc = road.lanes[lane === undefined ? Math.floor(this.r() * road.lanes.length) : lane];
       Object.assign(v, {
         piece: null, s: pc.len * (0.1 + this.r() * 0.8), plan: [], hist: [], dest: null, cur: 0, state: 'drive', timer: 0,
         pos: new THREE.Vector3(), prevPos: new THREE.Vector3(), vel: new THREE.Vector3(), fwd: new THREE.Vector3(),
@@ -1234,24 +1243,30 @@ export class Traffic {
       this.roadVehicles.push(v);
       return v;
     };
-    // land-train: the Moonliner passenger express or the Prospector freight rig, in the colours of the
+    // land-trains: the Moonliner passenger express or the Prospector freight rig, in the colours of the
     // faction whose towns it joins
-    const spec = this.trainSpec(road, k);
-    const lt = makeLandTrain(spec);
-    this.w.scene.add(lt.root);
-    for (const t of lt.trailers) this.w.scene.add(t.root);
-    const train = add({
-      ...lt, kind: 'landtrain', vmax: 11, acc: 1.4, front: 4.6, tail: 4.4 + lt.trailers.length * 9.9, waitT: spec.type === 'moonliner' ? 16 : 12,
-      quat: lt.root.quaternion, view: 1200, radius: 6, boarding: 0, wheelR: 1.2,
-      pax: spec.type === 'moonliner' ? [1, 3] : null, hp: TRAIN_HP, maxHp: TRAIN_HP, hitR: 4.8, credits: 60,
+    const base = [road.A, road.B].find((l) => l && l.restricted);
+    const specs = military
+      ? [{ faction: base.faction, type: 'moonliner', cars: ['pax', 'pax', 'pax'] }, { faction: base.faction, type: 'prospector', cars: FREIGHT[0] }]
+      : [this.trainSpec(road, k)];
+    specs.forEach((spec, n) => {
+      const lt = makeLandTrain(spec);
+      this.w.scene.add(lt.root);
+      for (const t of lt.trailers) this.w.scene.add(t.root);
+      const train = add({
+        ...lt, kind: 'landtrain', vmax: 11, acc: 1.4, front: 4.6, tail: 4.4 + lt.trailers.length * 9.9, waitT: spec.type === 'moonliner' ? 16 : 12,
+        quat: lt.root.quaternion, view: 1200, radius: 6, boarding: 0, wheelR: 1.2, shuttle: military ? [road.A, road.B] : null,
+        pax: spec.type === 'moonliner' ? [1, 3] : null, hp: TRAIN_HP, maxHp: TRAIN_HP, hitR: 4.8, credits: 60,
+      }, military ? n : undefined);
+      train.trailers.forEach((t, i) => {
+        t.offset = 4.3 + 1.6 + 4.0 + i * 9.9;
+        t.hintF = { i: 0, f: 0 }; t.hintR = { i: 0, f: 0 };
+        t.plat = { pos: new THREE.Vector3(), prevPos: new THREE.Vector3(), vel: new THREE.Vector3(), decks: t.decks, quat: t.root.quaternion };
+        this.platforms.push(t.plat);
+      });
+      this.vehicles.push(train);
     });
-    train.trailers.forEach((t, i) => {
-      t.offset = 4.3 + 1.6 + 4.0 + i * 9.9;
-      t.hintF = { i: 0, f: 0 }; t.hintR = { i: 0, f: 0 };
-      t.plat = { pos: new THREE.Vector3(), prevPos: new THREE.Vector3(), vel: new THREE.Vector3(), decks: t.decks, quat: t.root.quaternion };
-      this.platforms.push(t.plat);
-    });
-    this.vehicles.push(train);
+    if (military) return;
     // hover-cars: hop over slower traffic instead of queueing (the jar can scoop these)
     for (let i = 0; i < 2; i++) {
       const m = makeHoverCar({ color: [0xff7ad9, 0x2ec4ff, 0x7dff6a, 0xffd23f][(k + i) % 4] });
@@ -1643,7 +1658,8 @@ export class Traffic {
 
   // Back on the road later, somewhere the camera can't see it appear.
   respawn(v, camPos) {
-    const lanes = this.roads.flatMap((r) => r.lanes).filter((pc) => pc.len > 300);
+    // (the Vostok supply trains come back on their own road, and nothing else is put on it)
+    const lanes = this.roads.filter((r) => !!(r.A.restricted || (r.B && r.B.restricted)) === !!v.shuttle).flatMap((r) => r.lanes).filter((pc) => pc.len > 300);
     const h = { i: 0, f: 0 };
     for (let tries = 0; tries < 8 && lanes.length; tries++) {
       const pc = lanes[Math.floor(this.r() * lanes.length)];

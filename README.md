@@ -437,7 +437,7 @@ towns it joins (SpaceCom white and yellow, Vostok slate and red, Kepler orange a
 faction's emblem and name on the flanks): the **Moonliner**, a streamlined passenger express pulling three capsule coaches
 (the only one that picks up and sets down passengers), and the **Prospector**, a dozer-bladed freight rig pulling a cryogenic
 **Helium-3** tanker, a cargo container and an **explosives** magazine (hazard bands, placards, NFPA diamond and DANGER signs).
-You can ride on a freighter deck or a land-train trailer.
+A road of its own, 2.4 km out from the Helium-3 Exchange into the red zone round Bastion Vostok-9, carries the Vostok Moonliner and Prospector, which run only there. You can ride on a freighter deck or a land-train trailer.
 
 ## Townspeople
 
