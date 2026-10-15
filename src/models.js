@@ -275,12 +275,27 @@ export class ScarfSim {
       const root = new THREE.Vector3(0.2 - k * 0.12, piv.y, piv.z + 0.02);
       const seg = len / (SCARF_PTS - 1);
       const p = [], o = [];
-      for (let i = 0; i < SCARF_PTS; i++) {
-        const v = new THREE.Vector3(root.x + i * 0.02, root.y - i * seg * 0.7, root.z - 0.3 - i * seg * 0.7);
-        p.push(v); o.push(v.clone());
-      }
-      this.tails.push({ mesh, inkMesh, root, seg, w: st.w * (k ? 0.85 : 1), p, o, phase: k * 1.7 });
+      for (let i = 0; i < SCARF_PTS; i++) { p.push(new THREE.Vector3()); o.push(new THREE.Vector3()); }
+      const T = { mesh, inkMesh, root, seg, w: st.w * (k ? 0.85 : 1), p, o, phase: k * 1.7 };
+      this.hang(T);
+      this.tails.push(T);
     }
+  }
+
+  // one tail's chain hanging down the back from its root, with no motion in it
+  hang(T) {
+    const { p, o, root, seg } = T;
+    for (let i = 0; i < SCARF_PTS; i++) {
+      p[i].set(root.x + i * 0.02, root.y - i * seg * 0.7, root.z - 0.3 - i * seg * 0.7);
+      o[i].copy(p[i]);
+    }
+  }
+
+  // back to hanging at rest, and forget the last velocity (so no swing is read out of a teleport): for
+  // when the runner is put somewhere new by a cutscene
+  settle() {
+    this.prevVel = null;
+    for (const T of this.tails || []) this.hang(T);
   }
 
   // vel: the body's world velocity; up: world up at the body. The gear on your back: back = how

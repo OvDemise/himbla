@@ -158,8 +158,8 @@ export class Medevac {
 
     // you: out cold on your back
     P.model.root.visible = true;
+    P.restPose(); // (the torso's lean, the bob and the scarf are as they were when you went down)
     const m = P.model;
-    m.legL.rotation.set(0, 0, 0); m.legR.rotation.set(0, 0, 0);
     m.armL.rotation.set(0.08, 0, -0.2); m.armR.rotation.set(0.08, 0, 0.2);
     this.putBody(this.groundPose());
 
@@ -380,9 +380,7 @@ export class Medevac {
   dispose() {
     const P = this.game.player;
     for (const o of [this.ship.root, this.str.root, this.medA.root, this.medB.root]) o.removeFromParent();
-    const m = P.model;
-    m.legL.rotation.set(0, 0, 0); m.legR.rotation.set(0, 0, 0);
-    m.armL.rotation.set(0, 0, 0); m.armR.rotation.set(0, 0, 0);
+    P.restPose();
     document.body.classList.remove('medevac');
   }
 }

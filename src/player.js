@@ -489,6 +489,32 @@ export class Player {
     if (it.speed > 6) { g.events.onImpact(it.speed); g.story.onImpact(it.speed); }
   }
 
+  // physics scarf: hangs at rest, streams with speed, drapes over whatever is on your back
+  updateScarf(dt) {
+    const b = this.body;
+    if (!this.scarfSim) this.scarfSim = new ScarfSim(this.model);
+    // (a crate on your back, or the Kepler twin stack, is taller and wider than the pack)
+    const twin = this.cargoMesh && this.cargoMesh.children.length > 3;
+    this.scarfSim.update(dt, this.vehicle ? this.vehicle.e.body.vel : b.vel, b.up, this.cargoMesh ? { back: 1.14, top: twin ? 1.5 : 1.0, hw: 0.42 } : { back: 0.55, top: 0.94 });
+  }
+
+  // Standing at rest: upright, limbs level, no bob or roll, the scarf hanging. animate() poses the model
+  // only while you play, so a cutscene that takes over (the recall shuttle, the Spindle med-evac) calls this
+  // first, or you come out of it frozen in whatever pose you were in, scarf streaming, as if still moving.
+  restPose() {
+    const m = this.model;
+    m.torso.rotation.set(0, 0, 0);
+    m.legL.rotation.set(0, 0, 0); m.legR.rotation.set(0, 0, 0);
+    m.armL.rotation.set(0, 0, -0.15); m.armR.rotation.set(0, 0, 0.15); // (arms a little out from the sides: the idle pose in animate)
+    m.body.position.y = m.bodyBase;
+    this.roll = 0;
+    this.steerLean = 0;
+    this.anim = 0;
+    this.clearTrick();
+    if (!this.scarfSim) this.scarfSim = new ScarfSim(m);
+    this.scarfSim.settle();
+  }
+
   animate(dt, cam, ctrl) {
     const b = this.body;
     const m = this.model;
@@ -555,11 +581,7 @@ export class Player {
     if (this.rag) {
       if (!this.rag.update(dt)) { this.rag.release(); this.rag = null; }
     }
-    // physics scarf: hangs at rest, streams with speed, drapes over whatever is on your back
-    if (!this.scarfSim) this.scarfSim = new ScarfSim(m);
-    // (a crate on your back, or the Kepler twin stack, is taller and wider than the pack)
-    const twin = this.cargoMesh && this.cargoMesh.children.length > 3;
-    this.scarfSim.update(dt, this.vehicle ? this.vehicle.e.body.vel : b.vel, up, this.cargoMesh ? { back: 1.14, top: twin ? 1.5 : 1.0, hw: 0.42 } : { back: 0.55, top: 0.94 });
+    this.updateScarf(dt);
 
     const right = new THREE.Vector3(1, 0, 0).applyQuaternion(m.root.quaternion);
     const strength = b.skating && b.grounded ? Math.min(1, sp / 30) : this.vaneCarve ? 0.55 + 0.45 * Math.abs(this.vaneCarve) : 0; // (the Vanes leave ribbons in the air)
