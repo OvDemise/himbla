@@ -3,8 +3,9 @@ import { toon, glow, ink } from './toon.js';
 import { arcDist, greatCircle, tangent } from './geo.js';
 
 // Meteor showers: rare, one at a time, over a big patch of open ground (never a settlement or an
-// outpost). The rocks are big (4-9 m) and come in slow and shallow, gliding nearly sideways as
-// the Moon pulls them down, so you can chase one, ride alongside it and bounce off it. Each rock
+// outpost). The rocks are huge (7.5-17 m across the radius) and come in slow and shallow, gliding nearly sideways as
+// the Moon pulls them down, so you can chase one, ride alongside it and bounce off it: a landing on top flings you
+// high and away (see bounce()), so with a few rocks about you can chain them. Each rock
 // is one of a few kinds (stony, iron, icy comet, carbon with glowing veins, crystal-studded). The patch shows on the globe map and minimap as a red warning zone while it lasts. Rocks
 // only fall when you're close enough to see them: each one streaks in on the shower's slant, marks
 // its impact point with a warning ring, is a real (bouncy) collider on the way down, so you can
@@ -16,6 +17,13 @@ const FIRST = [420, 720]; // seconds of play before the first shower
 const GAP = [900, 1500]; // between showers
 const DUR = [130, 190];
 const SPAWN_NEAR = 2200; // rocks fall while you're within this of the zone's edge
+const SIZE = [7.5, 16.875]; // a rock's radius in metres (the first version's 6-13.5, 25% bigger)
+// landing on top of a rock: it flings you straight up and away from where you hit it
+const BOUNCE_UP = 36; // m/s up (was 22): about 110 m of air at the Moon's 6 m/s2, enough to reach the next rock
+const BOUNCE_AWAY = 16; // m/s along the ground, away from the rock's body
+const BOUNCE_GLIDE = 0.6; // the share of the rock's own glide you're carried along with
+const BOUNCE_CD = 0.7; // s before the same rock can fling you again (landing on one again pogos you off it)
+const CHAIN_WINDOW = 14; // a bounce within this many seconds of the last one is a chain
 const rand = (a, b) => a + Math.random() * (b - a);
 
 const _a = new THREE.Vector3(), _b = new THREE.Vector3(), _c = new THREE.Vector3();
@@ -86,6 +94,8 @@ export class Meteors {
     this.rocks = [];
     this.chunks = [];
     this.scorches = [];
+    this.chain = 0; // bounces in a row (each within CHAIN_WINDOW s of the last)
+    this.lastBounce = -1e9;
     this.mats = {};
     for (const [k, K] of Object.entries(KINDS)) this.mats[k] = { body: toon(K.body), hot: glow(K.hot), chunk: toon(K.chunk) };
   }
@@ -129,20 +139,25 @@ export class Meteors {
   }
 
   // ---------- rocks ----------
-  spawnRock() {
+  // One rock coming down. By default it lands somewhere in the shower's zone on the shower's slant, first seen 280 m up;
+  // `dir` (a unit vector from the Moon's centre: where it lands), `slant` and `height` aim it instead.
+  spawnRock({ dir: at = null, slant = null, height = 280 } = {}) {
     const g = this.game, Z = this.zone;
-    const t = tangent(_a.set(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5), Z.dir).normalize();
-    const dir = greatCircle(Z.dir, t, Math.sqrt(Math.random()) * Z.r, new THREE.Vector3());
+    let dir = at;
+    if (!dir) {
+      const t = tangent(_a.set(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5), Z.dir).normalize();
+      dir = greatCircle(Z.dir, t, Math.sqrt(Math.random()) * Z.r, new THREE.Vector3());
+    }
     const gp = g.planet.ground(dir, new THREE.Vector3());
     const up = dir;
     // slow and shallow: 15-23 degrees below the horizon, almost sideways, like something being
     // reeled in by the Moon rather than dropped on it
     const speed = rand(22, 34), dive = THREE.MathUtils.degToRad(rand(15, 23));
-    const fall = _b.copy(tangent(Z.slant, up, _c).normalize()).multiplyScalar(Math.cos(dive)).addScaledVector(up, -Math.sin(dive)).normalize();
+    const fall = _b.copy(tangent(slant || Z.slant, up, _c).normalize()).multiplyScalar(Math.cos(dive)).addScaledVector(up, -Math.sin(dive)).normalize();
     const vel = fall.clone().multiplyScalar(speed);
-    const travel = 280 / Math.sin(dive); // first seen ~280 m up: time to read it and plan a jump
+    const travel = height / Math.sin(dive); // first seen ~280 m up: time to read it and plan a jump
     const pos = gp.clone().addScaledVector(fall, -travel);
-    const r = rand(6, 13.5);
+    const r = rand(...SIZE);
     const kind = pickKind(), K = KINDS[kind], M = this.mats[kind];
     const seed = Math.random() * 100;
     const geo = rockGeo(K.lump, seed, kind === 'iron' ? 3 : 2);
@@ -208,8 +223,43 @@ export class Meteors {
     const near = g.player.pos.distanceTo(gp) < 900;
     const blast = 8 + r * 1.8;
     const ring = near ? g.fx.warningRing(gp, blast, travel / speed) : null;
-    const rock = { grp, mesh: body, geo, kind, pos, vel, r, gp, blast, axis, reach, minor, cols: [], spin: new THREE.Vector3(Math.random(), Math.random(), Math.random()).normalize(), spinRate: rand(0.2, 0.8), col: null, touched: false, ring };
+    const rock = { grp, mesh: body, geo, kind, pos, vel, r, gp, blast, axis, reach, minor, cols: [], spin: new THREE.Vector3(Math.random(), Math.random(), Math.random()).normalize(), spinRate: rand(0.2, 0.8), col: null, bounceT: 0, hurt: false, ring };
     this.rocks.push(rock);
+  }
+
+  // dev menu: a rock that comes down on the spot you're standing on, first seen 70 m up so it's a few seconds away
+  // (the warning ring is on the ground; a landing on you hurts, so move, or go and stand on it as it comes in)
+  spawnOnPlayer() {
+    const dir = this.game.player.pos.clone().normalize();
+    const slant = tangent(_a.set(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5), dir).normalize();
+    this.spawnRock({ dir, slant, height: 70 });
+    return this.rocks[this.rocks.length - 1];
+  }
+
+  // landing on top of a rock: it flings you straight up (cancelling the fall into it) and away from where you hit it,
+  // plus a share of its own glide, so you clear it and have the air time to reach the next rock. A bounce within
+  // CHAIN_WINDOW s of the last is a chain: more style each time.
+  bounce(rk, sph, up) {
+    const g = this.game, P = g.player;
+    rk.bounceT = BOUNCE_CD;
+    rk.hurt = true; // (it has taken to you: no BONK for sliding down its flank afterwards)
+    const away = tangent(P.center.clone().sub(sph), up, new THREE.Vector3());
+    if (away.lengthSq() < 1e-4) tangent(rk.vel, up, away); // (straight above its middle: the way it's gliding)
+    away.normalize();
+    const v = P.vel;
+    const vu = v.dot(up);
+    if (vu < 0) v.addScaledVector(up, -vu); // (the fall into it doesn't eat the kick...)
+    const into = -tangent(v, up, new THREE.Vector3()).dot(away);
+    if (into > 0) v.addScaledVector(away, into); // (...and nor does running at it)
+    v.addScaledVector(up, BOUNCE_UP).addScaledVector(away, BOUNCE_AWAY).addScaledVector(tangent(rk.vel, up, new THREE.Vector3()), BOUNCE_GLIDE);
+    P.body.grounded = false;
+    P.body.sinceContact = 1;
+    this.chain = g.time - this.lastBounce < CHAIN_WINDOW ? this.chain + 1 : 1;
+    this.lastBounce = g.time;
+    const n = this.chain;
+    g.style(45 + 25 * (n - 1), n > 1 ? `METEOR CHAIN ×${n}` : 'METEOR BOUNCE');
+    g.fx.pop(n > 1 ? `METEOR CHAIN ×${n}!` : 'METEOR BOUNCE!', null, { color: '#ff9f1c', size: 56 });
+    g.audio.tone(520 + 70 * Math.min(n - 1, 6), 0.25, 'square', 0.18, 2);
   }
 
   // the rock's spheres in world space right now
@@ -305,20 +355,18 @@ export class Meteors {
       const dP = P.pos.distanceTo(rk.pos);
       if (dP < 250) this.syncCollider(rk);
       else if (rk.col) this.dropCollider(rk);
-      // touching one: land on top of it and it flings you; get hit from above and it hurts
-      const near2 = this.spheres(rk).some((c) => P.center.distanceTo(c) < rk.minor + 1.5);
-      if (!rk.touched && !P.dead && near2) {
-        rk.touched = true;
+      // touching one: land on top of it and it flings you up and away (again and again, if you land on it again); hit it
+      // from the side or below and it hurts, once
+      rk.bounceT = Math.max(0, (rk.bounceT || 0) - dt);
+      let hit = null, hd = Infinity;
+      for (const c of this.spheres(rk)) { const d = P.center.distanceTo(c); if (d < rk.minor + 1.5 && d < hd) { hd = d; hit = c; } }
+      if (hit && !P.dead) {
         const up = rk.pos.clone().normalize();
         const rel = P.center.clone().sub(rk.pos);
         if (rel.dot(up) > rk.r * 0.2) {
-          // a bounce off the top: up, and carried along with the rock's glide
-          P.vel.addScaledVector(up, 22).addScaledVector(tangent(rk.vel, up, _a), 0.6);
-          P.body.grounded = false;
-          g.style(45, 'METEOR BOUNCE');
-          g.fx.pop('METEOR BOUNCE!', null, { color: '#ff9f1c', size: 56 });
-          g.audio.tone(520, 0.25, 'square', 0.18, 2);
-        } else {
+          if (rk.bounceT <= 0) this.bounce(rk, hit, up);
+        } else if (!rk.hurt) {
+          rk.hurt = true;
           g.damagePlayer(12 + rk.r * 1.5, 'meteor');
           P.vel.addScaledVector(rel.normalize(), 16);
           g.fx.pop('BONK!', null, { color: '#ff4f2e', size: 56 });

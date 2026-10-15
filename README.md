@@ -196,11 +196,12 @@ restricted military zones work (their turrets open fire without clearance). Afte
   **threat range** of about 700 m: outrun them and they give up and vanish ("LOST THEM!"), with a breather
   before the next squad. Thieves carrying your cargo and event raiders never give up.
 - **Meteor showers:** rarely (the first after about 7–12 minutes, then every 15–25), a shower hits a big patch of open
-  ground, never a settlement or outpost. The rocks are huge (6–13 m) and glide in slow and shallow, nearly sideways,
+  ground, never a settlement or outpost. The rocks are huge (7.5–17 m radius) and glide in slow and shallow, nearly sideways,
 from about 280 m up, so you can see one coming for half a minute and plan a jump onto it. Only one at a time; the patch shows as a pulsing red zone on the globe map and
   the minimap while it lasts (about 2–3 minutes). Rocks only fall when you're near: each streaks in on the shower's slant
-  with a red warning ring where it will land. They're real colliders on the way down: land on one for a METEOR
-  BOUNCE (style), get hit from above and it hurts. On impact they explode into tumbling chunks and leave a smouldering
+  with a red warning ring where it will land. They're real colliders on the way down: land on one and it flings you
+  high (about 110 m of air) and away from it for a METEOR BOUNCE (style), so you can chain them: bounce again within
+  14 s for a bigger METEOR CHAIN ×n. Landing on the same one again pogos you off it. Hit one from the side or below and it hurts. On impact they explode into tumbling chunks and leave a smouldering
   scorch mark; everything fades away afterwards.
 - **Military zones:** Fort Meridian (Atlantic Accord) and Bastion Vostok-9 (Pan-Pacific
   Directorate) sit inside red striped walls. If you enter without a contract that grants

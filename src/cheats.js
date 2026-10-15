@@ -27,7 +27,7 @@ export class Cheats {
     this.showStats = false; // draw calls + polygons rendered per frame, under the minimap
     this.debugView = null; // 'poly' (every polygon outlined) | 'draw' (every draw call its own flat colour): the scene drawn bare, without the comic post pass
     this.crackedVisor = true; // the cracks that spread over the screen as hull drops (hud.js)
-    this.spawnDebug = false; // bottom-right pirate counts + spawn timers overlay
+    this.spawnDebug = false; // bottom-right pirate counts + spawn timers overlay (no menu entry for now: set game.cheats.spawnDebug = true from the console)
     this.speed = 1; // player speed multiplier, 1 to 10 (player.js)
     // once the dev menu has been opened (F8 / controller combo) it gets a button on the pause card, remembered across launches
     try { this.unlocked = localStorage.getItem(DEV_KEY) === '1'; } catch { this.unlocked = false; }
@@ -48,18 +48,27 @@ export class Cheats {
       this.showPauseButton();
     }
     g.dialog('DEV MENU', '<small>Hidden. Toggles last until you reload.</small>', [
-      { label: `1 · UNLIMITED JET: ${this.infJet ? 'ON' : 'OFF'}`, fn: () => { this.infJet = !this.infJet; this.tick(); this.dev(); } },
-      { label: `2 · UNLIMITED HEALTH: ${this.god ? 'ON' : 'OFF'}`, fn: () => { this.god = !this.god; this.tick(); this.dev(); } },
-      { label: this.speedLabel(), fn: () => { this.setSpeed(this.speed >= 10 ? 1 : this.speed + 1); this.dev(); } },
-      { label: '4 · TELEPORT TO RUSTMOON HOLD', fn: () => { const l = g.locations.find((x) => x.id === 'rustmoon'); if (l) this.teleport(l); } },
-      { label: `5 · PIRATE SPAWN DEBUG: ${this.spawnDebug ? 'ON' : 'OFF'}`, fn: () => { this.spawnDebug = !this.spawnDebug; this.tick(); this.dev(); } },
-      { label: '6 · DISPLAY & DEBUG…', fn: () => this.displayMenu() },
-      { label: `7 · SHOW AI PATHS: ${this.aiPaths ? 'ON' : 'OFF'}`, fn: () => { this.aiPaths = !this.aiPaths; this.tick(); this.dev(); } },
-      { label: '8 · FULL CHEAT MENU…', fn: () => this.open() },
-      { label: `9 · CLICK MAP TO TELEPORT: ${this.mapTeleport ? 'ON' : 'OFF'}`, fn: () => { this.mapTeleport = !this.mapTeleport; this.dev(); } },
+      { label: '1 · UNLIMITED JET, HEALTH & SPEED…', fn: () => this.boostMenu() },
+      { label: '2 · SPAWN A METEOR ON ME', fn: () => this.spawnMeteor() },
+      { label: '3 · DISPLAY & DEBUG…', fn: () => this.displayMenu() },
+      { label: `4 · CLICK MAP TO TELEPORT: ${this.mapTeleport ? 'ON' : 'OFF'}`, fn: () => { this.mapTeleport = !this.mapTeleport; this.dev(); } },
+      { label: '5 · FULL CHEAT MENU…', fn: () => this.open() },
       { label: 'CLOSE' },
     ]);
     g.dialogButtons.dev = true;
+  }
+
+  // Unlimited jet and health, and the speed multiplier
+  boostMenu() {
+    const g = this.game;
+    const on = (v) => (v ? 'ON' : 'OFF');
+    g.dialog('UNLIMITED JET, HEALTH & SPEED', '<small>Toggles last until you reload.</small>', [
+      { label: `1 · UNLIMITED JET: ${on(this.infJet)}`, fn: () => { this.infJet = !this.infJet; this.tick(); this.boostMenu(); } },
+      { label: `2 · UNLIMITED HEALTH: ${on(this.god)}`, fn: () => { this.god = !this.god; this.tick(); this.boostMenu(); } },
+      { label: this.speedLabel(), fn: () => { this.setSpeed(this.speed >= 10 ? 1 : this.speed + 1); this.boostMenu(); } },
+      { label: '4 · BACK', fn: () => this.dev() },
+      { label: 'CLOSE' },
+    ]);
     // the speed row adjusts in place: click / A = +1 (wraps), left / right on a controller (d-pad or stick) = -1 / +1
     const row = document.querySelector('#dialog [data-i="2"]');
     if (row) {
@@ -70,7 +79,15 @@ export class Cheats {
     }
   }
 
-  // On-screen readouts and effects: frame rate, draw calls and polygons, the cracked visor
+  // A rock that comes down on the spot you're standing on (meteors.js spawnOnPlayer): a few seconds' warning from the ring
+  spawnMeteor() {
+    const g = this.game;
+    if (g.spindle && g.spindle.active) { g.hud.toast('No meteors out on the Spindle.', 2); return; }
+    g.meteors.spawnOnPlayer();
+    g.hud.toast('Meteor inbound: it lands where you stand in a few seconds. Move, or go and land on it.', 4);
+  }
+
+  // On-screen readouts and effects: frame rate, draw calls and polygons, the cracked visor, the AI paths
   displayMenu() {
     const g = this.game;
     const on = (v) => (v ? 'ON' : 'OFF');
@@ -83,7 +100,8 @@ export class Cheats {
       { label: `6 · SHOW EACH POLYGON: ${on(this.debugView === 'poly')}`, fn: () => { this.setDebugView(this.debugView === 'poly' ? null : 'poly'); this.displayMenu(); } },
       { label: `7 · SHOW EACH DRAW CALL: ${on(this.debugView === 'draw')}`, fn: () => { this.setDebugView(this.debugView === 'draw' ? null : 'draw'); this.displayMenu(); } },
       { label: `8 · STATIC SHADOW CACHE: ${g.shadowCache.failed ? 'FAILED (see console)' : on(g.shadowCache.enabled)}`, fn: () => { g.shadowCache.enabled = !g.shadowCache.enabled; g.shadowCache.failed = false; g.shadowCache.invalidate(); this.displayMenu(); } },
-      { label: '9 · BACK', fn: () => this.dev() },
+      { label: `9 · SHOW AI PATHS: ${on(this.aiPaths)}`, fn: () => { this.aiPaths = !this.aiPaths; this.tick(); this.displayMenu(); } },
+      { label: 'BACK', fn: () => this.dev() }, // (a tenth row: the number keys stop at 9, so BACK is mouse / pad; Esc closes)
       { label: 'CLOSE' },
     ]);
   }
