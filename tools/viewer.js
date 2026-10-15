@@ -152,7 +152,7 @@ if (m === 'shuttle' || m === 'freighter') {
   const stats = {}, tpls = {};
   srcs.forEach((s, i) => {
     let t;
-    try { t = outpostTemplate(kind, color, 0, wreck, s); } catch (e) { lines.push(`${s}: ${e.message}${GLB_KINDS.has(kind) ? '' : ' (not a GLB kind: see GLB_KINDS in src/outpostGlb.js)'}`); return; }
+    try { t = outpostTemplate(kind, color, 0, wreck, s); } catch (e) { lines.push(`${s}: ${e.message}`); return; }
     const g = new THREE.Group();
     g.position.x = (i - (srcs.length - 1) / 2) * 70;
     g.add(t.root.clone());
@@ -167,7 +167,9 @@ if (m === 'shuttle' || m === 'freighter') {
     window.outpostParity = par;
     lines.push(`GLB vs Kit gameplay data: ${par.ok ? 'same' : 'DIFFERENT'} (${par.rows.map((r) => `${r.what} ${r.matched}/${r.of}${r.extra.length ? ' +' + r.extra.length : ''}`).join(', ')})`);
   }
-  document.getElementById('ui').innerHTML = `${kind}${wreck ? ' (wreck)' : ''}<br>${lines.join('<br>')}<br>cyan = collider, orange = blast box, green = raid, red = smoke, blue = drop`;
+  const ui = document.getElementById('ui'); // (text, not HTML: `kind` comes from the URL)
+  ui.style.whiteSpace = 'pre-line';
+  ui.textContent = [`${kind}${wreck ? ' (wreck)' : ''}${GLB_KINDS.has(kind) ? '' : ' (not in GLB_KINDS: the game would not use the GLB for it yet)'}`, ...lines, 'cyan = collider, orange = blast box, green = raid, red = smoke, blue = drop'].join('\n');
   const swing = [];
   model.traverse((o) => { if (o.userData.spin || o.userData.blink || o.userData.flag) swing.push(o); });
   anim = (t) => { // (what territory.js does to a placed outpost)

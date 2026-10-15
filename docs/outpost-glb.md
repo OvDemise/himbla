@@ -40,9 +40,11 @@ or failing that from the name up to the first `_` or digit.
 
 ## Meshes
 
-- Any depth under a root. **One material per mesh**, indexed triangles, `POSITION` + `NORMAL` only. UVs, textures,
-  skins, animations and lights are ignored (the checker warns).
-- Custom property `ink` (number, metres) on a mesh = outline thickness (smoothed-normal shell). Absent or 0 = none.
+- Any depth under a root. **One material per mesh** is the convention (a mesh with several works: each material
+  becomes its own part, and the checker warns), indexed triangles, `POSITION` + `NORMAL` only. UVs, textures, skins,
+  animations and lights are ignored (the checker warns).
+- Custom property `ink` (number, metres) on a mesh = outline thickness (smoothed-normal shell). Absent or 0 = none. It
+  belongs to that mesh alone: a mesh parented under an inked one gets no outline of its own.
 - Flat colours only. The look is the game's 3-step toon ramp over the material's **base colour**.
 - Do not use alpha blending (not supported in the pilot: the checker warns, the mesh renders opaque).
 
@@ -62,8 +64,10 @@ Colours are sRGB hex in the game and **linear** in Blender: convert (the build s
 
 ## Gameplay empties
 
-Non-mesh nodes anywhere under a root. Position and rotation are relative to the root. The role comes from the custom
-property `role`, or failing that from the name's prefix (`col_…`, `hit_…`, `raid`, `smoke`, `drop`, `text_…`).
+Empties (not meshes) anywhere under a root. Position and rotation are relative to the root. The role comes from the
+custom property `role`, or failing that from the name's prefix (`col_…`, `hit_…`, `raid`, `smoke`, `drop`, `text_…`). A
+mesh carrying a role (or `anim`) is just drawn as geometry, and the checker warns. Meshes parented under a gameplay
+empty are ordinary geometry and are drawn.
 
 | Role | Meaning | How it is read |
 |---|---|---|
@@ -76,11 +80,16 @@ property `role`, or failing that from the name's prefix (`col_…`, `hit_…`, `
 
 A **box** is an empty (cube display, size 1) whose **scale is the half-extents**, rotated about Y only; its position is
 the box's centre. A **cyl** is a vertical cylinder: radius = scale.x, its axis runs from `y - scale.y` to `y + scale.y`
-at the node's x/z. A **sphere** takes its radius from scale.x. Tilt on boxes is ignored (the checker warns).
+at the node's x/z. A **sphere** takes its radius from scale.x. Colliders are always upright and round: a tilt on a box
+or cylinder, or an uneven sphere, is flattened to that (the checker warns), so build a lying pipe from boxes.
+
+In Blender's z-up axes the half-extents `(hx, hy, hz)` go in as `scale = (hx, hz, hy)` and a turn of `θ` about the
+game's vertical is `rotation_euler.z = θ`; the exporter converts them back (the build script's helpers do this).
 
 A **text** empty needs `str` (the words) and `w` (board width in metres); optional `fg`, `bg`, `stroke` (CSS colours),
 `back` (1 = a second face on the back, default 1) and `off` (distance of each face from the node, default 0.17). The
-plane faces the node's +z.
+plane faces the node's +z; its turn about the vertical and its roll about its own +z are kept, a lean (pitch) is dropped
+(the checker warns).
 
 ## Moving parts
 
@@ -93,13 +102,18 @@ separate object that the game animates, instead of merging them into the static 
 | `blink` | shows and hides it |
 | `spin` | turns it 0.6 rad/s about Y (put the node on the spin axis) |
 
-Author an animated part's meshes relative to the node's origin.
+Author an animated part's meshes relative to the node's origin. Apply any non-uniform scale on its parents in Blender: a
+turned moving part under a stretched parent cannot be placed correctly (the checker warns).
 
 ## Switching it on
 
-Off by default. Turn it on with `?outpostGlb` in the URL or `localStorage['mr-outpost-glb'] = '1'`. The dev viewer
-(`/tools/viewer.html?m=outpost&kind=mast`) shows it beside the Kit build with every collider drawn
-(`&src=kit|glb|both`, `&wreck=1`, `&cols=0`).
+Off by default. Turn it on with `?outpostGlb` in the URL or `localStorage['mr-outpost-glb'] = '1'`. In the URL,
+`?outpostGlb=0` (or `false`, `off`) turns it off again, and the URL beats the saved setting. A missing or broken file,
+kind or wreck quietly gives the Kit-built outpost; it can never stop the game starting.
+
+The dev viewer (`/tools/viewer.html?m=outpost&kind=mast`) shows it beside the Kit build with every collider drawn and
+checks that the two hold the same gameplay data (`&src=kit|glb|both`, `&wreck=1`, `&cols=0`). `src=glb` shows any kind in
+the file, whether or not it is in `GLB_KINDS` yet.
 
 ## Rebuilding the file
 
@@ -117,5 +131,6 @@ means the script or Blender changed. Nothing in CI runs it; `npm run check:outpo
 
 1. Add its builder to `tools/blender/build_outposts.py` (or author it in Blender) with both roots.
 2. Run the script, commit `src/assets/outposts.glb`.
-3. `npm run check:outposts`.
-4. Add the kind to `GLB_KINDS` in `src/outpostGlb.js` once it matches the Kit version's gameplay data.
+3. `npm run check:outposts --` with `--kind <name>` (or `--all`): by default it checks only the kinds in `GLB_KINDS`.
+4. Open `/tools/viewer.html?m=outpost&kind=<name>` (and `&wreck=1`): it should say the gameplay data is the same.
+5. Add the kind to `GLB_KINDS` in `src/staticContract.js`.

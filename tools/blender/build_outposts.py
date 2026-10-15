@@ -266,8 +266,8 @@ class Kit:
         """The raid marker: two glowing rings on the ground, plus the stand point (nothing on a wreck)."""
         if self.wreck:
             return
-        self.ring(1.7, 0.14, slot, x, F + 0.04, z, name="raid_ring_outer")
-        self.ring(1.1, 0.07, slot, x, F + 0.04, z, name="raid_ring_inner")
+        self.ring(1.7, 0.14, slot, x, F + 0.04, z, name="ring_raid_outer")
+        self.ring(1.1, 0.07, slot, x, F + 0.04, z, name="ring_raid_inner")
         self.point("raid", x, F, z)
 
     def scatter_debris(self, cx, cz, hx, hz, n, rr, colors=("char", "rubble_dark", "rubble_brown", "rubble_grey")):

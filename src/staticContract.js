@@ -2,6 +2,10 @@
 // dev checker (tools/check-outposts.mjs) so they cannot drift apart. No imports: runs in Node too.
 // The contract itself is written up for artists in docs/outpost-glb.md.
 
+// The kinds the game builds from the GLB (when the pilot is switched on and the file has them). A kind joins this
+// set once its gameplay data matches the Kit version's: tools/viewer.html?m=outpost&src=both shows whether it does.
+export const GLB_KINDS = new Set(['mast']);
+
 export const ROLES = ['col', 'hit', 'raid', 'smoke', 'drop', 'text'];
 export const SHAPES = ['box', 'cyl', 'sphere'];
 export const ANIMS = ['flag', 'blink', 'spin'];

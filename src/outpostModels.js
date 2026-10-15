@@ -1226,10 +1226,11 @@ const templates = new Map();
 //   drop  - Vector3 open apron spot 10-16 m from the main building where loot can land
 // wreck = true gives the same compound with the main building reduced to rubble.
 // src: 'auto' (a Blender-authored GLB if one is switched on, loaded and has this kind: outpostGlb.js;
-// otherwise the Kit build), 'kit', or 'glb' (throws if there isn't one: for the viewer).
+// otherwise the Kit build), 'kit', or 'glb' (any kind in the file, switched on or not; throws if there isn't one:
+// for the viewer).
 export function outpostTemplate(kind, color, variant = 0, wreck = false, src = 'auto') {
   variant %= VARIANTS;
-  const asset = src === 'kit' ? null : outpostAsset(kind, wreck);
+  const asset = src === 'kit' ? null : outpostAsset(kind, wreck, src === 'glb');
   if (src === 'glb' && !asset) throw new Error(`no GLB outpost for ${kind}${wreck ? ' wreck' : ''}`);
   const key = `${kind}|${color}|${variant}|${wreck ? 1 : 0}|${asset ? 'glb' : 'kit'}`;
   let t = templates.get(key);

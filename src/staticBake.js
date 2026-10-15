@@ -19,8 +19,22 @@ import { slotOf, roleOf, animOf, SHAPES } from './staticContract.js';
 const _p = new THREE.Vector3(), _q = new THREE.Quaternion(), _s = new THREE.Vector3(), _z = new THREE.Vector3();
 const ZAXIS = new THREE.Vector3(0, 0, 1), YAXIS = new THREE.Vector3(0, 1, 0);
 
+const IDENTITY = new THREE.Matrix4(), XAXIS = new THREE.Vector3(1, 0, 0);
+
 // a rotation's turn about +y (the direction its +z axis points in the ground plane)
 const yawOf = (q) => { _z.copy(ZAXIS).applyQuaternion(q); return Math.atan2(_z.x, _z.z); };
+
+// GLTFLoader turns a node whose mesh has several materials into a Group of one Mesh per material, all at the
+// node's own transform. That is a mesh (whatever its name), not a gameplay empty or a moving part.
+const isPrimitiveGroup = (o) => !o.isMesh && o.children.length > 0 && !('role' in o.userData) && !('anim' in o.userData) && o.children.every((c) => c.isMesh && c.matrix.equals(IDENTITY));
+
+// can a position / turn / scale hold this matrix? (not if a rotated node sits under a non-uniformly scaled parent)
+function isPlainTRS(m) {
+  m.decompose(_p, _q, _s);
+  const r = new THREE.Matrix4().compose(_p, _q, _s);
+  for (let i = 0; i < 16; i++) if (Math.abs(r.elements[i] - m.elements[i]) > 1e-4 * Math.max(1, Math.abs(m.elements[i]))) return false;
+  return true;
+}
 
 // ---------------------------------------------------------------- parse
 export function parseStaticGlb(scene, { warn = console.warn } = {}) {
@@ -29,7 +43,9 @@ export function parseStaticGlb(scene, { warn = console.warn } = {}) {
   for (const root of scene.children) {
     if (!root.name) continue;
     const warnRoot = (m) => warn(`${root.name}: ${m}`);
-    assets.set(root.name, parseRoot(root, warnRoot));
+    const asset = parseRoot(root, warnRoot);
+    asset.empty = asset.groups.every((g) => !g.parts.length); // (nothing to draw: the loader leaves such a root out)
+    assets.set(root.name, asset);
   }
   return assets;
 }
@@ -42,16 +58,22 @@ function parseRoot(root, warn) {
   asset.groups.push(body);
   const walk = (o, group, groupInv) => {
     for (const c of o.children) {
-      const anim = c.isMesh ? null : animOf(c.userData);
+      const meshNode = c.isMesh || isPrimitiveGroup(c);
+      if (meshNode) {
+        const stray = animOf(c.userData) || roleOf(c.name, c.userData);
+        if (stray) warn(`mesh "${c.name}" is marked "${stray}": only empties can be gameplay nodes or moving parts, so it is drawn as ordinary geometry`);
+      }
+      const anim = meshNode ? null : animOf(c.userData);
       if (anim) {
         if (group !== body) { warn(`animated node "${c.name}" inside another animated node: treated as part of it`); walk(c, group, groupInv); continue; }
         const g = { anim, matrix: new THREE.Matrix4().multiplyMatrices(inv, c.matrixWorld), parts: [] };
+        if (!isPlainTRS(g.matrix)) warn(`animated node "${c.name}" sits under a non-uniformly scaled parent and is turned: its meshes would land wrong (apply the scale in Blender)`);
         asset.groups.push(g);
         walk(c, g, new THREE.Matrix4().copy(c.matrixWorld).invert());
         continue;
       }
-      const role = c.isMesh ? null : roleOf(c.name, c.userData);
-      if (role) { gameplay(asset, role, c, inv, warn); continue; }
+      const role = meshNode ? null : roleOf(c.name, c.userData);
+      if (role) { gameplay(asset, role, c, inv, warn); walk(c, group, groupInv); continue; } // (meshes parented to it are ordinary geometry)
       if (c.isMesh) addPart(group, c, groupInv, warn);
       walk(c, group, groupInv);
     }
@@ -80,7 +102,7 @@ function addPart(group, mesh, groupInv, warn) {
     const ix = geo.index.array;
     for (let i = 0; i < ix.length; i += 3) { const t = ix[i + 1]; ix[i + 1] = ix[i + 2]; ix[i + 2] = t; }
   }
-  const ink = Number(mesh.userData.ink ?? (mesh.parent && mesh.parent.userData.ink)) || 0;
+  const ink = Number(mesh.userData.ink ?? (mesh.parent && isPrimitiveGroup(mesh.parent) ? mesh.parent.userData.ink : undefined)) || 0;
   group.parts.push({
     geo,
     slot: slotOf(mat.name),
@@ -100,6 +122,9 @@ function gameplay(asset, role, node, inv, warn) {
     const shape = role === 'hit' ? 'box' : (SHAPES.includes(u.shape) ? u.shape : 'box');
     if (u.shape !== undefined && role === 'col' && !SHAPES.includes(u.shape)) warn(`collider "${node.name}": unknown shape "${u.shape}", using box`);
     if (shape === 'box' && _z.copy(YAXIS).applyQuaternion(_q).y < 0.9998) warn(`${role} "${node.name}" is tilted: only its turn about the vertical is used`);
+    if (shape === 'cyl' && _z.copy(YAXIS).applyQuaternion(_q).y < 0.9998) warn(`cylinder "${node.name}" is tilted: a cylinder collider is always upright (use boxes for a lying one)`);
+    if (shape === 'cyl' && Math.abs(sx - sz) > 0.01 * Math.max(sx, sz)) warn(`cylinder "${node.name}": scale x and z differ: the radius is scale x`);
+    if (shape === 'sphere' && Math.max(sx, sy, sz) - Math.min(sx, sy, sz) > 0.01 * Math.max(sx, sy, sz)) warn(`sphere "${node.name}" is scaled unevenly: the radius is scale x`);
     if (shape === 'box') {
       const b = { hx: sx, hy: sy, hz: sz, x: _p.x, y: _p.y, z: _p.z, yaw: yawOf(_q) };
       if (role === 'hit') asset.hits.push(b); else asset.cols.push({ type: 'box', ...b });
@@ -110,9 +135,12 @@ function gameplay(asset, role, node, inv, warn) {
     asset[role] = _p.clone();
   } else if (role === 'text') {
     if (typeof u.str !== 'string' || !(Number(u.w) > 0)) { warn(`text "${node.name}" needs str and w: skipped`); return; }
+    // the face keeps the node's turn (yaw) and its roll about its own +z; a lean (pitch) is dropped
+    if (Math.abs(_z.copy(ZAXIS).applyQuaternion(_q).y) > 0.02) warn(`text "${node.name}" leans (pitch): only its turn and roll are kept`);
     asset.texts.push({
       str: u.str, w: Number(u.w), fg: u.fg, bg: u.bg, stroke: u.stroke,
-      back: u.back === undefined ? true : Number(u.back) !== 0, off: u.off === undefined ? 0.17 : Number(u.off), rz: Number(u.rz) || 0,
+      back: u.back === undefined ? true : Number(u.back) !== 0, off: u.off === undefined ? 0.17 : Number(u.off),
+      rz: Math.asin(Math.max(-1, Math.min(1, _z.copy(XAXIS).applyQuaternion(_q).y))),
       x: _p.x, y: _p.y, z: _p.z, yaw: yawOf(_q),
     });
   }
