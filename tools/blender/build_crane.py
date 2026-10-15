@@ -14,9 +14,13 @@
 #   blinker   the aircraft warning lights (apex, jib tip, counter-jib end); the game puts a blinking lamp on each
 #   trolley   the carriage on the jib's rails, a child of `slew`; the game slides it along x (it sits at x = 14)
 #   cable     the two rope falls, a child of `trolley`: one metre long, hanging down from its origin; the game scales y
-#   hook      the hook block, hook, slings and the load, a child of `trolley`; the game sets its y to minus the rope length
-# Each mesh has ONE material named after a slot: body (the crane's colour) and load (the colour of what it carries) are
-# swapped by the game; the rest are fixed (see CRANE_TOON / CRANE_GLOW in src/models.js).
+#   hook      the hook block, hook and bridle slings, a child of `trolley`; the game sets its y to minus the rope length
+#   load      under `hook`: the cargo container (the Prospector's, see build_landtrain.py) on its spreader frame, turned to lie along
+#             the jib. `livery` pivots under it (extra `faction`) carry each faction's plate and number; the game builds the one
+#             that matches the crane's cargo and leaves the rest out
+# Each mesh has ONE material named after a slot: body (the crane's colour) is swapped by the game, and so are the container's
+# load (its body), stripe and label (its trim and lettering) for the faction whose cargo it carries; the rest are fixed (see
+# craneSlot in src/models.js). The `drop` extra on the hook is the distance from its origin to the container's bottom.
 
 import bpy, math, os
 
@@ -44,10 +48,11 @@ COLL = "MoonTowerCrane"
 SLOT_COLORS = {
     "body": (1.0, 0.82, 0.25), "dark": (0.16, 0.14, 0.25), "steel": (0.33, 0.38, 0.48), "concrete": (0.66, 0.65, 0.72),
     "white": (1.0, 0.96, 0.88), "glass": (0.81, 0.94, 1.0), "lamp": (1.0, 0.96, 0.66), "load": (1.0, 0.23, 0.36),
-    "rope": (0.1, 0.09, 0.14),
+    "rope": (0.1, 0.09, 0.14), "metal": (0.54, 0.53, 0.63), "stripe": (1.0, 0.96, 0.88), "label": (0.16, 0.14, 0.25),
 }
 
 exec(open(os.path.join(REPO, "tools", "blender", "kit.py"), encoding="utf-8").read(), globals())
+exec(open(os.path.join(REPO, "tools", "blender", "decals.py"), encoding="utf-8").read(), globals())
 
 C = coll()
 for s in SLOT_COLORS:
@@ -326,13 +331,63 @@ for t in range(1, 13):
     arc.append((0.34 + 0.34 * math.cos(a), -2.0 + 0.34 * math.sin(a)))
 M("hookIron", tube([(x, y, 0) for x, y in arc], [0.1] * len(arc), 6, True), "dark", hook, 0.03)
 rb("hookLatch", 0.04, 0.2, 0.05, (0.46, -2.28, 0), "body", hook, 0, e=0.2)
-sl = [B((0, -1.6, 0), (sx * 1.3, -3.45, sz * 0.6), 0.035, 4, True) for sx in (-1, 1) for sz in (-1, 1)]
-M("slings", join(sl), "dark", hook, 0)
-# the load: a corrugated container with corner posts (its colour is the game's to choose)
-rb("load", 1.5, 0.8, 0.8, (0, -4.25, 0), "load", hook, 0.05, e=0.04)
-ribs = join([box(0.05, 0.68, 0.035, (-1.3 + 0.26 * i, -4.25, z), 0.01) for i in range(11) for z in (-0.82, 0.82)])
-M("loadRibs", ribs, "load", hook, 0)
-M("loadPosts", join([box(0.09, 0.82, 0.09, (sx * 1.46, -4.25, sz * 0.76), 0.02) for sx in (-1, 1) for sz in (-1, 1)]), "dark", hook, 0.02)
+# ---- the load: the Prospector's cargo container (faction-coloured corrugated steel, corner castings, roof rails, barred rear doors,
+# a branding plate and the container number on each flank), hung from a spreader frame by four bridle slings. Built in the
+# container's own frame (long axis z, deck level 0, box centre at y 3.3, as in build_landtrain.py), then the pivot is turned a
+# quarter so it lies along the jib.
+LOAD_Y = -10.55
+LOAD_DROP = -(LOAD_Y + 1.9)          # hook origin to the container's bottom: 8.65
+load = PV("load", (0, LOAD_Y, 0), hook, role="load")
+load.rotation_euler = (0, 0, PI / 2)  # (three.js: a quarter turn about y)
+LB = (1.55, 1.4, 3.62)               # the box's half extents
+
+
+def rbj(items, e=0.3, nu=6, nv=4):
+    return join([xf(rbox(hx, hy, hz, e, nu, nv), pos) for hx, hy, hz, pos in items])
+
+
+rb("box", *LB, (0, 3.3, 0), "load", load, 0.07, e=0.06)
+M("ribs", rbj([(0.035, 1.28, 0.055, (sx * 1.57, 3.3, -3.3 + k * 0.388)) for sx in (-1, 1) for k in range(18)], nu=4, nv=2), "load", load, 0.02)
+M("roofRibs", rbj([(1.42, 0.03, 0.06, (0, 4.72, -3.2 + k * 0.7)) for k in range(10)], nu=4, nv=2), "load", load, 0.02)
+M("roofRails", rbj([(0.08, 0.06, 3.62, (sx * 1.52, 4.74, 0)) for sx in (-1, 1)], e=0.2), "dark", load, 0.03)
+M("castings", rbj([(0.2, 0.17, 0.22, (sx * 1.5, y, sz * 3.55)) for sx in (-1, 1) for sz in (-1, 1) for y in (1.95, 4.62)], e=0.2), "dark", load, 0.03)
+# the rear doors: four locking bars, their cams and the seam
+M("doorBars", join([beam((x, 1.95, -3.66), (x, 4.6, -3.66), 0.05, 6) for x in (-1.0, -0.35, 0.35, 1.0)]), "metal", load, 0.02)
+M("doorCams", rbj([(0.12, 0.05, 0.05, (x, 2.7, -3.7)) for x in (-1.0, -0.35, 0.35, 1.0)]), "steel", load, 0.01)
+rb("doorSeam", 0.02, 1.35, 0.02, (0, 3.3, -3.65), "dark", load, 0, e=0.3, nu=6, nv=4)
+for sx in (-1, 1):
+    rb(f"plate{sx}", 0.04, 0.62, 1.8, (sx * 1.64, 3.5, 0.3), "dark", load, 0.03, e=0.08)
+
+# the spreader: four beams in a frame on the top castings (a twist-lock stub in each), a spine with a lifting eye, a lug at each corner
+SY = 5.05
+M("spreader", rbj([(0.1, 0.08, 3.75, (sx * 1.5, SY, 0)) for sx in (-1, 1)] + [(1.6, 0.08, 0.1, (0, SY, sz * 3.55)) for sz in (-1, 1)] + [(0.16, 0.1, 3.4, (0, SY + 0.05, 0))], e=0.2), "steel", load, 0.04)
+M("twistLocks", join([xf(lathe([(0.0, 4.78), (0.1, 4.78), (0.1, 4.98), (0.0, 4.98)], 8), (sx * 1.5, 0, sz * 3.55)) for sx in (-1, 1) for sz in (-1, 1)]), "dark", load, 0.02)
+M("lugs", rbj([(0.16, 0.12, 0.16, (sx * 1.5, SY + 0.17, sz * 3.55)) for sx in (-1, 1) for sz in (-1, 1)], e=0.3), "dark", load, 0.03)
+M("liftEye", join([xf(torus(0.2, 0.05, 12, 6), (0, SY + 0.35, 0), (PI / 2, 0, 0))]), "dark", load, 0.02)
+
+# the four bridle slings from the hook to the spreader's corners (in the hook's frame the container's z runs along x, and x along -z)
+M("slings", join([B((0, -2.0, 0), (sz * 3.55, LOAD_Y + SY + 0.3, -sx * 1.5), 0.04, 4, True) for sx in (-1, 1) for sz in (-1, 1)]), "dark", hook, 0)
+
+
+def cg_livery(f, piv):
+    s = NAMES[f]
+    code = f"{CODES[f]} 204117 6"
+    for side in (-1, 1):
+        d = side_dec(side, 1.68, 3.5, 0.3)
+        d.rect(-1.7, -0.56, 1.7, 0.56, "stripe", 0)
+        d.rect(-1.66, -0.52, 1.66, 0.52, "dark", 1)
+        emblem(d, f, -1.1, 0.0, 0.4, 2)
+        d.text(s, -0.55, 0.06, 0.045, "stripe", 2)
+        d.text("LOGISTICS", -0.55, -0.4, 0.035, "white", 2)
+        d.build(f"crane_plate{'P' if side > 0 else 'S'}_{f}", piv)
+        d2 = side_dec(side, 1.6, 4.3, 0.3)
+        d2.text(code, -1.55, 0, 0.04, "label", 0)
+        d2.build(f"crane_id{'P' if side > 0 else 'S'}_{f}", piv)
+
+
+for f in FACTIONS:
+    cg_livery(f, pivot(f"crane_livery_{f}", (0, 0, 0), load, role="livery", faction=f))
+hook["drop"] = round(LOAD_DROP, 3)
 
 # ---------------------------------------------------------------------------------------------------------------
 objs = [o for o in C.objects]

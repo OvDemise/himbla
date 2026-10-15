@@ -1,7 +1,7 @@
 // Dev-only model viewer: renders one model through the game's comic post pass on a turntable.
 import * as THREE from 'three';
 import { loadFonts } from '../src/fonts.js';
-import { loadRunnerParts, loadShipParts, makeShuttle, makeFreighter, makeHoverCar, makeApc, makeLandTrain, makeTowerCrane, CRANE_JIB } from '../src/models.js';
+import { loadRunnerParts, loadShipParts, makeShuttle, makeFreighter, makeHoverCar, makeApc, makeLandTrain, makeTowerCrane, CRANE_TROLLEY_MIN, CRANE_TROLLEY_SPAN } from '../src/models.js';
 import { makeChimera, makeMite, LIVING, MODIFIERS, spliceGenes } from '../src/chimera.js';
 import { ComicPost } from '../src/post.js';
 
@@ -60,11 +60,11 @@ if (m === 'shuttle' || m === 'freighter') {
   });
   height = 3;
 } else if (m === 'crane') {
-  // &h=34 (the mast, m; the model is 34)  &slew=<rad>  &trolley=0..1 (along the jib)  &rope=<m of rope>  &color=hex  &load=hex
-  const c = makeTowerCrane({ color: Q.has('color') ? parseInt(Q.get('color'), 16) : 0xffd23f, load: Q.has('load') ? parseInt(Q.get('load'), 16) : 0xff3b5c, h: num('h', 34) });
+  // &h=34 (the mast, m; the model is 34)  &slew=<rad>  &trolley=0..1 (along its run)  &rope=<m of rope>  &color=hex  &faction=kepler|meridian|spacecom|vostok (the cargo)
+  const c = makeTowerCrane({ color: Q.has('color') ? parseInt(Q.get('color'), 16) : 0xffd23f, faction: Q.get('faction') || 'kepler', h: num('h', 34) });
   const sc = num('h', 34) / 34;
   c.slew.rotation.y = num('slew', 0);
-  c.trolley.position.x = (3.8 + (CRANE_JIB - 6.5) * num('trolley', 0.5)) * sc;
+  c.trolley.position.x = (CRANE_TROLLEY_MIN + CRANE_TROLLEY_SPAN * num('trolley', 0.5)) * sc;
   c.cable.scale.y = num('rope', 14);
   c.hook.position.y = (-0.7 - num('rope', 14)) * sc;
   model = c.root;

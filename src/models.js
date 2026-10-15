@@ -1632,36 +1632,57 @@ export function makeLandTrain({ faction = 'kepler', type = 'moonliner', cars } =
 // 34 m of lattice mast under a 30 m jib; the game scales it uniformly (h / CRANE_H). The baked tree: the root's own meshes are
 // the foundation, base frame and mast; its `slew` child (turned about y) carries the tower head, jib, counter-jib, cab and
 // lamps, with `blinker` pivots for the aircraft warning lights; that has a `trolley` child (slid along the jib) holding
-// `cable` (two rope falls a metre long, stretched down to the hook) and `hook` (the hook block and its load, lowered with it).
+// `cable` (two rope falls a metre long, stretched down to the hook) and `hook` (the hook block, lowered with it), which carries
+// the `load`: the Prospector's cargo container on a spreader frame, with a `livery` pivot per faction (only the one for the
+// crane's cargo is built, as on the land-trains).
 export const CRANE_H = 34, CRANE_JIB = 30;
-export const CRANE_COLORS = { dark: 0x2a2540, steel: 0x55607a, concrete: 0x8a8698, white: 0xfff4e0, glass: 0xcfefff, lamp: 0xfff6a8, rope: 0x1d1a29 };
-const CRANE_GLOW = new Set(['glass', 'lamp']);
+export const CRANE_LOAD_DROP = 8.65; // from the hook's origin to the container's bottom
+// the trolley runs between these (m along the jib): near enough to the mast and the container (7.2 m long, along the jib) would
+// hit its ballast and platforms
+export const CRANE_TROLLEY_MIN = 7.9, CRANE_TROLLEY_SPAN = 19.1;
+const CRANE_COLORS = { dark: 0x2a2540, steel: 0x55607a, concrete: 0x8a8698, white: 0xfff4e0, glass: 0xcfefff, lamp: 0xfff6a8, rope: 0x1d1a29, metal: 0x8a87a0, tail: 0xff2a4a };
+const CRANE_GLOW = new Set(['glass', 'lamp', 'tail']);
+
+// The colour of a crane slot, and whether it glows. `color` paints the crane (body); the cargo container wears the livery of
+// `faction` (load: its body, stripe: its trim, label: its lettering), as the land-trains' do.
+export function craneSlot(slot, color, faction = 'kepler') {
+  const pal = LAND_TRAIN_FACTIONS[faction] || LAND_TRAIN_FACTIONS.kepler;
+  if (slot === 'body') return { color, glow: false };
+  if (slot === 'load') return { color: pal.body, glow: false };
+  if (slot === 'stripe') return { color: pal.stripe, glow: false };
+  if (slot === 'label') return { color: pal.label, glow: false };
+  return { color: CRANE_COLORS[slot] ?? 0xff00ff, glow: CRANE_GLOW.has(slot) };
+}
 
 export function craneModel() {
   const root = SHIP_PARTS.crane;
   const find = (n, role) => n.kids.find((k) => k.role === role);
-  const slew = find(root, 'slew'), trolley = find(slew, 'trolley');
-  return { root, slew, trolley, cable: find(trolley, 'cable'), hook: find(trolley, 'hook'), blinkers: slew.kids.filter((k) => k.role === 'blinker') };
+  const slew = find(root, 'slew'), trolley = find(slew, 'trolley'), hook = find(trolley, 'hook');
+  return { root, slew, trolley, cable: find(trolley, 'cable'), hook, load: find(hook, 'load'), blinkers: slew.kids.filter((k) => k.role === 'blinker') };
 }
 
 // A whole crane as plain meshes (the model viewer's): returns the root group and the pivots to drive. The settlements bake
 // the same parts into their own kit instead (settlements.js towerCrane).
-export function makeTowerCrane({ color = 0xffd23f, load = 0xff3b5c, h = CRANE_H } = {}) {
+export function makeTowerCrane({ color = 0xffd23f, faction = 'kepler', h = CRANE_H } = {}) {
   const C = craneModel();
   const mats = new Map();
   const matFor = (slot) => {
-    if (!mats.has(slot)) mats.set(slot, slot === 'body' ? toon(color) : slot === 'load' ? toon(load) : CRANE_GLOW.has(slot) ? glow(CRANE_COLORS[slot]) : toon(CRANE_COLORS[slot] ?? 0xff00ff));
+    if (!mats.has(slot)) {
+      const c = craneSlot(slot, color, faction);
+      mats.set(slot, c.glow ? glow(c.color) : toon(c.color));
+    }
     return mats.get(slot);
   };
   const rig = { blinkers: [] };
   const build = (node) => {
+    if (node.role === 'livery' && node.data.faction !== faction) return null; // (the other factions' marks never exist)
     const g = new THREE.Group();
     g.name = node.name;
     g.position.copy(node.pos);
     g.quaternion.copy(node.quat);
     for (const { slot, geo } of node.parts) {
       const m = new THREE.Mesh(geo, matFor(slot));
-      m.castShadow = !CRANE_GLOW.has(slot);
+      m.castShadow = !CRANE_GLOW.has(slot) && node.role !== 'livery';
       g.add(m);
     }
     if (node.ink) {
@@ -1676,7 +1697,10 @@ export function makeTowerCrane({ color = 0xffd23f, load = 0xff3b5c, h = CRANE_H 
       rig.blinkers.push(lamp);
     }
     if (node.role in { slew: 1, trolley: 1, cable: 1, hook: 1 }) rig[node.role] = g;
-    for (const k of node.kids) g.add(build(k));
+    for (const k of node.kids) {
+      const c = build(k);
+      if (c) g.add(c);
+    }
     return g;
   };
   rig.root = build(C.root);

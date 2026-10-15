@@ -4,7 +4,7 @@ import { FACTIONS } from './locations.js';
 import { pixelFont } from './fonts.js';
 import { glow } from './toon.js';
 import { market, tickerText } from './market.js';
-import { craneModel, CRANE_H, CRANE_JIB, CRANE_COLORS } from './models.js';
+import { craneModel, craneSlot, CRANE_H, CRANE_LOAD_DROP, CRANE_TROLLEY_MIN, CRANE_TROLLEY_SPAN } from './models.js';
 
 // Settlements, HQs and landmarks built with the outpost Kit (outpostModels.js): every static part
 // of a place bakes into one merged mesh per material plus one ink hull, so a detailed settlement
@@ -226,16 +226,27 @@ export function lattice(k, x, z, h, w0, w1, bays, legM, braceM, { r = 0.22 } = {
 // Tower crane (built in Blender, tools/blender/build_crane.py): foundation, ballasted base and lattice mast baked into the
 // kit; the slewing head (jib, counter-jib, cab, warning lamps), the trolley, the rope and the hook with its load are moving
 // objects. The model is 34 m of mast under a 30 m jib; `h` scales it uniformly (the `jib` argument is its own reach, kept for the
-// callers, and follows from the scale). The head slews, the trolley runs in and out, the hook rises and falls.
+// callers, and follows from the scale). The head slews, the trolley runs in and out, the hook rises and falls. The hook carries
+// the Prospector's cargo container, painted for one of three factions (by `phase`: a mixed yard of Kepler, Meridian and SpaceCom freight).
+const CRANE_CARGO = ['kepler', 'meridian', 'spacecom'];
 export function towerCrane(k, x, z, h, jib, color, { speed = 0.12, phase = 0 } = {}) {
   const C = craneModel(), sc = h / CRANE_H;
-  const load = [0xff3b5c, 0x2ec4ff, 0x7dff6a][Math.abs(Math.round(phase * 3)) % 3];
-  const mat = (slot) => (slot === 'body' ? T(color) : slot === 'load' ? T(load) : slot === 'glass' || slot === 'lamp' ? G(CRANE_COLORS[slot]) : T(CRANE_COLORS[slot] ?? 0xff00ff));
+  const faction = CRANE_CARGO[Math.abs(Math.round(phase * 3)) % 3];
+  const mat = (slot) => { const c = craneSlot(slot, color, faction); return c.glow ? G(c.color) : T(c.color); };
   k.at(x, z);
-  k.baked(C.root, mat, 0, 0, 0, sc);
+  k.baked(C.root, mat, new THREE.Matrix4().makeScale(sc, sc, sc));
   k.solid(4.3 * sc, 1.0 * sc, 4.3 * sc, 0, 0); // the foundation and its ballast
   k.column(1.7 * sc, h, 0, 0); // the mast
-  const piece = (node) => part(color, (q) => q.baked(node, mat, 0, 0, 0, sc));
+  // a moving piece: the node's own meshes, and those of its `load` and matching `livery` descendants, each in the node's frame
+  const piece = (node) => part(color, (q) => {
+    const walk = (n, m) => {
+      q.baked(n, mat, m);
+      for (const c of n.kids) {
+        if (c.role === 'load' || (c.role === 'livery' && c.data.faction === faction)) walk(c, new THREE.Matrix4().compose(c.pos, c.quat, new THREE.Vector3(1, 1, 1)).premultiply(m));
+      }
+    };
+    walk(node, new THREE.Matrix4().makeScale(sc, sc, sc));
+  });
   const top = piece(C.slew);
   for (const b of C.blinkers) {
     const lamp = new THREE.Mesh(new THREE.SphereGeometry((b.data.radius || 0.3) * sc, 8, 6), G(0xff2a4a));
@@ -250,11 +261,12 @@ export function towerCrane(k, x, z, h, jib, color, { speed = 0.12, phase = 0 } =
   trolley.add(cable, hook);
   top.add(trolley);
   top.position.y = C.slew.pos.y * sc;
-  const reach = CRANE_JIB - 6.5, ropeMax = CRANE_H - 6.6; // (the trolley stays clear of the cab and the jib tip; the load stops short of the ground)
+  // the rope pays out until the container is 1.5 m off the ground (the hook's height in the model is H + trolley + hook - rope)
+  const ropeMax = CRANE_H + C.trolley.pos.y + C.hook.pos.y - CRANE_LOAD_DROP - 1.5 - 2;
   top.userData.tick = (o, dt, t) => {
     const u = t * speed + phase;
     o.rotation.y = phase * 2 + Math.sin(u) * 1.6;
-    trolley.position.x = (3.8 + reach * (0.5 + 0.5 * Math.sin(u * 1.7 + 1))) * sc;
+    trolley.position.x = (CRANE_TROLLEY_MIN + CRANE_TROLLEY_SPAN * (0.5 + 0.5 * Math.sin(u * 1.7 + 1))) * sc;
     const rope = 2 + ropeMax * (0.5 + 0.5 * Math.sin(u * 1.3)); // (metres of rope, in the model's own size)
     cable.scale.y = rope;
     hook.position.y = (C.hook.pos.y - rope) * sc;

@@ -110,23 +110,22 @@ class Kit {
   }
 
   // A Blender-built part (models.js bakeShip: its geometry per material slot, and its outline hull, in the part's own frame)
-  // baked into the kit at (x, y, z), turned by ry and scaled uniformly by sc, in the current frame. `mat(slot)` picks the kit
-  // material for a slot. Only that node's own meshes go in, not its child pivots.
-  baked(node, mat, x = 0, y = 0, z = 0, sc = 1, ry = 0) {
-    _m.compose(_p.set(x, y, z), _q.setFromEuler(_e.set(0, ry, 0)), _s.set(sc, sc, sc)).premultiply(this.base);
-    _s.set(1, 1, 1);
+  // baked into the kit in the current frame, placed by the matrix `m` (the part's frame -> the kit frame: scale, turn, offset).
+  // `mat(slot)` picks the kit material for a slot. Only that node's own meshes go in, not its child pivots.
+  baked(node, mat, m) {
+    const w = new THREE.Matrix4().multiplyMatrices(this.base, m);
     for (const { slot, geo } of node.parts) {
-      const m = mat(slot);
-      let list = this.byMat.get(m);
-      if (!list) this.byMat.set(m, (list = []));
-      const g = prep(geo.clone()).applyMatrix4(_m);
-      list.push(m.side === THREE.FrontSide && this.onGround ? dropFloorFaces(g) : g);
+      const km = mat(slot);
+      let list = this.byMat.get(km);
+      if (!list) this.byMat.set(km, (list = []));
+      const g = prep(geo.clone()).applyMatrix4(w);
+      list.push(km.side === THREE.FrontSide && this.onGround ? dropFloorFaces(g) : g);
     }
     if (node.ink) {
       const hg = new THREE.BufferGeometry();
       hg.setAttribute('position', node.ink.attributes.position.clone());
       hg.setIndex(node.ink.index.clone());
-      hg.applyMatrix4(_m);
+      hg.applyMatrix4(w);
       this.ink.push(this.onGround ? dropFloorFaces(hg) : hg);
     }
     return this;

@@ -67,10 +67,6 @@ for s in SLOT_COLORS:
     material(s)
 
 PI = math.pi
-FACTIONS = ("spacecom", "vostok", "kepler", "meridian")
-NAMES = {"spacecom": "SPACECOM", "vostok": "VOSTOK", "kepler": "KEPLER", "meridian": "MERIDIAN"}
-CODES = {"spacecom": "SPC", "vostok": "VOS", "kepler": "KPL", "meridian": "MRD"}
-
 PFX = ""   # every object in a unit is named with the unit's prefix (Blender names are unique across the file)
 
 
@@ -356,10 +352,6 @@ decks(PX, [(1.75, 2.35, 3.5, 2.35, 0)])
 
 
 # page helpers for flank decals: Dec("+x") runs toward the rear, Dec("-x") toward the front
-def side_dec(side, x, y=0.0, z=0.0, lift=0.01):
-    return Dec("+x" if side > 0 else "-x", (side * x, y, z), lift)
-
-
 def U(side, z, z0=0.0):
     """The page coordinate of world z on a flank (page origin at z0)."""
     return -(z - z0) if side > 0 else (z - z0)

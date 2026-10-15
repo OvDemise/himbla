@@ -1,4 +1,4 @@
-# Flat lettering, emblems and signage for the Blender build scripts (build_landtrain.py). Load with
+# Flat lettering, emblems and signage for the Blender build scripts (build_landtrain.py, build_crane.py). Load with
 #   exec(open(<repo>/tools/blender/decals.py).read(), globals())
 # after kit.py (it uses bpy, tb, C and material from there).
 #
@@ -294,3 +294,14 @@ def nfpa(d, cu, cv, half, health, flam, react, special, layer=0):
         d.diamond(qu, qv, h * 0.48, slot, layer + 1)
         ps = h * 0.052
         d.text(txt, qu, qv - 3.5 * ps, ps * (1.0 if len(txt) == 1 else 0.7), "white" if slot in ("blue", "redsafe") else "dark", layer + 2, "c")
+
+
+# ---------------- the factions the vehicles and the cargo are painted for ----------------
+FACTIONS = ("spacecom", "vostok", "kepler", "meridian")
+NAMES = {"spacecom": "SPACECOM", "vostok": "VOSTOK", "kepler": "KEPLER", "meridian": "MERIDIAN"}
+CODES = {"spacecom": "SPC", "vostok": "VOS", "kepler": "KPL", "meridian": "MRD"}
+
+
+def side_dec(side, x, y=0.0, z=0.0, lift=0.01):
+    """A page on the +x (side > 0) or -x flank at distance x from the centreline."""
+    return Dec("+x" if side > 0 else "-x", (side * x, y, z), lift)
