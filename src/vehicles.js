@@ -470,11 +470,11 @@ export class Garage {
   exhaustSmoke(v, dt, thr, up) {
     const m = v.model;
     m.root.updateMatrixWorld(true);
-    const n = Math.floor((thr ? 60 : 16) * dt + Math.random());
+    const n = Math.floor((thr ? 30 : 8) * dt + Math.random());
     if (!n) return;
     m.exhaust.getWorldPosition(_ex);
     _exv.copy(up).multiplyScalar(2.2 + 2.2 * thr).addScaledVector(v.e.body.vel, 0.85);
-    this.game.fx.spawn(_ex, _exv, { color: 0x0b0910, size: 0.3 + 0.22 * thr, life: 0.45 + 0.2 * thr, drag: 2.4, count: n, spread: 1.4 });
+    this.game.fx.spawn(_ex, _exv, { color: 0x0b0910, size: 0.3 + 0.22 * thr, life: 0.225 + 0.1 * thr, drag: 2.4, count: n, spread: 1.4 });
   }
 
   // Left mouse while driving the APC: a shell from the barrel, the way the barrel points (it may still be
