@@ -4,7 +4,7 @@ import { FACTIONS } from './locations.js';
 import { pixelFont } from './fonts.js';
 import { glow } from './toon.js';
 import { market, tickerText } from './market.js';
-import { craneModel, craneSlot, CRANE_H, CRANE_LOAD_DROP, CRANE_TROLLEY_MIN, CRANE_TROLLEY_SPAN } from './models.js';
+import { craneModel, craneSlot, CRANE_H, CRANE_LOAD_DROP, CRANE_TROLLEY_MIN, CRANE_TROLLEY_SPAN, garageModel, garageSlot, GARAGE_HX, GARAGE_HZ } from './models.js';
 
 // Settlements, HQs and landmarks built with the outpost Kit (outpostModels.js): every static part
 // of a place bakes into one merged mesh per material plus one ink hull, so a detailed settlement
@@ -200,6 +200,31 @@ export function warehouse(k, x, z, w, d, h, color, yaw, trim) {
   for (let i = -3; i <= 3; i++) k.box(0.8, 0.12, 0.2, T(i % 2 ? YEL : DARK), i * 1.6, 1.1, d / 2 + 2.95, { outline: 0 });
   k.solid(w / 2 + 0.2, h / 2 + 1.5, d / 2 + 0.2, 0, 0);
   k.solid(w * 0.43, 0.55, 1.5, 0, d / 2 + 1.5);
+  k.at();
+}
+
+// Vehicle garage (built in Blender, tools/blender/build_garage.py): a three-bay motor pool for land-trains and rovers, with a
+// service office built onto one end and a fuel and coolant yard at the other. The shell, roof and yards are baked into the kit;
+// `open` (three booleans, bay 0 first) says which bay doors are rolled up, showing a lit workshop with a rover on a lift, an
+// engine stand or a bench; the roof's turbine vents turn and the antenna lamp blinks. Its doors (+z) face along the yaw.
+export function garage(k, x, z, yaw, open = [true, false, true]) {
+  const M = garageModel(open);
+  const mat = (slot) => { const c = garageSlot(slot); return c.glow ? G(c.color) : T(c.color); };
+  const I = new THREE.Matrix4();
+  k.at(x, z, yaw);
+  for (const n of M.flat) k.baked(n, mat, I);
+  for (const f of M.fans) {
+    const head = part(0xffffff, (q) => q.baked(f, mat, I));
+    head.userData.spin = f.data.speed || 1;
+    k.dyn(head, f.pos.x, f.pos.y, f.pos.z);
+  }
+  for (const b of M.blinkers) k.blinker(b.pos.x, b.pos.y, b.pos.z, 0xffd23f, b.data.radius || 0.25);
+  // solid: the hall (the bays are for show: the doors' plane is a wall), the office, the two tanks and the pump island
+  k.solid(GARAGE_HX + 0.2, 5.4, GARAGE_HZ + 0.2, 0, 0);
+  k.solid(4.4, 2.7, 6.7, 23.25, 3.5);
+  k.hcyl(1.5, 8.2, -23.6, 5.0, 0, 2.0);
+  k.hcyl(1.5, 8.2, -23.6, -4.2, 0, 2.0);
+  k.solid(2.4, 0.9, 0.8, -21.5, GARAGE_HZ + 4.8);
   k.at();
 }
 
@@ -658,10 +683,11 @@ export function buildMeridian(world, loc) {
     crown.userData.spin = 0.4;
     crown.scale.setScalar(1.5);
     k.dyn(crown, 0, y + 3.6, TZ);
-    // four warehouses on the corners, their docks turned in to face the tower across the plaza
+    // four motor-pool garages on the corners, their bays turned in to face the tower across the plaza (a different set of doors up in each)
+    const OPEN = [[true, false, true], [false, true, true], [true, true, false], [false, true, false]];
     for (let i = 0; i < 4; i++) {
       const a = (i / 4) * TAU + Math.PI / 4;
-      warehouse(k, Math.cos(a) * 86, Math.sin(a) * 86, 34, 18, 10, 0xd8d4e8, Math.atan2(-Math.cos(a), -Math.sin(a)), blue);
+      garage(k, Math.cos(a) * 86, Math.sin(a) * 86, Math.atan2(-Math.cos(a), -Math.sin(a)), OPEN[i]);
     }
     // container yard under a travelling gantry crane
     const yx = -5, yz = -100;

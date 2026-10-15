@@ -66,7 +66,7 @@ export const LOCATIONS = [
   {
     id: 'meridian', name: 'Meridian Exchange', short: 'MERIDIAN', type: 'trade', faction: 'meridian', hq: true,
     theta: 18, phi: 25, r: 150, jobs: ['meridian', 'meridian', 'kepler'], safe: true, repair: 8, defense: { ring: 125, turrets: 4 },
-    blurb: 'Meridian headquarters: a glass trading tower whose ticker never sleeps, warehouses, a container port and cranes.',
+    blurb: 'Meridian headquarters: a glass trading tower whose ticker never sleeps, motor-pool garages, a container port and cranes.',
   },
   {
     id: 'vostok', name: 'Bastion Vostok-9', short: 'VOSTOK-9', type: 'military', faction: 'vostok', hq: true,

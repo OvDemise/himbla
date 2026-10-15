@@ -11,6 +11,7 @@ import warrigGlb from './assets/warrig.glb?inline';
 import apcGlb from './assets/apc.glb?inline';
 import landtrainGlb from './assets/landtrain.glb?inline';
 import craneGlb from './assets/crane.glb?inline';
+import garageGlb from './assets/garage.glb?inline';
 import { Kit, T as KT, G as KG, D as KD, crate } from './outpostModels.js';
 
 function part(geo, mat, x = 0, y = 0, z = 0, outline = 0.05) {
@@ -1199,7 +1200,7 @@ const SHIP_FX = new Set(['plume', 'plumeCore', 'lift', 'engine', 'core']); // pe
 const FLAMES = new Set(['plume', 'plumeCore', 'lift']);
 export async function loadShipParts() {
   const loader = new GLTFLoader();
-  const [gltf, sk, wr, ap, lt, cr] = await Promise.all([loader.loadAsync(shipsGlb), loader.loadAsync(skimmerGlb), loader.loadAsync(warrigGlb), loader.loadAsync(apcGlb), loader.loadAsync(landtrainGlb), loader.loadAsync(craneGlb)]);
+  const [gltf, sk, wr, ap, lt, cr, ga] = await Promise.all([loader.loadAsync(shipsGlb), loader.loadAsync(skimmerGlb), loader.loadAsync(warrigGlb), loader.loadAsync(apcGlb), loader.loadAsync(landtrainGlb), loader.loadAsync(craneGlb), loader.loadAsync(garageGlb)]);
   SHIP_PARTS = {};
   for (const name of ['shuttle', 'freighter']) {
     const root = gltf.scene.getObjectByName(name);
@@ -1228,6 +1229,10 @@ export async function loadShipParts() {
   const crane = cr.scene.getObjectByName('crane');
   if (!crane) throw new Error('crane.glb has no crane');
   SHIP_PARTS.crane = bakeShip(crane);
+  // the Meridian motor pool garage (tools/blender/build_garage.py)
+  const garage = ga.scene.getObjectByName('garage');
+  if (!garage) throw new Error('garage.glb has no garage');
+  SHIP_PARTS.garage = bakeShip(garage);
 }
 
 function bakeShip(root) {
@@ -1706,6 +1711,76 @@ export function makeTowerCrane({ color = 0xffd23f, faction = 'kepler', h = CRANE
   rig.root = build(C.root);
   rig.root.scale.setScalar(h / CRANE_H);
   return rig;
+}
+
+// ---- The vehicle garage (built in Blender, see build_garage.py) ----
+// 38 m by 20 m, the three bay doors facing +z. The baked tree: the root's own meshes are the shell, roof and yards; its `door`
+// pivots hold each bay's closed and open door (extras `bay`, `state`), its `fit` pivots what is working inside a bay that is
+// open, `fan` the roof turbine heads (extra `speed`, spun about y) and `blinker` the antenna lamp.
+export const GARAGE_HX = 19, GARAGE_HZ = 10; // the main hall's half sizes
+const GARAGE_TOON = {
+  body: 0xfff4e0, trim: 0x2ec4ff, navy: 0x1b3a8f, gold: 0xffd23f, dark: 0x2a2540, steel: 0x55607a, metal: 0x8a87a0, concrete: 0x8a8698,
+  floor: 0x4a465c, door: 0xc6cbdc, roof: 0x3a3550, panel: 0x1d3a8a, tire: 0x1d1a29, white: 0xf3eee4, label: 0x2a2540,
+  stripe: 0xfff4e0, hazard: 0xffd23f, redsafe: 0xc9202e, orange: 0xff7a1a, blue: 0x1d63d6, tank: 0xc6d6ea,
+};
+const GARAGE_GLOW = { lamp: 0xfff6a8, glass: 0xcfefff, window: 0xfff6a8, green: 0x7dff6a, red: 0xff2a4a, hot: 0xff9f1c, interior: 0xa7a3b8, shopfloor: 0x58546c };
+
+// The colour of a garage slot, and whether it glows; `trim` is the cyan the faction can change.
+export function garageSlot(slot, trim = 0x2ec4ff) {
+  if (slot === 'trim') return { color: trim, glow: false };
+  if (slot in GARAGE_GLOW) return { color: GARAGE_GLOW[slot], glow: true };
+  return { color: GARAGE_TOON[slot] ?? 0xff00ff, glow: false };
+}
+
+// What to build for a garage whose bays are `open` (three booleans): the baked nodes of the static building, the moving
+// heads and the lamp. Every pivot of the model that isn't picked is left out.
+export function garageModel(open = [true, false, true]) {
+  const root = SHIP_PARTS.garage;
+  const keep = (n) => (n.role === 'door' ? (n.data.state === 'open') === !!open[n.data.bay] : n.role === 'fit' ? !!open[n.data.bay] : true);
+  const flat = [], fans = [], blinkers = [];
+  const walk = (n) => {
+    if (n.role === 'fan') { fans.push(n); return; }
+    if (n.role === 'blinker') { blinkers.push(n); return; }
+    if (!keep(n)) return;
+    flat.push(n);
+    for (const k of n.kids) walk(k);
+  };
+  walk(root);
+  return { root, flat, fans, blinkers };
+}
+
+// A whole garage as plain meshes (the model viewer's): `open` the bays that are up, the head of each vent turning with `t`.
+export function makeGarage({ open = [true, false, true], trim = 0x2ec4ff } = {}) {
+  const G = garageModel(open);
+  const mats = new Map();
+  const matFor = (slot) => {
+    if (!mats.has(slot)) { const c = garageSlot(slot, trim); mats.set(slot, c.glow ? glow(c.color) : toon(c.color)); }
+    return mats.get(slot);
+  };
+  const dress = (node, g) => {
+    for (const { slot, geo } of node.parts) {
+      const m = new THREE.Mesh(geo, matFor(slot));
+      m.castShadow = !(slot in GARAGE_GLOW);
+      g.add(m);
+    }
+    if (node.ink) { const m = new THREE.Mesh(node.ink, inkMat); m.userData.isInk = true; g.add(m); }
+  };
+  const root = new THREE.Group();
+  for (const n of G.flat) dress(n, root); // (the model's static pivots all sit at the origin)
+  const heads = G.fans.map((n) => {
+    const h = new THREE.Group();
+    h.position.copy(n.pos);
+    dress(n, h);
+    h.userData.spin = n.data.speed || 1;
+    root.add(h);
+    return h;
+  });
+  for (const b of G.blinkers) {
+    const lamp = new THREE.Mesh(new THREE.SphereGeometry(b.data.radius || 0.25, 8, 6), glow(0xffd23f));
+    lamp.position.copy(b.pos);
+    root.add(lamp);
+  }
+  return { root, heads, update(t) { for (const h of heads) h.rotation.y = t * h.userData.spin; } };
 }
 
 // Shuttle-bus: a fat lifting-body hopper with a wraparound windscreen, porthole windows, two

@@ -1,7 +1,7 @@
 // Dev-only model viewer: renders one model through the game's comic post pass on a turntable.
 import * as THREE from 'three';
 import { loadFonts } from '../src/fonts.js';
-import { loadRunnerParts, loadShipParts, makeShuttle, makeFreighter, makeHoverCar, makeApc, makeLandTrain, makeTowerCrane, CRANE_TROLLEY_MIN, CRANE_TROLLEY_SPAN } from '../src/models.js';
+import { loadRunnerParts, loadShipParts, makeShuttle, makeFreighter, makeHoverCar, makeApc, makeLandTrain, makeTowerCrane, CRANE_TROLLEY_MIN, CRANE_TROLLEY_SPAN, makeGarage } from '../src/models.js';
 import { outpostTemplate } from '../src/outpostModels.js';
 import { loadOutpostParts, GLB_KINDS } from '../src/outpostGlb.js';
 import { makeChimera, makeMite, LIVING, MODIFIERS, spliceGenes } from '../src/chimera.js';
@@ -126,6 +126,13 @@ if (m === 'shuttle' || m === 'freighter') {
   c.hook.position.y = (-0.7 - num('rope', 14)) * sc;
   model = c.root;
   height = 25;
+} else if (m === 'garage') {
+  // &open=101 (which bays are up, bay 0 first: 1 open, 0 shut)  &trim=hex
+  const o = (Q.get('open') || '101').padEnd(3, '0').split('').map((c) => c === '1');
+  const gar = makeGarage({ open: o, trim: Q.has('trim') ? parseInt(Q.get('trim'), 16) : 0x2ec4ff });
+  model = gar.root;
+  anim = (t) => gar.update(t);
+  height = 12;
 } else if (m === 'hovercar') {
   model = makeHoverCar({}).root;
   model.position.y = 2;
