@@ -28,6 +28,7 @@ export class Cheats {
     this.perfGraphs = false; // CPU + GPU load graphs under the FPS chip
     this.showStats = false; // draw calls + polygons rendered per frame, under the minimap
     this.debugView = null; // 'poly' (every polygon outlined) | 'draw' (every draw call its own flat colour): the scene drawn bare, without the comic post pass
+    this.ragdoll = true; // wipeouts and hard crashes turn the runner limp (player.js startRagdoll); off: you stay on your feet
     this.crackedVisor = true; // the cracks that spread over the screen as hull drops (hud.js)
     this.spawnDebug = false; // bottom-right pirate counts + spawn timers overlay (no menu entry for now: set game.cheats.spawnDebug = true from the console)
     this.inputMon = null; // controller map + held keys + trick state (inputmon.js), bottom right
@@ -59,6 +60,7 @@ export class Cheats {
       { label: `4 · CLICK MAP TO TELEPORT: ${this.mapTeleport ? 'ON' : 'OFF'}`, fn: () => { this.mapTeleport = !this.mapTeleport; this.dev(); } },
       { label: '5 · FULL CHEAT MENU…', fn: () => this.open() },
       { label: `6 · INPUT & CONTROLLER MONITOR: ${this.inputMon && this.inputMon.on ? 'ON' : 'OFF'}`, fn: () => { this.toggleInputMon(); this.dev(); } },
+      { label: `7 · RAGDOLL: ${this.ragdoll ? 'ON' : 'OFF'}`, fn: () => { this.toggleRagdoll(); this.dev(); } },
       { label: 'CLOSE' },
     ]);
     g.dialogButtons.dev = true;
@@ -83,6 +85,14 @@ export class Cheats {
       row.addEventListener('adj', (e) => bump(e.detail));
       row.onclick = (e) => { e.stopPropagation(); bump(this.speed >= 10 ? -9 : 1); };
     }
+  }
+
+  // Ragdoll on / off. Off, a wipeout or a hard crash still costs you the same health and speed but you stay on your feet;
+  // turning it off mid-tumble stands you straight back up.
+  toggleRagdoll() {
+    const P = this.game.player;
+    this.ragdoll = !this.ragdoll;
+    if (!this.ragdoll && P.rag) { P.rag.release(); P.rag = null; }
   }
 
   // The input monitor: the pad drawn as it is now, what the game thinks is held, the trick state (inputmon.js)
