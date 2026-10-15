@@ -4,6 +4,7 @@ import { FACTIONS } from './locations.js';
 import { pixelFont } from './fonts.js';
 import { glow } from './toon.js';
 import { market, tickerText } from './market.js';
+import { craneModel, CRANE_H, CRANE_JIB, CRANE_COLORS } from './models.js';
 
 // Settlements, HQs and landmarks built with the outpost Kit (outpostModels.js): every static part
 // of a place bakes into one merged mesh per material plus one ink hull, so a detailed settlement
@@ -222,53 +223,43 @@ export function lattice(k, x, z, h, w0, w1, bays, legM, braceM, { r = 0.22 } = {
   k.column(hw(h / 2) * 1.15 + r, h, x, z, h / 2);
 }
 
-// Tower crane: lattice mast, slewing jib with a trolley running in and out and a hook that
-// rises and falls. The slewing part, trolley and hook are moving objects.
+// Tower crane (built in Blender, tools/blender/build_crane.py): foundation, ballasted base and lattice mast baked into the
+// kit; the slewing head (jib, counter-jib, cab, warning lamps), the trolley, the rope and the hook with its load are moving
+// objects. The model is 34 m of mast under a 30 m jib; `h` scales it uniformly (the `jib` argument is its own reach, kept for the
+// callers, and follows from the scale). The head slews, the trolley runs in and out, the hook rises and falls.
 export function towerCrane(k, x, z, h, jib, color, { speed = 0.12, phase = 0 } = {}) {
+  const C = craneModel(), sc = h / CRANE_H;
+  const load = [0xff3b5c, 0x2ec4ff, 0x7dff6a][Math.abs(Math.round(phase * 3)) % 3];
+  const mat = (slot) => (slot === 'body' ? T(color) : slot === 'load' ? T(load) : slot === 'glass' || slot === 'lamp' ? G(CRANE_COLORS[slot]) : T(CRANE_COLORS[slot] ?? 0xff00ff));
   k.at(x, z);
-  k.box(6, 1, 6, T(CONC), 0, 0, 0, { outline: 0.06 });
-  lattice(k, 0, 0, h, 1.4, 1.4, Math.round(h / 4), T(color), T(color));
-  k.column(1.8, h, 0, 0);
-  const top = new THREE.Group();
-  top.add(part(color, (q) => {
-    q.cyl(1.9, 1.9, 1.2, 12, T(DARK), 0, 0, 0, { outline: 0.06 });
-    // jib out to +x and counter-jib with its weights to -x, a tower head and stays
-    for (const s of [-1, 1]) {
-      q.beam([0, 1.2, s * 0.8], [jib, 1.2, s * 0.8], 0.16, T(color), { outline: 0.04 });
-      q.beam([-jib * 0.32, 1.2, s * 0.8], [0, 1.2, s * 0.8], 0.16, T(color), { outline: 0.04 });
-    }
-    q.beam([0, 3.4, 0], [jib, 1.4, 0], 0.12, T(color), { outline: 0.03 });
-    for (let i = 1; i < jib / 3; i++) q.beam([i * 3, 1.2, -0.8], [i * 3 + 1.5, 3.2 - (i * 3 * 2) / jib, 0], 0.07, T(color), { outline: 0 });
-    q.box(1.2, 4.6, 1.2, T(color), 0, 1.2, 0, { outline: 0.04 });
-    q.beam([0, 5.8, 0], [jib * 0.75, 1.4, 0], 0.06, T(DARK), { outline: 0 });
-    q.beam([0, 5.8, 0], [-jib * 0.3, 1.4, 0], 0.06, T(DARK), { outline: 0 });
-    q.box(3, 2.6, 2.4, T(CONC), -jib * 0.28, 0.2, 0, { outline: 0.05 });
-    q.box(2.2, 2.2, 2, T(WHITE), 1.6, -1.2, 1.6, { outline: 0.05 });
-    q.box(2.24, 0.8, 2.04, G(0xcfefff), 1.6, -0.4, 1.6, { outline: 0 });
-    q.blinker(jib, 1.8, 0, 0xff2a4a, 0.3);
-    q.blinker(0, 6.2, 0, 0xff2a4a, 0.3);
-  }));
-  const trolley = new THREE.Group();
-  const cart = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.7, 1.4), T(DARK));
-  trolley.add(cart);
-  const cable = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 1, 4).translate(0, -0.5, 0), T(DARK));
-  trolley.add(cable);
-  const hook = part(color, (q) => {
-    q.box(0.9, 0.7, 0.9, T(YEL), 0, -0.7, 0, { outline: 0.03 });
-    q.add(new THREE.TorusGeometry(0.35, 0.1, 4, 10, Math.PI * 1.4), T(DARK), 0, -1.0, 0, { rz: Math.PI, outline: 0 });
-    q.box(3, 1.6, 3, T([0xff3b5c, 0x2ec4ff, 0x7dff6a][Math.abs(Math.round(phase * 3)) % 3]), 0, -3.4, 0, { outline: 0.05 });
-  });
-  trolley.add(hook);
+  k.baked(C.root, mat, 0, 0, 0, sc);
+  k.solid(4.3 * sc, 1.0 * sc, 4.3 * sc, 0, 0); // the foundation and its ballast
+  k.column(1.7 * sc, h, 0, 0); // the mast
+  const piece = (node) => part(color, (q) => q.baked(node, mat, 0, 0, 0, sc));
+  const top = piece(C.slew);
+  for (const b of C.blinkers) {
+    const lamp = new THREE.Mesh(new THREE.SphereGeometry((b.data.radius || 0.3) * sc, 8, 6), G(0xff2a4a));
+    lamp.userData.blink = true;
+    lamp.position.copy(b.pos).multiplyScalar(sc);
+    top.add(lamp);
+  }
+  const trolley = piece(C.trolley), cable = piece(C.cable), hook = piece(C.hook);
+  trolley.position.copy(C.trolley.pos).multiplyScalar(sc);
+  cable.position.copy(C.cable.pos).multiplyScalar(sc);
+  hook.position.copy(C.hook.pos).multiplyScalar(sc);
+  trolley.add(cable, hook);
   top.add(trolley);
-  top.position.y = h;
+  top.position.y = C.slew.pos.y * sc;
+  const reach = CRANE_JIB - 6.5, ropeMax = CRANE_H - 6.6; // (the trolley stays clear of the cab and the jib tip; the load stops short of the ground)
   top.userData.tick = (o, dt, t) => {
     const u = t * speed + phase;
     o.rotation.y = phase * 2 + Math.sin(u) * 1.6;
-    trolley.position.set(jib * (0.45 + 0.35 * Math.sin(u * 1.7 + 1)), 0.6, 0);
-    const drop = 6 + (h - 10) * (0.5 + 0.5 * Math.sin(u * 1.3));
-    cable.scale.y = drop; hook.position.y = -drop;
+    trolley.position.x = (3.8 + reach * (0.5 + 0.5 * Math.sin(u * 1.7 + 1))) * sc;
+    const rope = 2 + ropeMax * (0.5 + 0.5 * Math.sin(u * 1.3)); // (metres of rope, in the model's own size)
+    cable.scale.y = rope;
+    hook.position.y = (C.hook.pos.y - rope) * sc;
   };
-  k.dyn(top, 0, h, 0);
+  k.dyn(top, 0, top.position.y, 0);
   k.at();
 }
 

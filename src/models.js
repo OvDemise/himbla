@@ -10,6 +10,7 @@ import skimmerGlb from './assets/skimmer.glb?inline';
 import warrigGlb from './assets/warrig.glb?inline';
 import apcGlb from './assets/apc.glb?inline';
 import landtrainGlb from './assets/landtrain.glb?inline';
+import craneGlb from './assets/crane.glb?inline';
 import { Kit, T as KT, G as KG, D as KD, crate } from './outpostModels.js';
 
 function part(geo, mat, x = 0, y = 0, z = 0, outline = 0.05) {
@@ -1198,7 +1199,7 @@ const SHIP_FX = new Set(['plume', 'plumeCore', 'lift', 'engine', 'core']); // pe
 const FLAMES = new Set(['plume', 'plumeCore', 'lift']);
 export async function loadShipParts() {
   const loader = new GLTFLoader();
-  const [gltf, sk, wr, ap, lt] = await Promise.all([loader.loadAsync(shipsGlb), loader.loadAsync(skimmerGlb), loader.loadAsync(warrigGlb), loader.loadAsync(apcGlb), loader.loadAsync(landtrainGlb)]);
+  const [gltf, sk, wr, ap, lt, cr] = await Promise.all([loader.loadAsync(shipsGlb), loader.loadAsync(skimmerGlb), loader.loadAsync(warrigGlb), loader.loadAsync(apcGlb), loader.loadAsync(landtrainGlb), loader.loadAsync(craneGlb)]);
   SHIP_PARTS = {};
   for (const name of ['shuttle', 'freighter']) {
     const root = gltf.scene.getObjectByName(name);
@@ -1223,6 +1224,10 @@ export async function loadShipParts() {
     if (!unit) throw new Error('landtrain.glb has no ' + name);
     SHIP_PARTS['lt_' + name] = bakeShip(unit);
   }
+  // the tower crane (tools/blender/build_crane.py)
+  const crane = cr.scene.getObjectByName('crane');
+  if (!crane) throw new Error('crane.glb has no crane');
+  SHIP_PARTS.crane = bakeShip(crane);
 }
 
 function bakeShip(root) {
@@ -1621,6 +1626,62 @@ export function makeLandTrain({ faction = 'kepler', type = 'moonliner', cars } =
   const tractor = ltUnit(type, pal, fac);
   const trailers = cars.map((kind) => ({ ...ltUnit(LT_CAR[kind], pal, fac), kind }));
   return { root: tractor.root, wheels: tractor.wheels, beacon: tractor.beacon, decks: tractor.decks, trailers, type, faction: fac };
+}
+
+// ---- The tower crane (built in Blender, see build_crane.py) ----
+// 34 m of lattice mast under a 30 m jib; the game scales it uniformly (h / CRANE_H). The baked tree: the root's own meshes are
+// the foundation, base frame and mast; its `slew` child (turned about y) carries the tower head, jib, counter-jib, cab and
+// lamps, with `blinker` pivots for the aircraft warning lights; that has a `trolley` child (slid along the jib) holding
+// `cable` (two rope falls a metre long, stretched down to the hook) and `hook` (the hook block and its load, lowered with it).
+export const CRANE_H = 34, CRANE_JIB = 30;
+export const CRANE_COLORS = { dark: 0x2a2540, steel: 0x55607a, concrete: 0x8a8698, white: 0xfff4e0, glass: 0xcfefff, lamp: 0xfff6a8, rope: 0x1d1a29 };
+const CRANE_GLOW = new Set(['glass', 'lamp']);
+
+export function craneModel() {
+  const root = SHIP_PARTS.crane;
+  const find = (n, role) => n.kids.find((k) => k.role === role);
+  const slew = find(root, 'slew'), trolley = find(slew, 'trolley');
+  return { root, slew, trolley, cable: find(trolley, 'cable'), hook: find(trolley, 'hook'), blinkers: slew.kids.filter((k) => k.role === 'blinker') };
+}
+
+// A whole crane as plain meshes (the model viewer's): returns the root group and the pivots to drive. The settlements bake
+// the same parts into their own kit instead (settlements.js towerCrane).
+export function makeTowerCrane({ color = 0xffd23f, load = 0xff3b5c, h = CRANE_H } = {}) {
+  const C = craneModel();
+  const mats = new Map();
+  const matFor = (slot) => {
+    if (!mats.has(slot)) mats.set(slot, slot === 'body' ? toon(color) : slot === 'load' ? toon(load) : CRANE_GLOW.has(slot) ? glow(CRANE_COLORS[slot]) : toon(CRANE_COLORS[slot] ?? 0xff00ff));
+    return mats.get(slot);
+  };
+  const rig = { blinkers: [] };
+  const build = (node) => {
+    const g = new THREE.Group();
+    g.name = node.name;
+    g.position.copy(node.pos);
+    g.quaternion.copy(node.quat);
+    for (const { slot, geo } of node.parts) {
+      const m = new THREE.Mesh(geo, matFor(slot));
+      m.castShadow = !CRANE_GLOW.has(slot);
+      g.add(m);
+    }
+    if (node.ink) {
+      const m = new THREE.Mesh(node.ink, inkMat);
+      m.userData.isInk = true;
+      g.add(m);
+    }
+    if (node.role === 'blinker') {
+      const lamp = new THREE.Mesh(new THREE.SphereGeometry(node.data.radius || 0.3, 8, 6), glow(0xff2a4a));
+      lamp.userData.blink = true;
+      g.add(lamp);
+      rig.blinkers.push(lamp);
+    }
+    if (node.role in { slew: 1, trolley: 1, cable: 1, hook: 1 }) rig[node.role] = g;
+    for (const k of node.kids) g.add(build(k));
+    return g;
+  };
+  rig.root = build(C.root);
+  rig.root.scale.setScalar(h / CRANE_H);
+  return rig;
 }
 
 // Shuttle-bus: a fat lifting-body hopper with a wraparound windscreen, porthole windows, two

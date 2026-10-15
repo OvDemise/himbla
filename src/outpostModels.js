@@ -109,6 +109,29 @@ class Kit {
     return this;
   }
 
+  // A Blender-built part (models.js bakeShip: its geometry per material slot, and its outline hull, in the part's own frame)
+  // baked into the kit at (x, y, z), turned by ry and scaled uniformly by sc, in the current frame. `mat(slot)` picks the kit
+  // material for a slot. Only that node's own meshes go in, not its child pivots.
+  baked(node, mat, x = 0, y = 0, z = 0, sc = 1, ry = 0) {
+    _m.compose(_p.set(x, y, z), _q.setFromEuler(_e.set(0, ry, 0)), _s.set(sc, sc, sc)).premultiply(this.base);
+    _s.set(1, 1, 1);
+    for (const { slot, geo } of node.parts) {
+      const m = mat(slot);
+      let list = this.byMat.get(m);
+      if (!list) this.byMat.set(m, (list = []));
+      const g = prep(geo.clone()).applyMatrix4(_m);
+      list.push(m.side === THREE.FrontSide && this.onGround ? dropFloorFaces(g) : g);
+    }
+    if (node.ink) {
+      const hg = new THREE.BufferGeometry();
+      hg.setAttribute('position', node.ink.attributes.position.clone());
+      hg.setIndex(node.ink.index.clone());
+      hg.applyMatrix4(_m);
+      this.ink.push(this.onGround ? dropFloorFaces(hg) : hg);
+    }
+    return this;
+  }
+
   // boxes and cylinders by their base height
   box(w, h, d, mat, x, y0, z, o) { return this.add(new THREE.BoxGeometry(w, h, d), mat, x, y0 + h / 2, z, o); }
   cyl(rt, rb, h, seg, mat, x, y0, z, o) { return this.add(new THREE.CylinderGeometry(rt, rb, h, seg), mat, x, y0 + h / 2, z, o); }
