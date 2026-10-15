@@ -248,8 +248,7 @@ export class Trailer {
     clearEchoes(g);
     g.slowmo = 0;
     g.cam.shake = 0;
-    document.getElementById('popups').innerHTML = '';
-    if (g.fx.pops) g.fx.pops.length = 0;
+    g.fx.clearPops();
     P.setCargo(null);
     P.resetTrick();
     P.body.airTime = 0; // (or the next shot's first touchdown scores the last shot's jump)
@@ -505,8 +504,7 @@ export class Trailer {
     frameQuat(F.up, F.fwd, v.model.root.quaternion);
     v.model.root.position.copy(v.e.body.pos);
     g.garage.enter();
-    document.getElementById('popups').innerHTML = ''; // (no VEHICLE DROP! pop: it's already here)
-    if (g.fx.pops) g.fx.pops.length = 0;
+    g.fx.clearPops(); // (no VEHICLE DROP! pop: it's already here)
     return { v, F };
   }
   music(z, hard = true, fadeIn = 0.15) {
@@ -528,7 +526,7 @@ export class Trailer {
     G.setValueAtTime(G.value, now);
     G.linearRampToValueAtTime(to, now + Math.max(0.02, secs)); // (a straight ramp: a fade from silence stays quiet at the start)
   }
-  pop(text, color = '#ffd23f', size = 64, rot = 0) { this.g.fx.pop(text, null, { color, size, rot, life: 1.1 }); }
+  pop(text, color = '#ffd23f', size = 64, rot = 0) { this.g.fx.pop(text, null, { color, size, rot, life: 1.1, prio: 1 }); }
 }
 
 // ---------------------------------------------------------------------------------------------

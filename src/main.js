@@ -743,7 +743,7 @@ class Game {
     // style only pays during a delivery (it pools into the job's bonus); outside one it's just for show
     if (this.missions.active) this.missions.stylePool += points;
     // (and the +points only shows when they count)
-    if (label) this.fx.pop(this.missions.active ? `${label}! +${points}` : `${label}!`, null, { color: '#ff7ad9', size: 44, life: 1.3 });
+    if (label) this.fx.pop(this.missions.active ? `${label}! +${points}` : `${label}!`, null, { color: '#ff7ad9', size: 44, life: 1.3, prio: 1 });
   }
 
   damagePlayer(amount, cause, from = null) {
@@ -767,7 +767,7 @@ class Game {
     P.dead = true;
     P.model.root.visible = false;
     this.fx.explosion(P.center, 8, true);
-    this.fx.pop('K.O.!', P.center.clone().addScaledVector(P.up, 3), { color: '#ff2a4a', size: 110, life: 2 });
+    this.fx.pop('K.O.!', P.center.clone().addScaledVector(P.up, 3), { color: '#ff2a4a', size: 110, life: 2, prio: 1 });
     this.audio.boom(true);
     if (this.missions.active) this.missions.failAll('You went down — the cargo is lost.');
     this.story.onDeath();
@@ -1145,7 +1145,7 @@ class Game {
     // the Monolith's time dilation: the world crawls, you don't
     const wdt = playing && this.alchemy.buffs.dilate > 0 ? dt * DILATE_RATE : dt;
     if (!this.spindle.active) this.world.update(wdt, this.time, this.camera.position);
-    this.fx.update(wdt);
+    this.fx.update(wdt, rdt); // (popups run on real time: a pause or the Monolith's dilation doesn't freeze or stretch them)
     dbg.lap('world');
     this.hud.update(rdt);
     if (!this.spindle.active) this.updateLighting(dt);

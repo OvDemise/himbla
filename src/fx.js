@@ -10,6 +10,11 @@ const TRAIL_STEP = 1 / 60, TRAIL_LIFE = 40 * TRAIL_STEP, TRAIL_MAX = 2, TRAIL_N 
 const GHOST_GAP = 3, GHOST_LIFE = 0.55, GHOST_ALPHA = 0.55;
 const GHOST_NEW = new THREE.Color(0xc77dff), GHOST_OLD = new THREE.Color(0x5b3bff); // (the dash's violet, deepening as it fades)
 
+// Comic popups: at most POP_MAX are on screen at once and the rest queue behind them, each running its full time once it
+// starts. A backed-up queue sheds its oldest low-rank popups (POP_QUEUE_MAX), and a rank-0 popup that has waited longer than
+// it is still worth showing (about the thing it names: a shout at a spot that's long gone, a "+credit" that's old news) is dropped.
+const POP_MAX = 2, POP_QUEUE_MAX = 8, POP_WAIT_WORLD = 1.2, POP_WAIT_SCREEN = 3;
+
 // Particles, explosions, warning rings, skate trails and comic onomatopoeia.
 export class FX {
   constructor(scene, camera) {
@@ -36,6 +41,9 @@ export class FX {
     this.ghosts = []; // Phase Dash afterimages in flight
     this.ghostRun = null; // the dash laying them: { model, left, last }
     this.popLayer = document.getElementById('popups');
+    this.pops = []; // the popups on screen
+    this.popQueue = []; // ...and the ones waiting for a free slot
+    this.popSeq = 0;
 
     // skate trails (two ribbons)
     this.trails = [this.makeTrail(0x2ee6ff), this.makeTrail(0x2ee6ff)];
@@ -300,23 +308,79 @@ export class FX {
     return r;
   }
 
-  // Onomatopoeia anchored at a world position (or screen centre if pos null).
-  pop(text, pos = null, { color = '#ffd23f', size = 64, life = 1.0, rot = null } = {}) {
-    const el = document.createElement('div');
-    el.className = 'pop';
-    el.textContent = text;
-    el.style.color = color;
-    // pixel display font: ~0.55x the old comic sizes, and only a slight tilt (pixels hate rotation)
-    el.style.fontSize = Math.round(Math.max(10, size * 0.55)) + 'px';
-    el.style.setProperty('--rot', Math.round((rot ?? (Math.random() * 24 - 12)) * 0.25) + 'deg');
-    el.style.animationDuration = life + 's';
-    this.popLayer.appendChild(el);
-    const item = { el, pos: pos ? pos.clone() : null, t: 0, life };
-    if (!pos) { el.style.left = 50 + (Math.random() * 20 - 10) + '%'; el.style.top = 32 + Math.random() * 10 + '%'; }
-    (this.pops ||= []).push(item);
+  // Onomatopoeia anchored at a world position (or screen centre if pos null). Only POP_MAX show at a time; the rest wait
+  // their turn (priority ones jump ahead of the ordinary ones, and are never dropped for waiting too long).
+  pop(text, pos = null, { color = '#ffd23f', size = 64, life = 1.0, rot = null, prio = 0 } = {}) {
+    const q = this.popQueue;
+    let i = q.length;
+    while (i > 0 && q[i - 1].prio < prio) i--; // (behind everything of its own rank or higher)
+    q.splice(i, 0, { text, pos: pos ? pos.clone() : null, color, size, life: Math.max(0.2, life), rot, prio, wait: 0 });
+    if (q.length > POP_QUEUE_MAX) q.splice(q.findIndex((e) => e.prio === q[q.length - 1].prio), 1); // (the oldest of the lowest rank)
+    this.pumpPops();
   }
 
-  update(dt) {
+  // starts queued popups while there's room: each one's run time counts from here, not from when it was asked for
+  pumpPops() {
+    while (this.pops.length < POP_MAX && this.popQueue.length) this.startPop(this.popQueue.shift());
+  }
+
+  startPop(e) {
+    const el = document.createElement('div');
+    el.className = 'pop';
+    el.textContent = e.text;
+    el.style.color = e.color;
+    // pixel display font: ~0.55x the old comic sizes, and only a slight tilt (pixels hate rotation)
+    el.style.fontSize = Math.round(Math.max(10, e.size * 0.55)) + 'px';
+    el.style.setProperty('--rot', Math.round((e.rot ?? (Math.random() * 24 - 12)) * 0.25) + 'deg');
+    el.style.animationDuration = e.life + 's';
+    this.popLayer.appendChild(el);
+    const p = { el, pos: e.pos, t: 0, life: e.life, lp: 50, tp: 36, w: el.offsetWidth, h: el.offsetHeight, nudge: 0, fresh: true };
+    if (!e.pos) { p.lp = 50 + (Math.random() * 20 - 10); p.tp = 32 + Math.random() * 10; }
+    this.pops.push(p);
+    this.placePop(p);
+  }
+
+  // a world-anchored popup follows its spot on screen; a screen one stays where it was dropped
+  placePop(p) {
+    if (p.pos) {
+      this.v.copy(p.pos).project(this.camera);
+      p.el.style.visibility = this.v.z > 1 ? 'hidden' : ''; // (behind the camera: hidden, not display:none, which would restart its animation)
+      p.lp = ((this.v.x + 1) / 2) * 100;
+      p.tp = ((1 - this.v.y) / 2) * 100;
+    }
+    p.el.style.left = p.lp + '%';
+    p.el.style.top = p.tp + '%';
+  }
+
+  // Two popups never sit on top of each other: if the newer one would overlap the older, it's nudged up or down clear of it.
+  // (Sizes are read once when a popup starts; the nudge eases so a moving anchor doesn't make it jitter.)
+  separatePops(dt) {
+    const [a, b] = this.pops, W = window.innerWidth, H = window.innerHeight;
+    if (a && !b) { a.nudge += -a.nudge * Math.min(1, dt * 4); a.el.style.marginTop = a.nudge.toFixed(1) + 'px'; return; } // (alone again: settle back)
+    if (!b) return;
+    const ay = (a.tp / 100) * H + a.nudge, by = (b.tp / 100) * H;
+    const needY = ((a.h + b.h) / 2) * 1.35 + 8; // (headroom for the pop's overshoot and its drift upward)
+    let target = 0;
+    if (Math.abs((a.lp - b.lp) / 100 * W) < ((a.w + b.w) / 2) * 1.1 && Math.abs(by - ay) < needY) {
+      const dir = by >= ay ? 1 : -1; // (it keeps to the side of the older one it's already on, unless that runs off the screen)
+      target = ay + dir * needY - by;
+      const y = by + target;
+      if (y > H - b.h || y < b.h) target = ay - dir * needY - by;
+    }
+    b.nudge = b.fresh ? target : b.nudge + (target - b.nudge) * Math.min(1, dt * 14);
+    b.fresh = false;
+    b.el.style.marginTop = b.nudge.toFixed(1) + 'px';
+  }
+
+  clearPops() {
+    for (const p of this.pops) p.el.remove();
+    this.pops.length = 0;
+    this.popQueue.length = 0;
+  }
+
+  // popDt: the clock the popups run on, real time (their CSS animation does too): a pause or the Monolith's time dilation
+  // mustn't freeze or stretch them, or a held-up queue would never drain
+  update(dt, popDt = dt) {
     this.updateEmbers(dt);
     this.updateShells(dt);
     this.updateGhosts(dt);
@@ -373,19 +437,19 @@ export class FX {
       r.inner.scale.setScalar(k);
     }
 
-    if (this.pops) {
-      for (let i = this.pops.length - 1; i >= 0; i--) {
-        const p = this.pops[i];
-        p.t += dt;
-        if (p.t >= p.life) { p.el.remove(); this.pops.splice(i, 1); continue; }
-        if (p.pos) {
-          this.v.copy(p.pos).project(this.camera);
-          if (this.v.z > 1) { p.el.style.display = 'none'; continue; }
-          p.el.style.display = '';
-          p.el.style.left = ((this.v.x + 1) / 2) * 100 + '%';
-          p.el.style.top = ((1 - this.v.y) / 2) * 100 + '%';
-        }
-      }
+    const q = this.popQueue;
+    for (let i = q.length - 1; i >= 0; i--) {
+      const e = q[i];
+      e.wait += popDt;
+      if (e.prio === 0 && e.wait > (e.pos ? POP_WAIT_WORLD : POP_WAIT_SCREEN)) q.splice(i, 1);
     }
+    for (let i = this.pops.length - 1; i >= 0; i--) {
+      const p = this.pops[i];
+      p.t += popDt;
+      if (p.t >= p.life) { p.el.remove(); this.pops.splice(i, 1); }
+    }
+    this.pumpPops();
+    for (const p of this.pops) if (p.pos) this.placePop(p);
+    this.separatePops(popDt);
   }
 }

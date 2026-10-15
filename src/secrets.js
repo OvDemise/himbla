@@ -506,7 +506,7 @@ export class Secrets {
     root.frustumCulled = false;
     g.scene.add(root);
     // it behaves like a moving platform you can land on (body + both solar panels)
-    this.sat = { root, nameSign, artifact, aGlow, lights, halo, pos: new THREE.Vector3(), prevPos: new THREE.Vector3(), vel: new THREE.Vector3(), fwd: new THREE.Vector3(), cols: [], passAlert: 0 };
+    this.sat = { root, nameSign, artifact, aGlow, lights, halo, pos: new THREE.Vector3(), prevPos: new THREE.Vector3(), vel: new THREE.Vector3(), fwd: new THREE.Vector3(), cols: [] };
     this.placeSat(0);
     this.sat.prevPos.copy(this.sat.pos);
   }
@@ -571,13 +571,6 @@ export class Secrets {
     S.artifact.rotation.y += dt * 1.5;
     S.nameSign.visible = S.pos.distanceTo(P.pos) > 45; // don't fill the screen while you're aboard
     S.aGlow.scale.setScalar(1 + Math.sin(S.t * 4) * 0.15);
-    // heads-up when it's coming in low near you
-    const d = S.pos.distanceTo(P.pos);
-    S.passAlert -= dt;
-    if (d < 1600 && S.passAlert <= 0 && g.planet.visible(P.center, S.pos)) {
-      S.passAlert = 90;
-      g.hud.toast(`📡 SAT-7 "LANTERN" passing ${Math.round(S.pos.length() - g.planet.surface(S.pos))} m up${this.state.artifactTaken ? '' : ' (something on its deck is glowing)'}`, 4);
-    }
     if (P.body.platform === S && !S.landedOnce) {
       S.landedOnce = true;
       g.style(200, 'ORBITAL LANDING');

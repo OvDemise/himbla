@@ -94,6 +94,12 @@ export class Territory {
     this.chip.id = 'terrchip';
     this.chip.className = 'chip terr hidden';
     document.getElementById('undermap').appendChild(this.chip); // (the territory chip sits under the minimap)
+    this.t = 0; // play time (the chip doesn't flash while it settles in at the start of a session)
+    // the flash class comes off when its animation is over, or was cut off (the HUD hiding mid-flash fires 'animationcancel'; a restart
+    // does too, but then a new animation is already running, and that one's left alone)
+    const flashDone = () => { if (!this.chip.getAnimations().length) this.chip.classList.remove('flash'); };
+    this.chip.addEventListener('animationend', flashDone);
+    this.chip.addEventListener('animationcancel', flashDone);
     this.genOutposts();
     this.flatten();
     this.prebake();
@@ -504,7 +510,7 @@ export class Territory {
   update(dt) {
     const g = this.game;
     const P = g.player;
-    this.t = (this.t || 0) + dt;
+    this.t += dt;
     for (const o of this.outposts) {
       const d = arcDist(P.pos, o.dir);
       if (!o.model && d < BUILD_R) this.spawn(o);
@@ -524,15 +530,24 @@ export class Territory {
       this.checkT = 0.5;
       const f = this.owner(P.pos.clone().normalize());
       if (f !== this.current) {
-        const first = this.current === null;
         this.current = f;
         const F = FACTIONS[f];
         this.chip.style.background = F.color;
+        this.chip.style.setProperty('--glow', F.color);
         this.drawChip();
         this.chip.classList.remove('hidden');
-        if (!first && g.state === 'play') g.hud.toast(`Entering ${F.name} territory`, 2);
+        this.flashChip(); // (no "Entering X territory" popup: the chip under the minimap says it, and flashes)
       }
     }
+  }
+
+  // a glowing flash in the owner's colour, restarted each time the chip's text changes
+  flashChip() {
+    if (this.t < 1) return;
+    const el = this.chip;
+    el.classList.remove('flash');
+    void el.offsetWidth;
+    el.classList.add('flash');
   }
 
   // the chip: the territory line, and under it (centred, same box) the settlement you're in
@@ -547,6 +562,7 @@ export class Territory {
     if (name === this.placeName) return;
     this.placeName = name;
     this.drawChip();
+    this.flashChip();
   }
 
   // ---------- raiding minor structures ----------

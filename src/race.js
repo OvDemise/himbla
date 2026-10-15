@@ -852,11 +852,11 @@ export class Race {
       this.timer -= dt;
       const now = Math.ceil(this.timer);
       const r0 = this.racers[0];
-      if (now !== before && now > 0 && now <= 3) { g.fx.pop(String(now), r0.pos.clone().addScaledVector(r0.pos.clone().normalize(), 6), { color: '#ffd23f', size: 80 }); g.audio.tone(440, 0.2, 'square', 0.08); }
+      if (now !== before && now > 0 && now <= 3) { g.fx.pop(String(now), r0.pos.clone().addScaledVector(r0.pos.clone().normalize(), 6), { color: '#ffd23f', size: 80, prio: 1 }); g.audio.tone(440, 0.2, 'square', 0.08); }
       if (this.timer <= 0) {
         this.state = 'run';
         this.excite = 1;
-        g.fx.pop('AND THEY\'RE OFF!', null, { color: '#ff2e88', size: 70 });
+        g.fx.pop('AND THEY\'RE OFF!', null, { color: '#ff2e88', size: 70, prio: 1 });
         g.audio.roar(1);
         g.audio.tone(880, 0.4, 'square', 0.1);
       }
@@ -884,7 +884,7 @@ export class Race {
           r.done = true;
           r.place = ++this.finished;
           this.excite = 1;
-          g.fx.pop(r.place === 1 ? `${r.genes.name.toUpperCase()} WINS!` : `#${r.place}`, r.pos.clone().addScaledVector(r.pos.clone().normalize(), 6), { color: r.mine ? '#7dff3a' : '#ffffff', size: r.place === 1 ? 70 : 40 });
+          g.fx.pop(r.place === 1 ? `${r.genes.name.toUpperCase()} WINS!` : `#${r.place}`, r.pos.clone().addScaledVector(r.pos.clone().normalize(), 6), { color: r.mine ? '#7dff3a' : '#ffffff', size: r.place === 1 ? 70 : 40, prio: 1 });
           if (r.place === 1) g.audio.tone(660, 0.6, 'square', 0.25);
           if (r.mine) g.audio.roar(r.place === 1 ? 1.5 : r.place <= 3 ? 0.9 : 0.4);
           if (r.mine && r.place <= 3) this.confetti(r.pos);

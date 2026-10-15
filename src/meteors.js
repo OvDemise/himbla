@@ -126,9 +126,7 @@ export class Meteors {
       // the whole shower comes in on one slant, like a real one
       slant: tangent(_a.set(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5), up).normalize(),
     };
-    const d = arcDist(g.player.pos, site.dir);
     g.hud.alert('☄ METEOR SHOWER INCOMING ☄', '#ff4f2e', 4);
-    g.hud.toast(`Meteor shower ${(d / 1000).toFixed(1)} km away (red zone on the map). Stay out, or go surf it.`, 5);
     g.audio.alarm();
   }
 
@@ -257,8 +255,9 @@ export class Meteors {
     this.chain = g.time - this.lastBounce < CHAIN_WINDOW ? this.chain + 1 : 1;
     this.lastBounce = g.time;
     const n = this.chain;
-    g.style(45 + 25 * (n - 1), n > 1 ? `METEOR CHAIN ×${n}` : 'METEOR BOUNCE');
-    g.fx.pop(n > 1 ? `METEOR CHAIN ×${n}!` : 'METEOR BOUNCE!', null, { color: '#ff9f1c', size: 56 });
+    const pts = 45 + 25 * (n - 1);
+    g.style(pts, null);
+    g.fx.pop(`${n > 1 ? `METEOR CHAIN ×${n}` : 'METEOR BOUNCE'}!${g.missions.active ? ` +${pts}` : ''}`, null, { color: '#ff9f1c', size: 56, prio: 1 }); // (the +points only shows when they count)
     g.audio.tone(520 + 70 * Math.min(n - 1, 6), 0.25, 'square', 0.18, 2);
   }
 

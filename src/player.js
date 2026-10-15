@@ -17,6 +17,8 @@ const TAU = Math.PI * 2;
 const FLIP_RATE = 11; // rad/s ≈ 1.75 rotations per second
 const SPIN_RATE = 12;
 const NUMS = ['', '', 'DOUBLE ', 'TRIPLE ', 'QUAD ', 'QUINT '];
+const BIG_AIR_MIN = 5; // s in the air before BIG AIR! is called out (shorter hops still pay their style points, quietly)
+const SKY_HIGH_GAIN = 40; // m climbed above where a jump began before SKY-HIGH! is called out
 
 const _q = new THREE.Quaternion();
 const _Z = new THREE.Vector3(0, 0, 1);
@@ -39,6 +41,8 @@ export class Player {
     this.cargoMesh = null;
     this.speedMarks = SPEED_MARKS.map(() => false);
     this.launchCheck = -1;
+    this.airBase = null; // altitude where this spell in the air began (SKY-HIGH! counts the climb from it)
+    this.skyHigh = false; // ...and whether this jump has had its SKY-HIGH! yet
     this.anim = 0;
     this.upSmooth = spawn.clone().normalize();
     this.impacts = [];
@@ -95,6 +99,8 @@ export class Player {
     this.upSmooth.copy(this.body.up);
     if (facing) this.heading.copy(facing);
     this.resetTrick();
+    this.airBase = null;
+    this.skyHigh = false;
   }
 
   // color2: a second crate stacked on top (the Twin Cradle)
@@ -327,13 +333,13 @@ export class Player {
       }
     } else this.vaneN = 0;
     if (b.bounced > 6) {
-      g.fx.pop(b.bounced > 25 ? 'BOOOING!' : 'BOING!', null, { color: '#ff7ad9', size: 40 + Math.min(40, b.bounced) });
+      g.fx.pop(b.bounced > 25 ? 'BOOOING!' : 'BOING!', null, { color: '#ff7ad9', size: 40 + Math.min(40, b.bounced), prio: 1 });
       g.audio.tone(220 + b.bounced * 8, 0.3, 'sine', 0.2, 2);
       if (b.bounced > 20) g.style(Math.round(b.bounced / 2), null);
     }
     b.bounced = 0;
     // velocities on a deck are relative to it; convert when stepping on or off
-    if (!plat && b.platform) { b.vel.sub(b.platform.vel); g.fx.pop('ALL ABOARD!', null, { color: '#2ee6ff', size: 44, life: 1 }); }
+    if (!plat && b.platform) { b.vel.sub(b.platform.vel); g.fx.pop('ALL ABOARD!', null, { color: '#2ee6ff', size: 44, life: 1, prio: 1 }); }
     else if (plat && b.platform !== plat) { b.vel.add(plat.vel); if (b.platform) b.vel.sub(b.platform.vel); }
     // world-space acceleration (for sloshing fluids)
     const worldVel = _v.copy(b.vel);
@@ -344,18 +350,27 @@ export class Player {
 
     if (b.diveLanded) {
       g.fx.dust(b.pos, b.vel, 14, up);
-      if (b.diveLanded > 20) { g.fx.pop('STUCK IT!', null, { color: '#2ee6ff', size: 46 }); g.style(Math.round(b.diveLanded / 3), 'DIVE LANDING'); }
+      if (b.diveLanded > 20) { g.fx.pop('STUCK IT!', null, { color: '#2ee6ff', size: 46, prio: 1 }); g.style(Math.round(b.diveLanded / 3), 'DIVE LANDING'); }
       b.diveLanded = 0;
     }
     if (!wasGrounded && b.grounded && airBefore > 1.8 && !this.trickLanding) {
-      g.style(Math.round(airBefore * 15), `BIG AIR ${airBefore.toFixed(1)}s`);
+      g.style(Math.round(airBefore * 15), airBefore >= BIG_AIR_MIN ? `BIG AIR ${airBefore.toFixed(1)}s` : null);
     }
     this.trickLanding = false;
     if (wasGrounded && !b.grounded && this.speed > 40 && b.vel.dot(up) > 6) this.launchCheck = 0.6;
     if (this.launchCheck > 0) {
       this.launchCheck -= dt;
       if (this.launchCheck <= 0 && !b.grounded && b.vel.dot(up) > 0) {
-        g.fx.pop(this.speed > 70 ? 'SKY-HIGH!' : 'LAUNCH!', null, { color: '#2ee6ff', size: 72 });
+        g.fx.pop('LAUNCH!', null, { color: '#2ee6ff', size: 72, prio: 1 });
+      }
+    }
+    // SKY-HIGH!: once a jump has climbed SKY_HIGH_GAIN m above where it began (not for falling off a cliff or a ride)
+    if (b.grounded) { this.airBase = null; this.skyHigh = false; }
+    else {
+      this.airBase ??= b.altitude;
+      if (!this.skyHigh && b.altitude - this.airBase >= SKY_HIGH_GAIN && b.vel.dot(up) > 0) {
+        this.skyHigh = true;
+        g.fx.pop('SKY-HIGH!', null, { color: '#2ee6ff', size: 72, prio: 1 });
       }
     }
 
@@ -363,7 +378,7 @@ export class Player {
     SPEED_MARKS.forEach((m, i) => {
       if (!this.speedMarks[i] && kmh > m.kmh) {
         this.speedMarks[i] = true;
-        g.fx.pop(m.text, null, { color: i > 1 ? '#ff2e88' : '#ffd23f', size: 60 + i * 12 });
+        g.fx.pop(m.text, null, { color: i > 1 ? '#ff2e88' : '#ffd23f', size: 60 + i * 12, prio: 1 });
         g.style(10 + i * 10, null);
       } else if (this.speedMarks[i] && kmh < m.kmh - 60) this.speedMarks[i] = false;
     });
@@ -456,11 +471,11 @@ export class Player {
         pts += Math.round(landedAfter * 5);
         const name = parts.join(' + ');
         g.style(pts, name);
-        g.fx.pop('STUCK IT!', null, { color: '#7dff6a', size: 70, rot: 6 });
+        g.fx.pop('STUCK IT!', null, { color: '#7dff6a', size: 70, rot: 6, prio: 1 });
         this.trickLanding = true;
         g.stats.bestTrick = Math.max(g.stats.bestTrick || 0, pts);
       } else if (!clean) {
-        g.fx.pop('WIPEOUT!', null, { color: '#ff2a4a', size: 84, rot: -8 });
+        g.fx.pop('WIPEOUT!', null, { color: '#ff2a4a', size: 84, rot: -8, prio: 1 });
         g.damagePlayer(8, 'impact');
         b.vel.multiplyScalar(0.55);
         g.missions.jostle(18, true);
@@ -484,7 +499,7 @@ export class Player {
     if (it.speed > 6) g.audio.thud(it.speed);
     if (g.alchemy && g.alchemy.buffs.bouncy > 0 && it.kind === 'ground' && it.speed > 5) {
       this.body.bounceReady = Math.max(this.body.bounceReady || 0, it.speed);
-      g.fx.pop('BOING!', null, { color: '#ff7ad9', size: 44 });
+      g.fx.pop('BOING!', null, { color: '#ff7ad9', size: 44, prio: 1 });
       return;
     }
     if (it.speed > safe) {
@@ -495,7 +510,7 @@ export class Player {
       const glancing = it.kind === 'ground' ? 1 / (1 + (it.glide || 0) / 30) : 1;
       const dmg = 0.5 * this.maxHealth * (1 - Math.exp(-(it.speed - safe) / 60)) * (this.params.impactDamage / 1.3) * glancing;
       g.damagePlayer(dmg, 'impact');
-      g.fx.pop(it.speed - safe > 12 ? 'KRA-KOOM!' : 'KRAK!', this.body.pos.clone().addScaledVector(this.up, 2), { color: '#ff4f2e', size: 54 });
+      g.fx.pop(it.speed - safe > 12 ? 'KRA-KOOM!' : 'KRAK!', this.body.pos.clone().addScaledVector(this.up, 2), { color: '#ff4f2e', size: 54, prio: 1 });
       g.fx.dust(this.body.pos, this.body.vel, 14, this.up);
       this.startRagdoll(it.kind === 'ground' ? 1 : -1); // (a wall throws you back-first)
     } else if (it.speed > 9) {

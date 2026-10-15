@@ -53,7 +53,7 @@ Times are rough; tune them to the music. ▸ marks how each shot hands off to th
 | 2 | 3–6 | **Courier at the job board**, grabs a crate, skates off the base onto the plain. | Card: *"QUANTUM-LOCK DELIVERY SERVICE"* ▸ follow-cam keeps moving |
 | 3 | 6–9 | **Low chase cam at speed** across the plain, carving between craters; Earth on the horizon. | Music kicks in ▸ hit a crater lip |
 | 4 | 9–11 | **Rim grind:** catches a crater lip, slide pose, sparks spraying, quick orbit round the player. | ▸ pops off the end into the air |
-| 5 | 11–13 | **Trick in the air:** flip plus spin over a rille, stuck landing, "BIG AIR" pop text. | Card: *"…MOSTLY."* ▸ |
+| 5 | 11–13 | **Trick in the air:** flip plus spin over a rille, stuck landing, "STUCK IT!" and the trick-name pop text. | Card: *"…MOSTLY."* ▸ |
 | 6 | 13–16 | **Pirates:** a squad drops in on the dark side, lamp on, shots fly, cargo grab attempt. | ▸ whip-pan |
 | 7 | 16–19 | **Captain Kade's gun truck** skirting round, gatling bursts, then flak as the player jets up. | Slow-mo splash panel on his entrance (`story.spawnKade`) ▸ explosion flash cut |
 | 8 | 19–21 | **Vehicles:** the Daedalus Phase Skimmer drifting hard, then the Vostok APC ploughing through. | ▸ match cut on a skid |
@@ -91,7 +91,8 @@ Times are rough; tune them to the music. ▸ marks how each shot hands off to th
   game state is `'derby'` and the race drives the camera.
 - Monolith: `src/monolith.js` (`monolithTouch(g.alchemy)`; buffs are in `g.alchemy.buffs`).
 - Secrets / Xenoglide: `src/secrets.js` (the Fissure layout, the gate, and the shrine at the back).
-- Comic pop text: `g.fx.pop(text, pos, { color, size })`. Toasts and alerts: `g.hud.toast` /
+- Comic pop text: `g.fx.pop(text, pos, { color, size, life, prio })`. Only two show at once, the rest queue
+  (`g.fx.clearPops()` empties the screen and the queue between shots). Toasts and alerts: `g.hud.toast` /
   `g.hud.alert`. Slow motion: `g.slowmo = seconds`.
 - Music: `g.audio.setZone(...)` picks the track (menu, casino, downs, lab, dark side, …), from
   `musicZone()` in `main.js`. Crowd: `g.audio.setCrowd` / `roar`.

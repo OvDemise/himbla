@@ -176,7 +176,9 @@ restricted military zones work (their turrets open fire without clearance). Afte
 - **Tricks:** flips and spins score style points if you land upright. Buses, cars and freighters
   have solid decks: land on one and it carries you along, then launch off it. Land
   crooked and you **WIPE OUT**: you take damage, lose speed and the cargo gets jostled. Without
-  an active contract, style pays out half its value in credits straight away.
+  an active contract, style pays out half its value in credits straight away. Big jumps get called out
+  too: **SKY-HIGH!** once you've climbed 40 m above where the jump began, and **BIG AIR** (with the time)
+  if you land after 5 s or more in the air; shorter hops still score their style points, quietly.
 - **Job boards** are terminals: status screens (credits, standing, uplink), then a contracts screen and a gear
   screen. At the ILMB the board stands in the plaza as a kiosk of screens under a canopy.
 - **Skiing physics:** gravity pulls toward the Moon's centre and along the slope you're on. With the skates on, friction
@@ -388,7 +390,8 @@ front doors and press `F` at a station
 
 No spot on the Moon is unclaimed. Territory is a weighted split around every faction's settlements and
 ~120 smaller outposts (watchtowers, supply depots, farm domes, relay masts, trading kiosks, scrap shacks).
-A chip shows whose land you're on, and the globe map is
+A chip under the minimap shows whose land you're on (and the settlement you're in),
+flashing in the owner's colour whenever that text changes, and the globe map is
 tinted by owner. The purple line on the globe map is the terminator, the edge of the dark side (point at it
 for details); SAT-7's orbit is the green dashes, with chevrons showing which way it's heading. Military patrols drive between their faction's outposts and shoot pirates (never you, so
 settlement threat radii are unchanged). Captured and founded outposts move the borders.
@@ -647,7 +650,7 @@ crowd-noise bed for now (the cheering is due a rework), and the race countdown b
 - A post pass (`src/post.js`) that draws ink lines from the depth buffer, halftone dots in
   shadow, radial **speed lines** that scale with velocity, and damage and alert vignettes
 - Shattered crater rims: a band of broken regolith along the peak of every grindable lip (an uneven rocky core breaking up into patches, a scuffed halo, dark pebbles and bright chips of fresh rock that fade out with distance), worked out per pixel from the ~64 nearest craters so it never follows the terrain triangles. The rocky band and the grind rail come from the same measurement (planet.rimOf): only firm lips get either. Overlapping craters share one outline round the whole cluster (a crater on the floor of one at least twice its size keeps its own); the giants (over 120 m) get neither. The terrain's toon ramp has soft steps, so lighting bands don't saw-tooth round steep walls
-- Onomatopoeia pop-ups (WHOOSH!, KRAK!, KA-BOOM!, YOINK!)
+- Onomatopoeia pop-ups (WHOOSH!, KRAK!, KA-BOOM!, YOINK!): at most two on screen at once and never on top of each other; any more queue behind them, and each plays its full run time once it starts
 
 ## Code map
 

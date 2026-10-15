@@ -370,7 +370,7 @@ export class CasinoGames {
     const m = win / Math.max(1, stake);
     const [x, y, z] = at;
     if (m >= 10) {
-      this.popAt(pick(['KA-CHING!!', 'MOONSHOT!!', 'KA-BLAMMO!!', 'JACKPOT!!']), x, y + 1.5, z, { color: '#ffd23f', size: 96, life: 2 });
+      this.popAt(pick(['KA-CHING!!', 'MOONSHOT!!', 'KA-BLAMMO!!', 'JACKPOT!!']), x, y + 1.5, z, { color: '#ffd23f', size: 96, life: 2, prio: 1 });
       this.confetti(x, y, z, 160, 10);
       this.g.cam.shake = Math.max(this.g.cam.shake, 0.9);
       this.fanfare();
@@ -582,7 +582,7 @@ export class CasinoGames {
     this.msgCls = pay > 0 ? 'good' : kind === 'push' ? '' : 'bad';
     b.last = { kind, pay };
     if (kind === 'bj') {
-      this.popAt('BLACKJACK!!', BJ.x, 2.6, BJ.z + 2, { color: '#ffd23f', size: 92, life: 2 });
+      this.popAt('BLACKJACK!!', BJ.x, 2.6, BJ.z + 2, { color: '#ffd23f', size: 92, life: 2, prio: 1 });
       this.confetti(BJ.x, 1.6, BJ.z + 2, 120, 8);
       this.g.cam.shake = Math.max(this.g.cam.shake, 0.6);
       this.fanfare();
@@ -659,7 +659,7 @@ export class CasinoGames {
     d.phase = 'count';
     d.msg = `₵${fmt(bet)} ON #${d.pick + 1} ${DUCKS[d.pick].name} AT ×${d.odds[d.pick]}`;
     const cx = (DUCK.x0 + DUCK.x1) / 2;
-    ['3', '2', '1'].forEach((t, i) => this.after(i * 0.6, () => { this.popAt(t, DUCK.x0 + 3, 3.2, DUCK.lanes[1], { color: '#fff4e0', size: 90, life: 0.6 }); this.audio.tone(440, 0.15, 'square', 0.12); }));
+    ['3', '2', '1'].forEach((t, i) => this.after(i * 0.6, () => { this.popAt(t, DUCK.x0 + 3, 3.2, DUCK.lanes[1], { color: '#fff4e0', size: 90, life: 0.6, prio: 1 }); this.audio.tone(440, 0.15, 'square', 0.12); }));
     this.after(1.8, () => {
       d.phase = 'race';
       d.t = 0;
@@ -732,7 +732,7 @@ export class CasinoGames {
     d.history.length = Math.min(d.history.length, 8);
     const close = d.ds.filter((q, i) => i !== w).some((q) => RACE_L - q.x < 0.45);
     const lx = DUCK.x1;
-    this.popAt(close ? `PHOTO FINISH — #${w + 1}!` : `#${w + 1} ${DUCKS[w].name} WINS!`, lx, 4.2, DUCK.lanes[1], { color: hex(DUCKS[w].color), size: 70, life: 2.2 });
+    this.popAt(close ? `PHOTO FINISH — #${w + 1}!` : `#${w + 1} ${DUCKS[w].name} WINS!`, lx, 4.2, DUCK.lanes[1], { color: hex(DUCKS[w].color), size: 70, life: 2.2, prio: 1 });
     this.confetti(lx, 4.5, (DUCK.lanes[0] + DUCK.lanes[3]) / 2, 140, 9);
     if (close) this.audio.tone(1600, 0.08, 'square', 0.1);
     this.cheer();
@@ -742,7 +742,7 @@ export class CasinoGames {
       d.msg = `#${w + 1} ${DUCKS[w].name} WINS! YOU COLLECT ₵${fmt(win)}`;
       this.msgCls = 'good';
       this.celebrate(win, d.stake, [lx - 1, 2.5, DUCK.lanes[w]]);
-      this.popAt(`+₵${fmt(win)}`, lx - 2, 3, DUCK.lanes[w], { color: '#7dff6a', size: 60, life: 1.8 });
+      this.popAt(`+₵${fmt(win)}`, lx - 2, 3, DUCK.lanes[w], { color: '#7dff6a', size: 60, life: 1.8, prio: 1 });
       this.g.cam.shake = Math.max(this.g.cam.shake, 0.4);
     } else {
       d.msg = `#${w + 1} ${DUCKS[w].name} WINS. YOUR DUCK #${d.bet + 1} WAS ${['', '2ND', '3RD', '4TH'][Math.max(1, this.placeOf(d.bet))] || 'SLOW'}.`;
@@ -847,7 +847,7 @@ export class CasinoGames {
       this.msgCls = 'good';
       if (m >= 50) {
         this.g.cam.shake = Math.max(this.g.cam.shake, 1.4);
-        this.popAt('MEGA PLINKO!!!', PLK.x, PLK.y + 6, PLK.z + 1, { color: '#ffd23f', size: 110, life: 2.6 });
+        this.popAt('MEGA PLINKO!!!', PLK.x, PLK.y + 6, PLK.z + 1, { color: '#ffd23f', size: 110, life: 2.6, prio: 1 });
         this.confetti(PLK.x, PLK.y + 10, PLK.z + 1, 250, 14);
       }
     } else if (m >= 2) { this.audio.cash(); this.confetti(lx, ly, PLK.z + 0.6, 30, 4); p.msg = `${m}× — +₵${fmt(win)}`; this.msgCls = 'good'; } else if (m >= 1) this.audio.tone(990, 0.1, 'triangle', 0.1);

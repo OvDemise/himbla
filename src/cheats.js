@@ -446,7 +446,7 @@ export class Cheats {
     })).concat([
       { label: '7 · METEOR SHOWER (teleports you to its edge)', fn: () => {
         const M = g.meteors;
-        if (M.zone) M.end();
+        if (M.zone) M.zone = null; // (not end(): its 'has passed' toast would sit under the new shower's banner)
         M.begin();
         if (!M.zone) { g.hud.toast('No open ground nearby for a shower; try again.', 2); return; }
         const up = g.player.pos.clone().normalize();
