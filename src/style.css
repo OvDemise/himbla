@@ -1293,20 +1293,27 @@ body:not(.pad-on) .rl-pd, body.pad-on .rl-kb { display: none; }
 
 /* the controller's radial menu (gamepad.js): d-pad down, only while a controller is in use. The picked wedge
    glows the way the minimap does: faint white in the light, purple on the dark side */
-#padradial, #vradial { position: fixed; left: 50%; top: 50%; width: 440px; height: 440px; margin: -220px 0 0 -220px; pointer-events: none; z-index: 40; }
-#padradial.hidden, #vradial.hidden { display: none; }
-#padradial .pr-ring, #vradial .pr-ring { position: absolute; inset: 40px; border-radius: 50%; border: 3px solid #5b5870; background: radial-gradient(circle, rgba(18,10,30,.7) 0 30%, rgba(18,10,30,.8) 31% 100%); }
-#padradial .pr-hub, #vradial .pr-hub { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: 150px; text-align: center; color: #fff; font: 13px/1.3 var(--comic); text-shadow: 2px 2px 0 #05030c; }
-#padradial .pr-hub small, #vradial .pr-hub small { display: flex; flex-direction: column; align-items: center; gap: 4px; margin-top: 8px; color: #c9c3d9; font-size: 8px; }
-#padradial .pr-hub small span, #vradial .pr-hub small span { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
-#padradial .pr-item, #vradial .pr-item { position: absolute; transform: translate(-50%, -50%); box-sizing: border-box; width: 124px; height: 44px; padding: 0 4px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; color: #fff; background: #241a3a; border: 2px solid #5b5870; border-radius: 6px; font: 10px/1.25 var(--comic); white-space: nowrap; transition: transform .08s, border-color .08s, box-shadow .08s; }
-#padradial .pr-item small, #vradial .pr-item small { display: block; margin-top: 2px; color: #9be7ff; font-size: 8px; }
-#padradial .pr-item.locked, #vradial .pr-item.locked { opacity: .45; }
-#padradial .pr-item.on, #vradial .pr-item.on { z-index: 1; transform: translate(-50%, -50%) scale(1.12); border-color: #fff; box-shadow: 0 0 0 2px #05030c, 0 0 14px 3px rgba(255, 255, 255, 0.28); }
-body.dark-side #padradial .pr-item.on, body.dark-side #vradial .pr-item.on { border-color: #8f7bff; box-shadow: 0 0 0 2px #05030c, 0 0 22px 6px rgba(143, 100, 255, 0.75); }
+#padradial, #vradial, #powradial { position: fixed; left: 50%; top: 50%; width: 440px; height: 440px; margin: -220px 0 0 -220px; pointer-events: none; z-index: 40; }
+#padradial.hidden, #vradial.hidden, #powradial.hidden { display: none; }
+#padradial .pr-ring, #vradial .pr-ring, #powradial .pr-ring { position: absolute; inset: 40px; border-radius: 50%; border: 3px solid #5b5870; background: radial-gradient(circle, rgba(18,10,30,.7) 0 30%, rgba(18,10,30,.8) 31% 100%); }
+#padradial .pr-hub, #vradial .pr-hub, #powradial .pr-hub { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: 150px; text-align: center; color: #fff; font: 13px/1.3 var(--comic); text-shadow: 2px 2px 0 #05030c; }
+#padradial .pr-hub small, #vradial .pr-hub small, #powradial .pr-hub small { display: flex; flex-direction: column; align-items: center; gap: 4px; margin-top: 8px; color: #c9c3d9; font-size: 8px; }
+#padradial .pr-hub small span, #vradial .pr-hub small span, #powradial .pr-hub small span { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
+#padradial .pr-item, #vradial .pr-item, #powradial .pr-item { position: absolute; transform: translate(-50%, -50%); box-sizing: border-box; width: 124px; height: 44px; padding: 0 4px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; color: #fff; background: #241a3a; border: 2px solid #5b5870; border-radius: 6px; font: 10px/1.25 var(--comic); white-space: nowrap; transition: transform .08s, border-color .08s, box-shadow .08s; }
+#padradial .pr-item small, #vradial .pr-item small, #powradial .pr-item small { display: block; margin-top: 2px; color: #9be7ff; font-size: 8px; }
+#padradial .pr-item.locked, #vradial .pr-item.locked, #powradial .pr-item.locked { opacity: .45; }
+#padradial .pr-item.on, #vradial .pr-item.on, #powradial .pr-item.on { z-index: 1; transform: translate(-50%, -50%) scale(1.12); border-color: #fff; box-shadow: 0 0 0 2px #05030c, 0 0 14px 3px rgba(255, 255, 255, 0.28); }
+body.dark-side #padradial .pr-item.on, body.dark-side #vradial .pr-item.on, body.dark-side #powradial .pr-item.on { border-color: #8f7bff; box-shadow: 0 0 0 2px #05030c, 0 0 22px 6px rgba(143, 100, 255, 0.75); }
 /* (the vehicle wheel's names are longer: its wedges are a little wider and wrap) */
 #vradial .pr-item { width: 150px; height: auto; min-height: 46px; padding: 4px 6px; white-space: normal; }
 #vradial .pr-item.cd small { color: #ff7a8a; }
+/* (the power wheel: the same wedges as the vehicle wheel; the equipped power has an orange edge, and one that's recharging is red) */
+#powradial .pr-item { width: 150px; height: auto; min-height: 46px; padding: 4px 6px; white-space: normal; }
+#powradial .pr-item small { color: #7dff6a; }
+#powradial .pr-item.cd small { color: #ff7a8a; }
+#powradial .pr-item.cur { border-color: #ff9f1c; }
+#powradial .pr-item.cur.on { border-color: #fff; }
+body.dark-side #powradial .pr-item.cur.on { border-color: #8f7bff; }
 
 /* map legend: a comic panel to the left of the globe; folds into a slim tab */
 .globe-row { display: flex; align-items: flex-start; gap: 12px; max-width: 100vw; }
