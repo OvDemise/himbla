@@ -8,6 +8,10 @@ export const WEAPONS = [
   { key: 'mortar', name: 'Rustmoon Junk Mortar', unlock: 'mortar', delay: 1.2, desc: 'Lobbed scrap bomb, huge blast' },
 ];
 
+// The Vostok BTR-M's turret cannon (vehicles.js turretFire): while you drive the APC, left mouse fires this
+// from the barrel, wherever the camera points, instead of the runner's own weapons.
+export const APC_CANNON = { key: 'apccannon', name: 'BTR-M 30 mm Cannon', delay: 0.5, desc: 'Heavy high-explosive shell from the turret' };
+
 const _v = new THREE.Vector3();
 
 export function weaponUnlocked(w, upgrades) {
@@ -63,4 +67,18 @@ export function fireWeapon(g, w, muzzle, dir, inherit, mult, homing) {
     g.projectiles.fire('player', muzzle, d.multiplyScalar(100).addScaledVector(inherit, 0.5), { damage: 70 * mult, splash: 13, color: 0x7dff3a, size: 0.8, knock: 2.2, gravity: 20, life: 6 });
     g.audio.tone(140, 0.3, 'square', 0.25, 0.5);
   }
+}
+
+// One round from the APC cannon: a heavy tracer shell (projectiles.js type 'shell') with a flash at the muzzle.
+// `muzzle` is the barrel's mouth, `dir` the way the barrel points, `inherit` the vehicle's velocity.
+export function fireCannon(g, muzzle, dir, inherit, mult = 1) {
+  g.projectiles.fire('player', muzzle, dir.clone().multiplyScalar(170).addScaledVector(inherit, 0.6), {
+    type: 'shell', damage: 55 * mult, splash: 9, color: 0xff8a2a, size: 0.5, knock: 2, gravity: 3, life: 3.2, spare: true,
+  });
+  const up = g.player.up;
+  g.fx.spawn(muzzle, dir.clone().multiplyScalar(14).add(inherit), { color: 0xffe08a, size: 0.8, life: 0.18, count: 5, spread: 3, drag: 4 });
+  g.fx.spawn(muzzle, dir.clone().multiplyScalar(5).addScaledVector(up, 1), { color: 0x4a4560, size: 1.0, life: 0.8, count: 4, spread: 2.5, drag: 1.5 });
+  g.audio.tone(95, 0.3, 'square', 0.3, 0.35);
+  g.audio.burst(0.3, 1600, 0.45);
+  g.cam.shake = Math.max(g.cam.shake, 0.3);
 }

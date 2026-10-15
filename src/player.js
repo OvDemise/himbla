@@ -379,6 +379,12 @@ export class Player {
     const g = this.game;
     const b = this.body;
     const up = b.up;
+    // the APC (vehicles.js): its turret cannon replaces the runner's own weapons while you drive it
+    if (this.vehicle && this.vehicle.def.turret) {
+      if (this.scoped) { this.scoped = false; g.audio.tone(800, 0.06, 'square', 0.06); }
+      g.garage.turretFire(dt, input);
+      return;
+    }
     const wasScoped = this.scoped;
     // (limp in a ragdoll: no scope, no shooting)
     this.scoped = WEAPONS[this.weapon || 0].key === 'rail' && input.mouse[2] && input.locked && !this.dead && !this.rag;

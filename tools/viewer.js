@@ -1,7 +1,7 @@
 // Dev-only model viewer: renders one model through the game's comic post pass on a turntable.
 import * as THREE from 'three';
 import { loadFonts } from '../src/fonts.js';
-import { loadRunnerParts, loadShipParts, makeShuttle, makeFreighter, makeHoverCar } from '../src/models.js';
+import { loadRunnerParts, loadShipParts, makeShuttle, makeFreighter, makeHoverCar, makeApc } from '../src/models.js';
 import { makeChimera, makeMite, LIVING, MODIFIERS, spliceGenes } from '../src/chimera.js';
 import { ComicPost } from '../src/post.js';
 
@@ -36,6 +36,15 @@ if (m === 'shuttle' || m === 'freighter') {
   rig.setRamp(num('ramp', 0));
   model.position.y = rig.gearH * num('gear', 1) + (num('gear', 1) < 1 ? 4 : 0);
   height = m === 'shuttle' ? 8 : 20;
+} else if (m === 'apc') {
+  // &turret=<yaw rad>&barrel=<elevation rad> to pose it; the faction colours as in the game
+  const apc = makeApc({ color: Q.has('color') ? parseInt(Q.get('color'), 16) : 0x6b6f78, trim: Q.has('trim') ? parseInt(Q.get('trim'), 16) : 0xff3b5c });
+  apc.turret.rotation.y = num('turret', 0);
+  apc.barrel.rotation.x = -num('barrel', 0);
+  model = apc.root;
+  model.scale.setScalar(1.35);
+  model.position.y = 0.2;
+  height = 4;
 } else if (m === 'hovercar') {
   model = makeHoverCar({}).root;
   model.position.y = 2;

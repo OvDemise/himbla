@@ -324,7 +324,7 @@ Trade, a Militia Pact) reshapes the Moon and puts other factions' vehicles, weap
   (rebuilt as yours), run a Meridian vault cube home while every gun on the Moon chases you, then storm the
   ILMB.
 - **Vehicles** (`V` calls the crane drop, boards and leaves; hold `V` for a radial picker if you own more
-  than one; W/S drive, A/D steer, Shift hops, you can still shoot): SPACECOM Lunar Interceptor (fast), Vostok BTR-M APC (slow tank), Daedalus Phase Skimmer (hover,
+  than one; W/S drive, A/D steer, Shift hops, you can still shoot): SPACECOM Lunar Interceptor (fast), Vostok BTR-M APC (slow tank: its turret swings to follow your camera and the barrel elevates with it; left mouse / `RT` fires the 30 mm cannon instead of your own weapons), Daedalus Phase Skimmer (hover,
   drifts), Kepler Homestead Mule, Meridian Courier Light-Bike (a sleek light-bike you ride tucked low, leaving a
   glowing trail that fades over a second), Rustmoon Scrapjaw War-Rig. They hug the ground at speed: the wheeled
   ones have real downforce and tyres that bite sideways, and only a proper ramp throws one clear. Ramming pirates
@@ -684,13 +684,15 @@ src/
   assets/ships.glb   the shuttle-bus and freighter, with folding gear, ramps and thruster flames
   assets/skimmer.glb the Daedalus Phase Skimmer (hover-racer with spinning phase coils)
   assets/warrig.glb  the Rustmoon pirate war-rig (patchwork mad-max rover with a spiked ram plow)
+  assets/apc.glb     the Vostok BTR-M Moon APC (eight wheels, a turret that yaws and a barrel that elevates)
 tools/
   blender/build_runner.py  builds the runner in Blender and exports src/assets/runner.glb
   blender/build_ships.py   builds both transit ships in Blender and exports src/assets/ships.glb
   blender/build_skimmer.py builds the Daedalus skimmer -> src/assets/skimmer.glb
   blender/build_warrig.py  builds the pirate war-rig -> src/assets/warrig.glb
+  blender/build_apc.py     builds the Vostok APC and its turret -> src/assets/apc.glb (also runs headless: `pip install bpy`, then `MOONRUNNER_REPO=. python3 tools/blender/build_apc.py`)
   blender/kit.py           shared geometry/material/export helpers the skimmer and war-rig builders exec
-  viewer.html              dev-only model viewer (npm run dev, then /tools/viewer.html?m=shuttle|freighter|mite|lineup…)
+  viewer.html              dev-only model viewer (npm run dev, then /tools/viewer.html?m=shuttle|freighter|apc|mite|lineup…; apc takes &turret=<rad>&barrel=<rad>)
 ```
 
 **Editing the runner:** run `tools/blender/build_runner.py` in Blender (Scripting tab, or

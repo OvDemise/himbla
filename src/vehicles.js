@@ -1,5 +1,6 @@
 import * as THREE from 'three';
-import { makeRover, makeHoverCar, makeSkimmer, makeLightBike, LightTrail } from './models.js';
+import { makeRover, makeApc, makeHoverCar, makeSkimmer, makeLightBike, LightTrail } from './models.js';
+import { fireCannon } from './weapons.js';
 import { makeBody } from './physics.js';
 import { stepRover } from './enemies.js';
 import { frameQuat, tangent } from './geo.js';
@@ -9,7 +10,7 @@ import { glyphHtml } from './glyphs.js';
 // Faction vehicles unlocked through the story. V calls yours in (or hops out).
 export const VEHICLES = {
   interceptor: { hp: 220, name: 'SPACECOM Lunar Interceptor', faction: 'spacecom', max: 88, engine: 38, turn: 2.6, grip: 12, armor: 0.75, color: 0xfff4e0, trim: 0xffd23f, desc: 'Fast, nimble, lightly armoured.' },
-  apc: { hp: 480, name: 'Vostok BTR-M Moon APC', faction: 'vostok', max: 62, engine: 24, turn: 1.9, grip: 18, armor: 0.4, color: 0x6b6f78, trim: 0xff3b5c, scale: 1.35, hideRider: true, desc: 'Slow tank of a thing. Shrugs off fire.' },
+  apc: { hp: 480, name: 'Vostok BTR-M Moon APC', faction: 'vostok', max: 62, engine: 24, turn: 1.9, grip: 18, armor: 0.4, color: 0x6b6f78, trim: 0xff3b5c, scale: 1.35, hideRider: true, turret: true, desc: 'Slow tank of a thing. Shrugs off fire. The turret follows where you look and fires on left mouse.' },
   skimmer: { hp: 180, name: 'Daedalus Phase Skimmer', faction: 'daedalus', max: 100, engine: 34, turn: 2.2, grip: 4, armor: 0.85, color: 0x1a1426, trim: 0xc77dff, hover: true, desc: 'Hovers. Drifts. Terrifyingly fast.' },
   mule: { hp: 300, name: 'Kepler Homestead Mule', faction: 'kepler', max: 58, engine: 26, turn: 2.2, grip: 16, armor: 0.6, color: 0x6a8f3a, trim: 0xff9f1c, scale: 1.2, cargoSafe: true, desc: 'Hauler. Cargo rides in a padded bed and takes no jostle damage.' },
   // (id stays 'van' so existing saves keep it: it's a light-bike now)
@@ -18,9 +19,14 @@ export const VEHICLES = {
 };
 
 const _v = new THREE.Vector3(), _mu = new THREE.Vector3(), _mf = new THREE.Vector3();
+const _ap = new THREE.Vector3(), _am = new THREE.Vector3(), _ad = new THREE.Vector3(), _aq = new THREE.Quaternion();
 const RIDE_LIFT = 0.2; // the wheeled ones ride a touch above the physics ground: the tyres (and their ink outlines) reach below the model's origin, and sank into the terrain on slopes
 const REBUILD = 90; // seconds the orbital crane needs to replace a wrecked vehicle
 const CRASH_SAFE = 18; // m/s you can hit a wall at without hurting the vehicle
+const TURRET_YAW_RATE = 2.6; // rad/s the turret can swing
+const TURRET_PITCH_RATE = 1.7; // rad/s the barrel can elevate
+const TURRET_DOWN = -0.12, TURRET_UP = 0.75; // barrel travel (rad): a little depression, ~43 degrees up
+const AIM_RANGE = 300; // m the aim ray is followed for the spot the turret converges on
 const SUMMON_MAX_SPEED = 2; // m/s: the fastest the runner can be moving and still call a vehicle
 
 export class Garage {
@@ -93,6 +99,11 @@ export class Garage {
       // its own hover-racer model (it has a seat of its own, too)
       m = makeSkimmer({ color: def.color, trim: def.trim });
       return m;
+    }
+    if (id === 'apc') {
+      m = makeApc({ color: def.color, trim: def.trim });
+      m.root.scale.setScalar(def.scale);
+      return m; // (no seat-back: the runner is buttoned up inside)
     }
     if (def.bike) {
       m = makeLightBike({ color: def.color, trim: def.trim });
@@ -284,6 +295,9 @@ export class Garage {
     g.hud.toast(g.input.padActive
       ? `${name}: ${glyphHtml(['LS'])} drive / steer · ${glyphHtml(['A'])} hop · ${glyphHtml(['Y'])} get out`
       : `${name}: W/S drive · A/D steer · SHIFT hop · V to get out`, 3.5, g.input.padActive);
+    if (this.active.def.turret) g.hud.toast(g.input.padActive
+      ? `The turret follows where you look: ${glyphHtml(['RT'])} fires the cannon`
+      : 'The turret follows where you look: left mouse fires the cannon', 3.5, g.input.padActive);
   }
 
   exit() {
@@ -340,7 +354,7 @@ export class Garage {
     const q = frameQuat(b.groundN, e.heading, new THREE.Quaternion());
     model.root.quaternion.slerp(q, Math.min(1, dt * 8));
     const sp = b.vel.length();
-    for (const w of model.wheels) w.rotation.x += (along >= 0 ? 1 : -1) * sp * dt / 0.85;
+    for (const w of model.wheels) w.rotation.x += (along >= 0 ? 1 : -1) * sp * dt / (model.wheelR || 0.85);
     if (model.anim) model.anim(g.time, sp);
     this.trail(model, dt, true);
     // the runner sits in the seat, in the model's own frame (its tilt, its hover bob), so rider and
@@ -352,6 +366,7 @@ export class Garage {
     P.body.pos.copy(model.root.position).addScaledVector(_mu.set(0, 1, 0).applyQuaternion(mq), seatUp);
     if (def.seatZ) P.body.pos.addScaledVector(_mf.set(0, 0, 1).applyQuaternion(mq), def.seatZ);
     v.riderQuat = mq;
+    if (model.turret) this.aimTurret(v, dt, cam);
     P.body.vel.copy(b.vel);
     P.body.up.copy(up);
     P.body.groundN.copy(b.groundN);
@@ -393,7 +408,8 @@ export class Garage {
     const sc = def.scale || 1;
     const k = Math.min(1, (sp - 18) / 60); // 0 at the dust threshold, 1 at 78 m/s
     let spots;
-    if (model.wheels.length) spots = model.wheels.map((w) => [w.position.x * sc, w.position.z * sc]);
+    if (model.dustSpots) spots = model.dustSpots.map(([x, z]) => [x * sc, z * sc]);
+    else if (model.wheels.length) spots = model.wheels.map((w) => [w.position.x * sc, w.position.z * sc]);
     else {
       // (the skimmer's plumes: pivots at x = +-1.78, z = -3.06, 2.2 long at full scale, which model.anim
       // stretches from 0.35 to 1.25 with speed)
@@ -413,6 +429,55 @@ export class Garage {
       const size = def.hover ? (rear ? 0.5 + 1.1 * k : 0.5) : (rear ? 0.5 + 0.7 * k : 0.7); // (ground vehicles top out at 1.2)
       this.game.fx.dust(p, back, n, up, 0xe8e2d8, size);
     }
+  }
+
+  // The APC's turret follows the camera: it swings about the hull's up axis to face where you look, and the
+  // barrel elevates to match, both at a limited rate. The point it converges on is where the aim ray meets the
+  // ground (or AIM_RANGE out), so a shell lands on the crosshair rather than parallel to it.
+  aimTurret(v, dt, cam) {
+    const g = this.game;
+    const m = v.model;
+    const a = v.aim || (v.aim = { yaw: 0, pitch: 0, recoil: 0, cd: 0 });
+    m.root.updateMatrixWorld(true);
+    // the spot on the aim ray: step along it until it goes below the ground
+    const end = _ap.copy(cam.position).addScaledVector(cam.look, AIM_RANGE);
+    for (let t = 12; t <= AIM_RANGE; t += 12) {
+      _am.copy(cam.position).addScaledVector(cam.look, t);
+      if (g.planet.altitude(_am) < 0) { end.copy(_am); break; }
+    }
+    // into the hull's frame: the turret yaws about its y, the barrel pitches about its x
+    const pivot = m.barrel.getWorldPosition(_am);
+    const d = _ad.copy(end).sub(pivot).applyQuaternion(_aq.copy(m.root.quaternion).invert());
+    const yawT = Math.atan2(d.x, d.z);
+    const pitchT = Math.max(TURRET_DOWN, Math.min(TURRET_UP, Math.atan2(d.y, Math.hypot(d.x, d.z))));
+    let dy = yawT - a.yaw;
+    dy -= Math.PI * 2 * Math.round(dy / (Math.PI * 2));
+    a.yaw += Math.max(-TURRET_YAW_RATE * dt, Math.min(TURRET_YAW_RATE * dt, dy));
+    a.pitch += Math.max(-TURRET_PITCH_RATE * dt, Math.min(TURRET_PITCH_RATE * dt, pitchT - a.pitch));
+    a.recoil = Math.max(0, a.recoil - dt * 3.2);
+    m.turret.rotation.y = a.yaw;
+    m.barrel.rotation.x = -a.pitch; // (+z is forward, so raising the barrel is a negative turn about x)
+    m.barrel.position.copy(m.barrelRest).z -= 0.35 * a.recoil * a.recoil; // (the cannon kicks back, then runs out)
+    m.root.updateMatrixWorld(true);
+  }
+
+  // Left mouse while driving the APC: a shell from the barrel, the way the barrel points (it may still be
+  // swinging round to your aim). Called from Player.updateWeapons instead of the runner's own weapons.
+  turretFire(dt, input) {
+    const g = this.game;
+    const P = g.player;
+    const v = P.vehicle;
+    if (!v || !v.aim) return;
+    const a = v.aim;
+    a.cd -= dt;
+    if (!input.mouse[0] || a.cd > 0 || !input.locked || P.dead || P.rag) return;
+    a.cd = 0.5;
+    a.recoil = 1;
+    const m = v.model;
+    m.root.updateMatrixWorld(true);
+    const muzzle = m.muzzle.getWorldPosition(new THREE.Vector3());
+    const dir = _am.set(0, 0, 1).applyQuaternion(m.muzzle.getWorldQuaternion(_aq)).clone();
+    fireCannon(g, muzzle, dir, v.e.body.vel, P.damageMult || 1);
   }
 
   // leave a parked vehicle where it is; keep it posed

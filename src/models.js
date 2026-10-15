@@ -8,6 +8,7 @@ import runnerGlb from './assets/runner.glb?inline';
 import shipsGlb from './assets/ships.glb?inline';
 import skimmerGlb from './assets/skimmer.glb?inline';
 import warrigGlb from './assets/warrig.glb?inline';
+import apcGlb from './assets/apc.glb?inline';
 import { Kit, T as KT, G as KG, D as KD, crate } from './outpostModels.js';
 
 function part(geo, mat, x = 0, y = 0, z = 0, outline = 0.05) {
@@ -1196,7 +1197,7 @@ const SHIP_FX = new Set(['plume', 'plumeCore', 'lift', 'engine', 'core']); // pe
 const FLAMES = new Set(['plume', 'plumeCore', 'lift']);
 export async function loadShipParts() {
   const loader = new GLTFLoader();
-  const [gltf, sk, wr] = await Promise.all([loader.loadAsync(shipsGlb), loader.loadAsync(skimmerGlb), loader.loadAsync(warrigGlb)]);
+  const [gltf, sk, wr, ap] = await Promise.all([loader.loadAsync(shipsGlb), loader.loadAsync(skimmerGlb), loader.loadAsync(warrigGlb), loader.loadAsync(apcGlb)]);
   SHIP_PARTS = {};
   for (const name of ['shuttle', 'freighter']) {
     const root = gltf.scene.getObjectByName(name);
@@ -1211,6 +1212,10 @@ export async function loadShipParts() {
   const rig = wr.scene.getObjectByName('warrig');
   if (!rig) throw new Error('warrig.glb has no warrig');
   SHIP_PARTS.warrig = bakeShip(rig);
+  // the Vostok BTR-M Moon APC (tools/blender/build_apc.py)
+  const apc = ap.scene.getObjectByName('apc');
+  if (!apc) throw new Error('apc.glb has no apc');
+  SHIP_PARTS.apc = bakeShip(apc);
 }
 
 function bakeShip(root) {
@@ -1470,6 +1475,52 @@ export function makeWarRig({ color = 0x7b2ff7, trim = 0x7dff3a } = {}) {
   root.position.set(0, 0, 0);
   root.quaternion.identity();
   return { root, chassis: out.chassis, gun: out.gun, wheels: out.wheels, anim: out.cloth.update };
+}
+
+// Vostok BTR-M Moon APC (built in Blender, see build_apc.py): eight wheels, a sloped hull, and a turret on
+// the roof. The pivots the vehicle code drives: chassis, turret (yawed about y to follow the camera), barrel
+// (a child of the turret, pitched about x), muzzle (an empty at the cannon's mouth, a child of the barrel)
+// and eight wheels. Body and stripe take the faction colours; the rest are fixed.
+const APC_TOON = { dark: 0x2a2540, steel: 0x55607a, tire: 0x1d1a29, olive: 0x5a6a3a };
+const APC_GLOW = { glass: 0xcfefff, lamp: 0xfff6a8, tail: 0xff2a4a, hot: 0xff9f1c };
+export function makeApc({ color = 0x6b6f78, trim = 0xff3b5c } = {}) {
+  const B = SHIP_PARTS.apc;
+  const mats = new Map();
+  const matFor = (slot) => {
+    if (!mats.has(slot)) {
+      mats.set(slot, slot === 'body' ? toon(color) : slot === 'stripe' ? toon(trim) : APC_GLOW[slot] !== undefined ? glow(APC_GLOW[slot]) : toon(APC_TOON[slot] ?? 0xff00ff));
+    }
+    return mats.get(slot);
+  };
+  const out = { chassis: null, turret: null, barrel: null, muzzle: null, wheels: [] };
+  const build = (node) => {
+    const g = new THREE.Group();
+    g.name = node.name;
+    g.position.copy(node.pos);
+    g.quaternion.copy(node.quat);
+    for (const { slot, geo } of node.parts) {
+      const m = new THREE.Mesh(geo, matFor(slot));
+      m.castShadow = APC_GLOW[slot] === undefined;
+      g.add(m);
+    }
+    if (node.ink) {
+      const h = new THREE.Mesh(node.ink, inkMat);
+      h.castShadow = false;
+      h.userData.isInk = true;
+      g.add(h);
+    }
+    if (node.role === 'wheel') out.wheels.push(g);
+    else if (node.role && node.role in out) out[node.role] = g;
+    for (const k of node.kids) g.add(build(k));
+    return g;
+  };
+  const root = build(B);
+  root.position.set(0, 0, 0);
+  root.quaternion.identity();
+  out.barrelRest = out.barrel.position.clone(); // (the recoil slides it back from here)
+  // dust is kicked from the four corners, not from all eight wheels
+  const dustSpots = [[-1.72, 2.15], [1.72, 2.15], [-1.72, -2.15], [1.72, -2.15]];
+  return { root, chassis: out.chassis, gun: out.turret, turret: out.turret, barrel: out.barrel, barrelRest: out.barrelRest, muzzle: out.muzzle, wheels: out.wheels, wheelR: 0.62, dustSpots };
 }
 
 // Shuttle-bus: a fat lifting-body hopper with a wraparound windscreen, porthole windows, two
