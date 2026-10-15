@@ -135,6 +135,7 @@ mesh("exhaustBand", xf(rbox(HX + 0.015, 0.025, HZ + 0.015, 0.15, 10, 4), (EX, EY
 mesh("exhaustLip", xf(rbox(HX + 0.03, 0.03, HZ + 0.03, 0.15, 10, 4), (EX, TOP - 0.01, EZ)), "dark", CH, 0.02)
 mesh("exhaustGlow", xf(rbox(HX + 0.005, 0.014, HZ + 0.005, 0.2, 10, 4), (EX, TOP + 0.03, EZ)), "hot", CH, 0)
 mesh("exhaustMouth", xf(rbox(HX - 0.05, 0.02, HZ - 0.04, 0.2, 8, 4), (EX, TOP + 0.04, EZ)), "dark", CH, 0)
+pivot("apc_exhaust", (EX, TOP + 0.06, EZ), CH, role="exhaust")  # (an empty at the mouth: the game puffs its smoke from here)
 for i, x in enumerate((-0.75, 0.0)):
     mesh(f"can{i}", xf(rbox(0.2, 0.26, 0.11, 0.2), (x, 2.5, -2.62), (0, 0, 0.05 * (1 - 2 * i))), "olive", CH, 0.03)
 # antennas on the rear deck: each whip is its own pivot at its base (role "antenna") so the game can lay it

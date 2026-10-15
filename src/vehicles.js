@@ -20,6 +20,7 @@ export const VEHICLES = {
 
 const _v = new THREE.Vector3(), _mu = new THREE.Vector3(), _mf = new THREE.Vector3();
 const _ap = new THREE.Vector3(), _am = new THREE.Vector3(), _ad = new THREE.Vector3(), _aq = new THREE.Quaternion();
+const _ex = new THREE.Vector3(), _exv = new THREE.Vector3();
 const RIDE_LIFT = 0.2; // the wheeled ones ride a touch above the physics ground: the tyres (and their ink outlines) reach below the model's origin, and sank into the terrain on slopes
 const REBUILD = 90; // seconds the orbital crane needs to replace a wrecked vehicle
 const CRASH_SAFE = 18; // m/s you can hit a wall at without hurting the vehicle
@@ -368,6 +369,7 @@ export class Garage {
     if (def.seatZ) P.body.pos.addScaledVector(_mf.set(0, 0, 1).applyQuaternion(mq), def.seatZ);
     v.riderQuat = mq;
     if (model.turret) this.aimTurret(v, dt, cam);
+    if (model.exhaust) this.exhaustSmoke(v, dt, fwdIn ? 1 : 0, up);
     P.body.vel.copy(b.vel);
     P.body.up.copy(up);
     P.body.groundN.copy(b.groundN);
@@ -460,6 +462,19 @@ export class Garage {
     m.barrel.rotation.x = -a.pitch; // (+z is forward, so raising the barrel is a negative turn about x)
     m.barrel.position.copy(m.barrelRest).z -= 0.35 * a.recoil * a.recoil; // (the cannon kicks back, then runs out)
     m.root.updateMatrixWorld(true);
+  }
+
+  // Black smoke from the APC's exhaust stack: a thin trickle at idle, a thick plume while you're on the power, each
+  // puff shrinking away within about half a second. It leaves rising and carried along with the vehicle, then
+  // the drag leaves it hanging behind as you move off.
+  exhaustSmoke(v, dt, thr, up) {
+    const m = v.model;
+    m.root.updateMatrixWorld(true);
+    const n = Math.floor((thr ? 60 : 16) * dt + Math.random());
+    if (!n) return;
+    m.exhaust.getWorldPosition(_ex);
+    _exv.copy(up).multiplyScalar(2.2 + 2.2 * thr).addScaledVector(v.e.body.vel, 0.85);
+    this.game.fx.spawn(_ex, _exv, { color: 0x0b0910, size: 0.3 + 0.22 * thr, life: 0.45 + 0.2 * thr, drag: 2.4, count: n, spread: 1.4 });
   }
 
   // Left mouse while driving the APC: a shell from the barrel, the way the barrel points (it may still be

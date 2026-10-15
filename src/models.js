@@ -1492,7 +1492,7 @@ export function makeApc({ color = 0x6b6f78, trim = 0xff3b5c } = {}) {
     }
     return mats.get(slot);
   };
-  const out = { chassis: null, turret: null, barrel: null, muzzle: null, wheels: [], antennas: [] };
+  const out = { chassis: null, turret: null, barrel: null, muzzle: null, exhaust: null, wheels: [], antennas: [] };
   const build = (node) => {
     const g = new THREE.Group();
     g.name = node.name;
@@ -1526,7 +1526,7 @@ export function makeApc({ color = 0x6b6f78, trim = 0xff3b5c } = {}) {
   const whips = out.antennas.map((g, i) => ({ g, a: 0, v: 0, ph: i * 2.1 }));
   let lastT = null;
   const model = {
-    root, chassis: out.chassis, gun: out.turret, turret: out.turret, barrel: out.barrel, barrelRest: out.barrelRest, muzzle: out.muzzle,
+    root, chassis: out.chassis, gun: out.turret, turret: out.turret, barrel: out.barrel, barrelRest: out.barrelRest, muzzle: out.muzzle, exhaust: out.exhaust,
     wheels: out.wheels, wheelR: 0.62, dustSpots, antennas: out.antennas, along: 0,
     anim(t, sp) {
       const dt = lastT == null ? 0 : Math.min(0.05, Math.max(0, t - lastT));
