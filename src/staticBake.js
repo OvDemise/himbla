@@ -165,7 +165,10 @@ function bakeParts(parts, faction, fixed) {
   }
   for (const b of buckets.values()) {
     const m = new THREE.Mesh(mergeGeometries(b.list), vcMaterial(proto(b.kind, b.side)));
-    m.castShadow = m.receiveShadow = b.kind === 'toon';
+    // (a moving part only casts: like the Kit's flags and dishes, a thin double-sided cloth that also received
+    // shadow would speckle with its own)
+    m.castShadow = b.kind === 'toon';
+    m.receiveShadow = fixed && b.kind === 'toon';
     if (fixed) m.userData.kitMesh = true; // (fixed in its structure's frame: world.mergeLocation may fold it in)
     for (const g of b.list) g.dispose();
     out.push(m);

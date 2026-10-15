@@ -34,7 +34,9 @@ Scene roots, one empty at the origin per variant, everything else a descendant:
 | `mast_wreck` | the same compound with the main building in ruins (shared yard props are repeated) |
 
 Blender appends `.001` to duplicate names; the game strips a trailing `.NNN` from material names, but keep node names
-unique anyway.
+unique anyway. Object names are unique across the whole file, so the wreck root cannot reuse `raid`, `smoke` or `drop`:
+name them `smoke_wreck`, `col_shed_wreck` and so on. The role is read from the custom property `role` (always set it),
+or failing that from the name up to the first `_` or digit.
 
 ## Meshes
 
@@ -98,6 +100,18 @@ Author an animated part's meshes relative to the node's origin.
 Off by default. Turn it on with `?outpostGlb` in the URL or `localStorage['mr-outpost-glb'] = '1'`. The dev viewer
 (`/tools/viewer.html?m=outpost&kind=mast`) shows it beside the Kit build with every collider drawn
 (`&src=kit|glb|both`, `&wreck=1`, `&cols=0`).
+
+## Rebuilding the file
+
+`tools/blender/build_outposts.py` builds the roots in code (a port of the Kit builders, like the other `build_*.py`) and
+exports the GLB. Run it inside Blender, or with Blender as a Python module (`pip install bpy` in a venv):
+
+```
+MOONRUNNER_REPO=<repo> python tools/blender/build_outposts.py     # MOONRUNNER_EXPORT=0 builds without writing
+```
+
+It is deterministic: running it again reproduces `src/assets/outposts.glb` byte for byte, so a diff in the committed file
+means the script or Blender changed. Nothing in CI runs it; `npm run check:outposts` checks the committed file.
 
 ## Adding a kind
 

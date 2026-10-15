@@ -285,3 +285,126 @@ def export(out, objects):
     props = bpy.ops.export_scene.gltf.get_rna_type().properties.keys()
     bpy.ops.export_scene.gltf(**{k: v for k, v in kw.items() if k in props})
     print("exported", out, os.path.getsize(out), "bytes")
+
+
+# ---------------- three.js-style primitives and smooth-shaded meshes (additive; build_outposts.py) ----------------
+# Same vertex layout as THREE.BoxGeometry / CylinderGeometry / SphereGeometry / TorusGeometry / PlaneGeometry, so a
+# port lines up with a build made from those in the game. Each returns (verts, faces, smooth) in three.js axes:
+# faces counter-clockwise seen from outside, and one smoothing group per face (0 = flat; n > 0 = faces of group n
+# share normals across their common edges; edges between different groups stay hard, like three.js's split caps).
+# Place one with place(), build it with mesh_smooth().
+
+from mathutils import Matrix
+
+
+def place(geo, m):
+    """Apply a 4x4 matrix (three.js axes) to a primitive."""
+    verts, faces, smooth = geo
+    return [tuple(m @ Vector(v)) for v in verts], faces, smooth
+
+
+def cuboid(w, h, d):
+    x, y, z = w / 2, h / 2, d / 2
+    v = [(-x, -y, -z), (x, -y, -z), (x, y, -z), (-x, y, -z), (-x, -y, z), (x, -y, z), (x, y, z), (-x, y, z)]
+    return v, [(4, 5, 6, 7), (1, 0, 3, 2), (5, 1, 2, 6), (0, 4, 7, 3), (3, 7, 6, 2), (0, 1, 5, 4)], [0] * 6
+
+
+def plane(w, h):
+    """A single quad in the xy plane facing +z."""
+    x, y = w / 2, h / 2
+    return [(-x, -y, 0.0), (x, -y, 0.0), (x, y, 0.0), (-x, y, 0.0)], [(0, 1, 2, 3)], [0]
+
+
+def cylinder(rt, rb, h, seg, open_ended=False):
+    """Axis y, centred; the first vertex of a ring is at +z and angles run towards +x (like THREE.CylinderGeometry)."""
+    verts = []
+
+    def ring(r, y):
+        if r <= 1e-9:  # a cone's apex
+            verts.append((0.0, y, 0.0))
+            return [len(verts) - 1] * seg
+        idx = []
+        for i in range(seg):
+            a = 2 * math.pi * i / seg
+            idx.append(len(verts))
+            verts.append((math.sin(a) * r, y, math.cos(a) * r))
+        return idx
+
+    top, bot = ring(rt, h / 2), ring(rb, -h / 2)
+    faces, smooth = [], []
+    for i in range(seg):
+        j = (i + 1) % seg
+        f = tuple(dict.fromkeys((bot[i], bot[j], top[j], top[i])))  # (drops the repeated apex index)
+        faces.append(f)
+        smooth.append(1)
+    if not open_ended:
+        if rt > 1e-9:
+            faces.append(tuple(top)); smooth.append(0)
+        if rb > 1e-9:
+            faces.append(tuple(reversed(bot))); smooth.append(0)
+    return verts, faces, smooth
+
+
+def sphere(r, wseg, hseg, theta_len=math.pi):
+    """Pole at +y, a cap when theta_len < pi (like THREE.SphereGeometry with phi = 2 pi, theta from 0)."""
+    verts, grid = [], []
+    for iy in range(hseg + 1):
+        th = theta_len * iy / hseg
+        rr, y = r * math.sin(th), r * math.cos(th)
+        if rr <= 1e-9:
+            verts.append((0.0, y, 0.0))
+            grid.append([len(verts) - 1] * wseg)
+            continue
+        row = []
+        for ix in range(wseg):
+            ph = 2 * math.pi * ix / wseg
+            row.append(len(verts))
+            verts.append((-rr * math.cos(ph), y, rr * math.sin(ph)))
+        grid.append(row)
+    faces = []
+    for iy in range(hseg):
+        for ix in range(wseg):
+            i2 = (ix + 1) % wseg
+            faces.append(tuple(dict.fromkeys((grid[iy][i2], grid[iy][ix], grid[iy + 1][ix], grid[iy + 1][i2]))))
+    return verts, faces, [1] * len(faces)
+
+
+def torus_arc(R, r, tubular, radial):
+    """A full ring lying in the x-z plane (axis y), like THREE.TorusGeometry(R, r, radial, tubular).rotateX(pi / 2)."""
+    verts, faces = [], []
+    for i in range(tubular):
+        u = 2 * math.pi * i / tubular
+        for k in range(radial):
+            v = 2 * math.pi * k / radial
+            rr = R + r * math.cos(v)
+            verts.append((rr * math.cos(u), -r * math.sin(v), rr * math.sin(u)))
+    for i in range(tubular):
+        i2 = (i + 1) % tubular
+        for k in range(radial):
+            k2 = (k + 1) % radial
+            faces.append((i * radial + k, i2 * radial + k, i2 * radial + k2, i * radial + k2))
+    return verts, faces, [1] * len(faces)
+
+
+def mesh_smooth(name, geo, slot, parent, ink=0.04):
+    """Like mesh(), for a primitive above: faces keep their winding (no recalculation) and edges are smooth only
+    inside a smoothing group, so cylinders are round with hard caps and boxes stay crisp."""
+    verts, faces, smooth = geo
+    bm = bmesh.new()
+    vs = [bm.verts.new(tb(v)) for v in verts]
+    for f, g in zip(faces, smooth):
+        bm.faces.new([vs[i] for i in f]).smooth = g > 0
+    bm.faces.index_update()
+    for e in bm.edges:
+        lf = e.link_faces
+        e.smooth = len(lf) < 2 or (smooth[lf[0].index] > 0 and smooth[lf[0].index] == smooth[lf[1].index])
+    me = bpy.data.meshes.new(name)
+    bm.to_mesh(me)
+    bm.free()
+    o = bpy.data.objects.new(name, me)
+    C.objects.link(o)
+    o.parent = parent
+    me.materials.append(material(slot))
+    o["ink"] = float(ink)
+    o["slot"] = slot
+    return o
