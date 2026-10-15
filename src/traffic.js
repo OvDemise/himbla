@@ -1126,16 +1126,16 @@ export class Traffic {
     // ---- the forecourt: a wide bed across the whole front, from under the plinth to the ring's inner lane ----
     // (x across the garage's front, z out from it; its edges run straight out from the hall's and the office's corners, then bend away
     // along the ring's inner edge: a quarter-ellipse each side. The bed is as wide as a road is long, so the shader is told the width)
-    const FX0 = -27, FX1 = 30;                       // the left corner (beside the pump island) and the right (past the office)
-    const FL0 = 20, FL1 = 14;                        // how far each edge swings out (the right stops short of the casino road's junction)
+    const FX0 = -(H.hx + 0.6), FX1 = 27.7;           // its edges at the garage are the building's own: the hall's plinth on the left, the office's end on the right
+    const TIP0 = -47, TIP1 = 44;                     // and where they have swung out to by the ring (the right stops short of the casino road's junction)
     const zA = H.hz + 0.2, zEnd = LZ0 + tLane - 1;   // (it begins under the plinth; it ends in the ring's bed, which melts it in)
     const sideAt = (z) => L2W(1, z).sub(L2W(0, z)).normalize();
     const N = 18;
-    const fc = { x0: FX0 - FL0, x1: FX1 + FL1 };     // (across its widest, where it meets the ring)
+    const fc = { x0: TIP0, x1: TIP1 };               // (across its widest, where it meets the ring)
     const baseF = this.roadGeo.pos.length / 3;
     for (let k = 0; k <= N; k++) {
       const th = (k / N) * Math.PI / 2, z = zA + (zEnd - zA) * Math.sin(th), e = 1 - Math.cos(th);
-      const xl = FX0 - FL0 * e, xr = FX1 + FL1 * e;
+      const xl = FX0 + (TIP0 - FX0) * e, xr = FX1 + (TIP1 - FX1) * e;
       const centre = L2W((xl + xr) / 2, z), sv = sideAt(z), h = (xr - xl) / 2;
       const fade = smooth((zEnd - z) / 5);
       const berm = smooth((zEnd - 3.5 - z) / 3);
@@ -2214,9 +2214,9 @@ export class Traffic {
       const nx = v.plan[0];
       if (nx && nx.vlim < limit) limit = Math.min(limit, nx.vlim + Math.sqrt(2 * 1.5 * Math.max(0, pc.len - v.s - v.front)));
       // whoever is ahead on this piece or the next (land-trains and buggies queue; hover-cars hop over)
-      const scan = (list, base) => {
+      const scan = (list, base, from = 0) => {
         for (const o of list) {
-          if (o === v || o.captured > 0) continue;
+          if (o === v || o.captured > 0 || o.s < from) continue;
           const gap = base + o.s - v.s;
           if (v.kind === 'car') {
             if (gap > -(o.front + v.tail + 3) && gap < o.tail + v.front + 12) over = Math.max(over, o.kind === 'landtrain' ? 6.5 : o.kind === 'car' ? 2.6 : 4.5);
@@ -2227,13 +2227,13 @@ export class Traffic {
         }
       };
       scan(pc.vehicles, 0);
-      if (nx) scan(nx.vehicles, pc.len);
+      if (nx) scan(nx.vehicles, pc.len - (pc.joinTo === nx ? pc.joinS : 0), pc.joinTo === nx ? pc.joinS - 2 : 0); // (a road merging part-way sees only what is past the merge)
       // pull in at the destination's shelter
       // pull in at the destination's ring stop (it may be a few pieces ahead yet)
       const fin = v.plan.length ? v.plan[v.plan.length - 1] : pc, st = fin.stop;
       if (st && st.loc === v.dest && v.plan.length <= 4) {
         let toStop = st.s - v.s;
-        if (fin !== pc) { toStop = pc.len - v.s + st.s; for (let i = 0; i < v.plan.length - 1; i++) toStop += v.plan[i].len; }
+        if (fin !== pc) { toStop = pc.len - v.s + st.s - (pc.joinTo === v.plan[0] ? pc.joinS : 0); for (let i = 0; i < v.plan.length - 1; i++) toStop += v.plan[i].len; }
         if (toStop > -2) {
           limit = Math.min(limit, 0.6 + Math.sqrt(2 * 1.2 * Math.max(0, toStop - 0.3)));
           if (v.pax && toStop < 300) this.queueBoarders(st, v);
@@ -2326,10 +2326,17 @@ export class Traffic {
   // (trailers), or on into the next one (front axle).
   at(v, s, out, h, nOut) {
     let p = v.piece;
-    if (s < 0) {
-      for (const q of v.hist) { p = q; s += q.len; if (s >= 0) break; }
-      if (s < 0) s = 0;
-    } else if (s > p.len && v.plan[0]) { s -= p.len; p = v.plan[0]; }
+    // (a road that merges onto a piece part-way, like the garage road onto the ring, meets it `joinS` along: behind that point
+    // is the road the vehicle came by, and beyond the road's end is the piece from `joinS`, not from its start)
+    let back = 0;
+    for (;;) {
+      const q = v.hist[back];
+      const from = q && q.joinTo === p ? q.joinS : 0;
+      if (s >= from || !q) break;
+      s = q.len - (from - s); p = q; back++;
+    }
+    if (s < 0) s = 0;
+    if (!back && s > p.len && v.plan[0]) { s -= p.len; if (p.joinTo === v.plan[0]) s += p.joinS; p = v.plan[0]; }
     if (h.p !== p) { h.p = p; h.i = s > p.len * 0.5 ? p.path.pts.length - 2 : 0; }
     sample(p.path, s, out, h);
     return nOut.copy(p.normals[h.i]).lerp(p.normals[h.i + 1], h.f);
