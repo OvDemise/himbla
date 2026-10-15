@@ -429,8 +429,9 @@ container racks down both flanks, swept radiator wings and a four-bell engine cl
 it's headed). You ride inside while the camera hangs back to watch the ship; press `F` again to hop out down the ramp,
 or bail out mid-flight through the side hatch (keeping the ship's speed, with a little style for the nerve). Passengers walk off toward town, the queue
 at the shelter walks up and boards, and the doors close before it leaves; arriving passengers walk to real
-building entrances. Safe settlements are joined by a network of 12 pre-driven **dirt roads** (worn ruts,
-marker posts) that merge into a big **ring road** around each town, with one stop shelter on the ring. Big six-wheeled **land-trains**,
+building entrances. Safe settlements are joined by a network of 14 pre-driven **highways** (two 7.4 m lanes of
+sintered-regolith slab with a dashed amber centre line, white edge lines, reflector studs and delineator posts, wide enough for two
+land-trains to pass) that merge into a big **ring road** around each town, with one stop shelter on the ring. Big six-wheeled **land-trains**,
 hover-cars and buggies each pick a destination town: some pass straight through towns, others stop to
 swap passengers and then head somewhere new. There are two land-train services, each painted for the faction whose
 towns it joins (SpaceCom white and yellow, Vostok slate and red, Kepler orange and cream, Meridian cyan and cream, each with the
@@ -680,7 +681,7 @@ src/
   world.js       sky, settlement layout, colliders, ambient life
   settlements.js detailed settlements, HQs and landmarks built with the outpost kit (moving parts, skate park)
   market.js      the Meridian Exchange's stocks: a random-walk market refreshed every 15 s (exchangeBoard.js: the tower's big board)
-  traffic.js     landing pads, ship/bus flights and passengers, dirt roads, land-trains, cars, buggies
+  traffic.js     landing pads, ship/bus flights and passengers, roads, land-trains, cars, buggies
   wardrobe.js    wardrobe screen with live 3D preview
   trailer.js     trailer director mode (?trailer): the official trailer, shot by shot, from live gameplay
   models.js      stylised characters and vehicles from primitives; loads the Blender runner and ships

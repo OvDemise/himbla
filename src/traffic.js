@@ -7,7 +7,7 @@ import { SUN, frameQuat, arcDist } from './geo.js';
 
 // Ambient traffic: freighters and shuttle-buses that land on real pads at the edge of each
 // settlement (passengers walk off to the town's buildings, others come out to board), plus a
-// network of dirt roads joining the safe outposts (through or round each town) with land-trains,
+// network of highways joining the safe outposts (through or round each town) with land-trains,
 // hover-cars and buggies driving routes over it. Land-trains and buggies can be wrecked.
 //
 // Vehicle kinds in world.vehicles: 'ship' (freighter), 'bus' (shuttle), 'car' (hover-car, on
@@ -22,8 +22,11 @@ const clamp01 = (t) => Math.min(1, Math.max(0, t));
 const SAFE_ROAD = 2500; // connect safe outposts closer than this (plus each one's nearest neighbour < 3 km)
 const LINK_MAX = 3000; // nearest / second-nearest links up to this long
 const PAX_RANGE = 500; // passengers only exist near the camera
-const LANE = 2.4; // lane offset from the road centreline (right-hand traffic)
-const ROAD_LAT = [-5, -2.5, 0, 2.5, 5];
+// A land-train is 5.4 m across the tyres (2.7 each side of its centreline), so two pass with 2.2 m between them:
+// lane centres 3.8 m off the centreline, paving out to 7.4, then a gravel shoulder and a low dust berm to 9.
+const LANE = 3.8; // lane offset from the road centreline (right-hand traffic)
+const ROAD_HALF = 9; // half the drawn strip, metres
+const ROAD_LAT = [-9, -7.4, -3.8, 0, 3.8, 7.4, 9]; // (the strip is sampled onto the ground at these offsets)
 // squared distance from point c to the segment a-b
 function segDist2(a, b, c) {
   const abx = b.x - a.x, aby = b.y - a.y, abz = b.z - a.z;
@@ -39,10 +42,10 @@ const _z = new THREE.Vector3(0, 0, 1);
 // ring roads round each connected town
 const RING_GAP = 32; // ring centreline this far outside the settlement radius (past buildings / plateau edge)
 const RING_PUSH = 90; // pushed out up to this much more where something is in the way
-const JOIN = 18; // junction connectors join the ring this far along it either side of a road
-const JOIN_OUT = 20; // ...and leave the road lanes this far out from the ring
-const GATE_SEP = 80; // minimum ring distance between two junctions
-const FILLET = 16; // drawn flare at each junction
+const JOIN = 24; // junction connectors join the ring this far along it either side of a road
+const JOIN_OUT = 26; // ...and leave the road lanes this far out from the ring
+const GATE_SEP = 90; // minimum ring distance between two junctions
+const FILLET = 24; // drawn flare at each junction
 // Roads that were cut, and roads that end in a T on another road instead (buildSpur): the ILMB's
 // three roads east to Meridian, south-east to Tranquility and west to Aldrin became one road that
 // meets the Meridian-Tranquility road side-on, and traffic splits there.
@@ -51,7 +54,7 @@ const TEES = [{ from: 'ilmb', on: ['meridian', 'tranq'] }];
 // Roads laid by hand to places the network above leaves out: the Vostok supply road, from the Helium-3 exchange
 // into the restricted zone round Bastion Vostok-9 (the only road that reaches a restricted base)
 const EXTRA_ROADS = [['mine', 'vostok']];
-const T_ARM = 24; // metres from a T's centre where the lanes stop and the turning connectors take over
+const T_ARM = 30; // metres from a T's centre where the lanes stop and the turning connectors take over
 const STOP_IN = 50; // the stop is at least this far along its stretch of ring (room for a land-train)
 
 function part(geo, mat, x = 0, y = 0, z = 0, outline = 0.05) {
@@ -105,9 +108,9 @@ function roadMaterial() {
   return new THREE.ShaderMaterial({
     transparent: true, depthWrite: false, side: THREE.DoubleSide,
     uniforms: { sunDir: { value: SUN.clone() } },
-    vertexShader: `uniform vec3 sunDir; attribute float fade; varying vec2 vUv; varying float vLit; varying float vFade; varying float vEnd;
+    vertexShader: `uniform vec3 sunDir; attribute float fade; attribute float mark; varying vec2 vUv; varying float vLit; varying float vFade; varying float vEnd; varying float vMark;
       void main(){
-        vUv = uv; vEnd = fade;
+        vUv = uv; vEnd = fade; vMark = mark;
         vec4 wp = modelMatrix * vec4(position, 1.0);
         vec3 toCam = cameraPosition - wp.xyz; float dist = length(toCam);
         // pull toward the eye (screen position unchanged) so coarse terrain LODs never swallow the track
@@ -116,25 +119,49 @@ function roadMaterial() {
         vFade = 1.0 - smoothstep(2300.0, 2900.0, dist);
         gl_Position = projectionMatrix * viewMatrix * wp;
       }`,
-    fragmentShader: `varying vec2 vUv; varying float vLit; varying float vFade; varying float vEnd;
+    fragmentShader: `varying vec2 vUv; varying float vLit; varying float vFade; varying float vEnd; varying float vMark;
       float h1(float n){ return fract(sin(n) * 43758.5453); }
       float n1(float x){ float i = floor(x), f = fract(x); f = f * f * (3.0 - 2.0 * f); return mix(h1(i), h1(i + 1.0), f); }
+      // The Moon highway: a sintered-regolith carriageway (two 7.4 m lanes of slab paving, darker where the wheels run,
+      // a joint every 12 m), a dashed amber centre line with a reflector stud in each gap, white edge lines worn by dust,
+      // then a gravel shoulder and a low pale berm of swept dust. Metres across (X) and along (s) the road.
       void main(){
-        float X = vUv.x * 5.0, s = vUv.y, ax = abs(X);
+        float X = vUv.x * ${ROAD_HALF.toFixed(1)}, s = vUv.y, ax = abs(X);
         float n = n1(s * 0.11) * 0.6 + n1(s * 0.53 + 17.0) * 0.4;
-        float ne = n1(s * 0.31 + sign(X) * 41.0);
-        float wob = (n1(s * 0.07 + 3.0) - 0.5) * 0.5;
-        float band = 1.0 - smoothstep(2.6 + ne * 1.8, 4.9, ax);
-        float xr = abs(X + wob);
-        float rd = min(abs(xr - 1.15), abs(xr - 3.7));
-        float rut = (1.0 - smoothstep(0.08, 0.4, rd)) * (0.55 + 0.45 * n1(s * 0.8 + X * 3.0));
-        float berm = smoothstep(3.6 + ne, 4.3 + ne * 0.5, ax) * (1.0 - smoothstep(4.5, 5.0, ax));
-        vec3 col = mix(vec3(0.13, 0.115, 0.125), vec3(0.035, 0.03, 0.045), rut);
-        col = mix(col, vec3(0.75, 0.7, 0.62), berm * 0.6);
-        float a = band * (0.5 + 0.25 * n);
-        a = max(a, rut * 0.85 * band);
-        a = max(a, berm * 0.35);
+        float ne = n1(s * 0.29 + sign(X) * 41.0);
+        float lap = fract(s / 12.0);
+        // carriageway, its edge ragged where dust has drifted over it
+        float edge = 7.45 + (ne - 0.5) * 0.6;
+        float pave = 1.0 - smoothstep(edge - 0.2, edge + 0.2, ax);
+        vec3 slab = mix(vec3(0.215, 0.215, 0.285), vec3(0.165, 0.165, 0.225), n);
+        // wheel tracks: a darker, polished band under each lane's tyres
+        float wt = min(abs(ax - 1.9), abs(ax - 5.7));
+        float track = (1.0 - smoothstep(0.3, 0.85, wt)) * (0.55 + 0.45 * n1(s * 0.7 + ax * 2.0));
+        slab = mix(slab, vec3(0.1, 0.1, 0.15), track * 0.7);
+        // panel joints
+        float dj = min(lap, 1.0 - lap) * 12.0;
+        slab = mix(slab, vec3(0.05, 0.05, 0.08), (1.0 - smoothstep(0.05, 0.14, dj)) * 0.8);
+        // paint
+        float wear = smoothstep(0.12, 0.45, n1(s * 0.41 + ax * 0.7 + 5.0));
+        float dash = step(lap, 5.0 / 12.0);
+        float centre = (1.0 - smoothstep(0.14, 0.2, ax)) * dash;
+        float sideLn = 1.0 - smoothstep(0.12, 0.2, abs(ax - 6.9));
+        float stud = 1.0 - smoothstep(0.1, 0.2, length(vec2(ax, (lap - 8.5 / 12.0) * 12.0)));
+        float mk = vMark * wear;
+        vec3 col = slab;
+        col = mix(col, vec3(0.94, 0.94, 0.97), sideLn * mk * 0.92);
+        col = mix(col, vec3(1.0, 0.8, 0.2), centre * mk * 0.95);
+        // shoulder gravel and the dust berm
+        float gravel = (1.0 - smoothstep(8.2 + ne * 0.5, 9.0, ax)) * (1.0 - pave);
+        float berm = smoothstep(7.9, 8.4, ax) * (1.0 - smoothstep(8.55, 9.0, ax));
+        col = mix(col, vec3(0.34, 0.325, 0.37), gravel);
+        col = mix(col, vec3(0.78, 0.74, 0.68), berm * 0.7);
+        float a = max(pave * 0.94, max(gravel * 0.5 * (0.75 + 0.25 * n), berm * 0.34));
         col *= 0.22 + 0.85 * vLit;
+        // paint and studs are reflective: they still read on the dark side
+        col += vec3(0.95, 0.9, 0.7) * (sideLn + centre) * mk * (1.0 - vLit) * 0.22;
+        col = mix(col, vec3(1.0, 0.62, 0.16), stud * vMark);
+        a = max(a, stud * vMark);
         gl_FragColor = vec4(col, a * vFade * vEnd);
       }`,
   });
@@ -520,7 +547,7 @@ export class Traffic {
     }
     for (const [a, b] of CUT_ROADS) if (this.L[a] && this.L[b]) pairs.delete(key(this.L[a], this.L[b]));
     for (const [a, b] of EXTRA_ROADS) if (this.L[a] && this.L[b]) pairs.add(key(this.L[a], this.L[b]));
-    this.roadGeo = { pos: [], uv: [], fade: [], idx: [] };
+    this.roadGeo = { pos: [], uv: [], fade: [], mark: [], idx: [] };
     this.posts = [];
     this.pieces = [];
     this.mapLines = []; // every road and town ring as a thin polyline of unit directions, for the maps
@@ -547,6 +574,7 @@ export class Traffic {
     geo.setAttribute('position', new THREE.Float32BufferAttribute(G.pos, 3));
     geo.setAttribute('uv', new THREE.Float32BufferAttribute(G.uv, 2));
     geo.setAttribute('fade', new THREE.Float32BufferAttribute(G.fade, 1));
+    geo.setAttribute('mark', new THREE.Float32BufferAttribute(G.mark, 1));
     geo.setIndex(G.idx);
     geo.computeBoundingSphere();
     const mesh = new THREE.Mesh(geo, roadMaterial());
@@ -556,18 +584,20 @@ export class Traffic {
     this.w.scene.add(mesh);
     this.roadMesh = mesh;
     this.roadGeo = null;
-    // marker posts with reflective tips: two instanced draw calls for every road
+    // delineator posts every ~110 m: a white post with a dark band, an amber reflector looking up and down the road
+    // (and a lit cap), set clear of the shoulder; three instanced draw calls for every road
     const n = this.posts.length;
     if (n) {
-      const postM = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.12, 0.16, 1.6, 6).translate(0, 0.8, 0), toon(0xe8e4f4), n);
-      const tipM = new THREE.InstancedMesh(new THREE.BoxGeometry(0.3, 0.35, 0.3).translate(0, 1.7, 0), glow(0xff9f1c), n);
+      const postM = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.11, 0.15, 1.8, 6).translate(0, 0.9, 0), toon(0xe8e4f4), n);
+      const bandM = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.16, 0.16, 0.34, 6).translate(0, 1.4, 0), toon(0x2a2540), n);
+      const lensM = new THREE.InstancedMesh(new THREE.BoxGeometry(0.2, 0.24, 0.46).translate(0, 1.4, 0), glow(0xff9f1c), n);
+      const capM = new THREE.InstancedMesh(new THREE.BoxGeometry(0.2, 0.12, 0.2).translate(0, 1.86, 0), glow(0xfff6a8), n);
       const one = new THREE.Vector3(1, 1, 1);
       this.posts.forEach((p, i) => {
         _m4.compose(p.pos, p.q, one);
-        postM.setMatrixAt(i, _m4);
-        tipM.setMatrixAt(i, _m4);
+        for (const m of [postM, bandM, lensM, capM]) m.setMatrixAt(i, _m4);
       });
-      for (const m of [postM, tipM]) { m.frustumCulled = false; m.matrixAutoUpdate = false; this.w.scene.add(m); }
+      for (const m of [postM, bandM, lensM, capM]) { m.frustumCulled = false; m.matrixAutoUpdate = false; this.w.scene.add(m); }
       postM.castShadow = true;
     }
     this.posts = null;
@@ -604,14 +634,14 @@ export class Traffic {
     return (this._chunks = out);
   }
 
-  // Can a 10 m road run over local (x,z)? Exact contact tests against colliders plus the keep-out
-  // footprints (pads, solar fields, lamps, turret spots).
+  // Can an 18 m road (the paving and its shoulders) run over local (x,z)? Exact contact tests against
+  // colliders plus the keep-out footprints (pads, solar fields, lamps, turret spots).
   roadClear(loc, x, z, keeps) {
-    if (keeps.some((k) => Math.hypot(x - k.x, z - k.z) < k.r + 5)) return false;
+    if (keeps.some((k) => Math.hypot(x - k.x, z - k.z) < k.r + 8)) return false;
     const y = this.groundY(loc, x, z);
     for (const h of [2, 5]) {
       this.w.toWorld(loc, x, y + h, z, _c);
-      if (this.blocked(_c, 3.6)) return false;
+      if (this.blocked(_c, 5.5)) return false;
     }
     return true;
   }
@@ -704,14 +734,16 @@ export class Traffic {
 
   // Visible track: a strip of 5 ground-hugging samples across 10 m along a ground polyline.
   // `fade` (0..1) lets a strip melt into another one it overlaps (junction flares, road ends).
-  stripPush(centre, sideV, s, vScale = 1, fade = 1) {
+  // `mark` (0..1) is how much of the lane paint shows (none on junction flares and where roads meet rings).
+  stripPush(centre, sideV, s, vScale = 1, fade = 1, mark = 1) {
     const G = this.roadGeo;
     for (const o of ROAD_LAT) {
       _b.copy(centre).addScaledVector(sideV, o * vScale);
       this.P.ground(_b, _b, 0.04);
       G.pos.push(_b.x, _b.y, _b.z);
-      G.uv.push(o / 5, s);
+      G.uv.push(o / ROAD_HALF, s);
       G.fade.push(fade);
+      G.mark.push(mark);
     }
   }
 
@@ -744,7 +776,7 @@ export class Traffic {
   drawLine(g, s0 = 0, vScale = 1, fadeAt = null) {
     const { side, cum } = this.frames(g);
     const base = this.roadGeo.pos.length / 3;
-    for (let i = 0; i < g.length; i++) this.stripPush(g[i], side[i], s0 + cum[i], vScale, fadeAt ? fadeAt(i / (g.length - 1)) : 1);
+    for (let i = 0; i < g.length; i++) this.stripPush(g[i], side[i], s0 + cum[i], vScale, fadeAt ? fadeAt(i / (g.length - 1)) : 1, 0);
     this.stripIdx(base, g.length);
   }
 
@@ -842,13 +874,16 @@ export class Traffic {
     while (i0 < N && cum[i0] < 2.5) i0++;
     while (i1 > 0 && cum[N] - cum[i1] < 2.5) i1--;
     const base = this.roadGeo.pos.length / 3;
-    for (let i = i0; i <= i1; i++) this.stripPush(g[i], side[i], cum[i], 1, smooth((Math.min(cum[i], cum[N] - cum[i]) - 2.5) / 7));
+    for (let i = i0; i <= i1; i++) {
+      const e = Math.min(cum[i], cum[N] - cum[i]);
+      this.stripPush(g[i], side[i], cum[i], 1, smooth((e - 2.5) / 7), smooth((e - 12) / 16));
+    }
     this.stripIdx(base, i1 - i0 + 1);
-    // marker posts every ~110 m, alternating sides
+    // delineator posts every ~110 m, alternating sides
     for (let s = 60, k = 0; s < cum[N] - 60; s += 110, k++) {
       let i = 0;
       while (i < N && cum[i] < s) i++;
-      const p = g[i].clone().addScaledVector(side[i], k % 2 ? 6.5 : -6.5);
+      const p = g[i].clone().addScaledVector(side[i], k % 2 ? 10 : -10);
       P.ground(p, p);
       this.posts.push({ pos: p, q: frameQuat(dirs[i], tan[i], new THREE.Quaternion()) });
     }
@@ -856,7 +891,7 @@ export class Traffic {
     for (const [loc, from] of ends) {
       for (let k = 0; k <= N && (from ? cum[k] : cum[N] - cum[N - k]) < 90; k += 2) {
         const p = this.local(loc, g[from ? k : N - k], _a);
-        loc.stopKeep.push({ x: p.x, z: p.z, r: 6 });
+        loc.stopKeep.push({ x: p.x, z: p.z, r: 10 });
       }
     }
   }
@@ -1005,7 +1040,10 @@ export class Traffic {
       let s = 0;
       for (let i = 0; i <= M; i++) {
         if (i) s += W[wrap(i)].distanceTo(W[i - 1]);
-        this.stripPush(W[wrap(i)], side[wrap(i)], s);
+        // (no lane paint for ~30 m either side of a junction, where the road's flare takes over)
+        let dg = Infinity;
+        for (const e of R.gates) { const d = Math.abs(e.i - wrap(i)); dg = Math.min(dg, Math.min(d, M - d) * R.step); }
+        this.stripPush(W[wrap(i)], side[wrap(i)], s, 1, 1, smooth((dg - 24) / 14));
       }
       this.stripIdx(base, M + 1);
     }
@@ -1029,18 +1067,18 @@ export class Traffic {
         this.drawLine(this.bez(q, tIn, W[wrap(j)], laneT(d, j), 10, 0.5), 0, 0.85, (t) => smooth(t / 0.3) * smooth((1 - t) / 0.3));
       }
     }
-    // marker posts on the outside of the ring, away from the junctions
+    // delineator posts on the outside of the ring, away from the junctions
     const outSide = -R.din;
     const near = (i, list, dist) => list.some((gi) => { const d = Math.abs(gi - i); return Math.min(d, M - d) * R.step < dist; });
     const postEvery = Math.max(8, Math.round(95 / R.step));
     for (let i = 0; i < M; i += postEvery) {
       if (near(i, gates.map((e) => e.i), 34)) continue;
-      const p = W[i].clone().addScaledVector(side[i], 6.5 * outSide);
+      const p = W[i].clone().addScaledVector(side[i], 10 * outSide);
       P.ground(p, p);
       this.posts.push({ pos: p, q: frameQuat(W[i].clone().normalize(), tan[i], new THREE.Quaternion()) });
     }
     // pads (laid out after the roads) keep off the ring
-    for (let i = 0; i < M; i += 2) { const p = this.ringLocal(R, i); loc.stopKeep.push({ x: p.x, z: p.z, r: 6 }); }
+    for (let i = 0; i < M; i += 2) { const p = this.ringLocal(R, i); loc.stopKeep.push({ x: p.x, z: p.z, r: 10 }); }
     if (!n) return;
     // ---- pieces ----
     const span = (d, from, to) => { const out = []; for (let i = from; d > 0 ? i <= to : i >= to; i += d) out.push(lane(d, i)); return out; };
@@ -1116,9 +1154,9 @@ export class Traffic {
       for (let j = lo; j <= hi; j += 2) {
         const i = wrap(pc.i0 + d * j);
         const p = this.ringLocal(R, i);
-        // shelter 9 m in from the centreline, toward the town
+        // shelter 12 m in from the centreline, toward the town (clear of a land-train in the stop lane, 6.5 m out)
         const ux = Math.cos(p.a), uz = Math.sin(p.a);
-        const sx = p.x - ux * 9, sz = p.z - uz * 9;
+        const sx = p.x - ux * 12, sz = p.z - uz * 12;
         if (keeps.some((k) => Math.hypot(sx - k.x, sz - k.z) < k.r + 2.5)) continue;
         this.w.toWorld(loc, sx, this.groundY(loc, sx, sz) + 1.5, sz, _c);
         if (this.blocked(_c, 2.4)) continue;
@@ -1133,7 +1171,7 @@ export class Traffic {
       const pc = R.arcs[d].reduce((p, q) => (q.len > p.len ? q : p));
       const i = wrap(pc.i0 + d * Math.round(Math.abs(pc.i1 - pc.i0) * 0.6));
       const p = this.ringLocal(R, i);
-      best = { pc, i, sx: p.x - Math.cos(p.a) * 9, sz: p.z - Math.sin(p.a) * 9 };
+      best = { pc, i, sx: p.x - Math.cos(p.a) * 12, sz: p.z - Math.sin(p.a) * 12 };
       console.warn('[traffic] no open shelter spot on the ring at', loc.id);
     }
     const pc = best.pc, path = pc.path;
