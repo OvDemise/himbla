@@ -12,9 +12,10 @@ import { slotOf, roleOf, animOf, SHAPES } from './staticContract.js';
 //   bakeStatic(asset, { color })  an asset -> the template for one faction colour
 //
 // Like the runner and ship bakes (models.js) only geometry is read: positions, normals, the index,
-// each mesh's material name and flat base colour, and the `ink` extra. The game's own toon material
-// does the shading. Unlike them the result is vertex-coloured, so a structure of hundreds of Blender
-// objects bakes to a handful of meshes (one lit, one unlit, one outline hull), as Kit.finish does.
+// each mesh's material name, flat base colour (and alpha, for a light beam) and double-sided flag, and the `ink`
+// extra. The game's own toon material does the shading. Unlike them the result is vertex-coloured, so a structure
+// of hundreds of Blender objects bakes to a handful of meshes (lit and unlit, one outline hull, the beams, and a
+// few of their own per moving part), as Kit.finish does.
 
 const _p = new THREE.Vector3(), _q = new THREE.Quaternion(), _s = new THREE.Vector3(), _z = new THREE.Vector3();
 const ZAXIS = new THREE.Vector3(0, 0, 1), YAXIS = new THREE.Vector3(0, 1, 0);
@@ -150,20 +151,29 @@ function gameplay(asset, role, node, inv, warn) {
 // ---------------------------------------------------------------- bake
 // The shell of an outline: a copy of the geometry pushed out along its smoothed normals (normals are
 // averaged over the vertices that share a position, so seams stay closed), as models.js does for the runner.
+// A hard edge or corner (a box's) is pushed out further (mitred, at most twice) so that each face moves out by
+// the full `t`, as the Kit's outline hull does; along the plain average they would only move t/sqrt(3) (a corner)
+// or t/sqrt(2) (an edge), and the line would come out thinner than the Kit's.
+const MITRE_MIN = 0.5;
 function inkShell(geo, t) {
   const pos = geo.attributes.position, nor = geo.attributes.normal, n = pos.count;
   const key = (i) => `${Math.round(pos.getX(i) * 1e4)},${Math.round(pos.getY(i) * 1e4)},${Math.round(pos.getZ(i) * 1e4)}`;
   const sum = new Map();
   for (let i = 0; i < n; i++) {
     const k = key(i);
-    const s = sum.get(k) || [0, 0, 0];
+    const s = sum.get(k) || [0, 0, 0, 1, 1]; // (x, y, z, the least dot of the average with a face normal, the average's length)
     s[0] += nor.getX(i); s[1] += nor.getY(i); s[2] += nor.getZ(i);
     sum.set(k, s);
   }
+  for (const s of sum.values()) s[4] = Math.hypot(s[0], s[1], s[2]) || 1;
+  for (let i = 0; i < n; i++) {
+    const s = sum.get(key(i)), l = Math.hypot(nor.getX(i), nor.getY(i), nor.getZ(i)) || 1;
+    s[3] = Math.min(s[3], (s[0] * nor.getX(i) + s[1] * nor.getY(i) + s[2] * nor.getZ(i)) / (s[4] * l));
+  }
   const out = new Float32Array(n * 3);
   for (let i = 0; i < n; i++) {
-    const s = sum.get(key(i)), l = Math.hypot(s[0], s[1], s[2]) || 1;
-    out[i * 3] = pos.getX(i) + (s[0] / l) * t; out[i * 3 + 1] = pos.getY(i) + (s[1] / l) * t; out[i * 3 + 2] = pos.getZ(i) + (s[2] / l) * t;
+    const s = sum.get(key(i)), d = t / (s[4] * Math.max(MITRE_MIN, s[3]));
+    out[i * 3] = pos.getX(i) + s[0] * d; out[i * 3 + 1] = pos.getY(i) + s[1] * d; out[i * 3 + 2] = pos.getZ(i) + s[2] * d;
   }
   const g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.BufferAttribute(out, 3));

@@ -2,7 +2,8 @@
 
 The small faction structures (watchtower, depot, farm dome, relay mast, kiosk, scrap shack, junk pile) are built in
 code by `Kit` (`src/outpostModels.js`). This is the contract for building one in Blender instead. It is a **pilot**:
-the Relay Mast (`mast`) is the first kind to go through it, and it is **off by default** (see "Switching it on").
+two kinds have gone through it so far, the Relay Mast (`mast`) and the Watchtower (`tower`), the other five are still
+Kit-built, and it is **off by default** (see "Switching it on").
 
 Read the file with `src/outpostGlb.js`, bake it with `src/staticBake.js`, check it with `npm run check:outposts`.
 
@@ -13,9 +14,11 @@ y = 0, the yard's centre at the origin, +z towards the gate). `territory.js` clo
 every entry of `cols`, damages the building when a blast reaches a box in `hits`, lets you raid it at `raid`, makes
 the wreck smoulder at `smoke` and throws loot to `drop`. A GLB supplies all of that:
 
-- **Geometry** is baked once per kind × faction colour × wreck into a handful of merged meshes: one vertex-coloured
-  toon mesh, one unlit glow mesh, one outline hull. Hundreds of Blender objects cost the same as a Kit build
-  (about a dozen draw calls).
+- **Geometry** is baked once per kind × faction colour × wreck into a handful of merged meshes: vertex-coloured toon
+  and unlit glow meshes (one more of each for a double-sided material), one outline hull, one mesh per `additive…`
+  colour and opacity, a set of its own for every moving part, and a face or two per sign. Hundreds of Blender objects
+  cost the same as a Kit build: 8 to 13 draw calls (the Relay Mast 13, the Watchtower 11, either wreck 8;
+  `npm run check:outposts` prints the count for each root).
 - **Gameplay data** (`cols`, `hits`, `raid`, `smoke`, `drop`) comes from **empties**, not from the visible meshes.
   Collision is never read from a mesh: draw the building however you like, then place the colliders by hand.
 
@@ -30,21 +33,24 @@ Scene roots, one empty at the origin per variant, everything else a descendant:
 
 | Root | Meaning |
 |---|---|
-| `mast` | the intact compound |
-| `mast_wreck` | the same compound with the main building in ruins (shared yard props are repeated) |
+| `<kind>` | the intact compound (`mast`, `tower`) |
+| `<kind>_wreck` | the same compound with the main building in ruins (shared yard props are repeated) |
 
 Blender appends `.001` to duplicate names; the game strips a trailing `.NNN` from material names, but keep node names
 unique anyway. Object names are unique across the whole file, so the wreck root cannot reuse `raid`, `smoke` or `drop`:
-name them `smoke_wreck`, `col_shed_wreck` and so on. The role is read from the custom property `role` (always set it),
-or failing that from the name up to the first `_` or digit.
+name them `smoke_wreck`, `col_shed_wreck` and so on, and give every kind after the first a marker of its own, role word
+first (the Watchtower's are `raid_tower`, `col_tower_lattice`, `smoke_tower_wreck`, `tower_apron`; the Relay Mast keeps
+the plain names). The role is read from the custom property `role` (always set it), or failing that from the name up to
+the first `_` or digit.
 
 ## Meshes
 
 - Any depth under a root. **One material per mesh** is the convention (a mesh with several works: each material
   becomes its own part, and the checker warns), indexed triangles, `POSITION` + `NORMAL` only. UVs, textures, skins,
   animations and lights are ignored (the checker warns).
-- Custom property `ink` (number, metres) on a mesh = outline thickness (smoothed-normal shell). Absent or 0 = none. It
-  belongs to that mesh alone: a mesh parented under an inked one gets no outline of its own.
+- Custom property `ink` (number, metres) on a mesh = outline thickness: a shell pushed out so that every face moves
+  out by that much, edges and corners included, like the Kit's outline hull. Absent or 0 = none. It belongs to that
+  mesh alone: a mesh parented under an inked one gets no outline of its own.
 - Flat colours only. The look is the game's 3-step toon ramp over the material's **base colour**.
 - Do not use alpha blending, except on an `additive…` material (see below): anywhere else the checker warns and the mesh renders opaque.
 
@@ -61,6 +67,11 @@ The material **name** (a trailing `.NNN` is ignored) picks the treatment; everyt
 | anything else | lit toon in the material's own base colour |
 
 Turn **backface culling off** on a material to make it double-sided (dishes, cloth).
+
+To author a beam: name the material `additive_…`, set the Principled BSDF's **Alpha** below 1 (0.13 for the
+Watchtower's searchlight) and the material's blend mode to Alpha Blend (Render Method: Blended in Blender 4.2+), so the
+exporter writes `alphaMode: BLEND` and the alpha. A material with alpha 0 or 1, or one that is not blended, draws not at
+all or at full strength (the checker warns).
 Colours are sRGB hex in the game and **linear** in Blender: convert (the build script has `srgb()`).
 
 ## Gameplay empties
@@ -109,10 +120,11 @@ turned moving part under a stretched parent cannot be placed correctly (the chec
 ## Switching it on
 
 Off by default. Turn it on with `?outpostGlb` in the URL or `localStorage['mr-outpost-glb'] = '1'`. In the URL,
-`?outpostGlb=0` (or `false`, `off`) turns it off again, and the URL beats the saved setting. A missing or broken file,
-kind or wreck quietly gives the Kit-built outpost; it can never stop the game starting.
+`?outpostGlb=0` (or `false`, `off`, `no`) turns it off again, and the URL beats the saved setting. A missing or broken
+file, kind or wreck quietly gives the Kit-built outpost. (The file is a separate chunk fetched while the game starts,
+so a very slow request delays the start; a failed one never stops it.)
 
-The dev viewer (`/tools/viewer.html?m=outpost&kind=mast`) shows it beside the Kit build with every collider drawn and
+The dev viewer (`/tools/viewer.html?m=outpost&kind=mast` or `kind=tower`) shows it beside the Kit build with every collider drawn and
 checks that the two hold the same gameplay data (`&src=kit|glb|both`, `&wreck=1`, `&cols=0`). `src=glb` shows any kind in
 the file, whether or not it is in `GLB_KINDS` yet.
 
@@ -130,8 +142,10 @@ means the script or Blender changed. Nothing in CI runs it; `npm run check:outpo
 
 ## Adding a kind
 
-1. Add its builder to `tools/blender/build_outposts.py` (or author it in Blender) with both roots.
+1. Add its builder to `tools/blender/build_outposts.py` (or author it in Blender) with both roots: a Kit with its own
+   `tag=`, registered in `BUILDERS` with its seed in `KIND_SEED` (the one in `src/outpostModels.js`).
 2. Run the script, commit `src/assets/outposts.glb`.
-3. `npm run check:outposts --` with `--kind <name>` (or `--all`): by default it checks only the kinds in `GLB_KINDS`.
+3. `npm run check:outposts -- --kind <name>` (or `-- --all`): by default it checks only the kinds in `GLB_KINDS`.
+   It exits 0 when the file is fine, 1 with errors, 2 on bad usage.
 4. Open `/tools/viewer.html?m=outpost&kind=<name>` (and `&wreck=1`): it should say the gameplay data is the same.
-5. Add the kind to `GLB_KINDS` in `src/staticContract.js`.
+5. Add the kind to `GLB_KINDS` in `src/staticContract.js`, and to the pilot sentence at the top of this file.

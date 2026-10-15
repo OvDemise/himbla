@@ -14,8 +14,9 @@
 # MOONRUNNER_EXPORT=0 builds the scene without writing the file.
 #
 # Everything is authored in three.js axes (x right, y up, +z towards the gate, ground at y = 0) like the other
-# build scripts. To add a kind: write build_<kind>(wreck) the way build_mast does (a Kit on a root pivot) and
-# register it in BUILDERS together with its seed in KIND_SEED (must equal the one in src/outpostModels.js).
+# build scripts. To add a kind: write build_<kind>(wreck) the way build_mast does (a Kit on a root pivot, and
+# tag=<kind> so its object names stay unique across the file: see build_tower) and register it in BUILDERS together
+# with its seed in KIND_SEED (must equal the one in src/outpostModels.js).
 
 import bpy, math, os
 from mathutils import Matrix, Vector
@@ -91,8 +92,9 @@ for _name, (_hex, _double) in MATERIALS.items():
 
 def setup_additive():
     """Make the beam materials see-through the way the glTF exporter writes it: the Principled BSDF's Alpha input
-    (-> baseColorFactor[3]) and the blended render method (-> alphaMode BLEND), backface culling off (-> doubleSided).
-    material() only rewrites Base Color and Roughness, so this survives it; call it once the meshes are built."""
+    (below 1) gives both alphaMode BLEND and baseColorFactor[3]; backface culling off gives doubleSided. The render
+    method and diffuse colour only make the viewport match. material() only rewrites Base Color and Roughness, so
+    this survives it; call it once the meshes are built."""
     for name, alpha in ADDITIVE.items():
         m = material(name)
         bsdf = next(n for n in m.node_tree.nodes if n.type == "BSDF_PRINCIPLED")
@@ -643,7 +645,7 @@ def build_tower(wreck):
     sandbags(k, 9, 12, 1.8, -0.6, 3.6, 2)
     crate(k, 9, F, 12, 1.1, "olive_dark")
     # gate arch, flags and floodlights
-    k.sign("WATCHTOWER", 0, 22, w=9.8, y=5.4, ph=2.2470)  # (2.2470 m: the board's text plane height at width 9.3, measured in the game)
+    k.sign("WATCHTOWER", 0, 22, w=9.8, y=5.4, ph=2.2470)  # (2.2470 m: the board's text plane height at width 9.3 with the game's sign font; the text itself is drawn at runtime)
     k.flag(-6.6, 21.2, 10)
     k.flag(6.6, 21.2, 10)
     k.lamp(16, 13, 8)
@@ -658,6 +660,9 @@ for _kind, _build in BUILDERS.items():
     _build(False)
     _build(True)
 setup_additive()
+# (Blender renames a clashing object `name.001`: a kind without its own tag= would end up here)
+_clash = [o.name for o in C.objects if o.name[-4:-3] == "." and o.name[-3:].isdigit()]
+assert not _clash, f"object names must be unique across the file, Blender renamed {_clash[:3]}: give each kind its own tag="
 print("built", len(C.objects), "objects:", sum(o.type == "MESH" for o in C.objects), "meshes,", sum(o.type == "EMPTY" for o in C.objects), "empties")
 
 if os.environ.get("MOONRUNNER_EXPORT", "1") == "1":

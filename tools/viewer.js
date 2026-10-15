@@ -151,7 +151,7 @@ if (m === 'shuttle' || m === 'freighter') {
   });
   anim = (t, sp) => anims.forEach((a) => a(t, sp));
 } else if (m === 'outpost') {
-  // &kind=mast  &src=kit|glb|both (default both, side by side)  &wreck=1  &color=rrggbb  &cols=0 hides the colliders
+  // &kind=mast|tower (any kind in outposts.glb; src=kit takes any Kit kind)  &src=kit|glb|both (default both, side by side)  &wreck=1  &color=rrggbb  &cols=0 hides the colliders
   const kind = Q.get('kind') || 'mast', wreck = Q.get('wreck') === '1', color = Q.has('color') ? parseInt(Q.get('color'), 16) : 0x2ec4ff;
   const srcs = Q.get('src') === 'kit' ? ['kit'] : Q.get('src') === 'glb' ? ['glb'] : ['kit', 'glb'];
   model = new THREE.Group();

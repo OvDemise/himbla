@@ -9,8 +9,9 @@ import { rootName, GLB_KINDS } from './staticContract.js';
 //   switch on:   ?outpostGlb in the URL (?outpostGlb=0 / =false / =off switches it off again, and the URL beats
 //                the saved setting), or localStorage['mr-outpost-glb'] = '1'
 //   fall back:   a missing or unreadable file, kind or wreck, a root with nothing to draw, or a bake that throws,
-//                quietly gives the Kit-built outpost (outpostModels.js). Unlike the ship GLBs this can never stop
-//                the game starting, even if the file is not in the checkout (the import is a glob, not a path)
+//                quietly gives the Kit-built outpost (outpostModels.js). Unlike the ship GLBs a failed load can never
+//                stop the game starting, even if the file is not in the checkout (the import is a glob, not a path);
+//                a request that hangs does hold it up, as there is no timeout
 //   cost:        the file is a separate chunk, fetched only when switched on
 //
 // To make it the default: drop the `outpostGlbOn()` test below, and import the GLB statically if the extra
@@ -41,7 +42,11 @@ export async function loadOutpostParts({ force = false } = {}) {
     const assets = parseStaticGlb(gltf.scene, { warn: (m) => console.warn('[outposts.glb]', m) });
     for (const [name, a] of [...assets]) if (a.empty) { console.warn(`[outposts.glb] ${name}: nothing to draw, left out`); assets.delete(name); }
     for (const kind of GLB_KINDS) {
-      if (!assets.has(rootName(kind, false))) { console.warn(`[outposts.glb] no "${kind}": using the Kit-built one`); continue; }
+      if (!assets.has(rootName(kind, false))) { // (a kind is the Kit's or the file's, wreck and all)
+        console.warn(`[outposts.glb] no "${kind}": using the Kit-built one`);
+        assets.delete(rootName(kind, true));
+        continue;
+      }
       if (!assets.has(rootName(kind, true))) console.warn(`[outposts.glb] no "${kind}_wreck": its wreck stays Kit-built`);
     }
     ASSETS = assets;
