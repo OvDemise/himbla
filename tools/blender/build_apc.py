@@ -122,22 +122,19 @@ for sx in (-1, 1):
 for sx in (-1, 1):
     mesh(f"tail{sx}", xf(rbox(0.2, 0.1, 0.04, 0.2, 8, 4), (sx * 0.85, 1.45, -3.31)), "tail", CH, 0.02)
 mesh("pintle", xf(lathe([(0.12, 0), (0.12, 0.16), (0.07, 0.2)], 8), (0, 1.3, -3.3), (-math.pi / 2, 0, 0)), "steel", CH, 0.02)
-# the exhaust: a short stack on the back of the engine deck that comes straight up and hits a 45, running back
-# and down to a hot mouth
-EX, EY, EZ = 0.8, 2.26, -2.7           # where it stands
-BEND_Y, R = EY + 0.3, 0.2              # the end of the (short) vertical run, and the radius of the elbow
-elbow = [(EX, EY, EZ)]
-for deg in (0, 45, 90, 135):
-    a = math.radians(deg)
-    elbow.append((EX, BEND_Y + R * math.sin(a), EZ - R + R * math.cos(a)))
-d = (0.0, -math.sqrt(0.5), -math.sqrt(0.5))                     # 45 degrees down and back
-tip = tuple(elbow[-1][i] + d[i] * 0.3 for i in range(3))
-elbow.append(tip)
-mesh("exhaust", tube(elbow, [0.11] * len(elbow), 8), "steel", CH, 0.03)
-mesh("exhaustBase", xf(rbox(0.18, 0.05, 0.18, 0.3, 8, 4), (EX, EY + 0.02, EZ)), "dark", CH, 0.02)
-mesh("exhaustBand", xf(torus(0.11, 0.03, 12, 4), (EX, EY + 0.14, EZ)), "dark", CH, 0)
-mesh("exhaustMouth", xf(lathe([(0.11, 0.0), (0.145, 0.07), (0.125, 0.1)], 10), tip, (-3 * math.pi / 4, 0, 0)), "dark", CH, 0.02)
-mesh("exhaustGlow", xf(torus(0.095, 0.022, 12, 4), tuple(tip[i] + d[i] * 0.06 for i in range(3)), (-3 * math.pi / 4, 0, 0)), "hot", CH, 0)
+# the exhaust: a short rectangular stub standing upright on the back of the engine deck plate (flat there, so it
+# sits square), with a flange, a clamp band, a lip and a glowing rim round a dark mouth
+EX, EZ = 0.8, -2.62                    # where it stands (x, z): left side, clear of the antenna and the cans
+EY = 2.285                             # the top of the deck plate
+TOP = EY + 0.34                        # the top of the box
+BOT = EY - 0.06                        # the bottom of the box, down through the plate
+HX, HZ = 0.15, 0.1                     # half-width across the vehicle, half-depth front to back
+mesh("exhaust", xf(rbox(HX, (TOP - BOT) / 2, HZ, 0.1, 10, 6), (EX, (TOP + BOT) / 2, EZ)), "steel", CH, 0.03)
+mesh("exhaustFlange", xf(rbox(HX + 0.05, 0.035, HZ + 0.05, 0.15, 10, 4), (EX, EY + 0.02, EZ)), "dark", CH, 0.02)
+mesh("exhaustBand", xf(rbox(HX + 0.015, 0.025, HZ + 0.015, 0.15, 10, 4), (EX, EY + 0.17, EZ)), "dark", CH, 0)
+mesh("exhaustLip", xf(rbox(HX + 0.03, 0.03, HZ + 0.03, 0.15, 10, 4), (EX, TOP - 0.01, EZ)), "dark", CH, 0.02)
+mesh("exhaustGlow", xf(rbox(HX + 0.005, 0.014, HZ + 0.005, 0.2, 10, 4), (EX, TOP + 0.03, EZ)), "hot", CH, 0)
+mesh("exhaustMouth", xf(rbox(HX - 0.05, 0.02, HZ - 0.04, 0.2, 8, 4), (EX, TOP + 0.04, EZ)), "dark", CH, 0)
 for i, x in enumerate((-0.75, 0.0)):
     mesh(f"can{i}", xf(rbox(0.2, 0.26, 0.11, 0.2), (x, 2.5, -2.62), (0, 0, 0.05 * (1 - 2 * i))), "olive", CH, 0.03)
 # antennas on the rear deck: each whip is its own pivot at its base (role "antenna") so the game can lay it
