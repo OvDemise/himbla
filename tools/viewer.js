@@ -1,7 +1,7 @@
 // Dev-only model viewer: renders one model through the game's comic post pass on a turntable.
 import * as THREE from 'three';
 import { loadFonts } from '../src/fonts.js';
-import { loadRunnerParts, loadShipParts, makeShuttle, makeFreighter, makeHoverCar, makeApc, makeLandTrain, makeTowerCrane, CRANE_TROLLEY_MIN, CRANE_TROLLEY_SPAN, makeGarage } from '../src/models.js';
+import { loadRunnerParts, loadShipParts, makeShuttle, makeFreighter, makeHoverCar, makeApc, makeLandTrain, makeTowerCrane, CRANE_TROLLEY_MIN, CRANE_TROLLEY_SPAN, makeGarage, makeDishStation, DISH_SIZE } from '../src/models.js';
 import { outpostTemplate } from '../src/outpostModels.js';
 import { loadOutpostParts, GLB_KINDS } from '../src/outpostGlb.js';
 import { makeChimera, makeMite, LIVING, MODIFIERS, spliceGenes } from '../src/chimera.js';
@@ -133,6 +133,22 @@ if (m === 'shuttle' || m === 'freighter') {
   model = gar.root;
   anim = (t) => gar.update(t);
   height = 12;
+} else if (m === 'dish') {
+  // &kind=cryo|gantry  &faction=kepler|meridian|spacecom|vostok  &no=01..04 (the dish's number)  &size=30 (the old dish's size: a 30 m mount scales to it)
+  // &tilt=rad (the dish's elevation, as the game sweeps it: -0.35 to -0.85)  &az=rad (its azimuth)  &sweep=1 turns and nods it like the game; the lamps blink
+  const st = makeDishStation({ kind: Q.get('kind') || 'cryo', faction: Q.get('faction') || 'meridian', no: Q.get('no') || '01', size: num('size', DISH_SIZE) });
+  st.tilt.rotation.x = num('tilt', -0.6);
+  st.yaw.rotation.y = num('az', 0);
+  model = st.root;
+  const lamps = [];
+  model.traverse((o) => { if (o.userData.blink) lamps.push(o); });
+  anim = (t) => {
+    if (Q.get('sweep') === '1') { st.yaw.rotation.y = num('az', 0) + t * 0.12; st.tilt.rotation.x = -0.6 + Math.sin(t * 0.24) * 0.25; }
+    for (const o of lamps) o.visible = Math.sin(t * 4) > -0.3;
+  };
+  height = 24;
+  Object.assign(sun.shadow.camera, { left: -70, right: 70, top: 70, bottom: -70, far: 400 });
+  sun.shadow.camera.updateProjectionMatrix();
 } else if (m === 'hovercar') {
   model = makeHoverCar({}).root;
   model.position.y = 2;

@@ -7,7 +7,7 @@ import { FACTIONS } from './locations.js';
 import { SUN, frameQuat, arcDist, dirFromAngles, tangent } from './geo.js';
 import { buildCasino } from './casinoWorld.js'; // casino
 import { Traffic } from './traffic.js';
-import { buildHelium, buildMeridian, buildFunpark, dressLab, dressLabInside, dressMonolith, buildTown, dressIlmb, dressBase, dressArray, buildDen, buildPirateCamp, buildRuin, dressScrap, jobTerminal, part as kitPart, dressCasinoLot } from './settlements.js';
+import { buildHelium, buildMeridian, buildFunpark, dressLab, dressLabInside, dressMonolith, buildTown, dressIlmb, dressBase, dressArray, ARRAY_DISHES, buildDen, buildPirateCamp, buildRuin, dressScrap, jobTerminal, part as kitPart, dressCasinoLot } from './settlements.js';
 import { makeProp } from './storyAssets.js';
 import { buildHomeTown } from './hometown.js';
 import { spindleGeometry } from './spindle.js';
@@ -1534,14 +1534,9 @@ export class World {
   }
 
   buildArray(loc) {
-    const pts = [[-60, -30, 26], [55, -40, 30], [0, 60, 34], [-80, 70, 18]];
-    for (const [dx, dz, s] of pts) {
-      const d = makeDish(s, 0xfff4e0);
-      this.put(d.root, loc, dx, dz, 0, 0, true);
-      this.dishes.push({ ...d, speed: 0.05 + this.r() * 0.1, loc });
-      this.col(loc, { type: 'cyl', x: dx, z: dz, y0: -2, y1: s * 0.95, r: s * 0.2 + 0.5 });
-    }
-    dressArray(this, loc); // observatory, labs, control centre, mast, cable runs
+    // (a sweep rate per dish, drawn here as ever so the rest of the world's random stream is undisturbed)
+    const speeds = ARRAY_DISHES.map(() => 0.05 + this.r() * 0.1);
+    dressArray(this, loc, speeds); // the four dish stations, observatory, labs, control centre, mast, cable runs
     this.pad(loc, -100, -20, 13, 0x7dff6a, true);
     this.solarField(loc, 0, 120, 3, 8, 0);
     this.addFigures(loc, 8, { kind: 'worker', look: () => ({ suit: 0xffffff, visor: 0x2b8f4a }) });

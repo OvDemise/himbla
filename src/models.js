@@ -12,6 +12,7 @@ import apcGlb from './assets/apc.glb?inline';
 import landtrainGlb from './assets/landtrain.glb?inline';
 import craneGlb from './assets/crane.glb?inline';
 import garageGlb from './assets/garage.glb?inline';
+import dishGlb from './assets/dish.glb?inline';
 import { Kit, T as KT, G as KG, D as KD, crate } from './outpostModels.js';
 
 function part(geo, mat, x = 0, y = 0, z = 0, outline = 0.05) {
@@ -1200,7 +1201,7 @@ const SHIP_FX = new Set(['plume', 'plumeCore', 'lift', 'engine', 'core']); // pe
 const FLAMES = new Set(['plume', 'plumeCore', 'lift']);
 export async function loadShipParts() {
   const loader = new GLTFLoader();
-  const [gltf, sk, wr, ap, lt, cr, ga] = await Promise.all([loader.loadAsync(shipsGlb), loader.loadAsync(skimmerGlb), loader.loadAsync(warrigGlb), loader.loadAsync(apcGlb), loader.loadAsync(landtrainGlb), loader.loadAsync(craneGlb), loader.loadAsync(garageGlb)]);
+  const [gltf, sk, wr, ap, lt, cr, ga, di] = await Promise.all([loader.loadAsync(shipsGlb), loader.loadAsync(skimmerGlb), loader.loadAsync(warrigGlb), loader.loadAsync(apcGlb), loader.loadAsync(landtrainGlb), loader.loadAsync(craneGlb), loader.loadAsync(garageGlb), loader.loadAsync(dishGlb)]);
   SHIP_PARTS = {};
   for (const name of ['shuttle', 'freighter']) {
     const root = gltf.scene.getObjectByName(name);
@@ -1236,6 +1237,12 @@ export async function loadShipParts() {
   const shed = ga.scene.getObjectByName('garage_small');
   if (!shed) throw new Error('garage.glb has no garage_small');
   SHIP_PARTS.garage_small = bakeShip(shed);
+  // the radio-dish array stations (tools/blender/build_dish.py)
+  for (const kind of DISH_KINDS) {
+    const station = di.scene.getObjectByName('dish_' + kind);
+    if (!station) throw new Error('dish.glb has no dish_' + kind);
+    SHIP_PARTS['dish_' + kind] = bakeShip(station);
+  }
 }
 
 function bakeShip(root) {
@@ -1787,6 +1794,75 @@ export function makeGarage({ open = [true, false, true], kind = 'main', trim = 0
     root.add(lamp);
   }
   return { root, heads, update(t) { for (const h of heads) h.rotation.y = t * h.userData.spin; } };
+}
+
+// ---- The dish-array stations (built in Blender, see build_dish.py) ----
+// The big radio dishes at the research arrays stand on one of two stations, both built for a 30 m mount (the game scales one uniformly,
+// size / DISH_SIZE): the CRYO RECEIVER, the Prospector's Helium-3 tanker stood on end under a banded dish, and the GANTRY STATION, a
+// crane-like lattice mast over a yard of cargo-container control rooms. The baked tree: the root's own meshes are the whole station
+// (its `livery` pivots hold each faction's mark, its `number` pivots the digits for each dish; only the matching ones are built) and
+// its `blinker` pivots the warning lamps; `yaw` (turned about y) carries the neck's turning column and the head, `tilt` (a child of
+// yaw, turned about x) the trunnion drum, the reflector, its back structure and the feed, with a `blinker` of its own.
+export const DISH_SIZE = 30;
+export const DISH_KINDS = ['cryo', 'gantry'];
+const DISH_TOON = { dark: 0x2a2540, steel: 0x55607a, metal: 0x8a87a0, concrete: 0x8a8698, white: 0xf3eee4, dish: 0xfff4e0, seam: 0x8a87a0, tank: 0xc6d6ea, hazard: 0xffd23f, brand: 0x14a3b8, redsafe: 0xc9202e, blue: 0x1d63d6 };
+const DISH_GLOW = { glass: 0x9be7ff, window: 0xfff6a8, lamp: 0xfff6a8, tail: 0xff2a4a, green: 0x7dff6a, hot: 0xff9f1c };
+
+// The colour of a station slot, and whether it glows: body, stripe, accent and label are the faction's livery colours (as on the land-trains).
+export function dishSlot(slot, faction = 'meridian') {
+  const pal = LAND_TRAIN_FACTIONS[faction] || LAND_TRAIN_FACTIONS.meridian;
+  if (slot in pal) return { color: pal[slot], glow: false };
+  if (slot in DISH_GLOW) return { color: DISH_GLOW[slot], glow: true };
+  return { color: DISH_TOON[slot] ?? 0xff00ff, glow: false };
+}
+
+// The baked nodes of a station: the root, its pivots, and the faction's livery and the dish's number (every other pivot of those is left out).
+export function dishModel(kind, faction = 'meridian', no = '01') {
+  const root = SHIP_PARTS['dish_' + kind];
+  if (!root) throw new Error('no dish station ' + kind);
+  const find = (n, role) => n.kids.find((k) => k.role === role);
+  const yaw = find(root, 'yaw'), tilt = find(yaw, 'tilt');
+  const fac = LAND_TRAIN_FACTIONS[faction] ? faction : 'meridian';
+  const fixed = [root, ...root.kids.filter((k) => (k.role === 'livery' && k.data.faction === fac) || (k.role === 'number' && k.data.no === no))];
+  return { root, fixed, yaw, tilt, blinkers: root.kids.filter((k) => k.role === 'blinker'), tiltBlinkers: tilt.kids.filter((k) => k.role === 'blinker'), size: root.data.size || DISH_SIZE, radius: root.data.radius };
+}
+
+// A whole station as plain meshes (the model viewer's): returns the root group and the pivots to drive. The array sites bake the same parts
+// into their own kit instead (settlements.js dishStation).
+export function makeDishStation({ kind = 'cryo', faction = 'meridian', no = '01', size = DISH_SIZE } = {}) {
+  const D = dishModel(kind, faction, no);
+  const mats = new Map();
+  const matFor = (slot) => {
+    if (!mats.has(slot)) { const c = dishSlot(slot, faction); mats.set(slot, c.glow ? glow(c.color) : toon(c.color)); }
+    return mats.get(slot);
+  };
+  const dress = (node, g) => {
+    for (const { slot, geo } of node.parts) {
+      const m = new THREE.Mesh(geo, matFor(slot));
+      m.castShadow = !(slot in DISH_GLOW);
+      g.add(m);
+    }
+    if (node.ink) { const m = new THREE.Mesh(node.ink, inkMat); m.userData.isInk = true; g.add(m); }
+  };
+  const lamp = (b) => {
+    const m = new THREE.Mesh(new THREE.SphereGeometry(b.data.radius || 0.4, 8, 6), glow(0xff2a4a));
+    m.userData.blink = true;
+    m.position.copy(b.pos);
+    return m;
+  };
+  const root = new THREE.Group();
+  for (const n of D.fixed) dress(n, root);
+  for (const b of D.blinkers) root.add(lamp(b));
+  const yaw = new THREE.Group(), tilt = new THREE.Group();
+  yaw.position.copy(D.yaw.pos);
+  tilt.position.copy(D.tilt.pos);
+  dress(D.yaw, yaw);
+  dress(D.tilt, tilt);
+  for (const b of D.tiltBlinkers) tilt.add(lamp(b));
+  yaw.add(tilt);
+  root.add(yaw);
+  root.scale.setScalar(size / D.size);
+  return { root, yaw, tilt };
 }
 
 // Shuttle-bus: a fat lifting-body hopper with a wraparound windscreen, porthole windows, two

@@ -624,9 +624,9 @@ crowd-noise bed for now (the cheering is due a rework), and the race countdown b
 | Location | Type | Notes |
 | --- | --- | --- |
 | International Moon Base (ILMB) | SPACECOM HQ | Fortress walls, turrets, artillery, embassies, job board, repair bay, launch pad |
-| Meridian Exchange · Shackleton Radar Array · Helium-3 Exchange | Meridian | Trade hub (trading tower with a live price ticker, a motor-pool garage with its own service road and two small garages, a container gantry and tower cranes at work), radar research (an observatory with a turning cupola), and a working strip-mine (bucket-wheel excavator, ore conveyor, pumping derrick, Horton-sphere tank farm) |
+| Meridian Exchange · Shackleton Radar Array · Helium-3 Exchange | Meridian | Trade hub (trading tower with a live price ticker, a motor-pool garage with its own service road and two small garages, a container gantry and tower cranes at work), radar research (four big dishes that turn and nod, each on a Blender-built station: a cryo receiver, a Helium-3 tanker stood on end, or a gantry station, a lattice mast over container control rooms; plus an observatory with a turning cupola), and a working strip-mine (bucket-wheel excavator, ore conveyor, pumping derrick, Horton-sphere tank farm) |
 | Kepler Civic Center · Tranquility Commons · Aldrin Heights · Twilight Waystation · Hertzsprung Refuge | Kepler | Towns, safe rest and repair |
-| Farside Listening Post | SPACECOM (dark side) | Hazard-pay destination |
+| Farside Listening Post | SPACECOM (dark side) | Hazard-pay destination: the same four-dish array in SPACECOM paint, the two station designs swapped round |
 | Bastion Vostok-9 · Vostok-4 Outpost | Vostok | Restricted zones: turrets, patrols, artillery |
 | Daedalus Citadel · Daedalus Forward Post | Daedalus (dark side) | Restricted zones: turrets, patrols, artillery |
 | Rustmoon Hold · Scrapjaw Gulch · Blackrock Den · Gloom Harbor + scattered camps | Rustmoon (dark side) | Stolen cargo is fenced at the nearest working den |
@@ -715,6 +715,7 @@ src/
   assets/landtrain.glb  the Moonliner and Prospector land-trains: two tractors and four trailers, each with a livery for every faction
   assets/crane.glb   the tower crane (lattice mast, ballasted base, slewing head with cab, trolley and hook)
   assets/garage.glb  the Meridian motor-pool garages: the main one (three bays with open and shut doors, workshop fit-outs, service office, fuel yard, roof plant) and a small two-bay one
+  assets/dish.glb    the two stations for the research arrays' big dishes: the cryo receiver (a banded Helium-3 vessel with a stair, valve cabinet and branding panel) and the gantry station (a lattice mast, container control rooms, battery bank, fuel tank), each with the dish, its yaw and tilt pivots and a livery and number for every faction and dish
   assets/outposts.glb  the Relay Mast and Watchtower outposts, intact and wrecked (a pilot, off unless the URL has `?outpostGlb`; contract in docs/outpost-glb.md)
 tools/
   blender/build_runner.py  builds the runner in Blender and exports src/assets/runner.glb
@@ -726,10 +727,11 @@ tools/
   blender/build_landtrain.py builds the Moonliner and Prospector tractors and trailers -> src/assets/landtrain.glb (also runs headless, like build_apc.py)
   blender/build_crane.py   builds the tower crane -> src/assets/crane.glb (also runs headless, like build_apc.py)
   blender/build_garage.py  builds the main and small motor-pool garages -> src/assets/garage.glb (also runs headless)
+  blender/build_dish.py    builds the cryo receiver and gantry station dish arrays -> src/assets/dish.glb (also runs headless)
   blender/build_outposts.py builds the Relay Mast and Watchtower -> src/assets/outposts.glb (also runs headless; `npm run check:outposts` checks the file)
   blender/decals.py        flat lettering, emblems, hazard stripes and safety signs (no textures) the land-train builder execs after kit.py
   blender/kit.py           shared geometry/material/export helpers the skimmer, war-rig, APC and land-train builders exec
-  viewer.html              dev-only model viewer (npm run dev, then /tools/viewer.html?m=shuttle|freighter|apc|landtrain|crane|garage|outpost|mite|lineup…; apc takes &turret=<rad>&barrel=<rad>; landtrain takes &type=moonliner|prospector&faction=spacecom|vostok|kepler|meridian&cars=pax,tank,cargo,blast&unit=<n>)
+  viewer.html              dev-only model viewer (npm run dev, then /tools/viewer.html?m=shuttle|freighter|apc|landtrain|crane|garage|dish|outpost|mite|lineup…; dish takes &kind=cryo|gantry&faction=…&no=01..04&size=30&tilt=<rad>&sweep=1; apc takes &turret=<rad>&barrel=<rad>; landtrain takes &type=moonliner|prospector&faction=spacecom|vostok|kepler|meridian&cars=pax,tank,cargo,blast&unit=<n>)
 ```
 
 **Editing the runner:** run `tools/blender/build_runner.py` in Blender (Scripting tab, or

@@ -4,7 +4,7 @@ import { FACTIONS } from './locations.js';
 import { pixelFont } from './fonts.js';
 import { glow } from './toon.js';
 import { market, tickerText } from './market.js';
-import { craneModel, craneSlot, CRANE_H, CRANE_LOAD_DROP, CRANE_TROLLEY_MIN, CRANE_TROLLEY_SPAN, garageModel, garageSlot, GARAGE_HALL } from './models.js';
+import { craneModel, craneSlot, CRANE_H, CRANE_LOAD_DROP, CRANE_TROLLEY_MIN, CRANE_TROLLEY_SPAN, garageModel, garageSlot, GARAGE_HALL, dishModel, dishSlot, DISH_KINDS } from './models.js';
 
 // Settlements, HQs and landmarks built with the outpost Kit (outpostModels.js): every static part
 // of a place bakes into one merged mesh per material plus one ink hull, so a detailed settlement
@@ -304,6 +304,61 @@ export function towerCrane(k, x, z, h, jib, color, { speed = 0.12, phase = 0 } =
     hook.position.y = (C.hook.pos.y - rope) * sc;
   };
   k.dyn(top, 0, top.position.y, 0);
+  k.at();
+}
+
+// Radio-dish array station (built in Blender, tools/blender/build_dish.py): 'cryo' (the Helium-3 tanker on end under a banded dish) or
+// 'gantry' (a lattice mast over a yard of container control rooms). The whole station is baked into the kit, painted for `faction`
+// with the dish's `no` ('01'..) on its panel; the head and the dish on it are moving objects: the head turns about the vertical, the dish
+// nods on its trunnions (as the old bare dishes did), and a warning lamp on the feed blinks. `size` is the old dish's size (the model is
+// a 30 m mount and scales uniformly); the front (the panel, the cabinet, the containers' plates) faces local `yaw`.
+const DISH_COLLIDERS = {
+  // the skirt and the vessel (a cylinder each), the valve cabinet (on the thin pad)
+  cryo(k, s) {
+    k.column(6.9 * s, 3.2 * s, 0, 0);
+    k.column(5.7 * s, 20.5 * s, 0, 0);
+    k.solid(2.1 * s, 1.35 * s, 0.6 * s, -3.9 * s, 7.6 * s, 0, 0.3 * s);
+  },
+  // the four footings, the mast as a solid core in three steps as it tapers, the boxes (one stacked), the battery bank, the fuel tank, the generator and its stack
+  gantry(k, s) {
+    for (const sx of [-1, 1]) for (const sz of [-1, 1]) k.solid(1.5 * s, 0.55 * s, 1.5 * s, sx * 4.3 * s, sz * 4.3 * s);
+    k.solid(4.4 * s, 4.0 * s, 4.4 * s, 0, 0);
+    k.solid(3.9 * s, 3.3 * s, 3.9 * s, 0, 0, 0, 8 * s);
+    k.solid(3.4 * s, 3.5 * s, 3.4 * s, 0, 0, 0, 14.6 * s);
+    k.solid(1.75 * s, 3.3 * s, 4.8 * s, -11.5 * s, 3.0 * s);
+    k.solid(1.75 * s, 1.65 * s, 4.8 * s, 11.5 * s, 4.5 * s);
+    k.solid(1.75 * s, 1.65 * s, 4.8 * s, 11.5 * s, -7.0 * s);
+    k.hcyl(1.45 * s, 5.6 * s, -1.5 * s, -9.5 * s, Math.PI / 2, 2.3 * s);
+    k.solid(1.4 * s, 1.0 * s, 1.4 * s, -12.5 * s, -4.5 * s);
+    k.column(0.5 * s, 11.5 * s, -12.5 * s, -4.5 * s);
+  },
+};
+export function dishStation(k, x, z, size, kind, faction, no, { yaw = 0, speed = 0.1, phase = 0 } = {}) {
+  const D = dishModel(kind, faction, no), sc = size / D.size;
+  const mat = (slot) => { const c = dishSlot(slot, faction); return c.glow ? G(c.color) : T(c.color); };
+  const S = new THREE.Matrix4().makeScale(sc, sc, sc);
+  const ONE = new THREE.Vector3(1, 1, 1);
+  const lamp = (b) => {
+    const m = new THREE.Mesh(new THREE.SphereGeometry((b.data.radius || 0.4) * sc, 8, 6), G(0xff2a4a));
+    m.userData.blink = true;
+    m.position.copy(b.pos).multiplyScalar(sc);
+    return m;
+  };
+  k.at(x, z, yaw);
+  for (const n of D.fixed) k.baked(n, mat, new THREE.Matrix4().compose(n.pos, n.quat, ONE).premultiply(S));
+  for (const b of D.blinkers) k.blinker(b.pos.x * sc, b.pos.y * sc, b.pos.z * sc, 0xff2a4a, (b.data.radius || 0.4) * sc);
+  DISH_COLLIDERS[kind](k, sc);
+  const piece = (node) => part(0xffffff, (q) => q.baked(node, mat, S));
+  const head = piece(D.yaw), dish = piece(D.tilt);
+  dish.position.copy(D.tilt.pos).multiplyScalar(sc);
+  for (const b of D.tiltBlinkers) dish.add(lamp(b));
+  head.add(dish);
+  const turn0 = k.yaw;
+  head.userData.tick = (o, dt, t) => {
+    o.rotation.y = turn0 + phase + t * speed;
+    dish.rotation.x = -0.6 + Math.sin(t * speed * 2 + phase) * 0.25;
+  };
+  k.dyn(head, 0, D.yaw.pos.y * sc, 0);
   k.at();
 }
 
@@ -1926,11 +1981,16 @@ export function dressBase(world, loc) {
 }
 
 // =============================================================================================
-// Research arrays (Shackleton, Farside): the dishes stay (world.js); here an observatory whose
-// cupola turns, two lab blocks and a control centre with a big screen, a tall comms mast,
-// cable runs between the dishes, floodlights.
+// Research arrays (Shackleton, Farside): four big dishes, each on a Blender-built station (a cryo
+// receiver, a tanker on end, or a gantry station, a lattice mast over container control rooms: they
+// alternate round the site, and swap places at Farside), painted for the site's faction and numbered
+// 01-04; plus an observatory whose cupola turns, two lab blocks and a control centre with a big
+// screen, a tall comms mast, cable runs between the dishes and the control centre, floodlights.
 // =============================================================================================
-export function dressArray(world, loc) {
+// where the four dishes stand (x, z) and their size (a 30 m mount is size 30), and where their cables run to (the stations face it)
+export const ARRAY_DISHES = [[-60, -30, 26], [55, -40, 30], [0, 60, 34], [-80, 70, 18]];
+const ARRAY_CONTROL = [-10, -72];
+export function dressArray(world, loc, speeds = []) {
   settle(world, loc, 7301 + loc.id.length * 13, (k, ctx) => {
     const green = 0x7dff6a;
     // observatory: a drum with a turning slit cupola and a telescope peeking out
@@ -2003,8 +2063,12 @@ export function dressArray(world, loc) {
     k.solid(7.4, 1.25, 9.7, 28, -5);
     k.at();
     commsMast(world, loc, k, 100, -20, 40, green);
-    // cable runs from each dish to the control centre
-    for (const [x, z] of [[-60, -30], [55, -40], [0, 60], [-80, 70]]) k.strip([x, z], [-10, -72], 0.6, 0.12, T(DARK), 0);
+    // the dish stations, and the cable runs from each to the control centre
+    ARRAY_DISHES.forEach(([x, z, size], i) => {
+      const kind = DISH_KINDS[(i + (loc.id === 'farside' ? 1 : 0)) % DISH_KINDS.length];
+      dishStation(k, x, z, size, kind, loc.faction, String(i + 1).padStart(2, '0'), { yaw: Math.atan2(ARRAY_CONTROL[0] - x, ARRAY_CONTROL[1] - z), speed: speeds[i] ?? 0.1, phase: i * 2.1 });
+      k.strip([x, z], ARRAY_CONTROL, 0.6, 0.12, T(DARK), 0);
+    });
     floodMast(k, 30, 10, 12); floodMast(k, -40, 30, 12);
   });
 }
