@@ -934,9 +934,11 @@ body.seated #hud > :not(#popups) { display: none !important; }
 .card.back .px { --s: 3px; position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); }
 
 /* the prize wheel: sized from the window (the canvas is 640 px; the page scales it) */
-.pwheel { --wd: clamp(320px, calc(min(860px, 94vh) - 316px), 600px); display: flex; gap: 44px; align-items: center; justify-content: center; flex-wrap: wrap; }
+.pwheel { --wd: clamp(240px, calc(min(860px, 94vh) - 316px), 600px); display: flex; gap: 44px; align-items: center; justify-content: center; flex-wrap: wrap; }
 .pw-wrap { position: relative; width: var(--wd); height: var(--wd); margin-top: 34px; }
 .pw-wrap canvas { width: 100%; height: 100%; border-radius: 50%; }
+/* the wheel page never scrolls: the spinning canvas is a square turning about its centre, and its corners swept past the page's edge, which grew a scrollbar that bobbed up and down with every spin (the wheel itself always fits: --wd is sized from the window) */
+.cas-body.tab-wheel { overflow: hidden; }
 .pw-ptr { --s: 4px; position: absolute; left: 50%; top: -26px; transform: translateX(-50%); z-index: 2; margin: 0; }
 .pw-hub { position: absolute; left: 50%; top: 50%; width: calc(var(--wd) * 0.17); height: calc(var(--wd) * 0.17); margin: calc(var(--wd) * -0.085); display: grid; place-items: center; text-align: center; border: 4px solid #05030c; border-radius: 50%; background: var(--yellow); color: #05030c; font-size: calc(var(--wd) * 0.026); line-height: 1.2; box-shadow: inset -4px -4px 0 #c9a23a; }
 .pw-side { max-width: 400px; }
