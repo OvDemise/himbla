@@ -118,7 +118,6 @@ export class Tutorial {
     this.prog = 0;
     this.lastFwd = null;
     this.lastPos = g.player.pos.clone();
-    g.tipIndex = 1e9; // the old tips stay quiet while BOLT teaches
     this.pickRoute();
     if (!this.drone) {
       this.drone = makeDrone();

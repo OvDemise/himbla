@@ -144,12 +144,11 @@ export class Trailer {
     g.player.applyUpgrades(g.upgrades);
     g.story.vehicles = ['interceptor', 'apc', 'skimmer'];
     g.tutorial.done = true;
-    if (g.settings) Object.assign(g.settings.v, { tips: false, panels: 'off' });
+    if (g.settings) Object.assign(g.settings.v, { panels: 'off' });
     g.enemies.pirateTimer = g.enemies.darkTimer = 1e9;
     g.meteors.next = 1e9;
     g.race.postT = 1e9;
     g.story.kade.nextAt = 1e9;
-    g.tipIndex = 99;
     g.updateScanner = () => {}; // no red threat-scanner ink: the shots show the models as they are
     const pop = g.fx.pop.bind(g.fx);
     g.fx.pop = (text, ...rest) => (this.popMute && this.popMute.test(text) ? undefined : pop(text, ...rest)); // shots can mute pops
