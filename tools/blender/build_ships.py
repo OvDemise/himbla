@@ -944,8 +944,9 @@ for side in (-1, 1):
 _solid = []
 
 
-def solid(hx, hy, hz, x, y, z, k=1.0):
-    _solid.append([round(v * k, 3) for v in (hx, hy, hz, x, y, z)])
+def solid(hx, hy, hz, x, y, z, k=1.0, roll=0.0):
+    """One box: half sizes and centre, scaled by k; `roll` (rad) tips it about the ship's z axis, for a slab on a slope."""
+    _solid.append([round(v * k, 3) for v in (hx, hy, hz, x, y, z)] + [round(roll, 4)])
 
 
 _c = lambda lo, hi: ((lo + hi) / 2, (hi - lo) / 2)      # (centre, half) of a span
@@ -978,13 +979,10 @@ slabs(PH, zf(15.6), zf(25.6), 1.7)                       # the pilot house
 solid(8.8, 5.8, 2.8, 0, 0, -29.0, K)                     # the stern block
 for bx, by in ((-4.2, 2.6), (4.2, 2.6), (-4.2, -2.6), (4.2, -2.6)):
     solid(2.1, 2.1, 2.55, bx, by, -35.9, K)              # the four engine bells
-for sx in (-1, 1):                                       # the radiator wings, in steps up their dihedral
-    for s0, s1 in ((0.0, 3.5), (3.5, 7.0), (7.0, 10.0), (10.0, 13.0)):
-        lead = lambda sp: 0.0 if sp < 6.0 else 3.0 * (sp - 6.0) / 7.0
-        trail = lambda sp: 9.2 if sp < 5.5 else 9.2 - 2.0 * (sp - 5.5) / 7.5
-        lo_, hi_ = max(lead(s0), lead(s1)), min(trail(s0), trail(s1))
+for sx in (-1, 1):                                       # the radiator wings: each a few slabs tipped to the wing's own dihedral, so the plate is a smooth ramp to walk up
+    for s0, s1, lo_, hi_ in ((0.0, 6.0, 0.0, 9.2), (6.0, 9.5, 1.3, 8.3), (9.5, 13.0, 2.5, 7.5)):
         sp_ = (s0 + s1) / 2
-        solid((s1 - s0) / 2 * math.cos(RAD_DIH) + 0.05, 0.42, (hi_ - lo_) / 2, sx * (7.6 + sp_ * math.cos(RAD_DIH)), WY + sp_ * math.sin(RAD_DIH), -6.0 - (lo_ + hi_) / 2, K)
+        solid((s1 - s0) / 2, 0.42, (hi_ - lo_) / 2, sx * (7.6 + sp_ * math.cos(RAD_DIH)), WY + sp_ * math.sin(RAD_DIH), -6.0 - (lo_ + hi_) / 2, K, sx * RAD_DIH)
 # the cargo cages (absolute sizes): posts, the two long rails, each bay's floor, and a block for every stack of crates
 for side in (-1, 1):
     ph_ = (BAY_TOP + 0.2 - FOOT_Y) / 2

@@ -314,7 +314,23 @@ export class Player {
     b.jumped = false;
     // ride moving vehicles: carry along with the deck you're standing on
     const plat = b.platform;
-    if (plat) b.pos.add(_v.subVectors(plat.pos, plat.prevPos));
+    if (plat) {
+      b.pos.add(_v.subVectors(plat.pos, plat.prevPos));
+      // ...and turn with it: a deck that yaws or pitches (a freighter following its route over the curve of the Moon) swings everything on it
+      // round its middle, and the further out you stand (the wings, the cargo bays) the further it would slide you out from under your feet
+      const pq = this.platQ || (this.platQ = new THREE.Quaternion());
+      if (plat.quat) {
+        if (this.platOn === plat) {
+          _q.copy(pq).invert().premultiply(plat.quat);
+          if (_q.w < 0.99999999 && _q.w > 0.9) {
+            b.pos.sub(plat.pos).applyQuaternion(_q).add(plat.pos);
+            b.vel.applyQuaternion(_q);
+          }
+        }
+        pq.copy(plat.quat);
+        this.platOn = plat;
+      } else this.platOn = null;
+    } else this.platOn = null;
     this.prevVel = (this.prevVel || new THREE.Vector3()).copy(b.vel);
     if (plat) this.prevVel.add(plat.vel);
     // Quantum Slipstream Vanes (a power: on for a few seconds when used): a share of your ground handling in the air

@@ -2696,7 +2696,13 @@ export class Traffic {
     _a.set(1, 0, 0).applyQuaternion(q); _b.set(0, 1, 0).applyQuaternion(q); _c.set(0, 0, 1).applyQuaternion(q);
     boxes.forEach((d, i) => {
       const c = s.deckCols[i];
-      c.ax.copy(_a); c.ay.copy(_b); c.az.copy(_c);
+      if (d.roll) {
+        // (a slab tipped about the ship's z axis: a wing on its dihedral)
+        const cs = Math.cos(d.roll), sn = Math.sin(d.roll);
+        c.ax.copy(_a).multiplyScalar(cs).addScaledVector(_b, sn);
+        c.ay.copy(_b).multiplyScalar(cs).addScaledVector(_a, -sn);
+      } else { c.ax.copy(_a); c.ay.copy(_b); }
+      c.az.copy(_c);
       c.c.copy(s.pos).addScaledVector(_a, d.x || 0).addScaledVector(_b, d.y).addScaledVector(_c, d.z);
       c.hx = d.hx; c.hy = d.hy; c.hz = d.hz;
       this.C.add(c);
