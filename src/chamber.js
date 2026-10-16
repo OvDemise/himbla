@@ -445,7 +445,7 @@ export class Chamber {
     if (t >= TL.bang) th = lerp(-1.5, -1.8, ease((t - TL.bang) / 0.3));
     m.armL.rotation.set(th, 0, 0.12);
     m.head.rotation.y = hush ? 0 : 0.45 * Math.sin(t * 0.7);
-    P.scarfSim.update(dt, new THREE.Vector3(), new THREE.Vector3(0, 1, 0), { back: 0.55, top: 0.94 });
+    P.scarfSim.update(dt, new THREE.Vector3(), new THREE.Vector3(0, 1, 0));
   }
 
   // fully black: take the set down and hand over to the announcement (the picture stays black until reveal())
