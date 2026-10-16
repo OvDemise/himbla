@@ -276,14 +276,15 @@ export class Garage {
     this.enter();
   }
 
-  summon(id) {
+  // at / face: set it down there with its nose along `face` (the town's motor pool) instead of beside you, facing where you look
+  summon(id, at = null, face = null) {
     const g = this.game;
     const P = g.player;
     if (this.active) { this.active.model.root.removeFromParent(); if (this.active.model.trail) this.active.model.trail.dispose(); }
     const def = VEHICLES[id];
     const model = this.build(id);
-    const pos = g.planet.ground(P.pos.clone().addScaledVector(g.cam.right, 5), new THREE.Vector3(), 0.5);
-    const e = { body: makeBody(pos), heading: tangent(g.cam.fwd.clone(), pos.clone().normalize()).normalize() };
+    const pos = g.planet.ground(at ? at.clone() : P.pos.clone().addScaledVector(g.cam.right, 5), new THREE.Vector3(), 0.5);
+    const e = { body: makeBody(pos), heading: tangent((face || g.cam.fwd).clone(), pos.clone().normalize()).normalize() };
     model.root.position.copy(pos).addScaledVector(pos.clone().normalize(), def.hover ? 0.35 : RIDE_LIFT);
     g.scene.add(model.root);
     this.active = { id, def, e, model };

@@ -82,6 +82,7 @@ const _ahead = new THREE.Vector3();
 const _v2 = new THREE.Vector3();
 const JAR_HOLD = 1; // seconds to hold X to empty the jar
 const FROZEN_STATES = new Set(['paused', 'map', 'dialog', 'board', 'log', 'wardrobe', 'dawn']);
+const BOARD_TABS = [{ id: 'jobs', label: 'CONTRACTS' }, { id: 'town', label: 'COUNCIL HALL' }]; // the job board in your own town has the second tab (hometown.js boardPane)
 const _sightN = new THREE.Vector3();
 const _sightNear = [];
 // The threat outline: each enemy's ink shells redrawn in bold red, pushed out a fixed number of
@@ -389,6 +390,11 @@ class Game {
       const esc = code === 'Escape';
       if (this.state === 'board') {
         if (esc || code === 'KeyF') { this.closeModal(esc); return; }
+        if (this.townBoard(this.boardLoc)) {
+          const step = code === 'KeyE' || (code === 'Tab' && !(e && e.shiftKey)) ? 1 : code === 'KeyQ' || code === 'Tab' ? -1 : 0;
+          if (step) { if (!(e && e.repeat)) this.setBoardTab(step); return; }
+          if (this.boardTab === 'town') { if (!(e && e.repeat)) this.town.boardKey(code); return; } // (the digits are the page's numbered buttons here: contracts only on CONTRACTS)
+        }
         const n = parseInt(code.replace('Digit', ''), 10);
         if (n >= 1 && n <= 9) {
           const offers = this.missions.offersFor(this.boardLoc);
@@ -892,16 +898,36 @@ class Game {
   }
 
   // ---------- job board ----------
-  openBoard(loc) {
+  // your town's board has a second tab, the council hall's page (F always opens on CONTRACTS; a screen that came from the hall page reopens on it)
+  townBoard(loc) { return !!(loc && loc.id === 'hometown' && this.town && this.town.loc === loc && this.town.state); }
+
+  openBoard(loc, tab = 'jobs') {
     this.tutorial.on('board');
     this.boardLoc = loc;
+    this.boardTab = this.townBoard(loc) ? tab : 'jobs';
     this.openModal('board');
+    this.refreshBoard();
+  }
+
+  // to: a tab id, or +1 / -1 for the next / previous
+  setBoardTab(to) {
+    if (!this.townBoard(this.boardLoc)) return;
+    const ids = BOARD_TABS.map((t) => t.id), i = ids.indexOf(this.boardTab);
+    const id = typeof to === 'number' ? ids[(i + to + ids.length) % ids.length] : to;
+    if (id === this.boardTab || !ids.includes(id)) return;
+    this.audio.click();
+    this.boardTab = id;
     this.refreshBoard();
   }
 
   refreshBoard() {
     const loc = this.boardLoc;
+    const town = this.townBoard(loc);
     this.hud.openBoard(loc, this.missions.offersFor(loc), {
+      tabs: town ? BOARD_TABS : null,
+      tab: this.boardTab,
+      onTab: (id) => this.setBoardTab(id),
+      pane: town && this.boardTab === 'town' ? this.town.boardPane() : null,
       onAccept: (o) => this.acceptOffer(o),
       onClose: () => this.closeModal(false),
       shop: SHOPS[loc.id] || null,
@@ -1038,7 +1064,21 @@ class Game {
     applyWorldState(this.ws, this.locations);
     const added = this.locations.filter((l) => !before.has(l));
     const changed = this.locations.filter((l) => before.has(l) && before.get(l) !== sig(l));
-    for (const l of added) { this.planet.addZone(l); this.world.buildLocation(l); this.world.prepCulling(l); }
+    // the town grows over the outpost you founded: its flat comes out with the new plateau (refreshWorld,
+    // below, only forgets the outpost, so look it up first)
+    const rep = this.ws.town && this.territory.outposts.find((o) => o.built && o.id === this.ws.town.replaces);
+    for (const l of added) {
+      this.planet.addZone(l, l.id === 'hometown' && rep ? [rep.dir] : []);
+      // crystals lying in the new plateau's blend ring are set back on the new ground (they were placed with
+      // ground(); their old height can't be read once applyWorldState has listed the town without a plane)
+      const cosNear = Math.cos((l.r * 2.2) / this.planet.R);
+      for (const cr of this.world.crystals || []) {
+        if (cr.pos.clone().normalize().dot(l.dir) <= cosNear) continue;
+        this.planet.ground(cr.pos, cr.pos);
+        cr.mesh.position.copy(cr.pos);
+      }
+      this.world.buildLocation(l); this.world.prepCulling(l);
+    }
     for (const l of changed) this.world.rebuildLocation(l);
     const all = [...changed, ...added];
     for (const l of all) delete this.missions.offers[l.id];
@@ -1046,6 +1086,7 @@ class Game {
     this.territory.refreshWorld();
     if (added.some((l) => l.id === 'hometown')) {
       this.town = new HomeTown(this);
+      this.world.traffic.registerLocation(this.town.loc); // (the new town isn't one of the places traffic was built with)
       this.globe.discover(this.town.loc, true);
     }
     this._homes = {};
@@ -1564,7 +1605,7 @@ class Game {
       this.hud.prompt('<b>F</b> — SWEAR IN WITH RUSTMOON');
       if (this.input.pressed('KeyF') && this.boardCooldown <= 0) this.wreckChoice();
     } else if (canBoard) {
-      this.hud.prompt(`<b>F</b> — ${z.short} ${z.hq ? 'HQ · ' : ''}JOB BOARD${SHOPS[z.id] ? ' &amp; GEAR' : ''}`);
+      this.hud.prompt(`<b>F</b> — ${z.short} ${z.hq ? 'HQ · ' : ''}JOB BOARD${SHOPS[z.id] ? ' &amp; GEAR' : ''}${this.townBoard(z) ? ' &amp; COUNCIL HALL' : ''}`);
       if (this.input.pressed('KeyF') && this.boardCooldown <= 0) this.openBoard(z);
     } else this.hud.prompt(null);
 

@@ -280,7 +280,7 @@ const parts = {
 // ---------------------------------------------------------------------------------------------
 const HOME = [
   ['housing', 'HOUSING DOMES'], ['market', 'MARKET HALL'], ['clinic', 'CLINIC'], ['farm', 'GREENHOUSE FARM'], ['motorpool', 'MOTOR POOL'],
-  ['barracks', 'MILITIA BARRACKS'], ['school', 'SCHOOL & PLAYGROUND'], ['radio', 'RADIO TOWER'], ['pad', 'SHUTTLE PAD'],
+  ['barracks', 'MILITIA BARRACKS'], ['roads', 'ROADS'], ['radio', 'RADIO TOWER'], ['pad', 'SHUTTLE PAD'],
 ];
 const hometown = {
   id: 'buildings.hometown',
