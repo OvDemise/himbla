@@ -8,7 +8,7 @@
 #                 a dark splitter. SPACECOM's car alone has a roof light bar (the `livery_spacecom` pivot, extra `faction`: the
 #                 game keeps only the matching one); the other factions' cars have none. No emblems yet (the logos aren't made).
 #   car_civilian  the CIVILIAN car: the same hull, rounder and a hand taller: a big glass bubble under a two-tone roof, chrome
-#                 side bumpers, a single round headlamp on the nose cone, a roof rack with a luggage pod, a soft swoosh instead of a stripe, stubby tail fins.
+#                 side bumpers, a single oval headlamp on the nose cone, a roof rack with a luggage pod, a soft swoosh instead of a stripe, stubby tail fins.
 #
 # Both are about 6.5 m long and 3.9 m over the pods (1.18 x the old car's footprint of 5.5 x 3.3 m), authored in three.js axes
 # (x right, y up, +z nose), centred on the hull's middle like the old car.
@@ -181,10 +181,12 @@ def build_faction(R):
         mesh(f"vent{sx}", xf(rbox(0.09, 0.025, 0.28, 0.3, 8, 4), (x, y, z), (-math.atan(slope), 0, 0)), "dark", R, 0)
     # a dark splitter under the nose: it starts inside the hull's underside and reaches past the nose
     mesh("splitter", xf(extrude([(2.5, 0), (3.5, 0), (3.28, 0.07), (2.5, 0.13)], 1.0, "x"), (0, -0.44, 0)), "dark", R, 0.02)
-    # lamps set into the nose and tail flanks: placed on the hull's surface, turned to its normal, half buried
+    # lamps set into the nose and tail flanks: placed on the hull's surface, turned to its normal, half buried. The headlamp sits above
+    # the chine stripe in a dark housing, so it reads whatever colour the trim is; the tail lamp is a slit on the tail flank
     for sx in (-1, 1):
-        p, yaw = flank(H, sx, 0.02, 2.92)
-        mesh(f"head{sx}", xf(rbox(0.2, 0.045, 0.06, 0.4, 8, 4), mount(p, yaw, 0.03), (0, yaw, 0)), "lamp", R, 0)
+        p, yaw = flank(H, sx, 0.16, 2.86)
+        mesh(f"headHousing{sx}", xf(rbox(0.14, 0.055, 0.05, 0.3, 8, 4), mount(p, yaw, 0.01), (0, yaw, 0)), "dark", R, 0.012)
+        mesh(f"head{sx}", xf(rbox(0.1, 0.032, 0.035, 0.4, 8, 4), mount(p, yaw, -0.022), (0, yaw, 0)), "lamp", R, 0)
         p, yaw = flank(H, sx, 0.15, -3.0)
         mesh(f"tail{sx}", xf(rbox(0.2, 0.045, 0.06, 0.4, 8, 4), mount(p, yaw, 0.03), (0, yaw, 0)), "tail", R, 0)
     # a brake bar across the deck's tail, a number plate on the tail face
@@ -251,11 +253,13 @@ def build_civilian(R):
         q = mount(p, yaw, 0.03)
         mesh(f"tail{sx}", xf(lathe([(0, 0), (0.13, 0), (0.13, 0.06), (0, 0.06)], 12), q, (PI / 2, yaw, 0)), "tail", R, 0)
         mesh(f"tailBezel{sx}", xf(torus(0.145, 0.03, 12, 5), (q[0] + math.sin(yaw) * 0.05, q[1], q[2] + math.cos(yaw) * 0.05), (PI / 2, yaw, 0)), "trim", R, 0)
-    # one round headlamp on the nose cone, in a chrome bezel, its back half inside the cone (the end cap sits at z = 3.1)
+    # one oval headlamp filling the nose cone, in a chrome bezel, its back half inside the cone (the end cap sits at z = 3.1)
     zn = H[-1]["z"]
     yn = H[-1].get("yc", 0.0) + (H[-1]["t"] - H[-1]["b"]) / 2
-    mesh("head", xf(lathe([(0, -0.05), (0.125, -0.05), (0.125, 0.04), (0, 0.04)], 16), (0, yn, zn), (PI / 2, 0, 0)), "lamp", R, 0)
-    mesh("headBezel", xf(torus(0.14, 0.028, 16, 5), (0, yn, zn + 0.03), (PI / 2, 0, 0)), "trim", R, 0.008)
+    ea, eb = 0.31, 0.155    # the lamp's half width and half height
+    mesh("head", xf(lathe([(0, -0.05), (1.0, -0.05), (1.0, 0.04), (0, 0.04)], 24), (0, yn, zn), (PI / 2, 0, 0), (ea, 1, eb)), "lamp", R, 0)
+    ring = [(math.cos(2 * PI * k / 28) * (ea + 0.015), yn + math.sin(2 * PI * k / 28) * (eb + 0.015), zn + 0.035) for k in range(29)]
+    mesh("headBezel", tube(ring, [0.026] * len(ring), 6, False), "trim", R, 0.008)
     # chrome bumpers that wrap the nose and the tail along the hull's own flank (no bar hanging in the air)
     def bumper(name, zs, y, tip_z=None):
         """A tube along the left flank, 5 cm proud of the surface, and (with a tip) round the tip and back up the right flank;
