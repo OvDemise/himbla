@@ -104,6 +104,23 @@ def mount(p, yaw, depth):
     return (p[0] - nx * depth, p[1], p[2] - nz * depth)
 
 
+def gsec(S, z, d):
+    """The loft's section at z, grown by d all round (for a layer laid over it)."""
+    a = sec_at(S, z)
+    return {"z": z, "w": a["w"] + d, "t": a["t"] + d, "b": a["b"] + d, "yc": a["yc"], "eT": a["eT"], "eB": a["eB"]}
+
+
+def above(S, c, f):
+    """True when the face centre c lies in the top part of the loft: more than fraction f of the way up from its centre line to its crown."""
+    a = sec_at(S, c[2])
+    return c[1] > a["yc"] + f * a["t"]
+
+
+def slab(S, z0, z1, d, pred, n=64, k=8):
+    """A patch of the loft's skin between z0 and z1, standing d proud of it, cut to the faces `pred` keeps (a roof panel, a frame, a vent)."""
+    return keep(loft([gsec(S, z0 + (z1 - z0) * i / k, d) for i in range(k + 1)], n, False, False), pred)
+
+
 HULL_F, HULL_C = None, None
 
 
@@ -157,7 +174,7 @@ def build_pods(R, civ, H):
         mesh(f"lift{i}_ring", xf(torus(0.36, 0.045, 16, 5), (0, 0.04, 0)), "trim", P, 0)
 
 
-def build_faction(R):
+def build_faction(R, roof="none"):
     H = HULL_F
     mesh("hull", loft(H, 40), "body", R, 0.07)
     # the livery stripe down the spine, and a chine line down each flank
@@ -173,6 +190,25 @@ def build_faction(R):
     ]
     mesh("canopy", loft(cano, 28), "glass", R, 0.04)
     mesh("canopyFrame", keep(loft(grow(cano, 0.02), 28, False, False), lambda c: abs(c[0]) < 0.16 and c[1] > 1.0), "stripe", R, 0)
+    # ROOF A, ribbed canopy: the glass is broken into panes by three arched ribs in the body colour, and a sensor dome sits on the rear deck.
+    # ROOF B, sport roof: a solid body-colour roof panel over the middle of the canopy (glass left at the windscreen, the back and the
+    # side strips), a stripe down it, and a ramped air scoop with a dark mouth on the back of the panel.
+    if roof == "A":
+        for z in (-0.85, -0.2, 0.75):
+            mesh(f"rib{z}", loft([gsec(cano, z - 0.05, 0.03), gsec(cano, z + 0.05, 0.03)], 40, False, False), "body", R, 0.02)
+        dx, dz = 0.5, -1.95
+        dy = top_y(H, dx, dz) - 0.03
+        mesh("domeBase", xf(lathe([(0, 0), (0.2, 0), (0.2, 0.06), (0, 0.06)], 16), (dx, dy, dz)), "dark", R, 0.015)
+        mesh("dome", xf(lathe([(0, 0.05), (0.16, 0.05), (0.15, 0.1), (0.11, 0.17), (0.05, 0.21), (0, 0.22)], 16), (dx, dy, dz)), "trim", R, 0.015)
+        mesh("domeEye", xf(superquad(0.045, 0.03, 0.045, 0.8, 0.8, 8, 5), (dx, dy + 0.15, dz + 0.1)), "lamp", R, 0)
+    elif roof == "B":
+        mesh("roofPanel", slab(cano, -1.2, 0.55, 0.03, lambda c: above(cano, c, 0.55)), "body", R, 0.03)
+        mesh("roofStripe", slab(cano, -1.2, 0.55, 0.04, lambda c: above(cano, c, 0.55) and abs(c[0]) < 0.1), "stripe", R, 0)
+        yb = top_y(cano, 0, -0.7) + 0.03
+        mesh("scoop", xf(extrude([(-1.0, yb - 0.06), (-0.4, yb - 0.06), (-0.4, yb + 0.17), (-1.0, yb + 0.02)], 0.6, "x")), "trim", R, 0.02)
+        mesh("scoopMouth", xf(rbox(0.24, 0.06, 0.02, 0.3, 8, 4), (0, yb + 0.07, -0.395)), "dark", R, 0)
+        for sx in (-1, 1):
+            mesh(f"scoopFin{sx}", xf(rbox(0.012, 0.09, 0.3, 0.3, 4, 3), (sx * 0.3, yb + 0.02, -0.7)), "stripe", R, 0)
     # hood vents laid on the hood's slope
     for sx in (-1, 1):
         x, z = sx * 0.4, 2.15
@@ -207,7 +243,7 @@ def build_faction(R):
     # SPACECOM's roof light bar standing on the canopy: it belongs to the spacecom `livery` pivot, so only that faction's car has it
     # (two alternating lamps: pivots with role beacon, extra phase)
     LS = pivot("livery_spacecom", (0, 0, 0), R, role="livery", faction="spacecom")
-    yc = top_y(cano, 0, 0.35)
+    yc = top_y(cano, 0, 0.35) + (0.03 if roof == "B" else 0.0)
     mesh("barBase", xf(rbox(0.5, 0.06, 0.12, 0.3, 8, 4), (0, yc, 0.35)), "dark", LS, 0.02)
     for sx, slot in ((-1, "beaconA"), (1, "beaconB")):
         B_ = pivot(f"beacon{sx}", (sx * 0.27, yc + 0.07, 0.35), LS, role="beacon", phase=0 if sx < 0 else 1)
@@ -219,7 +255,7 @@ def build_faction(R):
     mesh("whip", B((ax, ay, az), (ax - 0.1, ay + 1.0, az - 0.3), 0.02, 5, True), "dark", R, 0)
 
 
-def build_civilian(R):
+def build_civilian(R, roof="none"):
     H = HULL_C
     mesh("hull", loft(H, 40), "body", R, 0.07)
     # a soft swoosh down each flank, in place of the faction car's racing stripe
@@ -234,19 +270,43 @@ def build_civilian(R):
     ]
     mesh("canopy", loft(cano, 28), "glass", R, 0.04)
     mesh("roof", keep(loft(grow(cano, 0.03), 28, False, False), lambda c: c[1] > 1.34), "roof", R, 0.02)
-    # a roof rack: four posts each standing on the roof (their feet buried in it), two rails and two cross bars, and the pod strapped on top
-    RY = 1.66
-    for sx in (-1, 1):
-        for z in (-0.9, 0.9):
-            yr = top_y(cano, 0.55, z) - 0.05
-            mesh(f"post{sx}{z}", B((sx * 0.55, yr, z), (sx * 0.55, RY, z), 0.03, 6, True), "trim", R, 0.01)
-            mesh(f"foot{sx}{z}", xf(rbox(0.07, 0.03, 0.07, 0.4, 6, 4), (sx * 0.55, yr + 0.04, z)), "trim", R, 0)
-        mesh(f"rail{sx}", B((sx * 0.55, RY, -0.95), (sx * 0.55, RY, 0.95), 0.03, 6, True), "trim", R, 0.01)
-    for z in (-0.5, 0.5):
-        mesh(f"cross{z}", B((-0.55, RY, z), (0.55, RY, z), 0.025, 6, True), "trim", R, 0)
-    mesh("luggage", xf(rbox(0.46, 0.17, 0.62, 0.35, 12, 6), (0, RY + 0.12, -0.05)), "stripe", R, 0.03)
-    for z in (-0.3, 0.3):
-        mesh(f"strap{z}", xf(rbox(0.475, 0.19, 0.025, 0.2, 10, 4), (0, RY + 0.12, z - 0.05)), "trim", R, 0)
+    # ROOF A, sunroof: a framed glass sunroof on the cream cap, a vent hatch behind it and an accent-coloured sun-visor ridge over the
+    # windscreen (no rack).  ROOF B, cargo box: the rack with a long streamlined roof box on it, a seam round the lid and a pair of
+    # roof lamps on a front crossbar.  (With neither, the original rack and luggage pod.)
+    if roof == "A":
+        mesh("sunroofFrame", slab(cano, -0.45, 0.85, 0.045, lambda c: c[1] > 1.3 and abs(c[0]) < 0.42), "trim", R, 0.01)
+        mesh("sunroof", slab(cano, -0.38, 0.78, 0.06, lambda c: c[1] > 1.3 and abs(c[0]) < 0.34), "glass", R, 0)
+        mesh("ventFrame", slab(cano, -1.06, -0.76, 0.045, lambda c: c[1] > 1.2 and abs(c[0]) < 0.3), "trim", R, 0.01)
+        mesh("vent", slab(cano, -1.0, -0.82, 0.055, lambda c: c[1] > 1.2 and abs(c[0]) < 0.24), "dark", R, 0)
+        for k in range(3):
+            z = -0.97 + k * 0.07
+            mesh(f"louver{k}", slab(cano, z - 0.012, z + 0.012, 0.065, lambda c: c[1] > 1.2 and abs(c[0]) < 0.24), "trim", R, 0)
+        mesh("visor", slab(cano, 0.95, 1.2, 0.07, lambda c: c[1] > 1.15 and abs(c[0]) < 0.75), "stripe", R, 0.01)
+    else:
+        # a roof rack on the cream cap: four posts each standing on the roof (their feet buried in it), two rails and two cross bars, and the pod strapped on top
+        RY = 1.66
+        for sx in (-1, 1):
+            for z in (-0.6, 0.6):
+                yr = top_y(cano, 0.42, z) - 0.05
+                mesh(f"post{sx}{z}", B((sx * 0.42, yr, z), (sx * 0.42, RY, z), 0.03, 6, True), "trim", R, 0.01)
+                mesh(f"foot{sx}{z}", xf(rbox(0.07, 0.03, 0.07, 0.4, 6, 4), (sx * 0.42, yr + 0.04, z)), "trim", R, 0)
+            mesh(f"rail{sx}", B((sx * 0.42, RY, -0.66), (sx * 0.42, RY, 0.66), 0.03, 6, True), "trim", R, 0.01)
+        for z in (-0.3, 0.3):
+            mesh(f"cross{z}", B((-0.42, RY, z), (0.42, RY, z), 0.025, 6, True), "trim", R, 0)
+        if roof == "none":
+            mesh("luggage", xf(rbox(0.36, 0.15, 0.46, 0.35, 12, 6), (0, RY + 0.12, 0.0)), "stripe", R, 0.03)
+            for z in (-0.2, 0.2):
+                mesh(f"strap{z}", xf(rbox(0.375, 0.17, 0.025, 0.2, 10, 4), (0, RY + 0.12, z)), "trim", R, 0)
+    if roof == "B":
+        RYb = 1.66
+        BX = [{"z": -0.62, "w": 0.26, "t": 0.1, "b": 0.08}, {"z": -0.3, "w": 0.36, "t": 0.18, "b": 0.1}, {"z": 0.3, "w": 0.36, "t": 0.18, "b": 0.1}, {"z": 0.62, "w": 0.26, "t": 0.1, "b": 0.08}]
+        mesh("boxHull", xf(loft(BX, 24), (0, RYb + 0.1, 0)), "stripe", R, 0.03)
+        mesh("boxSeam", xf(rbox(0.36, 0.012, 0.012, 0.3, 8, 3), (0, RYb + 0.275, 0.0)), "dark", R, 0)
+        mesh("crossFront", B((-0.42, RYb, 0.66), (0.42, RYb, 0.66), 0.025, 6, True), "trim", R, 0)
+        for sx in (-1, 1):
+            mesh(f"roofLampMount{sx}", B((sx * 0.3, RYb, 0.66), (sx * 0.3, RYb + 0.07, 0.7), 0.025, 6, True), "trim", R, 0)
+            mesh(f"roofLamp{sx}", xf(lathe([(0, -0.03), (0.075, -0.03), (0.075, 0.03), (0, 0.03)], 12), (sx * 0.3, RYb + 0.09, 0.73), (PI / 2, 0, 0)), "lamp", R, 0)
+            mesh(f"roofLampRing{sx}", xf(torus(0.085, 0.015, 12, 5), (sx * 0.3, RYb + 0.09, 0.74), (PI / 2, 0, 0)), "trim", R, 0)
     # round tail lamps in chrome bezels, set into the tail flanks and turned to the surface
     for sx in (-1, 1):
         p, yaw = flank(H, sx, 0.12, -3.0)
@@ -297,16 +357,24 @@ def build_civilian(R):
     mesh("whipTip", xf(superquad(0.05, 0.05, 0.05, 1, 1, 8, 5), (ax - 0.08, ay + 1.1, az - 0.28)), "tail", R, 0)
 
 
-RF = pivot("car_faction", (0, 0, 0))
-RC = pivot("car_civilian", (0, 0, 0))
-build_pods(RF, False, HULL_F)
-build_faction(RF)
-build_pods(RC, True, HULL_C)
-build_civilian(RC)
-for r in (RF, RC):
-    r["radius"] = 3.4
-    r["length"] = 6.5
-    r["width"] = 3.9
+def build_set(suffix, roof):
+    RF = pivot("car_faction" + suffix, (0, 0, 0))
+    RC = pivot("car_civilian" + suffix, (0, 0, 0))
+    build_pods(RF, False, HULL_F)
+    build_faction(RF, roof)
+    build_pods(RC, True, HULL_C)
+    build_civilian(RC, roof)
+    for r in (RF, RC):
+        r["radius"] = 3.4
+        r["length"] = 6.5
+        r["width"] = 3.9
+
+
+# the game's cars (the roofs it uses); MOONRUNNER_ROOF_PREVIEW=1 also builds every roof option beside them, as car_faction_A and so on
+build_set("", os.environ.get("HOVERCAR_ROOF", "none"))
+if os.environ.get("MOONRUNNER_ROOF_PREVIEW") == "1":
+    for _r in ("none", "A", "B"):
+        build_set("_" + _r, _r)
 print("built", len(C.objects), "objects")
 
 if os.environ.get("MOONRUNNER_EXPORT", "1") == "1":
