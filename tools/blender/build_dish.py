@@ -83,20 +83,6 @@ def par(r):
 
 
 # ---------------- pieces (geometry returns) ----------------
-def join(geos):
-    verts, faces = [], []
-    for v, f in geos:
-        o = len(verts)
-        verts.extend(v)
-        faces.extend([tuple(i + o for i in fc) for fc in f])
-    return verts, faces
-
-
-def B(a, b, r, seg=4, cap=False):
-    """One strut between two points (open ends by default: they sit inside the members they join)."""
-    return tube([a, b], [r, r], seg, cap)
-
-
 def cube(hx, hy, hz, pos=(0, 0, 0), rot=(0, 0, 0)):
     """A plain box (half extents): 12 triangles, for the small parts."""
     v = [(-hx, -hy, -hz), (hx, -hy, -hz), (hx, hy, -hz), (-hx, hy, -hz), (-hx, -hy, hz), (hx, -hy, hz), (hx, hy, hz), (-hx, hy, hz)]

@@ -76,20 +76,6 @@ def rb(name, hx, hy, hz, pos, slot, parent, ink=0.04, e=0.08, rot=(0, 0, 0), nu=
     return M(name, xf(rbox(hx, hy, hz, e, nu, nv), pos, rot), slot, parent, ink)
 
 
-def join(geos):
-    verts, faces = [], []
-    for v, f in geos:
-        o = len(verts)
-        verts.extend(v)
-        faces.extend([tuple(i + o for i in fc) for fc in f])
-    return verts, faces
-
-
-def B(a, b, r, seg=4, cap=False):
-    """One strut between two points (open ends by default: they sit inside the members they join)."""
-    return tube([a, b], [r, r], seg, cap)
-
-
 def box(hx, hy, hz, pos, e=0.05):
     return xf(rbox(hx, hy, hz, e, 4, 2), pos)
 

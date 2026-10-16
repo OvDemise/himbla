@@ -49,10 +49,7 @@ SLOT_COLORS = {
     "collar": (1.0, 0.82, 0.25), "lens": (1.0, 0.96, 0.66), "glint": (1.0, 1.0, 1.0),
 }
 
-
-def tb(p):
-    """three.js axes -> Blender axes"""
-    return (p[0], -p[2], p[1])
+exec(open(os.path.join(REPO, "tools", "blender", "kit.py"), encoding="utf-8").read(), globals())
 
 
 # ---------------- geometry helpers (three.js axes, return (verts, faces)) ----------------
@@ -84,10 +81,6 @@ def lathe(profile, segs=16, sx=1.0, sz=1.0, phase=0.0):
             for i in range(segs):
                 faces.append((a[i], a[(i + 1) % segs], b[(i + 1) % segs], b[i]))
     return verts, faces
-
-
-def spe(v, e):
-    return math.copysign(abs(v) ** e, v)
 
 
 def superquad(sx, sy, sz, e1=0.35, e2=0.35, nu=16, nv=10):
@@ -210,30 +203,7 @@ def keep(geo, pred):
     return [verts[i] for i in used], [tuple(remap[i] for i in f) for f in out]
 
 
-def merge(*geos):
-    verts, faces = [], []
-    for v, f in geos:
-        o = len(verts)
-        verts += v
-        faces += [tuple(i + o for i in face) for face in f]
-    return verts, faces
-
-
 # ---------------- scene plumbing ----------------
-
-def material(slot):
-    m = bpy.data.materials.get(slot)
-    if not m:
-        m = bpy.data.materials.new(slot)
-        m.use_nodes = True
-    c = SLOT_COLORS[slot]
-    m.diffuse_color = (*c, 1)
-    bsdf = next((n for n in m.node_tree.nodes if n.type == "BSDF_PRINCIPLED"), None)
-    if bsdf:
-        bsdf.inputs["Base Color"].default_value = (*c, 1)
-        bsdf.inputs["Roughness"].default_value = 0.6
-    return m
-
 
 def coll():
     c = bpy.data.collections.get(COLL)

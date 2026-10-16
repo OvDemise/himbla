@@ -1,6 +1,8 @@
-# Shared geometry and scene helpers for the Blender build scripts (build_skimmer.py,
-# build_warrig.py). Load with  exec(open(<repo>/tools/blender/kit.py).read(), globals())  after
-# setting COLL (the collection to rebuild) and SLOT_COLORS (preview colour per material slot).
+# Shared geometry and scene helpers for the Blender build scripts. Load with
+# exec(open(<repo>/tools/blender/kit.py).read(), globals())  after setting COLL (the collection
+# to rebuild) and SLOT_COLORS (preview colour per material slot). A script that needs a variant
+# (build_runner.py's lathe and mesh, build_ships.py's ring_pts and mesh) defines its own after
+# the exec, which replaces the kit's of that name for everything in the script.
 #
 # Everything is authored in three.js axes (x right, y up, +z forward) and converted to Blender's
 # (x, -z, y) on the way in, which the glTF exporter's +Y-up option converts back.
@@ -184,6 +186,25 @@ def keep(geo, pred):
     used = sorted({i for f in out for i in f})
     remap = {o: n for n, o in enumerate(used)}
     return [verts[i] for i in used], [tuple(remap[i] for i in f) for f in out]
+
+
+def join(geos):
+    verts, faces = [], []
+    for v, f in geos:
+        o = len(verts)
+        verts.extend(v)
+        faces.extend([tuple(i + o for i in fc) for fc in f])
+    return verts, faces
+
+
+def merge(*geos):
+    """join() with the geometries as arguments"""
+    return join(geos)
+
+
+def B(a, b, r, seg=4, cap=False):
+    """One strut between two points (open ends by default: they sit inside the members they join)."""
+    return tube([a, b], [r, r], seg, cap)
 
 
 def beam(a, b, r, seg=6):

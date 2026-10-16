@@ -58,17 +58,10 @@ SLOT_COLORS = {
     "cargo0": (1.0, 0.82, 0.25), "cargo1": (0.18, 0.77, 1.0), "cargo2": (1.0, 0.23, 0.36), "cargo3": (0.49, 1.0, 0.42),
 }
 
-
-def tb(p):
-    """three.js axes -> Blender axes"""
-    return (p[0], -p[2], p[1])
+exec(open(os.path.join(REPO, "tools", "blender", "kit.py"), encoding="utf-8").read(), globals())
 
 
 # ---------------- geometry helpers (three.js axes, return (verts, faces)) ----------------
-
-def spe(v, e):
-    return math.copysign(abs(v) ** e, v)
-
 
 def ring_pts(w, top, bot, eT, eB, yc=0.0, n=32):
     """A superellipse cross-section in the x-y plane: half-width w, top/bot heights above/below
@@ -81,28 +74,6 @@ def ring_pts(w, top, bot, eT, eB, yc=0.0, n=32):
         h = top if s >= 0 else bot
         pts.append((w * spe(c, 2 / e), yc + h * spe(s, 2 / e)))
     return pts
-
-
-def loft(sections, n=32, cap0=True, cap1=True):
-    """Hull through cross-sections, each a dict(z, w, t, b, eT=2.5, eB=2.5, yc=0), ordered by z."""
-    verts, faces = [], []
-    for s in sections:
-        for x, y in ring_pts(s["w"], s["t"], s["b"], s.get("eT", 2.5), s.get("eB", 2.5), s.get("yc", 0.0), n):
-            verts.append((x, y, s["z"]))
-    for j in range(len(sections) - 1):
-        for i in range(n):
-            a, b = j * n + i, j * n + (i + 1) % n
-            faces.append((a, b, b + n, a + n))
-    for cap, j in ((cap0, 0), (cap1, len(sections) - 1)):
-        if not cap:
-            continue
-        s = sections[j]
-        verts.append((0.0, s.get("yc", 0.0) + (s["t"] - s["b"]) / 2, s["z"]))
-        c = len(verts) - 1
-        for i in range(n):
-            a, b = j * n + i, j * n + (i + 1) % n
-            faces.append((b, a, c) if j == 0 else (a, b, c))
-    return verts, faces
 
 
 def surf_x(sec, y):
@@ -211,52 +182,6 @@ def rbox(sx, sy, sz, e=0.18, nu=16, nv=8):
     return superquad(sx, sy, sz, e, e, nu, nv)
 
 
-def lathe(profile, segs=16):
-    """profile: [(r, y)] bottom to top around the y axis; r == 0 rows collapse to a pole."""
-    verts, faces, rows = [], [], []
-    for r, y in profile:
-        if r <= 1e-6:
-            rows.append([len(verts)])
-            verts.append((0.0, y, 0.0))
-            continue
-        row = []
-        for i in range(segs):
-            a = 2 * math.pi * i / segs
-            row.append(len(verts))
-            verts.append((math.sin(a) * r, y, math.cos(a) * r))
-        rows.append(row)
-    for a, b in zip(rows, rows[1:]):
-        if len(a) == 1 and len(b) == 1:
-            continue
-        if len(a) == 1:
-            for i in range(segs):
-                faces.append((a[0], b[(i + 1) % segs], b[i]))
-        elif len(b) == 1:
-            for i in range(segs):
-                faces.append((a[i], a[(i + 1) % segs], b[0]))
-        else:
-            for i in range(segs):
-                faces.append((a[i], a[(i + 1) % segs], b[(i + 1) % segs], b[i]))
-    return verts, faces
-
-
-def torus(R, r, seg=24, rseg=8):
-    """Ring lying in the x-z plane (axis = y)."""
-    verts, faces = [], []
-    for i in range(seg):
-        a = 2 * math.pi * i / seg
-        for k in range(rseg):
-            b = 2 * math.pi * k / rseg
-            rr = R + r * math.cos(b)
-            verts.append((math.sin(a) * rr, r * math.sin(b), math.cos(a) * rr))
-    for i in range(seg):
-        i2 = (i + 1) % seg
-        for k in range(rseg):
-            k2 = (k + 1) % rseg
-            faces.append((i * rseg + k, i * rseg + k2, i2 * rseg + k2, i2 * rseg + k))
-    return verts, faces
-
-
 def tube(path, radii, seg=8, cap=True):
     """Round tube along a polyline with a radius per point."""
     verts, faces = [], []
@@ -319,51 +244,11 @@ def keep(geo, pred):
     return [verts[i] for i in used], [tuple(remap[i] for i in f) for f in out]
 
 
-def merge(*geos):
-    verts, faces = [], []
-    for v, f in geos:
-        o = len(verts)
-        verts += v
-        faces += [tuple(i + o for i in face) for face in f]
-    return verts, faces
-
-
 def mirror_x(geo):
     return merge(geo, xf(geo, s=(-1, 1, 1)))
 
 
-def beam(a, b, r, seg=6):
-    return tube([a, b], [r, r], seg)
-
-
 # ---------------- scene plumbing ----------------
-
-def material(slot):
-    m = bpy.data.materials.get(slot)
-    if not m:
-        m = bpy.data.materials.new(slot)
-        m.use_nodes = True
-    c = SLOT_COLORS[slot]
-    m.diffuse_color = (*c, 1)
-    bsdf = next((n for n in m.node_tree.nodes if n.type == "BSDF_PRINCIPLED"), None)
-    if bsdf:
-        bsdf.inputs["Base Color"].default_value = (*c, 1)
-        bsdf.inputs["Roughness"].default_value = 0.6
-    return m
-
-
-def coll():
-    c = bpy.data.collections.get(COLL)
-    if c:
-        for o in list(c.objects):
-            bpy.data.objects.remove(o, do_unlink=True)
-        for me in [m for m in bpy.data.meshes if m.users == 0]:
-            bpy.data.meshes.remove(me)
-    else:
-        c = bpy.data.collections.new(COLL)
-        bpy.context.scene.collection.children.link(c)
-    return c
-
 
 def pivot(name, pos, parent=None, **props):
     e = bpy.data.objects.new(name, None)

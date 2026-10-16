@@ -68,15 +68,6 @@ PFX = "garage_"   # the prefix of every object name in the garage being built (B
 # ---------------------------------------------------------------------------------------------------------------
 # geometry helpers: hard-edged boxes and the kit's cylinders, gathered per material slot into a few merged meshes
 # ---------------------------------------------------------------------------------------------------------------
-def join(geos):
-    verts, faces = [], []
-    for v, f in geos:
-        o = len(verts)
-        verts.extend(v)
-        faces.extend([tuple(i + o for i in fc) for fc in f])
-    return verts, faces
-
-
 class Acc:
     """Boxes and tubes that share a material slot and a parent, merged into one mesh when flushed."""
     all = []

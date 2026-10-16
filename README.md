@@ -731,7 +731,7 @@ tools/
   blender/build_dish.py    builds the cryo receiver and gantry station dish arrays -> src/assets/dish.glb (also runs headless)
   blender/build_outposts.py builds the Relay Mast and Watchtower -> src/assets/outposts.glb (also runs headless; `npm run check:outposts` checks the file)
   blender/decals.py        flat lettering, emblems, hazard stripes and safety signs (no textures) the land-train builder execs after kit.py
-  blender/kit.py           shared geometry/material/export helpers the skimmer, war-rig, APC and land-train builders exec
+  blender/kit.py           shared geometry/material/export helpers every Blender builder execs (the runner and ships keep their own variants of a few)
   viewer.html              dev-only model viewer (npm run dev, then /tools/viewer.html?m=shuttle|freighter|apc|landtrain|crane|garage|dish|outpost|mite|lineup…; dish takes &kind=cryo|gantry&faction=…&no=01..04&size=30&tilt=<rad>&sweep=1; apc takes &turret=<rad>&barrel=<rad>; landtrain takes &type=moonliner|prospector&faction=spacecom|vostok|kepler|meridian&cars=pax,tank,cargo,blast&unit=<n>)
 ```
 
