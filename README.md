@@ -536,7 +536,7 @@ lined up side by side, 203 of them in 25 sections (the runner and its gear, peop
 weapons and effects, rocks and nature, the secrets and the Spindle's props, ground vehicles and ships, outposts intact and
 wrecked, the building parts the settlements are made of, the hometown, and all the places). The small ones stand in the
 yellow lane (z = 0), the places over 100 m across in the cyan lane 460 m over; the whole row is about 9 km, so the dev
-speed multiplier helps. Each item has a name board and is built when you come near and let go of when you walk off, so the
+speed multiplier helps. There is a terminal by the plaza and at the start of every section (a dark console under a tall light column): stand by one, press `F`, and jump to the start of any other section instead of walking. Each item has a name board and is built when you come near and let go of when you walk off, so the
 row costs nothing to keep. You cannot be hurt there, the Moon (its story, missions and events) waits frozen, and nothing you
 do there is saved. Leave through the same menu entry (it reads LEAVE ASSET ROW), any teleport, or quit to the menu: you land
 back where you were. It is not a place on the Moon, is in no save, and a release build has none of it. The catalogue is in

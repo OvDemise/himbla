@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { GRAV } from './geo.js';
-import { toon, textSprite } from './toon.js';
+import { toon, glow, ink, textSprite } from './toon.js';
 import { mulberry32 } from './rng.js';
 import { GROUPS } from './assetRowItems/index.js';
 
@@ -28,6 +28,18 @@ const BUILD_MS = 14; // at most this long a frame spent building items (a big pl
 const GAP = (w) => Math.min(14, Math.max(6, w * 0.12)); // clear metres between neighbouring footprints
 const SECTION_GAP = 36;
 const COLOR = { A: '#ffd23f', B: '#2ee6ff' };
+const TERMINAL_R = 5.5; // m: how near a terminal you must stand to use it
+
+// A section terminal: a console with a slanted screen under a light column that shows from far off. `color` is the lane's.
+function makeTerminal(color) {
+  const g = new THREE.Group();
+  const base = new THREE.Mesh(new THREE.BoxGeometry(1.8, 1.1, 1.1), toon(0x2a2438)); base.position.y = 0.55; ink(base, 0.06); g.add(base);
+  const screen = new THREE.Mesh(new THREE.BoxGeometry(1.6, 1, 0.14), glow(0x2ee6ff)); screen.position.set(0, 1.6, 0.1); screen.rotation.x = -0.5; ink(screen, 0.05); g.add(screen);
+  const cap = new THREE.Mesh(new THREE.BoxGeometry(1.8, 0.12, 0.7), toon(color)); cap.position.set(0, 1.12, 0); g.add(cap);
+  const beam = new THREE.Mesh(new THREE.BoxGeometry(0.25, 22, 0.25), glow(color)); beam.position.y = 12.5; g.add(beam);
+  for (const m of [base, screen, cap]) m.castShadow = true;
+  return g;
+}
 
 // ---------- the flat planet interface the physics, camera, effects and HUD use (planet.js has the Moon's) ----------
 class FlatWorld {
@@ -101,6 +113,7 @@ export class AssetRow {
     this.root = null;
     this.items = []; // every catalogue item, with its place in the layout (layout())
     this.sections = [];
+    this.terminals = []; // one by the plaza and one at the start of every section (build())
     this.t = 0;
   }
 
@@ -151,7 +164,16 @@ export class AssetRow {
     // the plaza: the way in, and what is down the row
     const title = board('ASSET ROW', 9, '#2ee6ff'); title.position.set(0, 12, 20); root.add(title);
     const note = board(`${this.items.length} ASSETS · LANE A (YELLOW): EVERYTHING UNDER 100 M · LANE B (CYAN, ${LANE_Z.B} M OVER): THE BIG PLACES`, 1.6, '#ffffff'); note.position.set(0, 5.5, 20); root.add(note);
-    for (const s of this.sections) {
+    // the terminals: where you can jump to any section instead of walking (use: F, see terminalMenu)
+    const addTerminal = (name, x, z, color, hex) => {
+      const t = makeTerminal(color);
+      t.position.set(x, 0, z);
+      root.add(t);
+      this.terminals.push({ name, x, z, color: hex });
+    };
+    addTerminal('PLAZA', 8, 52, 0x2ee6ff, '#2ee6ff');
+    for (const s of [...this.sections].sort((a, b) => a.lane.localeCompare(b.lane) || a.x - b.x)) { // (the menu lists the yellow lane's sections down the row, then the cyan lane's)
+      addTerminal(`${s.lane} · ${s.title}`, s.x + 4, LANE_Z[s.lane] + 34, s.lane === 'A' ? 0xffd23f : 0x2ee6ff, COLOR[s.lane]);
       const b = board(s.title, 6, COLOR[s.lane]);
       b.position.set(s.x + 8, 13, LANE_Z[s.lane]);
       root.add(b);
@@ -252,6 +274,7 @@ export class AssetRow {
     this.build();
     this.active = true;
     this.t = 0;
+    this.nearTerminal = null;
     // remember where you were, and what a visit must not change
     this.back = { pos: g.player.pos.clone(), fwd: g.cam.fwd.clone(), pitch: g.cam.pitch };
     this.keep = { credits: g.credits, stats: JSON.parse(JSON.stringify(g.stats)) };
@@ -276,18 +299,19 @@ export class AssetRow {
     GRAV.flat = UP;
     // the Moon's HUD (contract, event, territory, objective, prompts, minimap) has nothing to say here
     this.style = document.createElement('style');
-    this.style.textContent = 'body.asset-row :is(#mission, #eventpanel, #scanchip, #techchip, #obj-arrow, #obj-marker, #zonewarn, #prompt, #tip, #banner, #evpop, #terrchip, #minimap, #dilate) { display: none !important; }';
+    this.style.textContent = 'body.asset-row :is(#mission, #eventpanel, #scanchip, #techchip, #obj-arrow, #obj-marker, #zonewarn, #tip, #banner, #evpop, #terrchip, #minimap, #dilate) { display: none !important; }';
     document.head.appendChild(this.style);
     document.body.classList.add('asset-row');
+    this.termCols = this.terminals.map((t) => g.colliders.add({ type: 'box', c: new THREE.Vector3(t.x, 1, t.z), hx: 0.9, hy: 1, hz: 0.6, ax: new THREE.Vector3(1, 0, 0), ay: UP.clone(), az: new THREE.Vector3(0, 0, 1) }));
     this.respawnAt();
     this.stream(1e9); // (what is round the start, all at once)
     g.hud.alert('ASSET ROW', '#2ee6ff', 2.5);
     g.hud.toast('Dev showroom: walk (or skate, or turn the dev speed up) along the row. Leave from the dev menu (F8) → full cheat menu → teleport, or teleport anywhere.', 6);
   }
 
-  respawnAt() {
+  respawnAt(x = 0, z = 70) {
     const g = this.game;
-    const p = new THREE.Vector3(0, 1.5, 70), fwd = new THREE.Vector3(1, 0, 0);
+    const p = new THREE.Vector3(x, 1.5, z), fwd = new THREE.Vector3(1, 0, 0);
     g.player.respawn(p, fwd);
     g.cam.fwd.copy(fwd);
     g.cam.up.copy(UP);
@@ -301,6 +325,9 @@ export class AssetRow {
     if (!this.active) return;
     this.active = false;
     for (const e of this.items) if (e.state === 'on') this.dropItem(e);
+    for (const c of this.termCols || []) g.colliders.remove(c);
+    this.termCols = null;
+    g.hud.prompt(null);
     for (const o of this.hidden || []) o.visible = true;
     this.hidden = null;
     this.root.removeFromParent();
@@ -331,12 +358,36 @@ export class AssetRow {
     if (g.territory) g.territory.current = null;
   }
 
+  // The terminal menu: every terminal (the plaza's, then each section's, in row order) as a jump, 7 to a page
+  terminalMenu(page = 0) {
+    const g = this.game;
+    const per = 7, pages = Math.ceil(this.terminals.length / per);
+    page = ((page % pages) + pages) % pages;
+    const buttons = this.terminals.slice(page * per, page * per + per).map((t, i) => ({ label: `${i + 1} · ${t.name}`, fn: () => this.jumpTo(t) }));
+    if (pages > 1) buttons.push({ label: `${buttons.length + 1} · NEXT PAGE (${page + 1}/${pages})`, fn: () => this.terminalMenu(page + 1) });
+    buttons.push({ label: 'CLOSE' });
+    g.dialog('ASSET ROW TERMINAL', '<small>Jump to the start of a section: the yellow lane is everything under 100 m across, the cyan one the big places.</small>', buttons);
+  }
+
+  // Stand in front of a terminal, facing down the row, and build what is round you
+  jumpTo(t) {
+    const g = this.game;
+    this.respawnAt(t.x, t.z + 3.5);
+    this.stream(1e9);
+    g.fx.pop(`→ ${t.name}`, null, { color: t.color, size: 44 });
+  }
+
   // every frame while here (main.js updateRow)
   update(dt) {
     const g = this.game, P = g.player;
     if (!this.active) return;
     this.t += dt;
     this.stream(BUILD_MS);
+    // a terminal in reach: F opens its menu
+    let near = null;
+    for (const t of this.terminals) if (Math.hypot(P.pos.x - t.x, P.pos.z - t.z) < TERMINAL_R && P.pos.y < 8) { near = t; break; }
+    if (near !== this.nearTerminal) { this.nearTerminal = near; g.hud.prompt(near ? 'F · TERMINAL: JUMP TO ANOTHER SECTION' : null); }
+    if (near && g.input.pressed('KeyF') && g.boardCooldown <= 0) this.terminalMenu();
     for (const e of this.items) if (e.state === 'on' && e.api && e.api.update) e.api.update(dt, this.t);
     // flat, even light: a high sun, the sky fill straight up, no moonlight, no helmet lamp
     const sunDir = _sd.set(0.45, 0.8, 0.4).normalize();
