@@ -940,7 +940,7 @@ for side in (-1, 1):
             FM(f"spreaderHinge{side}{sx}{sz}", xf(rbox(0.2, 0.06, 0.3, 0.3, 4, 3), (sx * 1.85, -0.38, sz * 3.9)), "steel", H_, 0.01)
 
 # ---- the collision: solid boxes in the ship's own frame (hx, hy, hz, x, y, z) that the game keeps in the world while the ship is near, so the
-# hull, tower, nose, bells, wings, the cages and the crates are solid and their tops can be stood on (the belly's middle stays open for the ramp) ----
+# hull, tower, nose, bells, wings, the cages and the crates are solid and their tops can be stood on ----
 _solid = []
 
 
@@ -951,8 +951,7 @@ def solid(hx, hy, hz, x, y, z, k=1.0):
 _c = lambda lo, hi: ((lo + hi) / 2, (hi - lo) / 2)      # (centre, half) of a span
 zc_, zh_ = _c(-27.2, zf(18.0))
 solid(7.9, 2.62, zh_, 0, 2.52, zc_, K)                   # the deck slab and the upper hull: top = the deck plate (5.14)
-for sx in (-1, 1):
-    solid(2.65, 2.45, zh_, sx * 5.25, -2.55, zc_, K)     # the lower hull either side of the belly's open middle
+solid(7.9, 2.45, zh_, 0, -2.55, zc_, K)                  # the lower hull, belly and all: the ramp is shut flush with the belly and is no door a player can walk through
 
 
 def slabs(secs, z0, z1, step, y_lo=None):
