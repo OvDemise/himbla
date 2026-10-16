@@ -13,6 +13,8 @@ export const VEHICLES = {
   apc: { hp: 480, name: 'Vostok BTR-M Moon APC', faction: 'vostok', max: 62, engine: 24, turn: 1.9, grip: 18, armor: 0.4, color: 0x6b6f78, trim: 0xff3b5c, scale: 1.35, hideRider: true, turret: true, desc: 'Slow tank of a thing. Shrugs off fire. The turret follows where you look and fires on left mouse.' },
   skimmer: { hp: 180, name: 'Daedalus Phase Skimmer', faction: 'daedalus', max: 100, engine: 34, turn: 2.2, grip: 4, armor: 0.85, color: 0x1a1426, trim: 0xc77dff, hover: true, desc: 'Hovers. Drifts. Terrifyingly fast.' },
   mule: { hp: 300, name: 'Kepler Homestead Mule', faction: 'kepler', max: 58, engine: 26, turn: 2.2, grip: 16, armor: 0.6, color: 0x6a8f3a, trim: 0xff9f1c, scale: 1.2, cargoSafe: true, desc: 'Hauler. Cargo rides in a padded bed and takes no jostle damage.' },
+  // (the Moon Council's Militia Pact puts it on sale at Kepler Civic Center: the APC's hull and cannon in militia paint, with the Mule's padded bed)
+  carrier: { hp: 380, name: 'Kepler Militia Carrier', faction: 'kepler', max: 66, engine: 28, turn: 2.1, grip: 18, armor: 0.5, color: 0x5c8a2e, trim: 0xff9f1c, scale: 1.15, hideRider: true, turret: true, apcHull: true, cargoSafe: true, desc: 'The Mule\'s big brother: a padded cargo bay, field armour and a turret cannon that follows where you look.' },
   // (id stays 'van' so existing saves keep it: it's a light-bike now)
   van: { hp: 190, name: 'Meridian Courier Light-Bike', faction: 'meridian', max: 96, engine: 34, turn: 2.7, grip: 10, armor: 0.8, color: 0x2ec4ff, trim: 0xffd23f, bike: true, seat: 1.42, seatZ: -0.88, radius: 2.1, desc: 'A sleek light-bike that leaves a glowing trail. Fast, sharp, and very stylish.' },
   warrig: { hp: 340, name: 'Rustmoon Scrapjaw War-Rig', faction: 'rustmoon', max: 78, engine: 32, turn: 2.4, grip: 14, armor: 0.6, color: 0x7b2ff7, trim: 0x7dff3a, scale: 1.35, pirate: true, desc: 'Stolen, welded, painted green. Rams for damage.' },
@@ -39,7 +41,7 @@ export function buildVehicleModel(id) {
     m = makeSkimmer({ color: def.color, trim: def.trim });
     return m;
   }
-  if (id === 'apc') {
+  if (id === 'apc' || def.apcHull) {
     m = makeApc({ color: def.color, trim: def.trim });
     m.root.scale.setScalar(def.scale);
     return m; // (no seat-back: the runner is buttoned up inside)

@@ -70,8 +70,8 @@ export const MOTIONS = {
     stance: {},
   },
   militiaPact: {
-    name: 'Militia Pact', icon: 'council', tint: '#ff9f1c', feature: '2 more militia turrets',
-    desc: 'Every Kepler town gets two more militia turrets, and the Homestead Mule goes on sale at Kepler Civic Center.',
+    name: 'Militia Pact', icon: 'council', tint: '#ff9f1c', feature: '2 more guns · Militia Carrier',
+    desc: 'Every Kepler town gets two more militia turrets, and the Kepler Militia Carrier (an armoured hauler with a turret cannon) goes on sale at Kepler Civic Center.',
     stance: {},
   },
 };
