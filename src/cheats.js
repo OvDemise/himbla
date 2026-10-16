@@ -74,7 +74,6 @@ export class Cheats {
       { label: '6 · FULL CHEAT MENU…', fn: () => this.open() },
       { label: `7 · RAGDOLL: ${this.ragdoll ? 'ON' : 'OFF'}`, fn: () => { this.toggleRagdoll(); this.dev(); } },
       { label: '8 · GIT: FETCH & PULL UPSTREAM…', fn: () => this.gitMenu() },
-      { label: '9 · SKATE SOUND (pitch & octave)…', fn: () => this.skateSoundMenu() },
       { label: 'CLOSE' },
     ]);
     g.dialogButtons.dev = true;
@@ -194,45 +193,6 @@ export class Cheats {
       row.addEventListener('adj', (e) => bump(e.detail));
       row.onclick = (e) => { e.stopPropagation(); bump(this.speed >= 10 ? -9 : 1); };
     }
-  }
-
-  // The skate hum's pitch and octave (audio.js skateOct / skateSemi): two sliders, and the same two as ◄ ► rows for a controller.
-  // HEAR IT plays the hum for a moment although the world is frozen behind the menu; the sliders keep it going while you drag.
-  skateSoundMenu() {
-    const g = this.game, A = g.audio;
-    const octL = () => `2 · OCTAVE: ${A.skateOct > 0 ? '+' : ''}${A.skateOct}  (◄ ►)`;
-    const semiL = () => `3 · PITCH: ${A.skateSemi > 0 ? '+' : ''}${A.skateSemi} semitones  (◄ ►)`;
-    const hear = () => { if (A.ctx) A.humPreviewUntil = performance.now() + 1800; };
-    const slider = (id, label, min, max, val) => `<label style="display:flex;align-items:center;gap:10px;margin:8px 0"><span style="min-width:74px">${label}</span><input type="range" id="${id}" min="${min}" max="${max}" step="1" value="${val}" style="flex:1"><b id="${id}-v" style="min-width:34px;text-align:right"></b></label>`;
-    g.dialog('SKATE SOUND', `<small>The skate hum, tuned live (the stock skates and the Dev Skates both use it). Kept until you reload.</small>${slider('ss-oct', 'OCTAVE', -3, 3, A.skateOct)}${slider('ss-semi', 'PITCH', -12, 12, A.skateSemi)}`, [
-      { label: '1 · HEAR IT', keep: true, fn: hear },
-      { label: octL(), keep: true, fn: () => bump('oct', A.skateOct >= 3 ? -6 : 1) },
-      { label: semiL(), keep: true, fn: () => bump('semi', A.skateSemi >= 12 ? -24 : 1) },
-      { label: '4 · RESET', keep: true, fn: () => { set('oct', 0); set('semi', 0); hear(); } },
-      { label: '5 · BACK', fn: () => this.dev() },
-      { label: 'CLOSE' },
-    ]);
-    g.dialogButtons.dev = true;
-    const $ = (id) => document.getElementById(id);
-    const rows = document.querySelectorAll('#dialog .dlg-btns button');
-    const paint = () => {
-      $('ss-oct').value = A.skateOct; $('ss-semi').value = A.skateSemi;
-      $('ss-oct-v').textContent = (A.skateOct > 0 ? '+' : '') + A.skateOct; $('ss-semi-v').textContent = (A.skateSemi > 0 ? '+' : '') + A.skateSemi;
-      rows[1].textContent = octL(); rows[2].textContent = semiL();
-    };
-    const set = (k, v) => {
-      if (k === 'oct') A.skateOct = Math.max(-3, Math.min(3, Math.round(v)));
-      else A.skateSemi = Math.max(-12, Math.min(12, Math.round(v)));
-      paint();
-    };
-    const bump = (k, d) => { set(k, (k === 'oct' ? A.skateOct : A.skateSemi) + d); hear(); };
-    $('ss-oct').oninput = (e) => { set('oct', +e.target.value); hear(); };
-    $('ss-semi').oninput = (e) => { set('semi', +e.target.value); hear(); };
-    for (const [row, k] of [[rows[1], 'oct'], [rows[2], 'semi']]) {
-      row.dataset.adj = '1';
-      row.addEventListener('adj', (e) => bump(k, e.detail));
-    }
-    paint();
   }
 
   // Ragdoll on / off. Off, a wipeout or a hard crash still costs you the same health and speed but you stay on your feet;
