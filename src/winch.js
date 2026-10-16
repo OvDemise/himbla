@@ -532,7 +532,9 @@ export class Winch {
     this.hook.quaternion.setFromUnitVectors(_z, N); // (the claw faces into the surface, the eye out along its normal)
     if (!this.strand) return;
     // the cable model, a metre at a time, laid along the line (each stretched to the length of its stretch of it)
-    const curve = new THREE.CatmullRomCurve3(pts);
+    // (one curve for good, over the same point objects: it only has to be told they moved, and 60 arc-length steps are plenty for 20 points)
+    const curve = this.curve ||= Object.assign(new THREE.CatmullRomCurve3(pts), { arcLengthDivisions: 60 });
+    curve.needsUpdate = true;
     const n = Math.min(MAX_PIECES, Math.max(1, Math.round(curve.getLength())));
     let p0 = curve.getPointAt(0, _a), p1 = _b;
     for (let i = 0; i < n; i++) {
