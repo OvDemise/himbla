@@ -142,6 +142,7 @@ export class Garage {
     const g = this.game;
     const P = g.player;
     if (P.rag) return; // (limp in a ragdoll: nothing to call)
+    if (g.winch.on) return; // (on the Hitch-Line)
     if (P.vehicle) { this.exit(); return; }
     const owned = this.owned();
     if (!owned.length) { g.hud.toast('No vehicles yet. Faction leaders hand them out as you rise in their story.', 3); return; }
@@ -267,7 +268,7 @@ export class Garage {
     if (this.radialEl) this.radialEl.classList.add('hidden');
     if (!commit || !R || R.sel < 0) return;
     const k = R.items[R.sel];
-    if (g.rides.ride || g.player.dead || g.player.vehicle) return; // (a transit ride started, or you died or boarded something while it was up: nothing to call)
+    if (g.rides.ride || g.player.dead || g.player.vehicle || g.winch.on) return; // (a transit ride started, or you died or boarded something while it was up: nothing to call)
     if (this.cooldown(k) > 0) { g.hud.toast(`${VEHICLES[k].name} is being rebuilt: ready in ${Math.ceil(this.cooldown(k))}s.`, 2.5); return; }
     this.choice = k;
     if (this.active && this.active.id === k && this.active.e.body.pos.distanceTo(g.player.pos) < 12) { this.enter(); return; }

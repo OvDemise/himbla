@@ -199,7 +199,10 @@ export class Player {
     }
 
     const wish = new THREE.Vector3();
-    const trickHeld = input.down('KeyQ') && !b.grounded && b.airTime > 0.12 && !this.rag;
+    // (no tricks on the end of the Hitch-Line: it has you by the harness)
+    const hitched = !!(g.winch && g.winch.on);
+    if (hitched && this.trick.active) this.clearTrick();
+    const trickHeld = input.down('KeyQ') && !b.grounded && b.airTime > 0.12 && !this.rag && !hitched;
     if (!trickHeld && input.padMove && input.padMove.on) {
       // a controller's left stick: analog (a gentle push, a gentle carve)
       wish.addScaledVector(cam.fwd, -input.padMove.y).addScaledVector(cam.right, input.padMove.x);

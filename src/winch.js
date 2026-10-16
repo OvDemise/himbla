@@ -73,20 +73,27 @@ function massOf(v) {
   return 6;
 }
 
-// A model's box in its own frame (measured once), so "the nearest surface" follows it round as it turns.
+// A model's hull in its own frame (measured once), so "the nearest surface" follows it round as it turns. Only its solid,
+// visible meshes count (not the shadow blob, the glow or the flames under it), and the bottom of it is left out, so the hook
+// goes on the body and not on whatever hangs beneath.
+const _bb = new THREE.Box3();
 function localBox(root) {
   let b = _localBoxes.get(root);
   if (b) return b;
   root.updateWorldMatrix(true, true);
-  _box.setFromObject(root);
-  if (_box.isEmpty()) b = new THREE.Box3(new THREE.Vector3(-1.5, -1.5, -1.5), new THREE.Vector3(1.5, 1.5, 1.5));
-  else {
-    const c = root.worldToLocal(_box.getCenter(new THREE.Vector3()));
-    const sc = root.getWorldScale(new THREE.Vector3());
-    const h = _box.getSize(new THREE.Vector3()).multiplyScalar(0.5);
-    h.set(h.x / (Math.abs(sc.x) || 1), h.y / (Math.abs(sc.y) || 1), h.z / (Math.abs(sc.z) || 1));
-    b = new THREE.Box3(c.clone().sub(h), c.clone().add(h));
-  }
+  _inv.copy(root.matrixWorld).invert();
+  b = new THREE.Box3();
+  root.traverse((o) => {
+    if (!o.isMesh || o.isInstancedMesh || !o.geometry) return;
+    const m = Array.isArray(o.material) ? o.material[0] : o.material;
+    if (!m || m.transparent || m.depthWrite === false || m.side === THREE.BackSide || m.blending === THREE.AdditiveBlending) return;
+    for (let p = o; p; p = p.parent) { if (!p.visible) return; if (p === root) break; }
+    if (!o.geometry.boundingBox) o.geometry.computeBoundingBox();
+    _bb.copy(o.geometry.boundingBox).applyMatrix4(_m.multiplyMatrices(_inv, o.matrixWorld));
+    b.union(_bb);
+  });
+  if (b.isEmpty()) b.set(new THREE.Vector3(-1.5, -1.5, -1.5), new THREE.Vector3(1.5, 1.5, 1.5));
+  b.min.y += (b.max.y - b.min.y) * 0.3;
   _localBoxes.set(root, b);
   return b;
 }
@@ -106,6 +113,7 @@ function nearestOnBox(b, p, out) {
 // the surface point of a model nearest to the eye, or where the sightline meets it (returns true when it does)
 function modelPoint(root, eye, look, out) {
   const b = localBox(root);
+  root.updateWorldMatrix(true, false);
   _inv.copy(root.matrixWorld).invert();
   _lo.copy(eye).applyMatrix4(_inv);
   _ld.copy(look).transformDirection(_inv);
@@ -224,18 +232,18 @@ export class Winch {
     return { obj: { kind: 'structure' }, col: c, mass: 1e6, flying: false, root: null, pos: () => c.mid, vel: () => ZERO, alive: () => true, push: () => {}, shift: () => {} };
   }
 
-  // A hook point on target T: the world point, kept as an offset from T's position (turning with its model).
+  // A hook point on target T, kept in the frame of what you see (its model; a structure has none and keeps the world point as
+  // an offset from its middle), so it rides the vehicle however it bobs, banks or is dragged.
   handle(T, point, looked, dist) {
-    const off = point.clone().sub(T.pos());
-    if (T.root) off.applyQuaternion(T.root.getWorldQuaternion(_q).invert());
-    return { target: T, off, looked, dist, len: dist, t: 0, reel: 0 };
+    const off = T.root ? T.root.worldToLocal(point.clone()) : point.clone().sub(T.pos());
+    return { target: T, off, goal: off.clone(), looked, dist, len: dist, t: 0, reel: 0 };
   }
 
   // where a handle's hook point is now
   anchorOf(h, out) {
-    out.copy(h.off);
-    if (h.target.root) out.applyQuaternion(h.target.root.getWorldQuaternion(_q));
-    return out.add(h.target.pos());
+    const T = h.target;
+    if (T.root) return T.root.localToWorld(out.copy(h.off));
+    return out.copy(h.off).add(T.pos());
   }
 
   // What Z would hook: the nearest surface of whatever the reticle is on; failing that, whatever's closest to
@@ -246,6 +254,7 @@ export class Winch {
     const P = g.player;
     const eye = g.camera.position;
     const look = g.camera.getWorldDirection(_look);
+    const prev = this.cand && this.cand.target; // (what's marked now keeps a lead, so the lock doesn't flicker between two near ones)
     const best = []; // (the top four, best first)
     const offer = (T, col, looked) => {
       const dP = P.center.distanceTo(_pt);
@@ -254,7 +263,8 @@ export class Winch {
       const dE = _to.length() || 1e-6;
       const cos = _to.divideScalar(dE).dot(look);
       if (cos < MIN_COS) return;
-      const score = (looked ? 10 : cos * 4) - dP / RANGE;
+      const sticky = prev && (col ? prev.col === col : T.obj === prev.obj) ? 0.6 : 0;
+      const score = (looked ? 10 : cos * 4) - dP / RANGE + sticky;
       if (best.length >= 4 && score <= best[3].score) return;
       best.push({ T, col, looked, dP, score, point: _pt.clone() });
       best.sort((p, q) => q.score - p.score);
@@ -289,7 +299,9 @@ export class Winch {
   fire() {
     const g = this.game;
     if (this.on || this.cd > 0 || !this.hasHand()) return;
-    const h = this.pick();
+    let h = this.cand && this.cand.target.alive() ? this.cand : null; // (what the marker is on, exactly)
+    if (h && this.hand(_a).distanceTo(this.anchorOf(h, _b)) > RANGE + 5) h = null;
+    h = h || this.pick();
     if (!h) {
       g.hud.toast(`Hitch-Line: nothing in reach. Aim at a vehicle or a structure within ${RANGE} m.`, 1.6);
       g.audio.tone(220, 0.12, 'square', 0.06, 0.7);
@@ -326,7 +338,14 @@ export class Winch {
     if (this.cd > 0) this.cd -= dt;
     const equipped = this.owned && g.powers && g.powers.current() === 'winch' && this.hasHand();
     if (equipped && !this.on) {
-      if ((this.pickT -= dt) <= 0) { this.pickT = PICK_EVERY; this.cand = this.pick(); }
+      if ((this.pickT -= dt) <= 0) {
+        this.pickT = PICK_EVERY;
+        const old = this.cand, nc = this.pick();
+        // (the same target again: its hook point eases to the new spot rather than jumping there)
+        if (nc && old && (nc.target.col ? nc.target.col === old.target.col : nc.target.obj === old.target.obj)) { nc.goal.copy(nc.off); nc.off.copy(old.off); }
+        this.cand = nc;
+      }
+      if (this.cand) this.cand.off.lerp(this.cand.goal, 1 - Math.exp(-dt * 12));
     } else { this.cand = null; this.pickT = 0; }
     this.drawMarker(equipped);
     const o = this.on;
