@@ -1046,6 +1046,7 @@ class Game {
     this.territory.refreshWorld();
     if (added.some((l) => l.id === 'hometown')) {
       this.town = new HomeTown(this);
+      this.world.traffic.registerLocation(this.town.loc); // (the new town isn't one of the places traffic was built with)
       this.globe.discover(this.town.loc, true);
     }
     this._homes = {};

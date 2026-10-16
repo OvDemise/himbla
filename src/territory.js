@@ -767,4 +767,4 @@ export class Territory {
   }
 }
 
-export { KIND_NAMES, MILITARY };
+export { KIND_NAMES, MILITARY, SAP_NAMES };

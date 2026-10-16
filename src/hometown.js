@@ -16,6 +16,14 @@ export const SLOT_R = 64, SLOTS = 8;
 // plot i: round the hall, the entrance (local +z) left clear
 export const slotAt = (i) => { const a = Math.PI / 8 + (i * Math.PI * 2) / SLOTS; return { x: Math.sin(a) * SLOT_R, z: Math.cos(a) * SLOT_R, face: a + Math.PI }; };
 
+// a point in plot i's own frame (x across, z toward the hall: what the building kits are baked in) as a position in the town's frame
+export const plotPoint = (i, x, z) => { const p = slotAt(i), c = Math.cos(p.face), s = Math.sin(p.face); return { x: p.x + x * c + z * s, z: p.z - x * s + z * c }; };
+// where you stand to use a building (F), in its plot's frame: the kit draws a glowing ring there. And the motor pool's bay: the apron in front
+// of the quonset's door where a vehicle is set down, nose to the plaza (+z)
+export const SPOTS = { farm: { x: 0, z: 12.8 }, motorpool: { x: -3, z: 9.8 }, radio: { x: 0, z: 6.5 }, clinic: { x: 0, z: 7.5 } };
+export const BAY = { x: -3, z: 15.5 };
+const PAD_R = 11.5, PAD_TOP = 0.78; // the shuttle pad's disc and the height of its deck (the kit's marking lines) over the plot's ground
+
 export const BANK_CAP = 1500; // what the town bank holds (₵); a full bank stops earning until you collect
 
 // Key order is the order of the hall's tiles and number keys. icon / tint / feature are what a building's
@@ -109,6 +117,9 @@ function hallKit(k) {
 }
 export const TERMINAL = { x: 4, z: 20.4 };
 
+// the glowing ring where you stand to use a building, in the building's tile colour (kit frame: call it after k.at())
+const spotRing = (k, type) => k.raidAt(SPOTS[type].x, SPOTS[type].z, parseInt(BUILDINGS[type].tint.slice(1), 16));
+
 // one plot's building, baked with its origin at the plot centre, facing the hall (local -z → +z
 // out of the hall: the door looks back at the plaza)
 function buildingKit(type) {
@@ -139,6 +150,7 @@ function buildingKit(type) {
         k.cyl(4, 4, 0.1, 24, T(0x5b5870), 7, 0.3, 6, { outline: 0.02 });
         k.ring(3.6, 0.12, G(0xff2a4a), 7, 0.42, 6);
         k.ball(0.4, G(0xff2a4a), 0, 6.2, 0, { outline: 0 });
+        spotRing(k, 'clinic');
         break;
       case 'farm':
         for (const x of [-4.5, 4.5]) {
@@ -148,6 +160,7 @@ function buildingKit(type) {
           k.hcyl(3.6, 16, x, 0, 0, 0.3);
           for (let r = -1; r <= 1; r++) for (let j = 0; j < 6; j++) k.add(new THREE.SphereGeometry(0.4, 6, 4), T(0x3f9a3a), x + r * 1.6, 1.0, -6 + j * 2.4, { outline: 0.02 });
         }
+        spotRing(k, 'farm');
         break;
       case 'motorpool':
         quonset(k, -3, 0, 5, 13, 0xd8d4e8, 0, KEP);
@@ -155,6 +168,7 @@ function buildingKit(type) {
         k.box(8, 0.12, 6, T(0x5b5870), 7, 0.3, -2, { outline: 0 });
         for (let i = 0; i < 3; i++) crate(k, 9, 0.3 + i * 0.9, 4, 0.9, 0x55607a, i);
         k.solid(2.2, 1.2, 2.6, 7, -2, 0.4, 0.3); // (the Mule parked on its apron)
+        spotRing(k, 'motorpool'); // (at the quonset's door)
         break;
       case 'barracks':
         quonset(k, 0, 3, 4.5, 12, 0x6b6f78, 0, KEP);
@@ -189,6 +203,7 @@ function buildingKit(type) {
         k.ball(0.6, G(0xff2a4a), 0, 30.6, 0, { outline: 0 });
         cabin(k, 6, 5, 5, 4, 3, 0xd8d4e8, 0, { trim: KEP });
         k.at();
+        spotRing(k, 'radio');
         break;
       case 'pad':
         k.cyl(11, 11.5, 0.4, 32, T(0x5b5870), 0, 0.3, 0, { outline: 0.04 });
@@ -212,6 +227,10 @@ export function buildHomeTown(world, loc) {
   const flags = [];
   root.traverse((o) => { if (o.userData.flag) flags.push(o); });
   if (flags.length) world.anims.push({ loc, list: flags, seed: 5 });
+  // ground the town keeps for itself, built on or not: traffic's pads and stops, the road crews and the defence pylons keep off the hall's
+  // disc and every plot's (their disc is 13.5 m; 14.5 leaves the apron's edge clear)
+  (loc.keep ||= []).push({ x: 0, z: 0, r: 34 });
+  for (let i = 0; i < SLOTS; i++) { const p = slotAt(i); loc.keep.push({ x: p.x, z: p.z, r: 14.5 }); }
   (loc.slots || []).forEach((type, i) => { if (type) addBuilding(world, loc, i, type); });
   for (let i = 0; i < SLOTS; i++) if (!(loc.slots || [])[i]) addPlot(world, loc, i);
 }
@@ -233,9 +252,12 @@ export function addBuilding(world, loc, i, type) {
   // colliders: the kit's boxes, turned to the plot's facing
   const c = Math.cos(p.face), s = Math.sin(p.face);
   for (const col of b.cols) {
-    const x = p.x + col.x * c + col.z * s, z = p.z - col.x * s + col.z * c;
+    const { x, z } = plotPoint(i, col.x, col.z);
     world.col(loc, { ...col, x, z, yaw: (col.yaw || 0) + p.face });
   }
+  // the shuttle pad is a real pad: traffic lands on this record and never drops it. One record per pad plot, however often it is built
+  // (a rebuilt town gets its old records back: world.rebuildLocation)
+  if (type === 'pad' && !(loc.pads || []).some((q) => q.plot === i)) (loc.pads ||= []).push({ x: p.x, z: p.z, r: PAD_R, spare: false, mesh: null, plot: i, top: PAD_TOP });
   // the barracks' guns and the motor pool's Mule are proper models
   if (type === 'barracks') for (const sx of [-1, 1]) {
     const t = makeTurret({ color: KEP });
@@ -256,6 +278,7 @@ export class HomeTown {
     this.loc = game.locations.find((l) => l.id === 'hometown') || null;
     this.fireCd = 0;
     this.saveT = 0;
+    this.spots = {}; // building type -> where you stand to use it (world position; see spot())
     if (this.loc) {
       this.terminal = game.world.toWorld(this.loc, TERMINAL.x, 0, TERMINAL.z);
       if (this.has('radio')) this.chart();
@@ -273,6 +296,24 @@ export class HomeTown {
     const cos = Math.cos(3000 / 3600), d = this.loc.dir;
     for (let k = 0; k < G2.explored.length; k++) if (G2.cells[k * 3] * d.x + G2.cells[k * 3 + 1] * d.y + G2.cells[k * 3 + 2] * d.z > cos) G2.explored[k] = 1;
     G2.save();
+  }
+
+  // a point in a building's plot frame (x across, z toward the hall), in the world; null until it's built
+  pt(type, x, z) {
+    const i = this.state.slots.indexOf(type);
+    if (i < 0) return null;
+    const q = plotPoint(i, x, z);
+    return this.game.world.toWorld(this.loc, q.x, 0, q.z);
+  }
+
+  // where you stand to use a building (cached: a building never moves once built)
+  spot(type) { return this.spots[type] || (SPOTS[type] && this.has(type) ? (this.spots[type] = this.pt(type, SPOTS[type].x, SPOTS[type].z)) : null); }
+
+  // a building went up: what the traffic and the game cached about the town's buildings (passengers' doors, the home spot) is stale
+  afterBuild() {
+    delete this.loc._bld;
+    for (const s of this.game.world.traffic.stops) if (s.loc === this.loc) delete s.doors;
+    this.game._homes = {};
   }
 
   // F at the hall's terminal
@@ -319,6 +360,7 @@ export class HomeTown {
     addBuilding(g.world, this.loc, i, type);
     if (type === 'motorpool' && !g.story.vehicles.includes('mule')) { g.story.vehicles.push('mule'); g.story.save(); g.hud.toast('Homestead Mule in the motor pool. Press V.', 3); }
     if (type === 'radio') this.chart();
+    this.afterBuild();
     saveWorldState(this.ws);
     g.save();
     g.audio.cash();

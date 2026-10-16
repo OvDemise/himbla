@@ -218,14 +218,20 @@ export class Traffic {
     this.pool = [];
     this.platforms = []; // trailer decks
     this._buf = [];
-    this.L = Object.fromEntries(world.locations.map((l) => [l.id, l]));
-    for (const loc of world.locations) {
-      loc._inv = loc.group.matrixWorld.clone().invert();
-      loc.stopKeep = [];
-    }
+    this.L = {};
+    for (const loc of world.locations) this.registerLocation(loc);
     this.buildRoads();
     this.buildFlights();
     this.dropSparePads();
+  }
+
+  // Let traffic know a place: the constructor does it for every settlement that exists at boot, and the town a finale founds mid-game (main.js
+  // applyWorldLive) comes through here, so a flyer or a road can be laid to it live. Idempotent.
+  registerLocation(loc) {
+    if (this.L[loc.id] === loc) return;
+    this.L[loc.id] = loc;
+    loc._inv = loc.group.matrixWorld.clone().invert();
+    loc.stopKeep = [];
   }
 
   // Settlements lay down a landing pad or two of their own; any that no transit line ended up using
