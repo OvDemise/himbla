@@ -3,16 +3,43 @@ import { toon, ink, glow, inkMat } from './toon.js';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-// inlined (a data URI) so the desktop build, which runs from file://, can load it without fetch
-import runnerGlb from './assets/runner.glb?inline';
-import shipsGlb from './assets/ships.glb?inline';
-import skimmerGlb from './assets/skimmer.glb?inline';
-import warrigGlb from './assets/warrig.glb?inline';
-import apcGlb from './assets/apc.glb?inline';
-import landtrainGlb from './assets/landtrain.glb?inline';
-import craneGlb from './assets/crane.glb?inline';
-import garageGlb from './assets/garage.glb?inline';
-import dishGlb from './assets/dish.glb?inline';
+import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
+// The model files (exported from Blender) are inlined as data URIs, so the desktop build, which runs from file://,
+// can load them without fetch. Each one is imported on demand, which makes it a chunk of its own (as outposts.glb is):
+// the game's code stays small, a change to the code doesn't make anyone download the models again, and each model is
+// cached on its own. Boot asks for the ones the world is built from all at once.
+const GLB = {
+  runner: () => import('./assets/runner.glb?inline'),
+  ships: () => import('./assets/ships.glb?inline'),
+  skimmer: () => import('./assets/skimmer.glb?inline'),
+  warrig: () => import('./assets/warrig.glb?inline'),
+  apc: () => import('./assets/apc.glb?inline'),
+  landtrain: () => import('./assets/landtrain.glb?inline'),
+  crane: () => import('./assets/crane.glb?inline'),
+  garage: () => import('./assets/garage.glb?inline'),
+  dish: () => import('./assets/dish.glb?inline'),
+};
+
+// A model file can be compressed (tools/optimize-glb.mjs: quantized, then meshopt-coded: about a third of the size).
+// The decoder does nothing for a plain file. Quantized vertex data comes out of the loader as 16- and 8-bit integers
+// (the node's scale puts the size back), but the bakers below transform and merge geometry, which integers can't
+// hold, so every attribute becomes a float first.
+function toFloat(a) {
+  if (a.array instanceof Float32Array) return a;
+  const out = new THREE.BufferAttribute(new Float32Array(a.count * a.itemSize), a.itemSize);
+  for (let i = 0; i < a.count; i++) {
+    out.setX(i, a.getX(i));
+    if (a.itemSize > 1) out.setY(i, a.getY(i));
+    if (a.itemSize > 2) out.setZ(i, a.getZ(i));
+    if (a.itemSize > 3) out.setW(i, a.getW(i));
+  }
+  return out;
+}
+const loadGlb = async (name) => {
+  const gltf = await new GLTFLoader().setMeshoptDecoder(MeshoptDecoder).loadAsync((await GLB[name]()).default);
+  gltf.scene.traverse((o) => { if (o.isMesh) for (const k of Object.keys(o.geometry.attributes)) o.geometry.setAttribute(k, toFloat(o.geometry.attributes[k])); });
+  return gltf;
+};
 import { Kit, T as KT, G as KG, D as KD, crate } from './outpostModels.js';
 
 function part(geo, mat, x = 0, y = 0, z = 0, outline = 0.05) {
@@ -100,7 +127,7 @@ const PIVOTS = ['legL', 'legR', 'torso', 'head', 'armL', 'armR'];
 const NO_SHADOW = new Set(['glow', 'lens', 'glint']);
 export async function loadRunnerParts() {
   try {
-    const gltf = await new GLTFLoader().loadAsync(runnerGlb);
+    const gltf = await loadGlb('runner');
     RUNNER_PARTS = bakeRunnerParts(gltf.scene);
   } catch (e) {
     console.warn('runner.glb unavailable, using the primitive runner', e);
@@ -1200,8 +1227,7 @@ const SHIP_TOON = { trim: 0xd8d4e8, dark: 0x2a2540, metal: 0x8a87a0, steel: 0x55
 const SHIP_FX = new Set(['plume', 'plumeCore', 'lift', 'engine', 'core']); // per-ship materials (they pulse)
 const FLAMES = new Set(['plume', 'plumeCore', 'lift']);
 export async function loadShipParts() {
-  const loader = new GLTFLoader();
-  const [gltf, sk, wr, ap, lt, cr, ga, di] = await Promise.all([loader.loadAsync(shipsGlb), loader.loadAsync(skimmerGlb), loader.loadAsync(warrigGlb), loader.loadAsync(apcGlb), loader.loadAsync(landtrainGlb), loader.loadAsync(craneGlb), loader.loadAsync(garageGlb), loader.loadAsync(dishGlb)]);
+  const [gltf, sk, wr, ap, lt, cr, ga, di] = await Promise.all(['ships', 'skimmer', 'warrig', 'apc', 'landtrain', 'crane', 'garage', 'dish'].map(loadGlb));
   SHIP_PARTS = {};
   for (const name of ['shuttle', 'freighter']) {
     const root = gltf.scene.getObjectByName(name);

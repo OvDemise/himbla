@@ -720,6 +720,7 @@ src/
 tools/
   blender/build_runner.py  builds the runner in Blender and exports src/assets/runner.glb
   blender/build_idles.py   keys the runner's five idles on its pivots -> src/assets/idles.json (headless: `pip install bpy`, then `python3 tools/blender/build_idles.py`; `MOONRUNNER_IDLES_BLEND=idles.blend` also saves the keyed scene)
+  optimize-glb.mjs         compresses the models in src/assets (quantized and meshopt-coded: about a quarter of the size); `npm run optimize:glb`, run after re-exporting a model from Blender
   blender/build_ships.py   builds both transit ships in Blender and exports src/assets/ships.glb
   blender/build_skimmer.py builds the Daedalus skimmer -> src/assets/skimmer.glb
   blender/build_warrig.py  builds the pirate war-rig -> src/assets/warrig.glb
@@ -739,3 +740,5 @@ tools/
 `src/assets/runner.glb`. Each part's material name is a colour slot (suit, accent, helmet, visor, scarf…)
 that outfits recolour, and the scarf stays a 4-link chain driven by `ScarfSim`. The standing idles are keyed
 on the same pivots by `tools/blender/build_idles.py` and played by `src/idles.js`.
+
+**Models and the bundle:** each model file in `src/assets` is its own chunk (imported on demand in `src/models.js`, inlined as a data URI so the desktop build, which runs from file://, needs no fetch), so the game's code is a small file of its own and each model is cached separately. The vehicle, ship, crane, garage and dish models are stored compressed: after re-exporting one from Blender, run `npm run optimize:glb` (a plain file still loads, it is just bigger). `runner.glb` and `outposts.glb` are left plain.

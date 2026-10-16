@@ -9,6 +9,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "check:outposts": "node tools/check-outposts.mjs",
+    "optimize:glb": "node tools/optimize-glb.mjs",
     "check:dev-strip": "node tools/check-dev-strip.mjs",
     "build:release": "vite build --mode release",
     "app": "vite build && electron .",
