@@ -42,7 +42,7 @@ export const BUILDINGS = {
   farm: { name: 'Greenhouse Farm', cost: 1000, icon: 'greenhouse', tint: '#7dff6a', feature: 'Heals · +₵15/min · saplings', income: 15, desc: 'Heals you anywhere in town, +₵15 a minute, and a free sapling for your jar from the nursery bench every 5 minutes.' },
   motorpool: { name: 'Motor Pool', cost: 1800, icon: 'garage', tint: '#ffd23f', feature: 'Your vehicles · militia', desc: 'A Homestead Mule of your own; roll any vehicle out of its door (F), and your vehicles are patched up whenever you\'re in town. When raiders reach the town, two militia rovers roll out (every 10 minutes).' },
   barracks: { name: 'Militia Barracks', cost: 2200, icon: 'turret2', tint: '#ff9f1c', feature: '2 guns, 400 m', desc: 'Two militia guns that shoot any pirate within 400 m of town.' },
-  roads: { name: 'Roads', cost: 1800, icon: 'roads', tint: '#c9c3d9', feature: 'Ring road + links', desc: 'Road crews lay a ring road round the town and link it to the settlements around it. Land-trains and hover-cars start calling.' },
+  roads: { name: 'Roads', cost: 1800, icon: 'roads', tint: '#c9c3d9', feature: 'Ring road + links', desc: 'Road crews lay a ring road round the town and link it to the settlements around it. Hover-cars and buggies start calling at once, land-trains by your next load.' },
   radio: { name: 'Radio Tower', cost: 1600, icon: 'beacon', tint: '#2ee6ff', feature: 'Charts 3 km · sweeps', desc: 'Charts 3 km of map round town and lets you sweep the rest of the Moon from the tower; you can call a council vote twice as often.' },
   pad: { name: 'Shuttle Pad', cost: 2500, icon: 'pad', tint: '#c77dff', feature: 'Shuttle · home base', desc: 'A landing pad and a shuttle service to the nearest settlement; the town is also your home base.' },
 };
@@ -269,6 +269,9 @@ export function buildHomeTown(world, loc) {
   for (let i = 0; i < SLOTS; i++) { const p = slotAt(i); loc.keep.push({ x: p.x, z: p.z, r: 14.5 }); }
   (loc.slots || []).forEach((type, i) => { if (type) addBuilding(world, loc, i, type); });
   for (let i = 0; i < SLOTS; i++) if (!(loc.slots || [])[i]) addPlot(world, loc, i);
+  // a town rebuilt in place (a Council motion) has lost what traffic hung on its old group: the shuttle pad's waiting shelter goes back up
+  // (at load and at the founding the world has no traffic yet, or it has no stop here)
+  if (world.traffic) world.traffic.redress(loc);
 }
 
 function addPlot(world, loc, i) {
@@ -361,18 +364,21 @@ const LIVE = {
     };
   },
   barracks: () => ({ rows: [['GUNS', '2 militia guns'], ['RANGE', '400 m round town'], ['FIRE', '28 dmg + splash, every 0.8 s'], ['TARGETS', 'Pirates']], note: 'Nothing to press: the guns fire by themselves.' }),
-  // (the ring road and its links are laid at load for now: until then the plot only has the road crew's depot)
   roads: (t) => {
-    const tr = t.game.world.traffic, ring = tr.rings.get(t.loc);
-    return ring ? { rows: [['RING', `${Math.round(ring.Rb)} m round the town`], ['LINKS', `${tr.roads.filter((r) => r.A === t.loc || r.B === t.loc).length} settlements`]], note: 'Nothing to press: the traffic uses them.' }
-      : { rows: [['RING', 'Not laid yet']], note: 'The road crews lay the ring road and the links when the game next loads.' };
+    const tr = t.game.world.traffic, ring = tr.rings.get(t.loc), n = tr.roads.filter((r) => r.A === t.loc || r.B === t.loc).length;
+    return ring ? { rows: [['RING', `${Math.round(ring.Rb)} m round the town`], ['LINKS', `${n} ${n === 1 ? 'settlement' : 'settlements'}`]], note: 'Nothing to press: the traffic uses them.' }
+      : { rows: [['RING', 'Not laid yet']], note: 'The road crews finish the ring road and the links when the game next loads.' };
   },
   radio: (t) => {
     const R = t.radio, s = R.s, pct = Math.round(R.frac * 100);
     const status = !s ? ['IDLE', 'dim'] : s.on ? [`SWEEPING ${pct}%`, 'gold'] : s.r >= SWEEP.max ? ['MAX RANGE', ''] : [`STOPPED ${pct}%`, 'dim'];
     return { rows: [['SWEEP', ...status], ['MAP CHARTED', '3 km round town'], ['VOTES', 'Council sits twice as often']], meter: s ? { v: R.frac, text: `${Math.round(s.r)} / ${SWEEP.max} m` } : null };
   },
-  pad: () => ({ rows: [['HOME BASE', 'You start, recall and redeploy here']], note: 'Nothing to press.' }),
+  pad: (t) => {
+    const v = t.shuttle(), home = ['HOME BASE', 'You start, recall and redeploy here'];
+    return v ? { rows: [home, ['SHUTTLE TO', v.stops[1].loc.name], ['FLIGHT', `${(v.path.len / 1000).toFixed(1)} km`]], note: 'Nothing to press: the shuttle runs by itself. Hop in with F while it is parked on the pad.' }
+      : { rows: [home, ['SHUTTLE TO', 'No settlement in reach']], note: 'Nothing to press.' };
+  },
 };
 // what a building does the moment it is built, beyond standing on its plot: type -> (t) => a line for the page's "BUILT" message
 const ON_BUILT = {
@@ -385,6 +391,8 @@ const ON_BUILT = {
   },
   radio: (t) => { t.chart(); return 'MAP CHARTED 3 KM ROUND TOWN'; },
   farm: (t) => { t.syncFarm(); return ''; }, // (the first sapling is ready: the grown ones show on the bench)
+  pad: (t) => t.linkShuttle(),
+  roads: (t) => t.layRoads(),
 };
 // where F does something in town, first match wins (interact()): at(t) is a world position (null: not there), r the reach in metres,
 // use(t, player) the prompt and what F does (null: nothing here)
@@ -457,6 +465,34 @@ export class HomeTown {
     delete this.loc._bld;
     for (const s of this.game.world.traffic.stops) if (s.loc === this.loc) delete s.doors;
     this.game._homes = {};
+  }
+
+  // the town's shuttle (a flyer, see traffic.js addTownShuttle), or null before the Shuttle Pad is built or when it has nowhere to go
+  shuttle() { return this.game.world.traffic.vehicles.find((v) => v.stops && v.stops[0].loc === this.loc) || null; }
+
+  // the Shuttle Pad opens a line to the nearest settlement; the first shuttle waits at the far end and comes in. (A load that finds the pad
+  // built starts the line itself: traffic.js buildFlights.) The page's line, or '' when there is nowhere to fly to
+  linkShuttle() {
+    const tr = this.game.world.traffic;
+    tr.registerLocation(this.loc);
+    const v = tr.addTownShuttle(this.loc, { startAtB: true });
+    return v ? `SHUTTLE SERVICE TO ${v.stops[1].loc.name.toUpperCase()} OPENS: FIRST SHUTTLE ON ITS WAY` : '';
+  }
+
+  // Roads: the road crews lay the ring road and the links at once (traffic.js addTownRoads), as far as a running game can: where a link meets a
+  // ring that was laid at load its traffic turns round, until the next load lays the whole network. The page's line, or '' when the town had its
+  // ring already. If the crews fail the game goes on (the plot is built and paid for, and a load lays the roads, as it does for any town with Roads)
+  layRoads() {
+    const tr = this.game.world.traffic;
+    try {
+      const r = tr.addTownRoads(this.loc);
+      if (!r) return '';
+      const n = r.links.length;
+      return n ? `ROAD CREWS FINISHED: RING ROAD + ${n} ${n === 1 ? 'LINK' : 'LINKS'}` : 'NO SETTLEMENT IN REACH: THE CREWS HAVE NOTHING TO LINK';
+    } catch (e) {
+      console.error(e);
+      return 'ROAD CREWS WILL FINISH AFTER YOUR NEXT LOAD';
+    }
   }
 
   // F in town: the first point in POINTS you stand at gives the prompt and what F does
