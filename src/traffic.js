@@ -4,6 +4,7 @@ const VEH_DETAIL = 220; // past this, a vehicle's small parts stop drawing
 import { makeFigure, makeShuttle, makeRover, makeHoverCar, makeFreighter, makeLandTrain, LAND_TRAIN_FACTIONS, GARAGE_HALL, GARAGE_BAYS, GARAGE_FLOOR } from './models.js';
 import { mulberry32 } from './rng.js';
 import { SUN, frameQuat, arcDist } from './geo.js';
+import { planRoad, roadQuality } from './roadplan.js';
 
 // Ambient traffic: freighters and shuttle-buses that land on real pads at the edge of each
 // settlement (passengers walk off to the town's buildings, others come out to board), plus a
@@ -64,6 +65,7 @@ const TEES = [{ from: 'ilmb', on: ['meridian', 'tranq'] }];
 // Roads laid by hand to places the network above leaves out: the Vostok supply road, from the Helium-3 exchange
 // into the restricted zone round Bastion Vostok-9 (the only road that reaches a restricted base)
 const EXTRA_ROADS = [['mine', 'vostok']];
+const UNSUITABLE_STEEP = 0.2, UNSUITABLE_OFF = 0.35; // (roadCentreline)
 const T_ARM = 30; // metres from a T's centre where the lanes stop and the turning connectors take over
 const STOP_IN = 50; // the stop is at least this far along its stretch of ring (room for a land-train)
 const pairKey = (a, b) => (a.id < b.id ? `${a.id}|${b.id}` : `${b.id}|${a.id}`); // (the name of the road between two settlements)
@@ -124,11 +126,20 @@ function roadMaterial() {
     transparent: false, depthWrite: false, side: THREE.DoubleSide,
     blending: THREE.CustomBlending, blendSrc: THREE.SrcAlphaFactor, blendDst: THREE.OneMinusSrcAlphaFactor,
     blendSrcAlpha: THREE.OneFactor, blendDstAlpha: THREE.OneMinusSrcAlphaFactor,
-    uniforms: { sunDir: { value: SUN.clone() } },
-    vertexShader: `uniform vec3 sunDir; attribute float fade; attribute float mark; attribute float berm; attribute float soft; attribute float wid; varying vec2 vUv; varying float vLit; varying float vFade; varying float vEnd; varying float vMark; varying float vBerm; varying float vSoft; varying float vWid;
+    // (lights: the sun's shadow map is bound to it: the road takes the shadows of the posts, vehicles and ridges that fall on it,
+    // which the translucent bed would otherwise hide under its own flat colour)
+    lights: true,
+    uniforms: THREE.UniformsUtils.merge([THREE.UniformsLib.lights, { sunDir: { value: SUN.clone() } }]),
+    vertexShader: `#include <common>
+      #include <shadowmap_pars_vertex>
+      uniform vec3 sunDir; attribute float fade; attribute float mark; attribute float berm; attribute float soft; attribute float wid; varying vec2 vUv; varying float vLit; varying float vFade; varying float vEnd; varying float vMark; varying float vBerm; varying float vSoft; varying float vWid;
       void main(){
         vUv = uv; vEnd = fade; vMark = mark; vBerm = berm; vSoft = soft; vWid = wid;
         vec4 wp = modelMatrix * vec4(position, 1.0);
+        #if defined( USE_SHADOWMAP ) && NUM_DIR_LIGHT_SHADOWS > 0
+          // (the shadow lookup is made from the true ground point, nudged up along the local vertical: the eye-ward pull below is for the depth test only)
+          vDirectionalShadowCoord[ 0 ] = directionalShadowMatrix[ 0 ] * ( wp + vec4( normalize( wp.xyz ) * directionalLightShadows[ 0 ].shadowNormalBias, 0.0 ) );
+        #endif
         vec3 toCam = cameraPosition - wp.xyz; float dist = length(toCam);
         // pull toward the eye (screen position unchanged) so coarse terrain LODs never swallow the track
         wp.xyz += toCam / max(dist, 1e-3) * min(dist * 0.5, 0.25 + dist * 0.012);
@@ -136,7 +147,11 @@ function roadMaterial() {
         vFade = 1.0 - smoothstep(2300.0, 2900.0, dist);
         gl_Position = projectionMatrix * viewMatrix * wp;
       }`,
-    fragmentShader: `varying vec2 vUv; varying float vLit; varying float vFade; varying float vEnd; varying float vMark; varying float vBerm; varying float vSoft; varying float vWid;
+    fragmentShader: `#include <common>
+      #include <packing>
+      #include <lights_pars_begin>
+      #include <shadowmap_pars_fragment>
+      varying vec2 vUv; varying float vLit; varying float vFade; varying float vEnd; varying float vMark; varying float vBerm; varying float vSoft; varying float vWid;
       float h1(float n){ return fract(sin(n) * 43758.5453); }
       float n1(float x){ float i = floor(x), f = fract(x); f = f * f * (3.0 - 2.0 * f); return mix(h1(i), h1(i + 1.0), f); }
       float h2(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
@@ -186,7 +201,12 @@ function roadMaterial() {
         float bedA = max(bed * mix(0.84, 0.96, vSoft), groove * 0.9);
         float a = max(bedA * vEnd, max(cut * 0.9, crest * 0.8)); // (the end fade is the bed's: a berm only stops where its strip says)
         a *= 1.0 - smoothstep(8.3 - edgeR, 9.0 - edgeR, dE);
-        col *= 0.22 + 0.85 * vLit;
+        float sh = 1.0;
+        #if defined( USE_SHADOWMAP ) && NUM_DIR_LIGHT_SHADOWS > 0
+          DirectionalLightShadow dls = directionalLightShadows[ 0 ];
+          if ( receiveShadow ) sh = getShadow( directionalShadowMap[ 0 ], dls.shadowMapSize, dls.shadowIntensity, dls.shadowBias, dls.shadowRadius, vDirectionalShadowCoord[ 0 ] );
+        #endif
+        col *= 0.22 + 0.85 * vLit * sh;
         gl_FragColor = vec4(col, a * vFade);
       }`,
   });
@@ -677,10 +697,14 @@ export class Traffic {
     this.rings = new Map(); // loc -> ring profile
     const keys = [...pairs].sort();
     for (const k of keys) for (const id of k.split('|')) if (!this.rings.has(this.L[id])) this.rings.set(this.L[id], this.ringProfile(this.L[id]));
+    // (how many roads each town has: a link is only left out where the terrain allows no road if both towns keep another)
+    this.linkCount = new Map();
+    for (const k of keys) for (const id of k.split('|')) this.linkCount.set(this.L[id], (this.linkCount.get(this.L[id]) || 0) + 1);
     for (const k of keys) {
       const [a, b] = k.split('|');
       this.buildRoad(this.L[a], this.L[b]);
     }
+    this.linkCount = null;
     for (const t of TEES) {
       const [m, n] = t.on.map((id) => this.L[id]);
       const main = this.roads.find((r) => (r.A === m && r.B === n) || (r.A === n && r.B === m));
@@ -810,6 +834,7 @@ export class Traffic {
     const mesh = new THREE.Mesh(geo, this.roadMesh ? this.roadMesh.material : roadMaterial());
     mesh.matrixAutoUpdate = false;
     mesh.frustumCulled = false;
+    mesh.receiveShadow = true;
     mesh.renderOrder = -0.5; // (after the terrain, before everything else: see roadMaterial)
     this.w.scene.add(mesh);
     if (!this.roadMesh) this.roadMesh = mesh;
@@ -936,14 +961,28 @@ export class Traffic {
       for (let t = 8; t <= 56; t += 4) if (!this.roadClear(loc, ux * (p.r + t), uz * (p.r + t), keeps)) return false;
       return true;
     };
+    // the ground a road leaving here would cross in its first 200 m (the foot of the plateau and beyond): how steep it climbs, and how much of it
+    // is crater, rock or rille (roadplan.js)
+    const lay = (i) => {
+      const p = this.ringLocal(R, i), ux = Math.cos(p.a), uz = Math.sin(p.a);
+      let h0 = null, climb = 0, bad = 0;
+      for (let t = 0; t <= 200; t += 10) {
+        this.w.toWorld(loc, ux * (p.r + t), 0, uz * (p.r + t), _c).normalize();
+        const h = this.P.H(_c.x, _c.y, _c.z), a = this.P.attr;
+        bad += 10 * a.floor + 6 * a.rim + 3 * a.rock + 2 * a.crest + 8 * a.rille;
+        if (h0 !== null) climb += 10 * Math.max(0, Math.abs(h - h0) / 10 - 0.1);
+        h0 = h;
+      }
+      return 40 * climb + bad;
+    };
     let best = null;
     for (const dev of [0, 0.06, -0.06, 0.12, -0.12, 0.2, -0.2, 0.3, -0.3, 0.42, -0.42, 0.56, -0.56, 0.72, -0.72, 0.9, -0.9, 1.1, -1.1, 1.35, -1.35]) {
       const i = idx(tw + dev);
       if (!sep(i) || !outside(i)) continue;
-      const bulge = R.rad[i] - R.Rb, kk = kink(i);
-      const score = Math.abs(dev) * 40 + bulge + kk * 3;
+      const bulge = R.rad[i] - R.Rb, kk = kink(i), ground = lay(i);
+      const score = Math.abs(dev) * 120 + bulge + kk * 3 + Math.min(150, ground * 0.4);
       if (!best || score < best.score) best = { i, score };
-      if (bulge < 4 && kk < 2) break;
+      if (bulge < 4 && kk < 2 && ground < 12) break;
     }
     if (!best) {
       // crowded: the nearest angle that keeps the junctions apart
@@ -1052,6 +1091,33 @@ export class Traffic {
   // road (a T). Returns { g, dirs, N, side, tan, cum }.
   roadCentreline(A, B, [dA, dA1, dA2], [dB, dB1, dB2]) {
     const P = this.P, R = P.R;
+    // keep clear of every other settlement (and its ring), military zone and black lake, and off its own two rings once it has left them
+    const obs = [];
+    for (const l of this.w.locations) {
+      const ring = this.rings.get(l);
+      const r0 = l === A || l === B ? ring.maxR + 18 : Math.max((l.zoneR || l.r) + 55, ring ? ring.maxR + 40 : 0);
+      obs.push({ d: l.dir, r: r0 });
+    }
+    for (const lk of this.w.lakes || []) obs.push({ d: lk.d, r: Math.acos(Math.min(1, lk.cos)) * R + 25 });
+    // the line itself is found on the real terrain (roadplan.js): round craters, rims, rocky ground and rilles, and along the gentlest slopes.
+    // (the older meander below is only the way out where that finds no way through)
+    const laid = [];
+    for (const r of this.roads) if (r.geo && r.geo.dirs) laid.push(r.geo.dirs.filter((_, i) => i % 3 === 0));
+    const mid = dA2.clone().add(dB2).normalize(), reach = Math.cos((arcDist(dA2, dB2) / 2 + 700) / R);
+    const plan = planRoad(P, dA2, dB2, obs, laid.map((l) => l.filter((q) => q.dot(mid) > reach)).filter((l) => l.length));
+    if (plan) {
+      const ctrl = [dA, dA1, ...plan.dirs, dB1, dB];
+      const curve = new THREE.CatmullRomCurve3(ctrl.map((d) => d.clone().multiplyScalar(R)), false, 'centripetal');
+      const total = curve.getLength();
+      const N = Math.max(8, Math.ceil(total / 4));
+      const dirs = curve.getSpacedPoints(N).map((p) => p.normalize());
+      const g = dirs.map((d) => P.ground(d, new THREE.Vector3()));
+      const { side, tan, cum } = this.frames(g);
+      // (a line that still runs a fifth of its length up grades over ~14 degrees, or over a third on rock, rille or crater floor, is one the
+      // terrain does not let through: buildRoad may leave that link out)
+      const q = roadQuality(P, dirs, cum);
+      return { g, dirs, N, side, tan, cum, planned: plan, quality: q, unsuitable: q.steep > UNSUITABLE_STEEP || q.off > UNSUITABLE_OFF };
+    }
     // control points: then a gently meandering great circle
     const len = arcDist(dA2, dB2);
     const n = Math.max(3, Math.ceil(len / 30));
@@ -1068,15 +1134,6 @@ export class Traffic {
       ctrl.push(d);
     }
     ctrl.push(dB2, dB1, dB);
-    // keep clear of every other settlement (and its ring), military zone and black lake, and off
-    // its own two rings once it has left them
-    const obs = [];
-    for (const l of this.w.locations) {
-      const ring = this.rings.get(l);
-      const r0 = l === A || l === B ? ring.maxR + 18 : Math.max((l.zoneR || l.r) + 55, ring ? ring.maxR + 40 : 0);
-      obs.push({ d: l.dir, r: r0 });
-    }
-    for (const lk of this.w.lakes || []) obs.push({ d: lk.d, r: Math.acos(Math.min(1, lk.cos)) * R + 25 });
     for (let it = 0; it < 60; it++) {
       for (let i = 3; i < ctrl.length - 3; i++) {
         const p = ctrl[i];
@@ -1148,6 +1205,16 @@ export class Traffic {
     RB.gates.push(eB);
     const dA = this.ringExit(eA, 0), dA1 = this.ringExit(eA, 24), dA2 = this.ringExit(eA, 52), dB = this.ringExit(eB, 0), dB1 = this.ringExit(eB, 24), dB2 = this.ringExit(eB, 52);
     const line = this.roadCentreline(A, B, [dA, dA1, dA2], [dB, dB1, dB2]);
+    // a link the terrain will not let through (a rocky ridge or a wall of crater between the two towns, nothing to be gained by going round)
+    // is left out, so long as both towns keep another road
+    const lc = this.linkCount;
+    if (line.unsuitable && lc && lc.get(A) > 1 && lc.get(B) > 1) {
+      RA.gates.pop(); RB.gates.pop();
+      lc.set(A, lc.get(A) - 1); lc.set(B, lc.get(B) - 1);
+      (this.droppedLinks ||= []).push([A.id, B.id, line.quality]);
+      console.info('[traffic] no way for a road from', A.id, 'to', B.id, '(', Math.round(line.quality.steep * 100), '% steep,', Math.round(line.quality.off * 100), '% rock or crater ): left out');
+      return null;
+    }
     this.layRoad(line, [[A, true], [B, false]]);
     const { g, N, side, cum } = line;
     // ---- lanes: right-hand traffic; the last ~20 m at each end belong to the ring junctions ----

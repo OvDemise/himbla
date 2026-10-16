@@ -464,7 +464,7 @@ in an ISO frame so it stacks like a box, and the explosives magazine, in the liv
 it's headed). You ride inside while the camera hangs back to watch the ship; press `F` again to hop out down the ramp,
 or bail out mid-flight through the side hatch (keeping the ship's speed, with a little style for the nerve). Passengers walk off toward town, the queue
 at the shelter walks up and boards, and the doors close before it leaves; arriving passengers walk to real
-building entrances. Safe settlements are joined by a network of 14 pre-driven **roads** (an 18 m track cut into the
+building entrances. Safe settlements are joined by a network of 13 pre-driven **roads** (laid by a route search over the real terrain, `roadplan.js`: round craters and their rims, rocky ridges and rilles, along the gentlest slopes; an 18 m track cut into the
 regolith: a scraped, rutted bed between two smooth berms of pushed-up dust, with delineator posts, wide enough for two
 land-trains to pass) that merge into a big **ring road** around each town (your own gets its ring road, and its roads out, when you build Roads), with one stop shelter on the ring. Big six-wheeled **land-trains**,
 hover-cars and buggies each pick a destination town: some pass straight through towns, others stop to
@@ -737,6 +737,7 @@ src/
   settlements.js detailed settlements, HQs and landmarks built with the outpost kit (moving parts, skate park)
   market.js      the Meridian Exchange's stocks: a random-walk market refreshed every 15 s, read by the tower's ticker
   traffic.js     landing pads, ship/bus flights and passengers, roads, land-trains, cars, buggies
+  roadplan.js    where a road runs: a least-cost search over the terrain (slope, craters, rims, rock, rilles) between two town gates
   wardrobe.js    wardrobe screen with live 3D preview
   trailer.js     trailer director mode (?trailer): the official trailer, shot by shot, from live gameplay
   models.js      stylised characters and vehicles from primitives; loads the Blender runner and ships
