@@ -1209,7 +1209,7 @@ function junk(k) {
   k.flag(5.5, 23, 8);
   k.lamp(-20, 12, 6, 0xffd27a); k.lamp(20, -12, 6, 0xffd27a);
 }
-const patch = (i) => [0xa05a2a, 0x4a6a5a, 0xc9a227, 0x2b59c3, 0xff7ad9][i % 5];
+const patch = (i) => [0xa05a2a, 0x4a6a5a, 0xc9a227, 0x2b59c3, 0xff7ad9][((i % 5) + 5) % 5]; // (i may be negative: the junk shack's left sheets)
 
 const BUILD = { tower, depot, farm, mast, kiosk, shack, junk };
 const VARIANTS = 1; // prop scatter variants per look (each one is a separate bake)
