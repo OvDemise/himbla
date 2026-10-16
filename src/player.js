@@ -545,9 +545,9 @@ export class Player {
   updateScarf(dt) {
     const b = this.body;
     if (!this.scarfSim) this.scarfSim = new ScarfSim(this.model);
-    // (a crate on your back, or the Kepler twin stack, is taller and wider than the pack)
-    const twin = this.cargoMesh && this.cargoMesh.children.length > 3;
-    this.scarfSim.update(dt, this.vehicle ? this.vehicle.e.body.vel : b.vel, b.up, this.cargoMesh ? { back: 1.14, top: twin ? 1.5 : 1.0, hw: 0.42 } : { back: 0.55, top: 0.94 });
+    // (a crate on your back, or the Twin Cradle's two, is something for the scarf to ride over)
+    const cargo = this.cargoMesh ? (this.cargoMesh.children.length > 3 ? 2 : 1) : 0;
+    this.scarfSim.update(dt, this.vehicle ? this.vehicle.e.body.vel : b.vel, b.up, { cargo });
   }
 
   // Standing at rest: upright, limbs level, no bob or roll, the scarf hanging. animate() poses the model

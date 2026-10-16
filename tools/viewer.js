@@ -1,7 +1,7 @@
 // Dev-only model viewer: renders one model through the game's comic post pass on a turntable.
 import * as THREE from 'three';
 import { loadFonts } from '../src/fonts.js';
-import { loadRunnerParts, loadShipParts, makeRunner, ScarfSim, makeShuttle, makeFreighter, makeHoverCar, makeApc, makeLandTrain, makeTowerCrane, CRANE_TROLLEY_MIN, CRANE_TROLLEY_SPAN, makeGarage, makeDishStation, DISH_SIZE } from '../src/models.js';
+import { loadRunnerParts, loadShipParts, makeRunner, makeCrate, ScarfSim, makeShuttle, makeFreighter, makeHoverCar, makeApc, makeLandTrain, makeTowerCrane, CRANE_TROLLEY_MIN, CRANE_TROLLEY_SPAN, makeGarage, makeDishStation, DISH_SIZE } from '../src/models.js';
 import { outpostTemplate } from '../src/outpostModels.js';
 import { loadOutpostParts, GLB_KINDS } from '../src/outpostGlb.js';
 import { makeChimera, makeMite, LIVING, MODIFIERS, spliceGenes } from '../src/chimera.js';
@@ -163,17 +163,23 @@ if (m === 'shuttle' || m === 'freighter') {
   sun.shadow.camera.updateProjectionMatrix();
 } else if (m === 'runner') {
   // &outfit=courier|spacecom2|meridian2|daedalus2|rustmoon|rustmoon2|kepler2|vostok2...  &speed=m/s (the scarf and halo are simulated at that speed, forward)
-  // &gear=pack|crate|twin (the scarf's collision gear)  &lean=rad (torso pitch)  &arms=rad (both arms' swing)  &fore=rad (both forearms' bend; negative bends the hand forward)  &armz=rad (arms out from the sides)
+  // &cargo=1|2 (a crate, or the Twin Cradle's two, on the back)  &lean=rad (torso pitch)  &arms=rad (both arms' swing)  &fore=rad (both forearms' bend; negative bends the hand forward)  &armz=rad (arms out from the sides)
   const R = makeRunner({ own: true });
   dressRunner(R, Q.get('outfit') || 'courier');
   R.torso.rotation.x = num('lean', 0);
   R.armL.rotation.set(num('arms', 0), 0, -num('armz', 0.15));
   R.armR.rotation.set(num('arms', 0), 0, num('armz', 0.15));
   if (R.foreL) { R.foreL.rotation.x = R.foreR.rotation.x = num('fore', 0); }
+  const cargo = num('cargo', 0); // &cargo=1 a crate on the back, 2 the Twin Cradle's two (as Player.setCargo)
+  if (cargo) {
+    const c = makeCrate(0xffd23f, 0.7);
+    if (cargo > 1) { const t = makeCrate(0x2ec4ff, 0.62); t.position.y = 0.55; t.rotation.y = 0.25; c.add(t); }
+    R.cargoSlot.add(c);
+  }
   const sim = new ScarfSim(R);
   const fwd = new THREE.Vector3(0, 0, 1), upv = new THREE.Vector3(0, 1, 0);
   let simT = 0;
-  anim = (t, sp, dt) => { simT += dt; sim.update(Math.max(dt, 1e-3), fwd.clone().multiplyScalar(num('speed', 0)), upv, Q.get('gear') === 'crate' ? { back: 1.14, top: 1.0, hw: 0.42 } : Q.get('gear') === 'twin' ? { back: 1.14, top: 1.5, hw: 0.42 } : { back: 0.55, top: 0.94 }); };
+  anim = (t, sp, dt) => { simT += dt; sim.update(Math.max(dt, 1e-3), fwd.clone().multiplyScalar(num('speed', 0)), upv, { cargo }); };
   model = R.root;
   height = 2.2;
   window.runner = R;

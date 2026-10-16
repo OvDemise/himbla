@@ -1262,7 +1262,7 @@ export class Enemies {
     m.body.position.y = m.bodyBase + (b.grounded ? -0.15 : 0);
     m.armL.rotation.z = -0.5; m.armR.rotation.z = 0.5;
     if (!e.scarfSim) e.scarfSim = new ScarfSim(m);
-    e.scarfSim.update(dt, b.vel, up, e.carrying ? { back: 1.14, top: 1.0 } : undefined);
+    e.scarfSim.update(dt, b.vel, up, e.carrying ? { cargo: 1 } : undefined);
     m.glowM.color.setHex(e.flash > 0 ? 0xffffff : dazed ? 0xffd23f : friendly ? 0x2ee6ff : e.glowColor || 0x7dff3a);
     if (e.carrying && !m.loot) { m.loot = makeCrate(g.missions.active ? g.missions.active.cargo.color : 0xffd23f, 0.7); m.cargoSlot.add(m.loot); }
     this.impactSkater(e, skating, hits); // (last, once the runner is posed: a ragdoll starts from that pose)
