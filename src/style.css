@@ -587,32 +587,6 @@ body:has(#title:not(.hidden)) #hud { visibility: hidden; }
 .cas.shake-s { animation: casShakeS 0.3s; }
 
 /* slots */
-.slots { display: flex; gap: 20px 56px; align-items: flex-start; justify-content: center; flex-wrap: wrap; }
-.slot-machine { position: relative; background: linear-gradient(#ff2e88, #c2185b); border: 5px solid var(--ink); border-radius: 24px 24px 10px 10px; box-shadow: 8px 8px 0 var(--ink); padding: 10px 18px 14px; width: 440px; text-align: center; }
-.slot-top { font-family: var(--comic); font-size: 30px; color: var(--yellow); -webkit-text-stroke: 1.5px var(--ink); text-shadow: 3px 3px 0 var(--ink); margin-bottom: 6px; }
-.reels { position: relative; display: flex; gap: 8px; justify-content: center; background: var(--ink); padding: 8px; border-radius: 10px; }
-.reel { width: 120px; height: 252px; overflow: hidden; background: linear-gradient(#cfc4b0, #fff 30%, #fff 70%, #cfc4b0); border: 3px solid #c9a23a; border-radius: 6px; position: relative; }
-.reel .strip { will-change: transform; }
-.reel.spinning .strip { filter: blur(1.5px); }
-.reel.stop { animation: casThunk 0.25s; }
-.reel.tease { box-shadow: 0 0 0 4px var(--yellow), 0 0 26px var(--yellow); animation: casTease 0.3s ease-in-out infinite alternate; }
-.reel.hit { box-shadow: 0 0 0 4px var(--green), 0 0 30px var(--green); animation: casHit 0.5s ease-in-out 3; }
-.cell { height: 84px; display: grid; place-items: center; font-size: 56px; position: relative; line-height: 1; }
-.cell small { position: absolute; bottom: 6px; font-family: var(--comic); font-size: 16px; color: var(--pink); -webkit-text-stroke: 0.5px var(--ink); }
-.payline { position: absolute; left: 4px; right: 4px; top: 50%; height: 4px; margin-top: -2px; background: rgba(255,42,74,0.7); pointer-events: none; box-shadow: 0 0 8px var(--red); }
-.slot-win { margin: 10px 0; font-family: var(--comic); font-size: 26px; color: #fff; -webkit-text-stroke: 1px var(--ink); min-height: 34px; }
-.slot-win.ok { color: var(--green); }
-.slot-win.big { color: var(--yellow); font-size: 34px; animation: casGlow 0.4s ease-in-out infinite alternate; }
-.slot-ctl { display: flex; gap: 10px; justify-content: center; }
-.lever { position: absolute; right: -34px; top: 70px; width: 14px; height: 120px; background: #c9c3d9; border: 3px solid var(--ink); border-radius: 6px; cursor: pointer; transform-origin: 50% 100%; }
-.lever i { position: absolute; left: 50%; top: -24px; width: 34px; height: 34px; margin-left: -17px; border-radius: 50%; background: var(--red); border: 3px solid var(--ink); }
-.lever.pull { animation: casLever 0.5s; }
-.paytable { background: #fff; border: 4px solid var(--ink); box-shadow: 5px 5px 0 var(--ink); border-collapse: collapse; transform: rotate(1deg); max-width: 300px; }
-.paytable th { font-family: var(--comic); font-size: 22px; background: var(--ink); color: var(--yellow); padding: 4px; }
-.paytable td { padding: 2px 10px; font-size: 22px; border-bottom: 2px dashed #d8ccb4; }
-.paytable td:last-child { font-family: var(--comic); text-align: right; color: var(--violet); }
-.paytable tr.jp td { background: var(--yellow); }
-.paytable td.fine { font-size: 12px; font-weight: 700; color: var(--ink); font-family: var(--body); text-align: left; }
 
 /* cards */
 .card { position: relative; width: 82px; height: 116px; background: #fff; border: 3px solid var(--ink); border-radius: 8px; box-shadow: 4px 4px 0 var(--ink); color: var(--ink); flex: none; }
@@ -671,17 +645,8 @@ body:has(#title:not(.hidden)) #hud { visibility: hidden; }
 .rl-ctl b { color: var(--yellow); font-weight: 400; }
 
 /* prize wheel */
-.pwheel { display: flex; gap: 26px; align-items: center; justify-content: center; flex-wrap: wrap; }
-.pw-wrap { position: relative; width: 420px; height: 420px; }
-.pw-wrap canvas { width: 420px; height: 420px; border-radius: 50%; box-shadow: 0 0 0 6px var(--ink), 8px 8px 0 6px var(--ink); }
-.pw-ptr { position: absolute; left: 50%; top: -28px; transform: translateX(-50%); font-size: 44px; color: var(--red); -webkit-text-stroke: 3px var(--ink); }
-.pw-hub { position: absolute; left: 50%; top: 50%; width: 76px; height: 76px; margin: -38px; border-radius: 50%; background: var(--yellow); border: 5px solid var(--ink); display: grid; place-items: center; text-align: center; font-family: var(--comic); font-size: 18px; line-height: 0.95; }
-.pw-side { max-width: 360px; }
-.pw-side h3 { font-family: var(--comic); font-size: 34px; margin: 0; color: var(--pink); -webkit-text-stroke: 1px var(--ink); }
-.pw-side p { font-weight: 700; }
 .pw-btns { display: flex; gap: 10px; flex-wrap: wrap; }
 .pw-btns button.ready { animation: casGlow 0.6s ease-in-out infinite alternate; }
-.pw-res { margin-top: 14px; font-family: var(--comic); font-size: 32px; color: var(--violet); min-height: 40px; }
 
 /* high-low */
 .hilo { padding: 14px 20px; display: flex; flex-direction: column; gap: 14px; align-items: stretch; min-height: 100%; }
@@ -712,19 +677,6 @@ body:has(#title:not(.hidden)) #hud { visibility: hidden; }
 .pz-txt small { font-weight: 700; font-size: 12px; }
 .prize button { font-size: 17px; max-width: 140px; }
 
-/* loan shark */
-.sh-card { display: flex; gap: 18px; align-items: flex-start; background: #2b2b2b radial-gradient(rgba(125,255,58,0.12) 1.5px, transparent 1.8px) 0 0 / 8px 8px; color: var(--paper); border: 4px solid var(--ink); box-shadow: 6px 6px 0 var(--ink); padding: 16px; transform: rotate(-0.5deg); }
-.sh-face { font-size: 90px; line-height: 1; filter: drop-shadow(4px 4px 0 var(--ink)); animation: casBob 1.6s ease-in-out infinite alternate; }
-.sh-txt { flex: 1; }
-.sh-txt h3 { font-family: var(--comic); font-size: 34px; margin: 0; color: #7dff3a; -webkit-text-stroke: 1px var(--ink); }
-.sh-txt > small { font-weight: 700; color: #aaa; }
-.sh-card .bubble { color: var(--ink); font-size: 17px; font-weight: 700; }
-.sh-debt { font-family: var(--comic); font-size: 30px; margin: 8px 0; }
-.sh-debt b { color: #ff6b81; font-weight: 400; font-size: 42px; }
-.sh-debt small { display: block; font-size: 16px; color: #ff9f1c; }
-.sh-btns { display: flex; gap: 10px; flex-wrap: wrap; }
-.sh-btns button small { display: block; margin: 0; }
-.sh-fine { font-size: 12px; color: #aaa; }
 
 @keyframes casRays { to { transform: rotate(360deg); } }
 @keyframes casBulbs { 50% { background-position: 9px 50%, 0 0; } }
@@ -745,7 +697,6 @@ body:has(#title:not(.hidden)) #hud { visibility: hidden; }
 @keyframes casHit { 50% { filter: brightness(1.5) saturate(1.4); transform: scale(1.04); } }
 @keyframes casLever { 40% { transform: scaleY(-0.6); } 100% { transform: scaleY(1); } }
 @keyframes casDeal { from { transform: translate(120px, -80px) rotate(30deg) scale(0.6); opacity: 0; } }
-@keyframes casBob { from { transform: translateY(0) rotate(-3deg); } to { transform: translateY(-8px) rotate(3deg); } }
 @media (max-width: 800px) { .cas-logo { font-size: 26px; } .cas-boss .cas-jp { display: none; } .slot-machine { width: 100%; } .reel { width: 28%; } }
 /* ---- instrument panel (bottom left): same dark panel family as the rest of the UI ---- */
 #speedo.panel { background: rgba(10, 8, 20, 0.9); color: var(--ui-text); border: 2px solid var(--ui-edge); box-shadow: 0 0 0 2px #05030c, var(--ui-shadow); }
@@ -892,32 +843,16 @@ body.seated #hud > :not(#popups) { display: none !important; }
 .cas-burst .rays { display: none; }
 .cas-flash { font-size: 20px; border: 2px solid #05030c; box-shadow: 4px 4px 0 #05030c; padding: 8px 14px 6px; }
 .cas-float { font-size: 22px; text-shadow: 2px 2px 0 #05030c; }
-.slot-machine { border: 2px solid #05030c; border-radius: 0; box-shadow: 4px 4px 0 #05030c; background: #8a1a52; }
-.slot-top { font-size: 16px; text-shadow: 2px 2px 0 #05030c; }
-.reels, .reel { border-radius: 0; }
-.cell small { font-size: 9px; }
-.slot-win { font-size: 14px; }
-.slot-win.big { font-size: 18px; }
-.lever, .lever i { border-width: 2px; }
-.paytable { transform: none; background: var(--ui-bg); color: var(--ui-text); border: 2px solid var(--ui-edge); box-shadow: 4px 4px 0 #05030c; }
-.paytable th { font-size: 11px; }
-.paytable td { font-size: 17px; border-bottom: 2px solid var(--ui-bg3); }
-.paytable td:last-child { font-size: 11px; color: var(--ui-violet); }
-.paytable td.fine { color: var(--ui-muted); }
-.paytable tr.jp td { color: #05030c; }
 .card { border: 2px solid #05030c; border-radius: 4px; box-shadow: 3px 3px 0 #05030c; }
 .card i { font-size: 11px; line-height: 1.3; }
 .prize:nth-child(odd) { transform: none; }
 .hl-msg { font-size: 13px; border-radius: 0; padding: 8px 12px 6px; border: 2px solid var(--ui-edge); }
 .rl-result { font-size: 14px; }
 .rl-result.show span { font-size: 20px; }
-.rl-hist span, .rn, .ro, .pw-hub { font-size: 10px; }
+.rl-hist span, .rn, .ro { font-size: 10px; }
 .rl-ctl { font-size: 11px; }
 .rl-info { font-weight: 400; font-size: 15px; }
 .rl-wheel canvas, .pw-wrap canvas { box-shadow: 0 0 0 2px #05030c, 4px 4px 0 2px #05030c; }
-.pw-side h3 { font-size: 18px; }
-.pw-side p { font-weight: 400; }
-.pw-res { font-size: 16px; color: var(--ui-violet); }
 .hl-top { font-size: 13px; }
 .hl-pot b { font-size: 22px; }
 .hl-cards .card i { font-size: 15px; }
@@ -930,12 +865,94 @@ body.seated #hud > :not(#popups) { display: none !important; }
 .pz-txt b { font-size: 12px; }
 .pz-txt small { font-weight: 400; font-size: 14px; color: var(--ui-muted); }
 .prize button { font-size: 10px; }
-.sh-card { border: 2px solid var(--ui-edge); box-shadow: 4px 4px 0 #05030c; transform: none; background: #1d1d24; }
-.sh-txt h3 { font-size: 18px; }
-.sh-card .bubble { font-weight: 400; }
-.sh-debt { font-size: 15px; }
-.sh-debt b { font-size: 22px; }
-.sh-debt small { font-size: 10px; }
+
+/* ---- classic games: pixel-art icons (pixelIcons.js), the bigger slots and the bigger prize wheel ---- */
+.px { display: inline-block; flex: none; width: calc(var(--w) * var(--s, 4px)); height: calc(var(--h) * var(--s, 4px)); background: center / 100% 100% no-repeat; image-rendering: pixelated; vertical-align: middle; }
+.px.ico { --s: 2px; margin: -5px 2px; }
+.px.sm { --s: var(--sm, 2px); }
+.px.big { --s: 4px; margin: -9px 6px; }
+.cas-face { display: grid; place-items: center; width: 84px; height: 84px; border: 2px solid #05030c; border-radius: 0; box-shadow: inset 0 0 0 2px #2ee6ff, 2px 2px 0 #05030c; background: #123a5a repeating-linear-gradient(0deg, rgba(255,255,255,0.06) 0 3px, transparent 3px 6px); font-size: 0; }
+.cas-face .px { --s: 3px; }
+.cas-chips .px { margin: -6px 4px -6px 0; }
+
+/* slots: the machine and its paytable grow with the window (the sprite pixel --s steps up, in whole pixels, so the art stays crisp) */
+.slots { --s: 4px; --sm: 2px; display: flex; gap: 20px 56px; align-items: stretch; justify-content: center; flex-wrap: wrap; }
+@media (min-height: 780px) { .slots { --s: 5px; } }
+@media (min-height: 840px) { .slots { --s: 6px; } }
+@media (min-height: 900px) { .slots { --s: 7px; } }
+.slot-machine { --cell: calc(16 * var(--s) + 8px); position: relative; display: flex; flex-direction: column; justify-content: space-between; width: calc(3 * var(--cell) + 84px); padding: 12px 22px 16px; text-align: center; background: #8a1a52 repeating-linear-gradient(90deg, rgba(0,0,0,0.1) 0 4px, transparent 4px 8px); border: 3px solid #05030c; box-shadow: inset 0 0 0 3px #c9a23a, inset 0 0 0 6px #05030c, 6px 6px 0 #05030c; }
+.slot-top { display: flex; align-items: center; justify-content: center; gap: 14px; margin-bottom: 8px; font-size: 18px; line-height: 1; color: var(--yellow); text-shadow: 2px 2px 0 #05030c; }
+.slot-top .px { --s: 3px; margin: 0; }
+.reels { position: relative; display: flex; gap: 6px; justify-content: center; background: #05030c; padding: 8px; border: 3px solid #c9a23a; }
+.reel { position: relative; width: var(--cell); height: calc(3 * var(--cell)); overflow: hidden; background: #1b1040 repeating-linear-gradient(0deg, rgba(255,255,255,0.045) 0 2px, transparent 2px 4px); border: 2px solid #05030c; box-shadow: inset 0 0 0 2px #3a2a78; }
+.reel::after { content: ''; position: absolute; inset: 0; pointer-events: none; background: linear-gradient(#05030c, transparent 24%, transparent 76%, #05030c); opacity: 0.5; } /* (the rows above and below the line are dimmer: the middle one is the one that pays) */
+.reel .strip { will-change: transform; }
+.reel.spinning .strip { filter: blur(1.5px); }
+.reel.stop { animation: casThunk 0.25s; }
+.reel.tease { box-shadow: 0 0 0 4px var(--yellow), 0 0 26px var(--yellow); animation: casTease 0.3s ease-in-out infinite alternate; }
+.reel.hit { box-shadow: 0 0 0 4px var(--green), 0 0 30px var(--green); animation: casHit 0.5s ease-in-out 3; }
+.cell { position: relative; display: grid; place-items: center; height: var(--cell); line-height: 1; }
+.cell small { position: absolute; bottom: 4px; font-size: 9px; color: var(--pink); text-shadow: 1px 1px 0 #05030c; }
+.payline { position: absolute; left: 8px; right: 8px; top: 50%; height: 4px; margin-top: -2px; background: repeating-linear-gradient(90deg, var(--red) 0 8px, transparent 8px 12px); pointer-events: none; z-index: 2; }
+.payline i { position: absolute; top: -8px; border: 10px solid transparent; }
+.payline i:first-child { left: -16px; border-left-color: var(--red); border-right-width: 0; }
+.payline i:last-child { right: -16px; border-right-color: var(--red); border-left-width: 0; }
+.slot-win { display: flex; align-items: center; justify-content: center; gap: 4px; flex-wrap: wrap; min-height: 22px; margin: 8px 0; padding: 8px 8px 6px; background: #05030c; border: 2px solid #3a2a78; font-size: 14px; line-height: 1.4; color: #fff; }
+.slot-win.ok { color: var(--green); }
+.slot-win.big { color: var(--yellow); font-size: 18px; animation: casGlow 0.4s ease-in-out infinite alternate; }
+.slot-ctl { display: flex; gap: 12px; justify-content: center; }
+.slot-ctl button { font-size: 13px; padding: 10px 16px 8px; }
+.slot-ctl button.big { font-size: 18px; padding: 10px 26px 8px; }
+.lever { position: absolute; right: -42px; top: 90px; width: 14px; height: 130px; background: #a9a3c2; border: 2px solid #05030c; cursor: pointer; transform-origin: 50% 100%; }
+.lever i { position: absolute; left: 50%; top: -26px; width: 32px; height: 32px; margin-left: -16px; background: var(--red); border: 2px solid #05030c; box-shadow: inset -4px -4px 0 #a3122a, inset 4px 4px 0 #ff8a9a; }
+.lever.pull { animation: casLever 0.5s; }
+.paytable { display: flex; flex-direction: column; width: 340px; color: var(--ui-text); background: var(--ui-bg); border: 3px solid var(--ui-edge); box-shadow: 4px 4px 0 #05030c; }
+.pt-head { padding: 10px 12px 8px; text-align: center; font-size: 13px; color: var(--yellow); background: #05030c; }
+.pt-head small { font-size: 9px; color: var(--ui-muted); margin-left: 6px; }
+.pt-row { display: flex; flex: 1; align-items: center; justify-content: space-between; gap: 10px; padding: 4px 14px; border-bottom: 2px solid var(--ui-bg3); }
+.pt-row span { display: flex; align-items: center; gap: 2px; }
+.pt-row em { margin-right: 8px; font-style: normal; font-size: 10px; color: var(--ui-muted); }
+.pt-row b { font-weight: 400; font-size: 16px; color: var(--ui-violet); }
+.pt-row.jp { background: var(--yellow); }
+.pt-row.jp b { color: #05030c; }
+.paytable .fine { margin: 0; padding: 8px 12px 10px; font-size: 14px; line-height: 1.3; color: var(--ui-muted); }
+.paytable .fine .px { margin: -4px 2px; }
+
+@media (max-height: 800px) {
+  .pt-head { padding: 7px 10px 5px; }
+  .pt-row { padding: 0 12px; }
+  .paytable .fine { padding: 6px 10px 8px; font-size: 12px; }
+  .slot-win { margin: 6px 0; }
+}
+
+/* cards use sprites for their suits */
+.card b { font-size: 0; }
+.card i .px { margin: 0; }
+.card i .cs { --s: 2px; }
+.card b .cb { --s: 5px; }
+.card.back::after { content: none; }
+.card.back .px { --s: 3px; position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); }
+
+/* the prize wheel: sized from the window (the canvas is 640 px; the page scales it) */
+.pwheel { --wd: clamp(320px, calc(min(860px, 94vh) - 316px), 600px); display: flex; gap: 44px; align-items: center; justify-content: center; flex-wrap: wrap; }
+.pw-wrap { position: relative; width: var(--wd); height: var(--wd); margin-top: 34px; }
+.pw-wrap canvas { width: 100%; height: 100%; border-radius: 50%; }
+.pw-ptr { --s: 4px; position: absolute; left: 50%; top: -26px; transform: translateX(-50%); z-index: 2; margin: 0; }
+.pw-hub { position: absolute; left: 50%; top: 50%; width: calc(var(--wd) * 0.17); height: calc(var(--wd) * 0.17); margin: calc(var(--wd) * -0.085); display: grid; place-items: center; text-align: center; border: 4px solid #05030c; border-radius: 50%; background: var(--yellow); color: #05030c; font-size: calc(var(--wd) * 0.026); line-height: 1.2; box-shadow: inset -4px -4px 0 #c9a23a; }
+.pw-side { max-width: 400px; }
+.pw-side h3 { margin: 0 0 8px; font-size: 22px; line-height: 1.3; color: var(--pink); }
+.pw-side p { margin: 0 0 12px; font-size: 20px; line-height: 1.3; font-weight: 400; }
+.pw-side p .px { margin: -4px 2px; }
+.pw-btns button { font-size: 13px; padding: 10px 16px 8px; }
+.pw-btns button.big { font-size: 16px; padding: 12px 20px 10px; }
+.pw-res { min-height: 52px; margin-top: 16px; font-size: 20px; line-height: 1.4; color: var(--ui-violet); }
+.rl-ptr { --s: 3px; position: absolute; left: 50%; top: -18px; transform: translateX(-50%); z-index: 2; margin: 0; }
+.prize button { max-width: 190px; white-space: nowrap; }
+.prize button:disabled { white-space: normal; max-width: 150px; line-height: 1.5; }
+.prize button .px.ico { margin: -5px 2px; }
+.pz-txt b { line-height: 1.4; }
+.pz-sw { display: flex; align-items: center; gap: 4px; }
+.pz-sw .px { margin: 0; }
 @keyframes casUp { 30% { background: var(--green); } }
 @keyframes casDown { 30% { background: #ff6b81; transform: translateX(-4px); } 60% { transform: translateX(3px); } }
 @media (max-width: 800px) { .cas-logo { font-size: 13px; } }

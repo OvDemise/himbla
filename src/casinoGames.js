@@ -143,7 +143,7 @@ export const STATIONS = [
   { id: 'duck', x: DUCK.kiosk[0], z: DUCK.kiosk[1] + 2, r: 2.8, label: 'DUCK DERBY — PICK A DUCK &amp; BET' },
   { id: 'plinko', x: PLK.x, z: PLK.z + 7.8, r: 3.2, label: 'PLAY PLINKO' },
   { id: 'classic', x: CLASSIC.x - 3.2, z: CLASSIC.zs[1], r: 4.2, label: 'CLASSIC GAMES (SLOTS · ROULETTE · WHEEL · HIGH-LOW)' },
-  { id: 'prizes', x: PRIZE.x - 2.8, z: PRIZE.z, r: 3.8, label: 'PRIZE COUNTER &amp; RUSTY THE LOAN SHARK' },
+  { id: 'prizes', x: PRIZE.x - 2.8, z: PRIZE.z, r: 3.8, label: 'PRIZE COUNTER' },
 ];
 
 const _v = new THREE.Vector3(), _w = new THREE.Vector3(), _l = new THREE.Vector3();
@@ -259,7 +259,7 @@ export class CasinoGames {
     if (this.g.credits >= n) return true;
     this.g.fx.pop('NOT ENOUGH CREDITS!', where || null, { color: '#ff2a4a', size: 44, life: 1.4 });
     this.audio.tone(140, 0.25, 'square', 0.12);
-    this.say(this.casino.debt() > 0 ? 'Broke AND in debt? Bold.' : 'Broke? Rusty the loan shark is at the prize counter…', 'bad');
+    this.say('Out of credits? Deliver a few packages and come back.', 'bad');
     return false;
   }
 
@@ -865,8 +865,14 @@ export class CasinoGames {
       if (dir) p.aim = Math.max(-AIM_RANGE, Math.min(AIM_RANGE, p.aim + dir * dt * 1.6));
       if (inp.down('Space') && p.cd <= 0) this.dropBall();
     }
-    cw.plinko.aim.position.x = PLK.x + p.aim;
-    cw.plinko.aim.children[1].position.y = 0.7 + Math.sin(time * 6) * 0.12;
+    // the aim marker (the ball and arrow over the chute) is only there while somebody is playing: stood at the board without sitting down, it
+    // floated over the chute for nothing
+    const aiming = this.mode === 'plinko';
+    cw.plinko.aim.visible = aiming;
+    if (aiming) {
+      cw.plinko.aim.position.x = PLK.x + p.aim;
+      cw.plinko.aim.children[1].position.y = 0.7 + Math.sin(time * 6) * 0.12;
+    }
     if (this.sim.balls.length) {
       this.sim.step(Math.min(dt, 1 / 20));
       for (const b of this.sim.balls) b.mesh.position.set(PLK.x + b.x, PLK.y + b.y, PLK.z + 0.12);
