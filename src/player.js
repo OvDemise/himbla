@@ -89,6 +89,7 @@ export class Player {
     this.body.pos.copy(pos);
     this.body.vel.set(0, 0, 0);
     this.body.platform = null; // never keep riding a deck (or satellite) you've been teleported off
+    this.body.velFrame = null;
     this.seat = null; // ...or a ship or funpark ride (rides.js lets go too)
     if (this.game.grind) this.game.grind.active = null; // ...or a grind rail
     upAt(pos, this.body.up);
@@ -346,6 +347,14 @@ export class Player {
     for (let i = 0; i < steps; i++) {
       const before = b.grounded;
       const imp = stepSkater(b, ctrl, h, g.planet, g.colliders, pr, this.impacts);
+      // velocities on a deck are relative to it: convert at once when stepping on or off or from one to another (b.velFrame is the deck b.vel
+      // is in; stepSkater meets any other deck at the speed it closes). At the end of the frame, as this was, a landing on a deck that was
+      // dropping gave you its speed upward, and a hop off it the same: on a ship going down the rider kept popping off the deck.
+      if (b.platform !== (b.velFrame || null)) {
+        if (b.velFrame) b.vel.add(b.velFrame.vel);
+        if (b.platform) b.vel.sub(b.platform.vel);
+        b.velFrame = b.platform || null;
+      }
       if (!before && b.grounded) landed = true;
       for (const it of imp) this.onImpact(it, ctrl.skates);
       ctrl.jump = false;
@@ -372,8 +381,7 @@ export class Player {
     }
     b.bounced = 0;
     // velocities on a deck are relative to it; convert when stepping on or off
-    if (!plat && b.platform) { b.vel.sub(b.platform.vel); g.fx.pop('ALL ABOARD!', null, { color: '#2ee6ff', size: 44, life: 1, prio: 1 }); }
-    else if (plat && b.platform !== plat) { b.vel.add(plat.vel); if (b.platform) b.vel.sub(b.platform.vel); }
+    if (!plat && b.platform) g.fx.pop('ALL ABOARD!', null, { color: '#2ee6ff', size: 44, life: 1, prio: 1 });
     // world-space acceleration (for sloshing fluids)
     const worldVel = _v.copy(b.vel);
     if (b.platform) worldVel.add(b.platform.vel);
