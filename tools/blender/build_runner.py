@@ -395,6 +395,8 @@ for s in (-1, 1):
 # (head_rim, at y 0.985), so the two never cross: a rib pattern here cut through the helmet and the rim at
 # the same height and the outline shells of the three read as splotches all the way round
 mesh("torso_collar", xf(torus(0.215, 0.062, 24, 6, 1.1), (0, 0.9, 0)), "collar", T, 0.03)
+# the knot where the scarf tails leave the collar at the back of the neck (ScarfSim roots them here)
+mesh("torso_scarfKnot", xf(superquad(0.085, 0.055, 0.05, 0.6, 0.6, 12, 6), (-0.015, 0.918, -0.232), (0.1, 0.0, 0.0)), "collar", T, 0.03)
 
 # ---- head ----
 H = pivot("head", (0, 1.18, 0), T)

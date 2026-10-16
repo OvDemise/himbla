@@ -163,7 +163,7 @@ if (m === 'shuttle' || m === 'freighter') {
   sun.shadow.camera.updateProjectionMatrix();
 } else if (m === 'runner') {
   // &outfit=courier|spacecom2|meridian2|daedalus2|rustmoon|rustmoon2|kepler2|vostok2...  &speed=m/s (the scarf and halo are simulated at that speed, forward)
-  // &lean=rad (torso pitch)  &arms=rad (both arms' swing)  &fore=rad (both forearms' bend; negative bends the hand forward)  &armz=rad (arms out from the sides)
+  // &gear=pack|crate|twin (the scarf's collision gear)  &lean=rad (torso pitch)  &arms=rad (both arms' swing)  &fore=rad (both forearms' bend; negative bends the hand forward)  &armz=rad (arms out from the sides)
   const R = makeRunner({ own: true });
   dressRunner(R, Q.get('outfit') || 'courier');
   R.torso.rotation.x = num('lean', 0);
@@ -173,7 +173,7 @@ if (m === 'shuttle' || m === 'freighter') {
   const sim = new ScarfSim(R);
   const fwd = new THREE.Vector3(0, 0, 1), upv = new THREE.Vector3(0, 1, 0);
   let simT = 0;
-  anim = (t, sp, dt) => { simT += dt; sim.update(Math.max(dt, 1e-3), fwd.clone().multiplyScalar(num('speed', 0)), upv, { back: 0.55, top: 0.94 }); };
+  anim = (t, sp, dt) => { simT += dt; sim.update(Math.max(dt, 1e-3), fwd.clone().multiplyScalar(num('speed', 0)), upv, Q.get('gear') === 'crate' ? { back: 1.14, top: 1.0, hw: 0.42 } : Q.get('gear') === 'twin' ? { back: 1.14, top: 1.5, hw: 0.42 } : { back: 0.55, top: 0.94 }); };
   model = R.root;
   height = 2.2;
   window.runner = R;
