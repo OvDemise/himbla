@@ -5,6 +5,7 @@ import { makeRunner, makeCrate, ScarfSim } from './models.js';
 import { frameQuat, upAt } from './geo.js';
 import { Ragdoll } from './ragdoll.js';
 import { Idle } from './idles.js';
+import { updateHalo } from './cosmetics.js';
 import { WEAPONS, weaponUnlocked, fireWeapon } from './weapons.js';
 
 const SPEED_MARKS = [
@@ -272,6 +273,7 @@ export class Player {
         if (m.armL && m.armR) {
           m.armL.rotation.x = m.armR.rotation.x = -0.75;
           m.armL.rotation.z = -0.22; m.armR.rotation.z = 0.22;
+          m.foreL.rotation.x = -0.55 + 0.2 * this.steerLean; m.foreR.rotation.x = -0.55 - 0.2 * this.steerLean; // (elbows in, a bend into the turn)
         }
       } else {
         m.torso.rotation.x = 0;
@@ -280,6 +282,7 @@ export class Player {
         if (m.armL && m.armR) {
           m.armL.rotation.x = -1.15 + 0.15 * this.steerLean; m.armR.rotation.x = -1.15 - 0.15 * this.steerLean;
           m.armL.rotation.z = -0.12; m.armR.rotation.z = 0.12;
+          m.foreL.rotation.x = -0.35 + 0.25 * this.steerLean; m.foreR.rotation.x = -0.35 - 0.25 * this.steerLean; // (the wheel hand pulls in)
         }
       }
       this.upSmooth.copy(b.up);
@@ -513,6 +516,7 @@ export class Player {
     const g = this.game;
     const safe = (g.alchemy && g.alchemy.buffs.cushion > 0) ? 1e9 : skates ? this.params.skateSafeImpact * (g.cheats ? g.cheats.speed : 1) : this.params.bootSafeImpact * (g.cheats ? g.cheats.speed : 1);
     if (it.speed > 6) g.audio.thud(it.speed);
+    if (it.speed > 4 && this.model.halo) this.model.halo.kick(Math.min(1, it.speed / 25)); // (a bump rings the halo)
     if (g.alchemy && g.alchemy.buffs.bouncy > 0 && it.kind === 'ground' && it.speed > 5) {
       this.body.bounceReady = Math.max(this.body.bounceReady || 0, it.speed);
       g.fx.pop('BOING!', null, { color: '#ff7ad9', size: 44, prio: 1 });
@@ -553,6 +557,7 @@ export class Player {
     this.idle.cancel(m);
     m.torso.rotation.set(0, 0, 0);
     m.legL.rotation.set(0, 0, 0); m.legR.rotation.set(0, 0, 0);
+    m.foreL.rotation.set(0, 0, 0); m.foreR.rotation.set(0, 0, 0);
     m.armL.rotation.set(0, 0, -0.15); m.armR.rotation.set(0, 0, 0.15); // (arms a little out from the sides: the idle pose in animate)
     m.body.position.y = m.bodyBase;
     this.roll = 0;
@@ -604,12 +609,14 @@ export class Player {
       m.legL.rotation.x = m.legR.rotation.x = -0.35;
       m.armL.rotation.x = m.armR.rotation.x = 0.9;
       m.armL.rotation.z = -0.25; m.armR.rotation.z = 0.25;
+      m.foreL.rotation.x = m.foreR.rotation.x = -0.2; // (hands streamlined, a hint of bend)
       if (Math.random() < dt * 20) this.game.fx.spawn(b.pos.clone().addScaledVector(up, 1.2), b.vel.clone().multiplyScalar(-0.2), { color: 0x9be7ff, size: 0.3, life: 0.3, count: 1, spread: 0.6 });
     } else if (!b.grounded) {
       m.torso.rotation.x = 0.15;
       m.legL.rotation.x = -0.5; m.legR.rotation.x = 0.3;
       m.armL.rotation.z = -1.1; m.armR.rotation.z = 1.1;
       m.armL.rotation.x = m.armR.rotation.x = 0;
+      m.foreL.rotation.x = m.foreR.rotation.x = -0.35 + 0.1 * Math.sin(this.anim * 0.5); // (loose elbows, balancing)
       m.body.position.y = base;
       if (this.trick.tucked) { m.legL.rotation.x = m.legR.rotation.x = -1.2; m.torso.rotation.x = 0.6; }
     } else if (b.skating) {
@@ -619,6 +626,10 @@ export class Player {
       m.legL.rotation.x = 0.35 * crouch; m.legR.rotation.x = -0.35 * crouch;
       m.armL.rotation.x = m.armR.rotation.x = -0.9 * crouch;
       m.armL.rotation.z = -0.3; m.armR.rotation.z = 0.3;
+      // elbows bent, hands out in front; leaning into a turn the inside arm tucks and the outside one reaches
+      const bank = THREE.MathUtils.clamp(this.roll / 0.5, -1, 1);
+      m.foreL.rotation.x = -(0.3 + 0.55 * crouch) + 0.25 * bank;
+      m.foreR.rotation.x = -(0.3 + 0.55 * crouch) - 0.25 * bank;
     } else {
       const run = Math.min(1, sp / 6);
       m.body.position.y = base + Math.abs(s) * 0.12 * run;
@@ -626,6 +637,8 @@ export class Player {
       m.legL.rotation.x = s * 0.9 * run; m.legR.rotation.x = -s * 0.9 * run;
       m.armL.rotation.x = -s * 0.8 * run; m.armR.rotation.x = s * 0.8 * run;
       m.armL.rotation.z = -0.15; m.armR.rotation.z = 0.15;
+      // elbows pump: bent most as the hand comes forward
+      m.foreL.rotation.x = -run * (0.45 + 0.55 * Math.max(0, s)); m.foreR.rotation.x = -run * (0.45 + 0.55 * Math.max(0, -s));
     }
     // stopped: the breath, and now and then another idle (idles.js), laid over the rest pose
     this.idle.apply(m, dt, b.grounded && !b.skating && !this.rag && !!ctrl && ctrl.wish.lengthSq() === 0, sp, !b.grounded || !!this.rag);
@@ -635,6 +648,7 @@ export class Player {
       this.game.devOverlay.lap('ragdoll');
     }
     this.updateScarf(dt);
+    updateHalo(m, dt);
 
     const right = new THREE.Vector3(1, 0, 0).applyQuaternion(m.root.quaternion);
     const strength = b.skating && b.grounded ? Math.min(1, sp / 30) : this.vaneCarve ? 0.55 + 0.45 * Math.abs(this.vaneCarve) : 0; // (the Vanes leave ribbons in the air)

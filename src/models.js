@@ -126,7 +126,8 @@ const LENS_M = new THREE.MeshBasicMaterial({ color: 0xfff6a8 });
 // each slot still gets the runner's own material, so outfits recolour it exactly as before.
 // If the file can't be loaded, makeRunner falls back to the primitive build below.
 let RUNNER_PARTS = null;
-const PIVOTS = ['legL', 'legR', 'torso', 'head', 'armL', 'armR'];
+const PIVOTS = ['legL', 'legR', 'torso', 'head', 'armL', 'armR', 'foreL', 'foreR']; // (foreL/foreR: forearms, on the elbows)
+const EXTRA_PIVOTS = ['padL', 'padR', 'band']; // (outfit extras, hung on by cosmetics.js; optional, so an older file still loads)
 const NO_SHADOW = new Set(['glow', 'lens', 'glint']);
 export async function loadRunnerParts() {
   try {
@@ -145,9 +146,12 @@ function bakeRunnerParts(scene) {
     return groups.get(key);
   };
   const inv = new THREE.Matrix4(), rel = new THREE.Matrix4();
-  for (const name of [...PIVOTS, 'scarfLinks']) {
+  for (const name of [...PIVOTS, ...EXTRA_PIVOTS, 'scarfLinks']) {
     const pivot = scene.getObjectByName(name);
-    if (!pivot) throw new Error('runner.glb has no pivot ' + name);
+    if (!pivot) {
+      if (EXTRA_PIVOTS.includes(name)) continue;
+      throw new Error('runner.glb has no pivot ' + name);
+    }
     inv.copy(pivot.matrixWorld).invert();
     for (const o of pivot.children) {
       if (!o.isMesh) continue;
@@ -222,6 +226,30 @@ function shellAt(base, k) {
 // tubes and squashed spheres that ink()'s bounding-box scaling can't). Used by the chimeras.
 export function inkShell(geo, t) {
   return shellAt(inkShellGeo(geo, t), 1);
+}
+
+// One of the runner's outfit extras ('padL', 'padR', 'band': see build_runner.py) as a group of meshes, or null if
+// the file has none. `mats` maps a colour slot to the material to wear (a slot it leaves out takes `fallback`).
+// The meshes and the outline shell are the caller's to remove (they are plain children of the group).
+export function runnerExtra(key, mats, fallback = null) {
+  const B = RUNNER_PARTS && RUNNER_PARTS[key];
+  if (!B) return null;
+  const g = new THREE.Group();
+  for (const { slot, geo } of B.parts) {
+    const mat = mats[slot] || fallback;
+    if (!mat) continue;
+    const m = new THREE.Mesh(geo, mat);
+    m.castShadow = true;
+    g.add(m);
+  }
+  if (B.ink) {
+    const h = new THREE.Mesh(B.ink.thin, inkMat);
+    h.castShadow = false;
+    h.userData.isInk = true;
+    h.userData.inkGeo = B.ink;
+    g.add(h);
+  }
+  return g;
 }
 
 // Hang a baked pivot's parts (and its one outline shell) on a group.
@@ -306,12 +334,13 @@ export class ScarfSim {
       mesh.frustumCulled = inkMesh.frustumCulled = false;
       mesh.castShadow = true;
       m.torso.add(mesh);
-      // the root: off to the right of the collar (a second tail a little further in)
-      const root = new THREE.Vector3(0.2 - k * 0.12, piv.y, piv.z + 0.02);
+      // the roots: over the right shoulder, outside the pack's edge, so a tail hangs down the side of the pack rather than
+      // lying on its lid. A second tail rests on the first: a hand's breadth in, a little higher and a layer further back
+      const root = new THREE.Vector3(0.33 - k * 0.04, piv.y - 0.03 + k * 0.012, piv.z + 0.13 - k * 0.04);
       const seg = len / (SCARF_PTS - 1);
       const p = [], o = [];
       for (let i = 0; i < SCARF_PTS; i++) { p.push(new THREE.Vector3()); o.push(new THREE.Vector3()); }
-      const T = { mesh, inkMesh, root, seg, w: st.w * (k ? 0.85 : 1), p, o, phase: k * 1.7 };
+      const T = { mesh, inkMesh, root, seg, w: st.w * (k ? 0.85 : 1), p, o, phase: k * 0.6 };
       this.hang(T);
       this.tails.push(T);
     }
@@ -321,7 +350,7 @@ export class ScarfSim {
   hang(T) {
     const { p, o, root, seg } = T;
     for (let i = 0; i < SCARF_PTS; i++) {
-      p[i].set(root.x + i * 0.02, root.y - i * seg * 0.7, root.z - 0.3 - i * seg * 0.7);
+      p[i].set(root.x + i * 0.004, root.y - i * seg * 0.95, Math.min(root.z - 0.06 * Math.min(i, 3), -0.2) - i * seg * 0.1);
       o[i].copy(p[i]);
     }
   }
@@ -345,8 +374,8 @@ export class ScarfSim {
     _sg.copy(up).multiplyScalar(-6).applyQuaternion(_sq); // gravity (stylised: the Moon's is too lazy to read)
     _sw.copy(vel).negate().applyQuaternion(_sq); // relative wind
     const ws = _sw.length();
-    _sw.multiplyScalar(0.08 * ws);
-    if (_sw.length() > 4) _sw.setLength(4); // (capped, so at speed it streams a little but stays close to you)
+    _sw.multiplyScalar(0.1 * ws);
+    if (_sw.length() > 11) _sw.setLength(11); // (capped, but past gravity's 6 from about 8 m/s: a skater's scarf streams out behind, level, not down the back)
     if (this.prevVel) _sa.copy(vel).sub(this.prevVel).divideScalar(Math.max(dt, 1e-3)).negate().multiplyScalar(0.12).applyQuaternion(_sq);
     else _sa.set(0, 0, 0);
     if (_sa.length() > 20) _sa.setLength(20); // (a respawn or a teleport isn't a swing)
@@ -400,8 +429,17 @@ export class ScarfSim {
           }
         }
       }
-      this.draw(T);
     }
+    // tails lie on each other, never through each other (the later one is the outer layer)
+    for (let k = 1; k < this.tails.length; k++) {
+      const A = this.tails[k - 1].p, B = this.tails[k].p;
+      for (let i = 1; i < SCARF_PTS; i++) {
+        _st.subVectors(B[i], A[i]);
+        const d = _st.length();
+        if (d < 0.045) { if (d < 1e-5) _st.set(0, 0, -1); else _st.divideScalar(d); B[i].addScaledVector(_st, (0.045 - d) * 0.6); A[i].addScaledVector(_st, -(0.045 - d) * 0.4); }
+      }
+    }
+    for (const T of this.tails) this.draw(T);
   }
 
   draw(T) {
@@ -519,22 +557,30 @@ export function makeRunner({
     addBaked(torso, 'torso', mats);
     addBaked(head, 'head', mats);
   }
-  if (pirate) head.add(part(G.band, toon(0xd7263d), 0, 0.12, 0, 0.02));
+  if (pirate) {
+    const band = runnerExtra('band', { accent: toon(0xd7263d), dark: toon(0x3a0f18) });
+    head.add(band || part(G.band, toon(0xd7263d), 0, 0.12, 0, 0.02));
+  }
 
-  const arms = [];
+  const arms = [], fores = [];
   for (const side of [-1, 1]) {
     const arm = new THREE.Group();
     arm.position.set(side * 0.45, 0.85, 0);
     torso.add(arm);
     arms.push(arm);
-    if (baked) { addBaked(arm, side < 0 ? 'armL' : 'armR', mats); continue; }
+    // the forearm turns on the elbow, 0.31 below the shoulder; at rest (rotation 0) it is straight
+    const fore = new THREE.Group();
+    fore.position.y = -0.31;
+    arm.add(fore);
+    fores.push(fore);
+    if (baked) { addBaked(arm, side < 0 ? 'armL' : 'armR', mats); addBaked(fore, side < 0 ? 'foreL' : 'foreR', mats); continue; }
     arm.add(part(G.arm, suitM, 0, 0, 0, 0.04));
     arm.add(part(G.shoulder, helmetM, side * 0.01, 0.0, 0, 0.03));
-    arm.add(part(G.wristCuff, accentM, 0, -0.52, 0, 0.02));
-    const glove = part(G.glove, dark, 0, -0.63, 0.01, 0.03);
+    fore.add(part(G.wristCuff, accentM, 0, -0.21, 0, 0.02));
+    const glove = part(G.glove, dark, 0, -0.32, 0.01, 0.03);
     glove.scale.set(0.95, 1.15, 0.85);
-    arm.add(glove);
-    arm.add(part(G.thumb, dark, -side * 0.05, -0.6, 0.08, 0.02));
+    fore.add(glove);
+    fore.add(part(G.thumb, dark, -side * 0.05, -0.29, 0.08, 0.02));
   }
 
   // Comic scarf streaming behind. The tail leaves from the top of the backpack and is kept above
@@ -566,7 +612,7 @@ export function makeRunner({
   }
 
   root.scale.setScalar(scale);
-  return { root, trick, body, bodyBase: -1.2, torso, head, legL: legs[0], legR: legs[1], armL: arms[0], armR: arms[1], scarf: scarfPivot, cargoSlot, glowM, accent, mats: { suit: suitM, accent: accentM, helmet: helmetM, visor: visorM, scarf: scarfM, collar: collarM, glow: glowM, skate: skateM } };
+  return { root, trick, body, bodyBase: -1.2, torso, head, legL: legs[0], legR: legs[1], armL: arms[0], armR: arms[1], foreL: fores[0], foreR: fores[1], scarf: scarfPivot, cargoSlot, glowM, accent, mats: { suit: suitM, accent: accentM, helmet: helmetM, visor: visorM, scarf: scarfM, collar: collarM, glow: glowM, skate: skateM } };
 }
 
 // ---- townsfolk ----

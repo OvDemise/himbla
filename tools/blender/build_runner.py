@@ -366,7 +366,7 @@ mesh("torso_plate", xf(superquad(0.215, 0.145, 0.035, 0.3, 0.3, 16, 8), (0, 0.65
 mesh("torso_plateInset", xf(superquad(0.17, 0.1, 0.012, 0.3, 0.3, 14, 6), (0, 0.655, 0), (-0.06, 0, 0), fn=cwrap(0.355, 0.315)), "helmet", T, 0)
 chev = extrude([(-0.11, 0.03), (0.0, -0.05), (0.11, 0.03), (0.11, 0.075), (0.0, -0.005), (-0.11, 0.075)], 0.016, "z")
 mesh("torso_chevron", xf(chev, (0, 0.635, 0), (-0.06, 0, 0), fn=cwrap(0.366, 0.326)), "accent", T, 0)
-mesh("torso_light", xf(superquad(0.03, 0.03, 0.012, 1, 1, 10, 6), (0.135, 0.73, 0), (-0.06, 0, 0), fn=cwrap(0.36, 0.322)), "glow", T, 0)
+mesh("torso_light", xf(superquad(0.02, 0.02, 0.01, 1, 1, 8, 6), (0.135, 0.73, 0), (-0.06, 0, 0), fn=cwrap(0.358, 0.32)), "glow", T, 0)
 mesh("torso_light2", xf(superquad(0.02, 0.02, 0.01, 1, 1, 8, 6), (-0.135, 0.73, 0), (-0.06, 0, 0), fn=cwrap(0.358, 0.32)), "glow", T, 0)
 # utility belt with a buckle and side pouches
 mesh("torso_belt", xf(torus(0.262, 0.042, 20, 5, 1.1), (0, 0.3, 0), s=(1, 1, 0.8)), "dark", T, 0.02)
@@ -389,13 +389,10 @@ for s in (-1, 1):
     # shoulder straps over the front
     path = [(s * 0.18, 0.95, -0.2), (s * 0.2, 0.99, -0.02), (s * 0.2, 0.93, 0.17), (s * 0.19, 0.82, 0.25)]
     mesh(f"torso_strap{'L' if s < 0 else 'R'}", tube(path, [0.03, 0.03, 0.03, 0.028], 6), "dark", T, 0.012)
-# knitted collar (the scarf's wrap around the neck): a fat ring with ribs
-def knit(v):
-    x, y, z = v
-    a = math.atan2(x, z)
-    r = 1 + 0.05 * math.cos(a * 9)
-    return (x * r, y, z * r)
-mesh("torso_collar", xf(torus(0.235, 0.075, 27, 6, 1.15), (0, 0.97, 0), fn=knit), "collar", T, 0.03)
+# neck collar (the scarf's wrap around the neck): a smooth fat ring that sits under the helmet's rim ring
+# (head_rim, at y 0.985), so the two never cross: a rib pattern here cut through the helmet and the rim at
+# the same height and the outline shells of the three read as splotches all the way round
+mesh("torso_collar", xf(torus(0.215, 0.062, 24, 6, 1.1), (0, 0.9, 0)), "collar", T, 0.03)
 
 # ---- head ----
 H = pivot("head", (0, 1.18, 0), T)
@@ -417,14 +414,15 @@ def shell(r, phi0, phi1, th0, th1, nu=20, nv=10, thick=0.0):
             a = j * (nu + 1) + i
             faces.append((a, a + 1, a + nu + 2, a + nu + 1))
     if thick:
-        n = len(verts)
-        inner = [tuple(c * (1 - thick / r) for c in v) for v in verts]
-        verts += inner
-        faces += [tuple(reversed([i + n for i in f])) for f in faces[: nu * nv]]
+        # a skirt round the edge only: the inner surface faces into the helmet, where nobody sees it
         rim = [j * (nu + 1) for j in range(nv + 1)] + [nv * (nu + 1) + i for i in range(1, nu + 1)] + \
               [j * (nu + 1) + nu for j in range(nv - 1, -1, -1)] + [i for i in range(nu - 1, 0, -1)]
-        for a, b in zip(rim, rim[1:] + rim[:1]):
-            faces.append((b, a, a + n, b + n))
+        base = len(verts)
+        for i in rim:
+            verts.append(tuple(c * (1 - thick / r) for c in verts[i]))
+        m = len(rim)
+        for k in range(m):
+            faces.append((rim[(k + 1) % m], rim[k], base + k, base + (k + 1) % m))
     return verts, faces
 mesh("head_visorFrame", shell(0.372, -1.0, 1.0, 0.84, 2.1, 16, 7, 0.03), "dark", H, 0)
 mesh("head_visor", shell(0.382, -0.88, 0.88, 0.93, 2.0, 16, 7, 0.012), "visor", H, 0)
@@ -443,23 +441,73 @@ mesh("head_bead", xf(superquad(0.055, 0.055, 0.055, 1, 1, 10, 6), (0.226, 0.6, -
 mesh("head_lamp", xf(lathe([(0, -0.05), (0.06, -0.05), (0.07, 0.03), (0.062, 0.05), (0, 0.05)], 12), (0.3, 0.15, 0.17), (math.pi / 2, 0, 0)), "dark", H, 0.015)
 mesh("head_lens", xf(superquad(0.05, 0.05, 0.03, 1, 1, 12, 6), (0.3, 0.15, 0.225)), "lens", H, 0)
 
-# ---- arms ----
-ARM = [(0, -0.56), (0.072, -0.55), (0.084, -0.49), (0.093, -0.42), (0.088, -0.33), (0.094, -0.27), (0.108, -0.17), (0.118, -0.06), (0.12, 0.02), (0.1, 0.08), (0, 0.12)]
+# ---- arms: an upper arm on the shoulder pivot (armL / armR) and a forearm on an elbow pivot (foreL / foreR) ----
+# The elbow sits 0.31 below the shoulder. A suit-coloured ball covers the seam, so the joint stays round
+# at any bend; the elbow cup, cuff, glove and thumb are on the forearm and turn with it.
+# Rest pose is straight (forearm rotation 0), so everything that poses only the arms still looks as it did.
+EL = 0.31
+ARM_UP = [(0, -EL), (0.091, -EL), (0.094, -0.27), (0.108, -0.17), (0.118, -0.06), (0.12, 0.02), (0.1, 0.08), (0, 0.12)]
+FORE = [(0, -0.25), (0.072, -0.24), (0.084, -0.18), (0.093, -0.11), (0.088, -0.02), (0.091, 0.02), (0.085, 0.05), (0, 0.07)]
 for side, name in ((-1, "armL"), (1, "armR")):
     A = pivot(name, (side * 0.45, 0.85, 0), T)
-    mesh(name + "_arm", lathe(ARM, 14), "suit", A, 0.04)
-    path = [(side * 0.118, -0.04, 0), (side * 0.11, -0.17, 0), (side * 0.092, -0.3, 0), (side * 0.09, -0.44, 0)]
-    mesh(name + "_stripe", tube(path, [0.015] * 4, 6), "accent", A, 0)
+    mesh(name + "_arm", lathe(ARM_UP, 14), "suit", A, 0.04)
+    mesh(name + "_elbowBall", xf(superquad(0.094, 0.094, 0.094, 1, 1, 12, 6), (0, -EL, 0)), "suit", A, 0.04)
+    path = [(side * 0.118, -0.04, 0), (side * 0.11, -0.17, 0), (side * 0.092, -0.3, 0)]
+    mesh(name + "_stripe", tube(path, [0.015] * 3, 6), "accent", A, 0)
     # layered shoulder pauldron in the helmet colour
     mesh(name + "_shoulder", xf(superquad(0.15, 0.125, 0.145, 0.55, 0.7, 14, 8), (side * 0.02, 0.01, 0), fn=lambda v: (v[0], max(v[1], -0.06), v[2])), "helmet", A, 0.03)
     mesh(name + "_shoulderTrim", xf(torus(0.145, 0.018, 16, 4), (side * 0.02, -0.055, 0), s=(1.05, 1, 1)), "accent", A, 0.01)
-    mesh(name + "_elbow", xf(superquad(0.06, 0.07, 0.045, 0.6, 0.6, 12, 6), (0, -0.31, -0.08)), "metal", A, 0.015)
-    mesh(name + "_cuff", xf(lathe([(0.098, -0.04), (0.104, -0.03), (0.104, 0.03), (0.096, 0.04)], 14), (0, -0.51, 0)), "accent", A, 0.02)
-    mesh(name + "_cuffLight", xf(superquad(0.025, 0.012, 0.01, 0.5, 0.5, 8, 4), (0, -0.51, 0.104)), "glow", A, 0)
+    F = pivot("fore" + name[-1], (0, -EL, 0), A)
+    mesh(name + "_fore", lathe(FORE, 14), "suit", F, 0.04)
+    fp = [(side * 0.092, 0.0, 0), (side * 0.09, -0.13, 0)]
+    mesh(name + "_foreStripe", tube(fp, [0.015] * 2, 6), "accent", F, 0)
+    mesh(name + "_elbowRing", xf(torus(0.088, 0.014, 12, 4), (0, 0.035, 0)), "accent", F, 0.01)
+    mesh(name + "_elbow", xf(superquad(0.06, 0.07, 0.045, 0.6, 0.6, 12, 6), (0, 0.0, -0.08), (0.1, 0, 0)), "metal", F, 0.015)
+    mesh(name + "_cuff", xf(lathe([(0.098, -0.04), (0.104, -0.03), (0.104, 0.03), (0.096, 0.04)], 14), (0, -0.2, 0)), "accent", F, 0.02)
+    mesh(name + "_cuffLight", xf(superquad(0.025, 0.012, 0.01, 0.5, 0.5, 8, 4), (0, -0.2, 0.104)), "glow", F, 0)
     # gauntlet glove: mitten body, knuckle plate, thumb
-    mesh(name + "_glove", xf(superquad(0.105, 0.13, 0.09, 0.55, 0.65, 12, 8), (0, -0.635, 0.01)), "dark", A, 0.03)
-    mesh(name + "_knuckle", xf(superquad(0.08, 0.035, 0.03, 0.4, 0.4, 10, 4), (0, -0.66, 0.085), (-0.15, 0, 0)), "metal", A, 0.01)
-    mesh(name + "_thumb", xf(superquad(0.04, 0.065, 0.04, 0.8, 0.8, 8, 6), (-side * 0.06, -0.6, 0.08), (0.4, 0, side * 0.4)), "dark", A, 0.02)
+    mesh(name + "_glove", xf(superquad(0.105, 0.13, 0.09, 0.55, 0.65, 12, 8), (0, -0.325, 0.01)), "dark", F, 0.03)
+    mesh(name + "_knuckle", xf(superquad(0.08, 0.035, 0.03, 0.4, 0.4, 10, 4), (0, -0.35, 0.085), (-0.15, 0, 0)), "metal", F, 0.01)
+    mesh(name + "_thumb", xf(superquad(0.04, 0.065, 0.04, 0.8, 0.8, 8, 6), (-side * 0.06, -0.29, 0.08), (0.4, 0, side * 0.4)), "dark", F, 0.02)
+
+# ---- outfit extras the game hangs on the runner only when an outfit asks for them (cosmetics.js) ----
+# Each sits on a pivot of its own (padL/padR on the shoulder pivots, band on the head), so the baker keeps it
+# apart from the always-worn parts. Colour slots: the pad's plates are `accent`, its trim `helmet`, its hardware
+# `metal`; the headband is `accent` (the outfit paints it red) with `dark` stitching.
+
+# shoulder pads: three lames stepping down and out over the pauldron, each edged in trim, a ridge down the
+# crown and studs. Bigger than the pauldron under them (0.15 x 0.125 x 0.145), turned with the arm.
+def lame(w, h, d, t, roll, side, name, P, trim=True):
+    """One curved plate: a half dome (flat underneath) rolled out and down, a trim bead round its lower edge."""
+    def clip(v):
+        return (v[0], max(v[1], -h * 0.28), v[2])
+    mesh(name, xf(superquad(w, h, d, 0.5, 0.62, 14, 6), t, (0, 0, side * roll), fn=clip), "accent", P, 0.03)
+    if trim:
+        ring = xf(torus(w * 0.98, 0.02, 16, 4), (0, 0, 0), s=(1.0, 1.0, d / w))
+        mesh(name + "Trim", xf(ring, (t[0], t[1] - h * 0.28 - 0.002, t[2]), (0, 0, side * roll)), "helmet", P, 0.01)
+
+for side, tag in ((-1, "L"), (1, "R")):
+    A = bpy.data.objects["arm" + tag]
+    P = pivot("pad" + tag, (0, 0, 0), A)
+    lame(0.215, 0.15, 0.2, (side * 0.045, 0.06, 0), 0.26, side, "pad" + tag + "_lame0", P)
+    lame(0.19, 0.11, 0.18, (side * 0.115, -0.005, 0), 0.5, side, "pad" + tag + "_lame1", P)
+    lame(0.16, 0.085, 0.15, (side * 0.18, -0.065, 0), 0.72, side, "pad" + tag + "_lame2", P)
+    ridge = extrude([(-0.15, 0.0), (-0.12, 0.05), (0.0, 0.075), (0.12, 0.05), (0.15, 0.0)], 0.022, "x")
+    mesh("pad" + tag + "_ridge", xf(ridge, (side * 0.055, 0.205, 0), (0, 0, side * 0.26)), "metal", P, 0.012)
+    for k, z in enumerate((-0.09, 0.0, 0.09)):
+        mesh(f"pad{tag}_stud{k}", xf(superquad(0.016, 0.012, 0.016, 0.8, 0.8, 8, 4), (side * (0.095 + 0.02 * (k == 1)), 0.115 - 0.01 * (k == 1), z), (0, 0, side * 0.3)), "metal", P, 0)
+
+# headband: a strip that hugs the helmet (radius 0.34 at its height), thicker at the front, a knot behind the
+# left ear with two tails and a loose end, and a stitched line along the lower edge
+Bp = pivot("band", (0, 0, 0), H)
+mesh("band_strip", xf(lathe([(0.336, 0.075), (0.352, 0.088), (0.356, 0.108), (0.352, 0.14), (0.336, 0.15)], 24)), "accent", Bp, 0.02)
+mesh("band_stitch", xf(torus(0.356, 0.005, 24, 3), (0, 0.082, 0)), "dark", Bp, 0)
+knot_c = (-0.13, 0.115, -0.335)
+mesh("band_knot", xf(superquad(0.045, 0.04, 0.035, 0.7, 0.7, 10, 6), knot_c, (0, 0.4, 0)), "accent", Bp, 0.02)
+for k, (dx, dz, ang) in enumerate(((-0.03, -0.03, 0.45), (0.04, -0.015, -0.3))):
+    pts = [(knot_c[0], knot_c[1], knot_c[2] - 0.01), (knot_c[0] + dx, knot_c[1] - 0.07, knot_c[2] - 0.045 + dz),
+           (knot_c[0] + dx * 2.2, knot_c[1] - 0.17, knot_c[2] - 0.075 + dz * 2)]
+    mesh(f"band_tail{k}", tube(pts, [0.02, 0.019, 0.012], 6), "accent", Bp, 0.015)
 
 # ---- scarf links (ScarfSim chain): each from z=0 back to z=-0.32, tapering ----
 SL = 0.32

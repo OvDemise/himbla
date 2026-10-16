@@ -1,11 +1,13 @@
 // Dev-only model viewer: renders one model through the game's comic post pass on a turntable.
 import * as THREE from 'three';
 import { loadFonts } from '../src/fonts.js';
-import { loadRunnerParts, loadShipParts, makeShuttle, makeFreighter, makeHoverCar, makeApc, makeLandTrain, makeTowerCrane, CRANE_TROLLEY_MIN, CRANE_TROLLEY_SPAN, makeGarage, makeDishStation, DISH_SIZE } from '../src/models.js';
+import { loadRunnerParts, loadShipParts, makeRunner, ScarfSim, makeShuttle, makeFreighter, makeHoverCar, makeApc, makeLandTrain, makeTowerCrane, CRANE_TROLLEY_MIN, CRANE_TROLLEY_SPAN, makeGarage, makeDishStation, DISH_SIZE } from '../src/models.js';
 import { outpostTemplate } from '../src/outpostModels.js';
 import { loadOutpostParts, GLB_KINDS } from '../src/outpostGlb.js';
 import { makeChimera, makeMite, LIVING, MODIFIERS, spliceGenes } from '../src/chimera.js';
 import { ComicPost } from '../src/post.js';
+import '../src/wardrobe.js'; // (first: wardrobe and cosmetics import each other, and only this order initialises OUTFITS in time)
+import { dressRunner } from '../src/cosmetics.js';
 
 const Q = new URLSearchParams(location.search);
 const num = (k, d) => (Q.has(k) ? parseFloat(Q.get(k)) : d);
@@ -159,6 +161,22 @@ if (m === 'shuttle' || m === 'freighter') {
   height = 24;
   Object.assign(sun.shadow.camera, { left: -70, right: 70, top: 70, bottom: -70, far: 400 });
   sun.shadow.camera.updateProjectionMatrix();
+} else if (m === 'runner') {
+  // &outfit=courier|spacecom2|meridian2|daedalus2|rustmoon|rustmoon2|kepler2|vostok2...  &speed=m/s (the scarf and halo are simulated at that speed, forward)
+  // &lean=rad (torso pitch)  &arms=rad (both arms' swing)  &fore=rad (both forearms' bend; negative bends the hand forward)  &armz=rad (arms out from the sides)
+  const R = makeRunner({ own: true });
+  dressRunner(R, Q.get('outfit') || 'courier');
+  R.torso.rotation.x = num('lean', 0);
+  R.armL.rotation.set(num('arms', 0), 0, -num('armz', 0.15));
+  R.armR.rotation.set(num('arms', 0), 0, num('armz', 0.15));
+  if (R.foreL) { R.foreL.rotation.x = R.foreR.rotation.x = num('fore', 0); }
+  const sim = new ScarfSim(R);
+  const fwd = new THREE.Vector3(0, 0, 1), upv = new THREE.Vector3(0, 1, 0);
+  let simT = 0;
+  anim = (t, sp, dt) => { simT += dt; sim.update(Math.max(dt, 1e-3), fwd.clone().multiplyScalar(num('speed', 0)), upv, { back: 0.55, top: 0.94 }); };
+  model = R.root;
+  height = 2.2;
+  window.runner = R;
 } else if (m === 'hovercar') {
   model = makeHoverCar({}).root;
   model.position.y = 2;
@@ -258,7 +276,7 @@ function frame() {
   camera.position.set(ctr.x + Math.sin(yaw) * Math.cos(pitch) * dist, ctr.y + Math.sin(pitch) * dist, ctr.z + Math.cos(yaw) * Math.cos(pitch) * dist);
   camera.lookAt(ctr);
   if (rig) rig.setThrust(num('thrust', 0), num('lift', 0), t);
-  if (anim) anim(t, num('speed', 6));
+  if (anim) anim(t, num('speed', 6), dt);
   post.material.uniforms.time.value = t;
   post.render(scene, camera);
   requestAnimationFrame(frame);

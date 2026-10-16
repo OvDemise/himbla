@@ -1052,9 +1052,9 @@ export function buildMutationMeshes(M, has, add) {
     sp.rotation.z = (i < 2 ? 1 : -1) * 1.0;
     add(M.torso, sp);
   }
-  if (has('claws')) for (const arm of [M.armL, M.armR]) for (let k = 0; k < 3; k++) {
+  if (has('claws')) for (const arm of [M.foreL, M.foreR]) for (let k = 0; k < 3; k++) { // (on the forearms, so they follow the hands)
     const c = new THREE.Mesh(new THREE.ConeGeometry(0.04, 0.22, 4), toon(0xfff4e0));
-    c.position.set((k - 1) * 0.06, -0.78, 0.06);
+    c.position.set((k - 1) * 0.06, -0.47, 0.06);
     c.rotation.x = Math.PI;
     add(arm, c);
   }

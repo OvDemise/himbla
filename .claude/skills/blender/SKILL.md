@@ -41,7 +41,7 @@ outposts. In the Blender app they run with `exec(open(r"<repo>/tools/blender/bui
   material per mesh. `kit.mesh(name, geo, slot, parent, ink=...)` sets this up.
 - **Custom property `ink`** = outline thickness in metres (0 = none); `slot` is also stored. Export with custom
   properties on (`export_extras`).
-- **Pivot empties** are the animated parts (runner: legL, legR, torso, head, armL, armR, scarfLinks). Geometry is
+- **Pivot empties** are the animated parts (runner: legL, legR, torso, head, armL, armR, foreL, foreR (forearms, on the elbows, children of the arm pivots), scarfLinks). `padL`, `padR` and `band` are outfit extras: baked apart from the always-worn parts and hung on by `cosmetics.js` only when an outfit asks (`runnerExtra` in `models.js`). Geometry is
   read in its pivot's frame. Vehicles have named pivots for wheels, turret, barrel, gear and so on; check the
   builder and `src/models.js` for the names before renaming anything.
 - **Colliders** are empties named `col.*` (outposts: `cols`, `hits`, `raid`, `smoke`, `drop`), never read from
@@ -51,5 +51,4 @@ outposts. In the Blender app they run with `exec(open(r"<repo>/tools/blender/bui
 
 ## Not covered
 
-Rendering previews from headless Blender is untried. To look at a model, use `tools/viewer.html` (three.js)
-or the game's Asset Row.
+Rendering previews from headless Blender is untried. To look at a model, use `tools/viewer.html` (three.js, `?m=runner&outfit=...` for the courier) or the game's Asset Row. Screenshots from headless Chromium work (swiftshader, a few seconds a frame).
