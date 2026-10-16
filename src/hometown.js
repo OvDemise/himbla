@@ -641,17 +641,19 @@ export class HomeTown {
   announce(m, ballots, yes, n, pass, news, back) {
     const g = this.game;
     const STEP = 0.6, FIRST = 0.5; // seconds between the lines, and before the first (the same as the delays in style.css)
+    const verdictAt = FIRST + (ballots.length + 0.4) * STEP; // (when the verdict line and the button appear)
     const roll = ballots.map((b, i) => `<div class="rc" style="--i:${i}"><span style="color:${FACTIONS[b.f].color}">${FACTIONS[b.f].name}</span>: <b style="color:${b.yes ? '#7dff6a' : '#ff3b5c'}">${b.yes ? 'AYE' : 'NAY'}</b></div>`).join('');
     const verdict = `<div class="rc" style="--i:${ballots.length + 0.4}"><br><b>${yes} to ${n - yes}. THE MOTION ${pass ? 'CARRIES' : 'FAILS'}.</b><br><small>${pass ? m.desc : 'Raise your standing with the doubters and call it again next session.'}</small></div>`;
     const title = `THE VOTE: ${m.name.toUpperCase()}`;
-    // (a key or a pad button still being mashed to skip the scene can't answer the card the moment it appears: the button, whichever way it
-    // is pressed, does nothing for the first 0.9 s; then it closes the card itself, like the choices that repaint their own page)
+    // (the button is invisible until the verdict is read out, so it is inert too: a key or pad button still being mashed to skip the scene, or a
+    // click where it will be, can't answer the card before the roll has been heard. That also means no tone is left waiting when it closes. Then
+    // it closes the card itself, like the choices that repaint their own page)
     const born = performance.now();
-    const answer = (label, then) => ({ label, keep: true, fn: () => { if (performance.now() - born < 900) return; g.closeModal(false); if (then) then(); } });
+    const answer = (label, then) => ({ label, keep: true, fn: () => { if (performance.now() - born < (verdictAt + 0.3) * 1000) return; g.closeModal(false); if (then) then(); } });
     if (pass) g.story.pendingDawn = () => g.newDawn(`THE COUNCIL HAS SPOKEN: ${m.name.toUpperCase()}`, news);
     g.dialog(title, roll + verdict, [pass ? answer('ONE WEEK LATER…') : answer('NEXT TIME', () => { g.chamber.reveal(0.8); back(); })], { cls: 'vote-roll' });
     const card = document.querySelector('#dialog .vote-roll');
-    if (card) card.style.setProperty('--at', `${FIRST + (ballots.length + 0.4) * STEP}s`);
+    if (card) card.style.setProperty('--at', `${verdictAt}s`);
     const blip = (at, f, len, wave, vol) => setTimeout(() => { if (g.state === 'dialog') g.audio.tone(f, len, wave, vol); }, (FIRST + at * STEP) * 1000);
     ballots.forEach((b, i) => blip(i, b.yes ? 740 : 260, 0.12, 'square', 0.12)); // (up for an AYE, down for a NAY)
     blip(ballots.length + 0.4, pass ? 880 : 220, 0.4, 'triangle', 0.25);

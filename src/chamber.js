@@ -238,8 +238,8 @@ export class Chamber {
       this.lines = this.script(spec);
       this.bars = g.recall.bars;
       this.bars.classList.remove('hidden', 'cb-out');
-      this.sayEl = this.bars.querySelector('.cb-say') || this.bars.appendChild(Object.assign(document.createElement('div'), { className: 'cb-say' }));
-      this.bangEl = this.bars.querySelector('.cb-bang') || this.bars.appendChild(Object.assign(document.createElement('div'), { className: 'cb-bang', textContent: 'BANG!' }));
+      this.sayEl = this.bars.appendChild(Object.assign(document.createElement('div'), { className: 'cb-say' }));
+      this.bangEl = this.bars.appendChild(Object.assign(document.createElement('div'), { className: 'cb-bang', textContent: 'BANG!' }));
       this.bangEl.style.display = 'none';
       this.t = 0; this.faded = false; this.banged = false; this.lastCap = '';
       this.cap(`THE MOON COUNCIL SITS IN ${spec.town.toUpperCase()}`);
@@ -301,7 +301,19 @@ export class Chamber {
     if (text) { const b = document.createElement('b'); b.textContent = 'COUNCILLOR'; this.sayEl.replaceChildren(b, text); }
   }
 
-  skip() { if (this.active && this.phase === 'play' && this.t > 1 && this.t < TL.gavel0) this.t = TL.gavel0 - 0.6; } // (to the gavel going up)
+  // (to the gavel going up; once there, more presses do nothing, or a player still mashing would hold the scene on that frame)
+  skip() { if (this.active && this.phase === 'play' && this.t > 1 && this.t < TL.gavel0 - 0.6) this.t = TL.gavel0 - 0.6; }
+
+  // The cinema bars are the recall's and the med-evac's too (g.recall.bars): hide them, take down what this scene added (the speech
+  // bubble, the BANG!) and give the caption its box back (the gavel shot hid it), or the next recall opens with a stuck BANG! and no caption
+  putBarsBack() {
+    if (!this.bars) return;
+    this.bars.classList.add('hidden');
+    for (const el of this.bars.querySelectorAll('.cb-say, .cb-bang')) el.remove();
+    const cap = this.bars.querySelector('.cb-cap');
+    if (cap) { cap.style.display = ''; cap.textContent = ''; }
+    this.bars = this.sayEl = this.bangEl = null;
+  }
 
   // Brings the picture back (the council is over). secs 0: at once (the "one week later" card is covering it)
   reveal(secs) {
@@ -335,7 +347,9 @@ export class Chamber {
       const n = Math.min(L.text.length, Math.floor((t - L.t0) * 34));
       if (n !== L.n) { if (n % 2 === 0) g.audio.tone(260 + Math.random() * 120, 0.03, 'square', 0.025); L.n = n; this.say(L.text.slice(0, n)); }
     } else this.say(null);
-    for (const l of this.lines) if (t >= l.t1 && !l.cheered && t > TL.close0 && t < TL.hush0) { l.cheered = true; if (this.people.some((p) => p.mood === 'warm' || p.mood === 'host')) g.audio.roar(0.3); }
+    let cheer = false; // (one roar a frame: a skip passes several lines at once, and four stacked roars are a louder burst than any applause in the scene)
+    for (const l of this.lines) if (t >= l.t1 && !l.cheered && t > TL.close0 && t < TL.hush0) { l.cheered = true; cheer = true; }
+    if (cheer && this.people.some((p) => p.mood === 'warm' || p.mood === 'host')) g.audio.roar(0.3);
     if (t >= TL.bang && !this.banged) {
       this.banged = true;
       g.audio.thud(40); g.audio.tone(150, 0.12, 'square', 0.25, 0.4);
@@ -442,7 +456,7 @@ export class Chamber {
     this.clear();
     this.returnPlayer();
     g.state = 'play';
-    if (this.bars) this.bars.classList.add('hidden');
+    this.putBarsBack();
     this.active = false; this.phase = null;
     this.dip(1, 0); // (a failed scene may not be dark yet)
     g.updateCamera(0.016, true);
@@ -453,7 +467,7 @@ export class Chamber {
   // the scene ends without a result to announce (the game went to the menu mid-scene)
   abort() {
     this.on = false; this.clear(); this.returnPlayer();
-    if (this.bars) this.bars.classList.add('hidden');
+    this.putBarsBack();
     this.active = false; this.phase = null; this.done = null;
     this.reveal(0);
   }
