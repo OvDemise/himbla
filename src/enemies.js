@@ -520,8 +520,9 @@ export class Enemies {
   }
 
   removeAllies() {
-    for (const e of this.list) if (e.faction === 'ally') { e.dead = true; e.model.root.removeFromParent(); }
-    this.list = this.list.filter((e) => e.faction !== 'ally');
+    // (keep: the town's militia rovers, hometown.js, aren't a chapter's backup: its end doesn't stand them down)
+    for (const e of this.list) if (e.faction === 'ally' && !e.keep) { e.dead = true; e.model.root.removeFromParent(); }
+    this.list = this.list.filter((e) => e.faction !== 'ally' || e.keep);
   }
 
   // Rustmoon pirates leave you alone once you've joined them — unless you start it.
