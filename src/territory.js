@@ -262,7 +262,9 @@ export class Territory {
       for (const [id, f] of Object.entries(d.captured || {})) { const o = this.outposts.find((x) => x.id === id); if (o) { o.faction = f; o.captured = true; } }
       for (const [id, k] of Object.entries(d.kinds || {})) { const o = this.outposts.find((x) => x.id === id); if (o) { o.kind = k; o.kindChanged = true; } }
       for (const b of d.built || []) {
-        if (this.game.ws && this.game.ws.town && this.game.ws.town.replaces === b.id) continue; // (it grew into your town)
+        // (it grew into your town: no outpost and no 40 m flat of its own; the live finale takes that flat
+        // out too, in applyWorldLive, so a reload shows the same ground)
+        if (this.game.ws && this.game.ws.town && this.game.ws.town.replaces === b.id) continue;
         const o = { ...b, dir: new THREE.Vector3().fromArray(b.dir), model: null, cols: [], built: true };
         this.outposts.push(o);
         this.game.planet.addFlat(o.dir, BUILT_R);

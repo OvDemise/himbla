@@ -99,8 +99,9 @@ export function applyWorldState(ws, locations) {
       dir = greatCircle(dir, away.normalize(), 60);
     }
     t.dir = dir.toArray();
+    // (fit: the plateau is levelled to the real ground under the town, not to the smooth base noise: terrainField.fitZone)
     locations.push({
-      id: 'hometown', name: t.name, short: t.name.toUpperCase().slice(0, 12), type: 'hometown', faction: 'kepler', r: 120, dir, late: true,
+      id: 'hometown', name: t.name, short: t.name.toUpperCase().slice(0, 12), type: 'hometown', faction: 'kepler', r: 120, dir, late: true, fit: true,
       jobs: ['kepler', 'meridian', 'spacecom'], safe: true, repair: 10, defense: { ring: 100, turrets: 2 }, dark: darkness(dir) > 0.5,
       slots: t.slots, blurb: `${t.name}: your town, and the seat of the Moon Council.`,
     });

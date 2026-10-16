@@ -1038,7 +1038,21 @@ class Game {
     applyWorldState(this.ws, this.locations);
     const added = this.locations.filter((l) => !before.has(l));
     const changed = this.locations.filter((l) => before.has(l) && before.get(l) !== sig(l));
-    for (const l of added) { this.planet.addZone(l); this.world.buildLocation(l); this.world.prepCulling(l); }
+    // the town grows over the outpost you founded: its flat comes out with the new plateau (refreshWorld,
+    // below, only forgets the outpost, so look it up first)
+    const rep = this.ws.town && this.territory.outposts.find((o) => o.built && o.id === this.ws.town.replaces);
+    for (const l of added) {
+      this.planet.addZone(l, l.id === 'hometown' && rep ? [rep.dir] : []);
+      // crystals lying in the new plateau's blend ring are set back on the new ground (they were placed with
+      // ground(); their old height can't be read once applyWorldState has listed the town without a plane)
+      const cosNear = Math.cos((l.r * 2.2) / this.planet.R);
+      for (const cr of this.world.crystals || []) {
+        if (cr.pos.clone().normalize().dot(l.dir) <= cosNear) continue;
+        this.planet.ground(cr.pos, cr.pos);
+        cr.mesh.position.copy(cr.pos);
+      }
+      this.world.buildLocation(l); this.world.prepCulling(l);
+    }
     for (const l of changed) this.world.rebuildLocation(l);
     const all = [...changed, ...added];
     for (const l of all) delete this.missions.offers[l.id];
