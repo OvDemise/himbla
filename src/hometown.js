@@ -1,15 +1,18 @@
 // Your town (Kepler story finale): a real settlement on the map, founded at the site you surveyed,
-// with eight building plots round the Moon Council hall. You fill the plots from the hall's terminal;
-// each building does something (income, healing, militia guns, a clinic to redeploy at, a motor pool,
-// a shuttle pad, roads, a radio tower). The hall is also where you call Moon Council votes: each
-// member faction votes with you more readily the better it thinks of you, and a motion that passes
-// changes the Moon (worldstate.js applies it on the next load, after a "one week later" cut).
+// with eight building plots round the Moon Council hall. You fill the plots from the hall's terminal
+// (or from the COUNCIL HALL tab of the town's job board: the same page, see page()); each building
+// does something (income, healing, militia guns, a clinic to redeploy at, a motor pool, a shuttle
+// pad, roads, a radio tower). The hall is also where you call Moon Council votes: each member
+// faction votes with you more readily the better it thinks of you, and a motion that passes changes
+// the Moon (worldstate.js applies it on the next load, after a "one week later" cut).
 import * as THREE from 'three';
 import { Kit, T, G, GLASS, crate, sandbags } from './outpostModels.js';
 import { habDome, cabin, quonset, lattice, warehouse } from './settlements.js';
 import { makeTurret, makeRover } from './models.js';
 import { FACTIONS } from './locations.js';
 import { saveWorldState } from './worldstate.js';
+import { terminalPage, wireTerminal, stepSel, keepScroll } from './terminalUI.js';
+import { glyphHtml } from './glyphs.js';
 
 const DK = 0x3a3550, LT = 0xd8d4e8, CONC = 0x8a8698, CREAM = 0xfff4e0, WARM = 0xfff6a8, KEP = 0xff9f1c, GRN = 0x7dff6a;
 export const SLOT_R = 64, SLOTS = 8;
@@ -43,27 +46,28 @@ export const BUILDINGS = {
 // ---------------------------------------------------------------------------------------------
 // Moon Council motions. Members are the five non-pirate factions still standing; Kepler (you) always
 // votes yes; a motion needs a majority. hidden(ws): not on the table (already passed, or moot).
+// icon / tint / feature are what a motion's tile shows on the hall's page, like a building's.
 // ---------------------------------------------------------------------------------------------
 export const MOTIONS = {
   ceasefire: {
-    name: 'Vostok–Daedalus Ceasefire',
+    name: 'Vostok–Daedalus Ceasefire', icon: 'council', tint: '#ff3b5c', feature: 'Vostok & Daedalus stand down',
     desc: 'Vostok and Daedalus stand down. Their militarised zones open up, and their armour (the BTR-M APC and the Phase Skimmer), their weapons and Daedalus\' Phase Dash go on sale to anyone.',
     stance: { vostok: -0.15, daedalus: -0.15 },
     hidden: (ws) => Object.keys(ws.conquered || {}).length > 0,
   },
   openSkies: {
-    name: 'Open Skies Accord',
+    name: 'Open Skies Accord', icon: 'council', tint: '#ffd23f', feature: 'SPACECOM opens its labs',
     desc: 'SPACECOM opens its motor pool and its labs: the Lunar Interceptor and the Deflector Shield go on sale at the ILMB.',
     stance: { spacecom: -0.05 },
     hidden: (ws) => !!ws.lawless,
   },
   freeTrade: {
-    name: 'Free Trade Charter',
+    name: 'Free Trade Charter', icon: 'council', tint: '#2ec4ff', feature: '10% off every shop',
     desc: 'Meridian drops its tariffs: 10% off every shop on the Moon, and the Courier Light-Bike and the Personal Teleporter go on sale at the Exchange.',
     stance: {},
   },
   militiaPact: {
-    name: 'Militia Pact',
+    name: 'Militia Pact', icon: 'council', tint: '#ff9f1c', feature: '2 more militia turrets',
     desc: 'Every Kepler town gets two more militia turrets, and the Homestead Mule goes on sale at Kepler Civic Center.',
     stance: {},
   },
@@ -270,7 +274,49 @@ export function addBuilding(world, loc, i, type) {
 }
 
 // ---------------------------------------------------------------------------------------------
-// Running the town: income, healing, guns, the hall's terminal, council votes.
+// What the hall's page shows for each building, and the places in town where F does something. The
+// features that come with a building add their lines here (EXTRAS, LIVE, ON_BUILT, POINTS) rather
+// than in the page code.
+// ---------------------------------------------------------------------------------------------
+// more buttons on a built building's detail screen (numbered with the rest): type -> (t) => [{ id, label, short, tone, fn }]
+const EXTRAS = {};
+// the live rows under a built building's text: type -> (t) => { rows: [[label, value, tone?]], meter?, note? }
+const pays = (k) => () => ({ rows: [['INCOME', `₵${BUILDINGS[k].income} a minute`], ['BANK HOLDS', `₵${BANK_CAP}`]], note: 'Nothing to press: it pays into the town bank.' });
+const LIVE = {
+  housing: pays('housing'),
+  market: pays('market'),
+  clinic: () => ({ rows: [['EFFECT', 'You redeploy here after a K.O.'], ['NEAREST', 'The nearest clinic wins']], note: 'Nothing to press: it works when you are K.O.ed.' }),
+  farm: () => ({ rows: [['EFFECT', 'Heals 4 hull a second in town'], ['INCOME', `₵${BUILDINGS.farm.income} a minute`]], note: 'Nothing to press: it works while you stand in town.' }),
+  motorpool: (t) => ({ rows: [['VEHICLE', 'Homestead Mule'], ['SUMMON', 'Press V anywhere'], ['STATUS', t.game.story.vehicles.includes('mule') ? 'UNLOCKED' : 'NOT UNLOCKED'], ['REPAIRS', 'Vehicles patched up in town']], note: 'Nothing to press: call it with V.' }),
+  barracks: () => ({ rows: [['GUNS', '2 militia guns'], ['RANGE', '400 m round town'], ['FIRE', '28 dmg + splash, every 0.8 s'], ['TARGETS', 'Pirates']], note: 'Nothing to press: the guns fire by themselves.' }),
+  // (the ring road and its links are laid at load for now: until then the plot only has the road crew's depot)
+  roads: (t) => {
+    const tr = t.game.world.traffic, ring = tr.rings.get(t.loc);
+    return ring ? { rows: [['RING', `${Math.round(ring.Rb)} m round the town`], ['LINKS', `${tr.roads.filter((r) => r.A === t.loc || r.B === t.loc).length} settlements`]], note: 'Nothing to press: the traffic uses them.' }
+      : { rows: [['RING', 'Not laid yet']], note: 'The road crews lay the ring road and the links when the game next loads.' };
+  },
+  radio: () => ({ rows: [['MAP CHARTED', '3 km round town'], ['VOTES', 'Council sits twice as often']], note: 'Nothing to press yet.' }),
+  pad: () => ({ rows: [['HOME BASE', 'You start, recall and redeploy here']], note: 'Nothing to press.' }),
+};
+// what a building does the moment it is built, beyond standing on its plot: type -> (t) => a line for the page's "BUILT" message
+const ON_BUILT = {
+  motorpool: (t) => {
+    const S = t.game.story;
+    if (S.vehicles.includes('mule')) return '';
+    S.vehicles.push('mule');
+    S.save();
+    return 'HOMESTEAD MULE UNLOCKED (V)';
+  },
+  radio: (t) => { t.chart(); return 'MAP CHARTED 3 KM ROUND TOWN'; },
+};
+// where F does something in town, first match wins (interact()): at(t) is a world position (null: not there), r the reach in metres,
+// use(t, player) the prompt and what F does (null: nothing here)
+const POINTS = [
+  { id: 'hall', at: (t) => t.terminal, r: 4.5, use: (t) => ({ prompt: '<b>F</b> — MOON COUNCIL HALL', act: () => t.menu() }) },
+];
+
+// ---------------------------------------------------------------------------------------------
+// Running the town: income, healing, guns, the hall's page, council votes.
 // ---------------------------------------------------------------------------------------------
 export class HomeTown {
   constructor(game) {
@@ -279,6 +325,11 @@ export class HomeTown {
     this.fireCd = 0;
     this.saveT = 0;
     this.spots = {}; // building type -> where you stand to use it (world position; see spot())
+    this.skin = 'hall'; // where the page is showing: 'hall' (the terminal's dialog) or 'board' (the job board's tab)
+    this.ui = null; // the page as last drawn: { sel, acts }
+    this.view = null; // the board tab's next paint: { sel, msg, tone }
+    this.quietUntil = 0; // (performance.now) a press just answered in place: the second half of a double-click is not meant for what is under it now
+    if (this.state) this.ws.council ||= { passed: [], next: 0 }; // (a town from before the council was saved has none)
     if (this.loc) {
       this.terminal = game.world.toWorld(this.loc, TERMINAL.x, 0, TERMINAL.z);
       if (this.has('radio')) this.chart();
@@ -316,55 +367,222 @@ export class HomeTown {
     this.game._homes = {};
   }
 
-  // F at the hall's terminal
+  // F in town: the first point in POINTS you stand at gives the prompt and what F does
   interact(P) {
     const g = this.game;
-    if (!this.loc || !this.loc.active || P.pos.distanceTo(this.terminal) > 4.5) return false;
-    g.hud.prompt('<b>F</b> — MOON COUNCIL HALL');
-    if (g.input.pressed('KeyF') && g.boardCooldown <= 0) this.menu();
-    return true;
+    if (!this.loc || !this.loc.active) return false;
+    for (const pt of POINTS) {
+      const at = pt.at(this);
+      if (!at || P.pos.distanceTo(at) > pt.r) continue;
+      const u = pt.use(this, P);
+      if (!u) continue;
+      g.hud.prompt(u.prompt);
+      if (u.act && g.input.pressed('KeyF') && g.boardCooldown <= 0) u.act();
+      return true;
+    }
+    return false;
   }
 
-  menu() {
+  // ---------- the hall's page ----------
+  // One view-model, two skins: the terminal at the hall's steps (menu(): a dialog) and the job board's COUNCIL HALL tab
+  // (boardPane()). Both draw page() and run what it offers through run(), so they cannot drift apart. The page is a tile for the
+  // town bank, one for each building and one for each council motion on the table (ids 'bank', the BUILDINGS keys, 'm:<motion>');
+  // each tile's detail screen carries its acts: { id, tile, label, short, tone, fn }. fn returns a Result, or nothing:
+  //   { msg?, tone?: 'ok' | 'bad', sel?, close?, takeover? }  (the page shows msg and selects sel; takeover: the act opened a screen of its own,
+  //   having called leave() first, and that screen's exit calls back())
+  // The number keys are the first nine acts in tile order; the rest are for the mouse, the arrows and Enter, and the pad.
+  rate() {
+    let r = 0;
+    for (const k of this.state.slots) if (k && BUILDINGS[k] && BUILDINGS[k].income) r += BUILDINGS[k].income;
+    return r;
+  }
+
+  income() {
+    const parts = Object.entries(BUILDINGS).filter(([k, b]) => b.income && this.has(k)).map(([k, b]) => [b.name.toUpperCase(), b.income]);
+    return { parts, rate: this.rate() };
+  }
+
+  bankDef() {
+    const st = this.state, bank = Math.floor(st.bank || 0), inc = this.income(), left = BANK_CAP - (st.bank || 0);
+    return {
+      id: 'bank',
+      tile: { name: 'Town Bank', icon: 'bank', tint: '#ffd23f', state: bank >= 1 ? 'built' : 'open', feature: inc.rate ? `+₵${inc.rate} a minute` : 'No income yet', chip: `₵${bank}`, chipTone: '' },
+      stateText: bank >= 1 ? 'READY TO COLLECT' : 'EMPTY',
+      desc: 'What your town earns while you are away. Housing, the market and the farm pay into it: collect it here.',
+      rows: [['INCOME', `₵${inc.rate} a minute`, inc.rate ? '' : 'dim'], ...inc.parts.map(([n, v]) => [n, `₵${v} a minute`]), ['HOLDS UP TO', `₵${BANK_CAP}`]],
+      meter: { v: (st.bank || 0) / BANK_CAP, text: `₵${bank} / ₵${BANK_CAP}${inc.rate ? (left > 1 ? ` · FULL IN ${Math.ceil(left / (inc.rate / 60) / 60)} MIN` : ' · FULL') : ''}` },
+      note: bank < 1 ? (inc.rate ? 'Nothing to collect yet.' : 'Build housing, a market or a farm to earn.') : '',
+      acts: bank >= 1 ? [{ id: 'collect', label: `COLLECT THE TOWN BANK — ₵${bank}`, short: `COLLECT ₵${bank}`, tone: 'go', fn: () => this.collect() }] : [],
+    };
+  }
+
+  buildingDef(type) {
+    const g = this.game, st = this.state, B = BUILDINGS[type];
+    const has = this.has(type), free = st.slots.includes(null), poor = g.credits < B.cost, cr = Math.floor(g.credits);
+    const state = has ? 'built' : free ? 'open' : 'full';
+    const d = has ? (LIVE[type] ? LIVE[type](this) : { rows: [] })
+      : { rows: [['PRICE', `₵${B.cost}`, 'gold'], ['YOUR CREDITS', `₵${cr}`, poor ? 'bad' : ''], poor ? ['SHORT BY', `₵${Math.ceil(B.cost - g.credits)}`, 'bad'] : ['AFTER BUILDING', `₵${cr - B.cost}`]], note: free ? '' : 'Every plot is built on.' };
+    const acts = has ? (EXTRAS[type] ? EXTRAS[type](this) : [])
+      : free ? [{ id: 'build:' + type, label: `BUILD ${B.name.toUpperCase()} — ₵${B.cost}`, short: `BUILD ₵${B.cost}`, tone: 'build' + (poor ? ' short' : ''), fn: () => this.build(type) }] : [];
+    return {
+      id: type,
+      tile: { name: B.name, icon: B.icon, tint: B.tint, state, feature: B.feature, chip: has ? 'BUILT' : free ? `₵${B.cost}` : 'NO PLOT', chipTone: state === 'open' && poor ? 'short' : '' },
+      stateText: { built: 'BUILT', open: 'NOT BUILT', full: 'NO PLOT FREE' }[state],
+      desc: B.desc, rows: d.rows, meter: d.meter, note: d.note, acts,
+    };
+  }
+
+  // the motions on the page: not hidden ones, unless they have passed
+  motionKeys() {
+    const c = this.ws.council;
+    return Object.entries(MOTIONS).filter(([k, m]) => c.passed.includes(k) || !(m.hidden && m.hidden(this.ws))).map(([k]) => k);
+  }
+
+  motionDef(key) {
+    const m = MOTIONS[key], c = this.ws.council, passed = c.passed.includes(key), cd = this.cooldown(), mem = this.members();
+    const mins = Math.ceil(cd / 60000), state = passed ? 'built' : cd > 0 ? 'locked' : 'open';
+    const rows = passed ? [['RESULT', 'CARRIED BY THE COUNCIL']] : mem.map((f) => {
+      const p = this.chance(f, m);
+      return [f === 'kepler' ? 'KEPLER (YOUR SEAT)' : FACTIONS[f].name.toUpperCase(), p >= 0.7 ? 'LIKELY YES' : p >= 0.4 ? 'LEANING' : 'UNLIKELY', p >= 0.7 ? '' : p >= 0.4 ? 'gold' : 'bad'];
+    }).concat([['TO CARRY', `${Math.floor(mem.length / 2) + 1} OF ${mem.length}`]]);
+    return {
+      id: 'm:' + key,
+      tile: { name: m.name, icon: m.icon, tint: m.tint, state, feature: m.feature, chip: passed ? 'PASSED' : cd > 0 ? `IN ${mins} MIN` : 'CALL VOTE', chipTone: '' },
+      stateText: passed ? 'CARRIED' : cd > 0 ? 'NOT SITTING' : 'ON THE TABLE',
+      desc: m.desc, rows, note: passed ? 'This motion has passed.' : cd > 0 ? `The next session sits in ${mins} min.` : '',
+      acts: state === 'open' ? [{ id: 'vote:' + key, label: `CALL A VOTE: ${m.name.toUpperCase()}`, short: 'CALL A VOTE', tone: 'vote', fn: () => this.vote(key) }] : [],
+    };
+  }
+
+  // the page for tile sel (the first one with something to do when sel is null or gone): { spec (terminalUI.js), acts, sel }; remembered as this.ui
+  page(sel = null, msg = '', msgTone = 'ok') {
+    const g = this.game, st = this.state;
+    const defs = [this.bankDef(), ...Object.keys(BUILDINGS).map((k) => this.buildingDef(k)), ...this.motionKeys().map((k) => this.motionDef(k))];
+    const acts = [];
+    for (const d of defs) for (const a of d.acts) { a.tile = d.id; acts.push(a); }
+    const keyOf = (a) => { const i = acts.indexOf(a); return i >= 0 && i < 9 ? i + 1 : ''; };
+    const tiles = defs.map((d) => ({ id: d.id, ...d.tile, key: d.acts[0] ? keyOf(d.acts[0]) : '' }));
+    if (!defs.some((d) => d.id === sel)) sel = acts[0] ? acts[0].tile : defs[0].id;
+    const c = defs.find((d) => d.id === sel);
+    const detail = { id: c.id, name: c.tile.name, icon: c.tile.icon, tint: c.tile.tint, state: c.tile.state, stateText: c.stateText, desc: c.desc, rows: c.rows, meter: c.meter, note: c.note,
+      actions: c.acts.map((a) => ({ id: a.id, label: a.short, key: keyOf(a), tone: a.tone })), msg, msgTone };
+    const spec = {
+      accent: '#ff9f1c', title: `${st.name.toUpperCase()} · COUNCIL HALL`, sub: 'MOON COUNCIL TERMINAL // KEPLER SETTLEMENTS', side: true, cols: 3,
+      stats: [{ k: 'CREDITS', v: `₵${Math.floor(g.credits)}`, tone: 'gold' }, { k: 'PLOTS BUILT', v: `${st.slots.filter(Boolean).length} / ${SLOTS}` }, { k: 'TOWN BANK', v: `₵${Math.floor(st.bank || 0)} / ₵${BANK_CAP}` }],
+      tiles, sel, detail,
+    };
+    this.ui = { sel, acts };
+    return { spec, acts, sel };
+  }
+
+  // run an act and show what it answers: in place on the page, unless it took the player to a screen of its own (or closed)
+  run(a) {
+    const r = a.fn() || {};
+    if (r.takeover) return;
+    if (r.close) { this.game.closeModal(false); return; }
+    this.show(r.sel || a.tile, r.msg || '', r.tone || 'ok');
+  }
+
+  show(sel, msg = '', tone = 'ok') {
+    this.quietUntil = msg ? performance.now() + 400 : 0;
+    if (this.skin === 'board') { this.view = { sel, msg, tone }; this.game.refreshBoard(); } else this.menu(sel, msg, tone);
+  }
+
+  // an act that opens a screen of its own closes the page first (leave()), and that screen's exit comes back to it (back())
+  leave() { const g = this.game; if (g.state === 'board' || g.state === 'dialog') g.closeModal(false); }
+  back() { if (this.skin === 'board') this.game.openBoard(this.loc, 'town'); else this.menu(this.ui && this.ui.sel); }
+
+  // the chamber's first draw is the slow part of a vote: it is warmed up while the page is read (nothing to warm yet)
+  warm() {}
+
+  // arrows / WASD and Enter over the page (both skins); false: not a key of the page's
+  key(code) {
+    const root = document.querySelector(this.skin === 'board' ? '#board .otm' : '#dialog .otm');
+    if (!root || !this.ui) return false;
+    const next = stepSel(root, this.ui.sel, code);
+    if (next) { if (next !== this.ui.sel) { this.game.audio.click(); this.show(next); } return true; }
+    if (code === 'Enter' || code === 'Space') {
+      const a = this.ui.acts.find((x) => x.tile === this.ui.sel);
+      if (a) this.run(a); else this.game.audio.click();
+      return true;
+    }
+    return false;
+  }
+
+  // the board tab's keys: the digits are the page's numbered acts
+  boardKey(code) {
+    const n = /^Digit([1-9])$/.exec(code);
+    if (n) {
+      const a = this.ui && this.ui.acts[+n[1] - 1];
+      if (a && performance.now() >= this.quietUntil) this.run(a);
+      return true;
+    }
+    return this.key(code);
+  }
+
+  // skin 1: the terminal at the hall's steps, a dialog like the outposts' (the numbered buttons are the acts, in order, and CLOSE last, so the
+  // number keys and Escape need nothing of their own)
+  menu(sel = null, msg = '', msgTone = 'ok') {
     const g = this.game;
-    const st = this.state;
-    const buttons = [];
-    if (st.bank >= 1) buttons.push({ label: `COLLECT THE TOWN BANK — ₵${Math.floor(st.bank)}`, fn: () => { g.addCredits(Math.floor(st.bank), st.name); st.bank = 0; saveWorldState(this.ws); this.menu(); } });
-    buttons.push({ label: 'BUILD ON A PLOT…', fn: () => this.buildMenu() });
-    buttons.push({ label: 'THE MOON COUNCIL…', fn: () => this.councilMenu() });
-    buttons.push({ label: 'CLOSE' });
-    const built = st.slots.filter(Boolean).map((t) => BUILDINGS[t].name).join(', ') || 'nothing yet';
-    g.dialog(`${st.name.toUpperCase()} · COUNCIL HALL`, `<small>Councillor's terminal.</small><br><br>Built: <b>${built}</b> (${st.slots.filter(Boolean).length}/${SLOTS} plots)<br>Town bank: <b>₵${Math.floor(st.bank)}</b>`, buttons.map((b, i) => ({ ...b, label: `${i + 1} · ${b.label}` })));
+    this.skin = 'hall';
+    this.warm();
+    const { spec, acts } = this.page(sel, msg, msgTone);
+    spec.foot = { kb: `Click a tile · 1-${Math.min(9, acts.length) || 1} do it · Arrows pick · Enter acts · Esc closes`, pad: `${glyphHtml(['A'])} do what the highlighted tile offers · ${glyphHtml(['B'])} close` };
+    spec.closeKey = acts.length < 9 ? acts.length + 1 : '';
+    const buttons = acts.map((a, i) => ({ label: `${i + 1} · ${a.label}`, fn: () => this.run(a), keep: true })).concat([{ label: `${acts.length + 1} · CLOSE` }]);
+    const settle = keepScroll('#dialog');
+    g.dialog(spec.title, terminalPage(spec), buttons, { raw: true, cls: 'otm-dlg town', stay: true, quiet: msg ? 400 : 0, onKey: (code) => this.key(code) }); // (quiet: as at the outposts' terminals)
+    settle();
+    wireTerminal(document.querySelector('#dialog .otm'), { onSelect: (id) => { g.audio.click(); this.show(id); }, onAct: (id) => g.pickDialog(id === 'close' ? acts.length : acts.findIndex((x) => x.id === id)) });
   }
 
-  buildMenu() {
+  // skin 2: the job board's COUNCIL HALL tab: { html, foot, wire } for hud.openBoard (the board draws the header and the tab bar)
+  boardPane() {
     const g = this.game;
-    const st = this.state;
-    const free = st.slots.indexOf(null);
-    if (free < 0) { g.hud.toast('Every plot is built on. The town is complete.', 3); return; }
-    const opts = Object.entries(BUILDINGS).filter(([k]) => !st.slots.includes(k));
-    g.dialog('BUILD ON A PLOT', `<small>${opts.map(([, b]) => `<b>${b.name}</b>: ${b.desc}`).join('<br>')}</small>`,
-      opts.map(([k, b], i) => ({ label: `${i + 1} · ${b.name.toUpperCase()} — ₵${b.cost}`, fn: () => this.build(k) })).concat([{ label: `${opts.length + 1} · BACK`, fn: () => this.menu() }]));
+    this.skin = 'board';
+    this.warm();
+    const v = this.view || {};
+    this.view = { sel: v.sel, msg: '', tone: 'ok' }; // (an answer shows once)
+    const { spec, acts } = this.page(v.sel || (this.ui && this.ui.sel), v.msg || '', v.tone || 'ok');
+    spec.bare = true;
+    return {
+      html: terminalPage(spec),
+      foot: { kb: `Click a tile · 1-${Math.min(9, acts.length) || 1} do it · Arrows pick · Enter acts · Q / E or Tab: other tab · F / Esc log off`, pad: `${glyphHtml(['A'])} do it · ${glyphHtml(['LB'])} ${glyphHtml(['RB'])} other tab · ${glyphHtml(['B'])} log off` },
+      wire: (root) => wireTerminal(root, {
+        onSelect: (id) => { g.audio.click(); this.show(id); },
+        onAct: (id) => { if (performance.now() < this.quietUntil) return; const a = this.ui.acts.find((x) => x.id === id); if (a) this.run(a); },
+      }),
+    };
   }
 
+  collect() {
+    const g = this.game, st = this.state, n = Math.floor(st.bank || 0);
+    if (n < 1) return { msg: 'NOTHING TO COLLECT', tone: 'bad', sel: 'bank' };
+    g.addCredits(n, st.name);
+    st.bank = 0;
+    saveWorldState(this.ws);
+    g.audio.cash();
+    return { msg: `₵${n} COLLECTED`, sel: 'bank' };
+  }
+
+  // the guards come first: a stale click, a held key or a double-click must not charge twice. The answer shows on the page (the world is
+  // frozen behind it): no toast, no pop
   build(type) {
-    const g = this.game;
-    const st = this.state;
-    const B = BUILDINGS[type];
+    const g = this.game, st = this.state, B = BUILDINGS[type];
+    if (!B || this.has(type)) return { msg: 'ALREADY BUILT', tone: 'bad', sel: type };
     const i = st.slots.indexOf(null);
-    if (i < 0) return;
-    if (g.credits < B.cost) { g.hud.toast(`Not enough credits (need ₵${B.cost}).`, 2.5); return; }
+    if (i < 0) return { msg: 'EVERY PLOT IS BUILT ON', tone: 'bad', sel: type };
+    if (g.credits < B.cost) { g.audio.tone(180, 0.08, 'square', 0.05); return { msg: `NOT ENOUGH CREDITS: ₵${Math.ceil(B.cost - g.credits)} SHORT`, tone: 'bad', sel: type }; }
     g.credits -= B.cost;
     st.slots[i] = type;
     this.loc.slots = st.slots;
     addBuilding(g.world, this.loc, i, type);
-    if (type === 'motorpool' && !g.story.vehicles.includes('mule')) { g.story.vehicles.push('mule'); g.story.save(); g.hud.toast('Homestead Mule in the motor pool. Press V.', 3); }
-    if (type === 'radio') this.chart();
+    const extra = ON_BUILT[type] ? ON_BUILT[type](this) : '';
     this.afterBuild();
     saveWorldState(this.ws);
     g.save();
     g.audio.cash();
-    g.fx.pop(`${B.name.toUpperCase()} BUILT!`, null, { color: '#ff9f1c', size: 56 });
+    return { msg: `${B.name.toUpperCase()} BUILT${extra ? ` · ${extra}` : ''}`, sel: type };
   }
 
   // ---------- the council ----------
@@ -378,46 +596,32 @@ export class HomeTown {
 
   cooldown() { const c = this.ws.council; return Math.max(0, (c.next || 0) - Date.now()); }
 
-  councilMenu() {
-    const g = this.game;
-    const c = this.ws.council;
-    const open = Object.entries(MOTIONS).filter(([k, m]) => !c.passed.includes(k) && !(m.hidden && m.hidden(this.ws)));
-    const passed = c.passed.map((k) => MOTIONS[k] && MOTIONS[k].name).filter(Boolean);
-    const cd = this.cooldown();
-    if (!open.length) { g.dialog('THE MOON COUNCIL', `Every motion on the table has passed.${passed.length ? `<br><br><small>Passed: ${passed.join(', ')}</small>` : ''}`, [{ label: '1 · BACK', fn: () => this.menu() }]); return; }
-    const forecast = (m) => this.members().map((f) => {
-      const p = this.chance(f, m);
-      const word = p >= 0.7 ? 'likely yes' : p >= 0.4 ? 'leaning' : 'unlikely';
-      return `<span style="color:${FACTIONS[f].color}">${FACTIONS[f].name}</span> ${word}`;
-    }).join(' · ');
-    const body = `${cd > 0 ? `<b>The next session sits in ${Math.ceil(cd / 60000)} min.</b><br><br>` : 'Call a vote. Each member votes with you more readily the better its standing with you; a majority carries the motion.<br><br>'}`
-      + `<small>${open.map(([, m]) => `<b>${m.name}</b>: ${m.desc}<br>${forecast(m)}`).join('<br><br>')}</small>`
-      + (passed.length ? `<br><br><small>Passed: ${passed.join(', ')}</small>` : '');
-    g.dialog('THE MOON COUNCIL', body, open.map(([k, m], i) => ({ label: `${i + 1} · CALL A VOTE: ${m.name.toUpperCase()}`, fn: () => this.vote(k) }))
-      .concat([{ label: `${open.length + 1} · BACK`, fn: () => this.menu() }]));
-  }
-
-  vote(key) {
+  // call a vote on a motion. The council's answer is told on screens of its own (the page is left first); back() is where a failed motion
+  // goes next
+  vote(key, back = () => this.back()) {
     const g = this.game;
     const m = MOTIONS[key];
-    if (this.cooldown() > 0) { g.hud.toast(`The council sits again in ${Math.ceil(this.cooldown() / 60000)} min.`, 3); return; }
+    const c = this.ws.council;
+    if (!m || c.passed.includes(key)) return { msg: 'ALREADY CARRIED', tone: 'bad', sel: 'm:' + key };
+    if (this.cooldown() > 0) return { msg: `THE COUNCIL SITS AGAIN IN ${Math.ceil(this.cooldown() / 60000)} MIN`, tone: 'bad', sel: 'm:' + key };
     const members = this.members();
     const ballots = members.map((f) => ({ f, yes: Math.random() < this.chance(f, m) }));
     const yes = ballots.filter((b) => b.yes).length;
     const pass = yes > members.length / 2;
-    const c = this.ws.council;
     c.next = Date.now() + VOTE_CD / (this.has('radio') ? 2 : 1);
     const roll = ballots.map((b) => `<span style="color:${FACTIONS[b.f].color}">${FACTIONS[b.f].name}</span>: <b style="color:${b.yes ? '#7dff6a' : '#ff3b5c'}">${b.yes ? 'AYE' : 'NAY'}</b>`).join('<br>');
     g.audio.tone(pass ? 880 : 220, 0.4, 'triangle', 0.25);
+    this.leave();
     if (!pass) {
       saveWorldState(this.ws);
-      g.dialog(`THE VOTE: ${m.name.toUpperCase()}`, `${roll}<br><br><b>${yes} to ${members.length - yes}. THE MOTION FAILS.</b><br><small>Raise your standing with the doubters and call it again next session.</small>`, [{ label: 'NEXT TIME', fn: () => this.menu() }]);
-      return;
+      g.dialog(`THE VOTE: ${m.name.toUpperCase()}`, `${roll}<br><br><b>${yes} to ${members.length - yes}. THE MOTION FAILS.</b><br><small>Raise your standing with the doubters and call it again next session.</small>`, [{ label: 'NEXT TIME', fn: back }]);
+      return { takeover: true };
     }
     c.passed.push(key);
     saveWorldState(this.ws);
     g.dialog(`THE VOTE: ${m.name.toUpperCase()}`, `${roll}<br><br><b>${yes} to ${members.length - yes}. THE MOTION CARRIES.</b><br><small>${m.desc}</small>`, [{ label: 'ONE WEEK LATER…' }]);
     g.story.pendingDawn = () => g.newDawn(`THE COUNCIL HAS SPOKEN: ${m.name.toUpperCase()}`, `<b>${m.name.toUpperCase()}.</b> ${m.desc}<br><br><small>Carried by the Moon Council, sitting in ${this.state.name}.</small>`);
+    return { takeover: true };
   }
 
   // ---------- per frame ----------
@@ -426,11 +630,7 @@ export class HomeTown {
     if (!this.loc || !this.state) return;
     const st = this.state;
     const P = g.player;
-    let rate = 0;
-    if (this.has('market')) rate += 60;
-    if (this.has('housing')) rate += 20;
-    if (this.has('farm')) rate += 15;
-    st.bank = Math.min(BANK_CAP, (st.bank || 0) + (rate / 60) * dt);
+    st.bank = Math.min(BANK_CAP, (st.bank || 0) + (this.rate() / 60) * dt);
     this.saveT -= dt;
     if (this.saveT <= 0) { this.saveT = 30; saveWorldState(this.ws); }
     const d = P.pos.distanceTo(this.loc.pos);

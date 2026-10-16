@@ -1409,7 +1409,7 @@ body.dark-side #powradial .pr-item.cur.on { border-color: #8f7bff; }
 .otm-stat b.gold { color: var(--yellow); text-shadow: 0 0 8px rgba(255, 210, 63, 0.5); }
 
 /* the tiles. An icon is three paths (--i1 body, --i2 accent, --i3 shade): unbuilt tiles are the dimmed set, built ones are lit in their own tint */
-.otm-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.otm-grid { display: grid; grid-template-columns: repeat(var(--cols, 4), minmax(0, 1fr)); gap: 8px; } /* (--cols: spec.cols; the narrow-screen rules below still win) */
 .otm-tile { position: relative; display: flex; flex-direction: column; align-items: center; gap: 5px; min-height: 122px; padding: 12px 6px 8px; text-align: center; cursor: pointer; font-family: var(--body); color: var(--ui-muted); background: var(--ui-bg2); border: 2px solid var(--ui-edge); --i1: #6c6490; --i2: #4a4270; --i3: #3d3466; }
 .otm-tile:hover { border-color: var(--ui-muted); background: var(--ui-bg3); }
 .otm-tile.built { color: var(--ui-text); background: #0f1c16; border-color: #2f4a3c; --i1: var(--paper); --i2: var(--tint, var(--green)); --i3: #a39bc6; }
@@ -1454,6 +1454,8 @@ body.dark-side #powradial .pr-item.cur.on { border-color: #8f7bff; }
 .otm-act.short { background: #2a1018; color: #ff7a8a; border-color: #ff2a4a; } /* (can't afford it: still clickable, it answers in the panel) */
 .otm-act.short .otm-key { background: #ff2a4a; color: #05030c; border-color: #05030c; }
 .otm-act:hover, .otm-act.pad-focus { background: var(--cyan); color: #05030c; }
+.otm-acts { display: flex; flex-direction: column; gap: 6px; } /* (a building can carry several buttons) */
+.otm-act.vote { background: var(--ui-violet); }
 .otm-note { font-family: var(--comic); font-size: 8px; line-height: 1.5; color: var(--ui-dim); }
 .otm-msg { min-height: 1.2em; font-family: var(--comic); font-size: 9px; line-height: 1.4; color: var(--green); }
 .otm-msg.bad { color: #ff7a8a; animation: shake 0.3s linear; }
@@ -1478,3 +1480,13 @@ body.pad-on .otm-foot .foot-kb { display: none; }
 .otm-tile.locked { border-style: dashed; opacity: 0.72; }
 .otm-tile.locked .otm-chip { background: transparent; color: var(--ui-dim); }
 .otm-pill.locked { background: var(--ui-bg3); color: var(--ui-dim); }
+/* spec.side, wide screens: the tiles on the left and the detail screen the full height on the right (the town's page; below 900 px it stacks like the outposts') */
+@media (min-width: 900px) {
+  .otm.side { display: grid; grid-template-columns: minmax(0, 1fr) min(400px, 42%); grid-template-rows: auto minmax(0, 1fr) auto; }
+  .otm.side:not(.bare) { height: min(700px, calc(100vh - 38px)); max-height: none; }
+  .otm.side .otm-head, .otm.side .otm-foot { grid-column: 1 / -1; }
+  .otm.side .otm-body { grid-row: 2; grid-column: 1; padding-right: 6px; }
+  .otm.side .otm-detail { grid-row: 2; grid-column: 2; min-height: 0; margin: 12px 12px 12px 6px; overflow-y: auto; grid-template-columns: 64px minmax(0, 1fr); }
+  .otm.side .otm-d-art { width: 64px; height: 64px; }
+  #dialog .dlg.otm-dlg.town { width: min(1000px, calc(100vw - 32px)); }
+}
