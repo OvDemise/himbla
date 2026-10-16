@@ -17,10 +17,10 @@
 // at all: hook it and you go round with it.
 //
 // The cable bends round structures like a rope round pegs: every 20th of a second it checks each leg of its path for a structure in the
-// way and, if there is one, bends round the best point along that structure's edges (up to WRAP_MAX bends; a fourth snags the line),
+// way and, if there is one, bends round the best point along that structure's edges (up to WRAP_MAX bends; one more and the cable strains against it until it slips),
 // and lets a bend go once the straight line past it has been clear, with room to spare, for a moment. You are pulled along the first
 // leg and the hook along the last. If the drum is running and you are not coming in (something solid is in the way) the cable strains,
-// creaking louder and higher, and slips off after STRAIN_MAX seconds.
+// creaking louder and higher while the pull builds to yank you free, and slips off after STRAIN_MAX seconds.
 import * as THREE from 'three';
 import { upAt } from './geo.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
@@ -45,12 +45,15 @@ const MIN_STRUCT_R = 2.5; // (smaller colliders are props and rocks, not structu
 const EMBED = 0.42;      // how far the claw is driven into the surface it bites
 const EYE_OUT = 1.08;    // the grapple's eye, this far back from its tip along the shank (the cable ends there)
 const SLOT = { gold: 0xffd23f, steel: 0x9aa3b2, dark: 0x2a2540, tracer: 0xff9f1c }; // (the Kepler orange tracer strand is in every cable)
-const WRAP_MAX = 3;      // the cable bends round at most this many structure corners; a fourth and it snags
+const WRAP_MAX = 5;      // the cable bends round at most this many structure corners; one more and it snags
+const WRAP_MIN_R = 4;    // (only structures this big, by bounding radius, bend it: boulders and props smaller than that don't)
 const WRAP_EVERY = 0.05; // seconds between wrap checks (20 Hz)
 const WRAP_MARGIN = 0.4; // a wrap point stands this far outside the corner it bends round
 const UNWRAP_FAT = 0.5;  // a wrap lets go only when the straight line past it is clear with this much room to spare (so it can't flicker)
 const UNWRAP_HOLD = 0.2; // ... and has been for this long
-const STRAIN_MAX = 1.5;  // seconds the drum can strain against something that won't give before the line slips
+const STRAIN_MAX = 2.5;  // seconds the drum can strain against something that won't give before the line slips
+const YANK = 2.5;        // ... while it strains the pull rises, up to this many times PULL_ACC more, to yank you free
+const YANK_FULL = 1.2;   // ... reaching that after this many seconds of strain
 const MAX_PIECES = Math.ceil(RANGE * 1.6) + 8; // (a metre of cable each, up to where the line snaps)
 
 const _d = new THREE.Vector3();
@@ -102,7 +105,7 @@ const _np = new THREE.Vector3();
 const _lc = new THREE.Vector3();
 const _wc = new THREE.Vector3();
 const _bb = new THREE.Box3();
-const _hits = [];
+const _hits = [], _inside = [];
 const aim = { point: new THREE.Vector3(), nrm: new THREE.Vector3(), looked: false };
 
 // A model's solid meshes (not the shadow blob, the glow or the flames), and the height below which it's underside: the
@@ -144,6 +147,7 @@ function modelHit(root, eye, look) {
   const P = partsOf(root);
   _rinv.copy(root.matrixWorld).invert();
   _hits.length = 0;
+  _inside.length = 0;
   let near = null, nearAng = Infinity;
   for (const o of P.list) {
     if (!shown(o, root)) continue;
@@ -153,7 +157,10 @@ function modelHit(root, eye, look) {
     _ld.copy(look).transformDirection(_im);
     _ray.origin.copy(_lo);
     _ray.direction.copy(_ld);
-    if (!bb.containsPoint(_lo) && _ray.intersectBox(bb, _hp)) {
+    // (standing on a ship you are inside its big hull meshes' boxes, which tell nothing about where the sightline meets them:
+    // those are tested triangle by triangle, below, so the deck under the reticle can be hooked and not just the parts round it)
+    if (bb.containsPoint(_lo)) _inside.push(o);
+    else if (_ray.intersectBox(bb, _hp)) {
       _wp.copy(_hp).applyMatrix4(o.matrixWorld);
       if (_wl.copy(_wp).applyMatrix4(_rinv).y >= P.cutY) _hits.push({ o, t: eye.distanceTo(_wp) });
     }
@@ -165,16 +172,25 @@ function modelHit(root, eye, look) {
     const c = d > 1e-3 ? _to.dot(look) / d : 0;
     if (c > 0.2 && 1 - c < nearAng) { nearAng = 1 - c; near = o; _np.copy(_wp); }
   }
-  if (_hits.length) {
+  if (_hits.length || _inside.length) {
     _hits.sort((a, b) => a.t - b.t);
     _rc.set(eye, look);
     _rc.far = 400;
+    let best = null;
     for (let i = 0; i < _hits.length && i < 6; i++) {
       const h = _rc.intersectObject(_hits[i].o, false)[0];
       if (!h || _wl.copy(h.point).applyMatrix4(_rinv).y < P.cutY) continue;
-      aim.point.copy(h.point);
+      best = h;
+      break;
+    }
+    for (const o of _inside) {
+      const h = _rc.intersectObject(o, false)[0];
+      if (h && (!best || h.distance < best.distance) && _wl.copy(h.point).applyMatrix4(_rinv).y >= P.cutY) best = h;
+    }
+    if (best) {
+      aim.point.copy(best.point);
       aim.looked = true;
-      hitNormal(h, look, aim.nrm);
+      hitNormal(best, look, aim.nrm);
       return aim;
     }
   }
@@ -267,7 +283,7 @@ function blocker(cols, a, b, skip = 0.35, only = null) {
     for (const c of cols.query(_v1, 1, _wq)) {
       if (c._ws === _ws) continue;
       c._ws = _ws;
-      if (c.platform || c.br < MIN_STRUCT_R) continue;
+      if (c.platform || c.br < WRAP_MIN_R) continue;
       const t = rayCollider(c, a, _fd, L);
       if (t > skip && t < L - skip && t < bt) { bt = t; best = c; }
     }
@@ -434,7 +450,7 @@ export class Winch {
     let off, n;
     if (T.root) { _rinv.copy(T.root.matrixWorld).invert(); off = point.clone().applyMatrix4(_rinv); n = nrm.clone().transformDirection(_rinv); } // (the pose it was found in)
     else { off = point.clone().sub(T.pos()); n = nrm.clone(); }
-    return { target: T, off, goal: off.clone(), nrm: n, looked, dist, len: dist, t: 0, reel: 0, wraps: [], free: [], wT: 0, strain: 0, creakT: 0 };
+    return { target: T, off, goal: off.clone(), nrm: n, looked, dist, len: dist, t: 0, reel: 0, wraps: [], free: [], wT: 0, strain: 0, creakT: 0, snagged: false };
   }
 
   // where a handle's hook point is now
@@ -492,7 +508,10 @@ export class Winch {
     }
     for (const b of best) {
       // (the line is clear of everything but the thing itself: its own solid boxes round the hull must not hide it from its own hook)
-      if (!g.enemies.clearShot(eye, b.point, b.T ? b.T.obj.plat || b.T.obj : null)) continue;
+      // (a hull's own deck boxes enclose it, so they are ignored for its hook; but not when you stand on that very ship: its tower
+      // between you and a hook on its nose is in the way, and the reel would drag you into it)
+      const plat = b.T ? b.T.obj.plat || b.T.obj : null;
+      if (!g.enemies.clearShot(eye, b.point, plat && P.body.platform === plat ? null : plat)) continue;
       return this.handle(b.T || this.structure(b.col), b.point, b.nrm, b.looked, b.dP);
     }
     return null;
@@ -618,7 +637,7 @@ export class Winch {
     if ((o.wT -= dt) <= 0) {
       o.wT = WRAP_EVERY;
       const r = this.tendWraps(o);
-      if (r === 'snag') { this.release(); g.hud.toast('The line snagged!', 1.5); g.audio.tone(160, 0.2, 'sawtooth', 0.08, 0.5); return; }
+      o.snagged = r === 'snag'; // (no bend left to take: the cable stays on its straight line, through the structure, and strains)
     }
     const nP = this.pathN;
     let len = this.pathLen();
@@ -639,7 +658,8 @@ export class Winch {
       // you're drawn up to the drum's speed (and held back from overshooting it), a bounded tug each frame
       const closing = closeNow;
       if (closing < o.reel) {
-        const dv = Math.min(o.reel - closing, PULL_ACC * dt);
+        const yank = 1 + YANK * Math.min(1, o.strain / YANK_FULL); // (straining against something: the pull builds to try to yank you free)
+        const dv = Math.min(o.reel - closing, PULL_ACC * yank * dt);
         P.vel.addScaledVector(_up, dv);
         T.push(_a.copy(_ut).multiplyScalar(dv)); // (the other end takes the reaction; a building takes none)
       } else if (closing > o.reel + 0.4) {
@@ -655,10 +675,11 @@ export class Winch {
 
     // the strain: the drum is running but you are not coming in (something is in the way, or what you hooked won't budge); it creaks
     // louder and higher, and after a moment the line slips off, gently
-    if (o.reel > 0.5 && len - o.len > LEAD * 0.5 && closeNow < 1) o.strain = Math.min(STRAIN_MAX, o.strain + dt);
+    if (o.snagged) o.strain = Math.min(STRAIN_MAX, o.strain + dt * 1.5);
+    else if (o.reel > 0.5 && len - o.len > LEAD * 0.5 && closeNow < 1) o.strain = Math.min(STRAIN_MAX, o.strain + dt);
     else o.strain = Math.max(0, o.strain - dt * 1.5);
     if (o.strain > 0.3 && (o.creakT -= dt) <= 0) { o.creakT = 0.28; g.audio.tone(170 + (o.strain / STRAIN_MAX) * 260, 0.1, 'sawtooth', 0.03 + 0.03 * (o.strain / STRAIN_MAX), 1.4); }
-    if (o.strain >= STRAIN_MAX) { this.release(); g.hud.toast('The line slipped!', 1.5); g.audio.tone(300, 0.18, 'square', 0.07, 0.4); return; }
+    if (o.strain >= STRAIN_MAX) { this.release(); g.hud.toast(o.snagged ? 'The line snagged!' : 'The line slipped!', 1.5); g.audio.tone(300, 0.18, 'square', 0.07, 0.4); return; }
 
     if (len > o.len && len > 1e-3) {
       const mP = 1, mT = T.mass;
