@@ -949,7 +949,8 @@ class Game {
     try {
       // (near: the settlement closest to you, so a load puts you beside it and not back at base)
       if (this.started && this.state !== 'title') { const n = this.nearestSettlement(); if (n) this.savedNear = n.id; }
-      localStorage.setItem(SAVE_KEY, JSON.stringify({ credits: this.credits, stats: this.stats, upgrades: this.upgrades, near: this.savedNear || null }));
+      const row = this.assetRow !== null && this.assetRow.active ? this.assetRow.keep : null; // (in the dev Asset Row: what the Moon had when you left it, whatever happens here)
+      localStorage.setItem(SAVE_KEY, JSON.stringify({ credits: row ? row.credits : this.credits, stats: row ? row.stats : this.stats, upgrades: this.upgrades, near: this.savedNear || null }));
     } catch { /* storage unavailable */ }
     if (this.started && this.saves) this.saves.snapshot(this.slotMeta()); // save slots
   }
