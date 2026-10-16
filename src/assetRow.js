@@ -19,7 +19,7 @@ import { GROUPS } from './assetRowItems/index.js';
 
 const UP = new THREE.Vector3(0, 1, 0);
 const LANE_Z = { A: 0, B: 460 };
-const LANE_HALF = { A: 90, B: 290 }; // the plinth reaches this far either side of a lane's line
+const LANE_HALF = { A: 90, B: 330 }; // the plinth reaches this far either side of a lane's line
 const PLINTH_X0 = -90, PLINTH_PAD = 120;
 const VOID_Y = -1e5; // "no floor" past the plinth's edge
 const FALL_LIMIT = -70; // below this you went over the edge: back to the start
@@ -85,6 +85,8 @@ function drawnBox(obj) {
 const disposeTree = (root) => {
   root.traverse((o) => {
     if (o.geometry) o.geometry.dispose();
+    if (o.isSkinnedMesh && o.skeleton) o.skeleton.dispose(); // (a skinned figure's bone texture)
+    if (o.isInstancedMesh) o.dispose(); // (a crowd's instance buffers)
     const mats = Array.isArray(o.material) ? o.material : o.material ? [o.material] : [];
     for (const m of mats) { if (m.map) m.map.dispose(); m.dispose(); }
   });
@@ -199,6 +201,7 @@ export class AssetRow {
         for (const b of made.cols) {
           if (b.type === 'sphere') specs.push({ type: 'sphere', c: at(b.x, b.y, b.z), r: b.r });
           else if (b.type === 'cyl') specs.push({ type: 'cyl', c: at(b.x, 0, b.z), axis: UP.clone(), y0: b.y0, y1: b.y1, r: b.r });
+          else if ((b.type === 'box' || b.type === undefined) && b.ax) specs.push({ type: 'box', c: at(b.x, b.y, b.z), hx: b.hx, hy: b.hy, hz: b.hz, ax: b.ax.clone(), ay: b.ay.clone(), az: b.az.clone() }); // (a full spec: a tilted ramp)
           else if (b.type === 'box' || b.type === undefined) {
             const q = new THREE.Quaternion().setFromAxisAngle(UP, b.yaw || 0);
             specs.push({ type: 'box', c: at(b.x, b.y, b.z), hx: b.hx, hy: b.hy, hz: b.hz, ax: new THREE.Vector3(1, 0, 0).applyQuaternion(q), ay: UP.clone(), az: new THREE.Vector3(0, 0, 1).applyQuaternion(q) });
