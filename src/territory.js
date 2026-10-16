@@ -53,6 +53,26 @@ function boxDist(p, h) {
   return Math.sqrt(qx * qx + qy * qy + qz * qz);
 }
 
+// The charred heap left of a wrecked founded outpost (and, for a farm, its dome ring): a pure builder, so the Asset Row can show it.
+export function rubbleModel(kind, seed) {
+  const root = new THREE.Group();
+  const rr = mulberry32(seed + 7);
+  const mats = [toon(0x2a2433), toon(0x3a3550), toon(0x4a3f3a)];
+  for (let i = 0; i < 10; i++) {
+    const m = new THREE.Mesh(new THREE.BoxGeometry(0.8 + rr() * 2.2, 0.3 + rr() * 1.2, 0.8 + rr() * 2.2), mats[i % 3]);
+    m.position.set(-5 + rr() * 10, 0.3, -5 + rr() * 10);
+    m.rotation.set(rr() * 0.6, rr() * 3, rr() * 0.6);
+    ink(m, 0.04);
+    root.add(m);
+  }
+  if (kind === 'farm') {
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(7, 0.3, 6, 24, Math.PI * 1.3).rotateX(Math.PI / 2), toon(0x55607a));
+    ring.position.y = 0.3;
+    root.add(ring);
+  }
+  return root;
+}
+
 // The ground each settlement claims, before any outposts: one anchor per faction location (HQs claim
 // more). Pirate camps and neutral places of interest hold no ground of their own.
 export function locationAnchors(locations) {
@@ -483,21 +503,7 @@ export class Territory {
       o.raidPoint = null;
       return;
     }
-    const root = new THREE.Group();
-    const rr = mulberry32(o.seed + 7);
-    const mats = [toon(0x2a2433), toon(0x3a3550), toon(0x4a3f3a)];
-    for (let i = 0; i < 10; i++) {
-      const m = new THREE.Mesh(new THREE.BoxGeometry(0.8 + rr() * 2.2, 0.3 + rr() * 1.2, 0.8 + rr() * 2.2), mats[i % 3]);
-      m.position.set(-5 + rr() * 10, 0.3, -5 + rr() * 10);
-      m.rotation.set(rr() * 0.6, rr() * 3, rr() * 0.6);
-      ink(m, 0.04);
-      root.add(m);
-    }
-    if (o.kind === 'farm') {
-      const ring = new THREE.Mesh(new THREE.TorusGeometry(7, 0.3, 6, 24, Math.PI * 1.3).rotateX(Math.PI / 2), toon(0x55607a));
-      ring.position.y = 0.3;
-      root.add(ring);
-    }
+    const root = rubbleModel(o.kind, o.seed);
     root.position.copy(g.planet.ground(o.dir, new THREE.Vector3(), -0.2));
     frameQuat(o.dir, tangent(SUN.clone(), o.dir).normalize(), root.quaternion);
     g.scene.add(root);
