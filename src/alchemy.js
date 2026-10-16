@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { PHYS } from './config.js';
-import { makeFigure, engineModel } from './models.js';
+import { makeFigure, engineModel, caseModel } from './models.js';
 import { toon, glow, ink } from './toon.js';
 import { frameQuat, tangent, greatCircle, SUN, arcDist } from './geo.js';
 import { pick, mulberry32 } from './rng.js';
@@ -70,16 +70,17 @@ const NAMES = ['Gary', 'Priya', 'Tomasz', 'Little Juno', 'Ade', 'Wen', 'Marisol'
 const _v = new THREE.Vector3();
 
 // What a pickup looks like on the ground (dropLoot below; the Asset Row shows them too): a core in the item's colour (an octahedron;
-// an engine, a plating slab, a junk-bot box, or a pink crate), a halo ring and a thin light pillar. Returns { root, core }.
+// a plating slab, a junk-bot box, or a pink crate), a halo ring and a thin light pillar. A salvaged engine and a credits briefcase are
+// Blender-built models (models.js engineModel / caseModel, once the models have loaded) and get no halo or pillar. Returns { root, core }.
 export function makeLoot(kind, { credits = 0, crate = false } = {}) {
   const root = new THREE.Group();
   const color = crate ? 0xff7ad9 : credits && !kind ? 0xffd23f : new THREE.Color(ITEMS[kind].color).getHex();
+  const model = crate ? null : kind === 'engine' ? engineModel() : credits && !kind ? caseModel() : null;
   const geo = crate ? new THREE.BoxGeometry(0.9, 0.9, 0.9) : kind === 'engine' ? new THREE.CylinderGeometry(0.5, 0.5, 0.9, 8).rotateZ(Math.PI / 2) : kind === 'plating' ? new THREE.BoxGeometry(1, 0.15, 0.8) : kind === 'junkbot' ? new THREE.BoxGeometry(0.6, 0.5, 0.6) : new THREE.OctahedronGeometry(0.45, 0);
-  // (an engine is the Blender-built model once the models have loaded: models.js engineModel)
-  const eng = kind === 'engine' && !crate ? engineModel() : null;
-  const core = eng || new THREE.Mesh(geo, toon(color));
-  if (!eng) ink(core, 0.05);
+  const core = model || new THREE.Mesh(geo, toon(color));
+  if (!model) ink(core, 0.05);
   root.add(core);
+  if (model) return { root, core };
   const halo = new THREE.Mesh(new THREE.TorusGeometry(0.9, 0.06, 6, 20).rotateX(Math.PI / 2), glow(color));
   halo.position.y = -0.6;
   root.add(halo);
@@ -318,8 +319,7 @@ export class Alchemy {
     g.scene.add(root);
     if (kind === 'engine' && !to) {
       // a salvaged engine is a heavy lump: it pops out in a random direction, thuds, skids and settles
-      // (updateEngine), and only then can it be scooped with G. The halo and light pillar wait for it.
-      for (const c of root.children) if (c !== core) c.visible = false;
+      // (updateEngine), and only then can it be scooped with G.
       const dir = tangent(new THREE.Vector3(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5), up).normalize();
       const p0 = pos.clone().addScaledVector(up, 1.5);
       root.position.copy(p0);
@@ -392,7 +392,6 @@ export class Alchemy {
           L.pos.setLength(g.planet.surface(L.pos) + 0.45);
           // lie flat on the ground, whichever way it ended up facing
           frameQuat(L.pos.clone().normalize(), tangent(new THREE.Vector3(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5), L.pos.clone().normalize()).normalize(), L.root.quaternion);
-          for (const c of L.root.children) c.visible = true;
         }
       }
     }

@@ -19,6 +19,7 @@ const GLB = {
   garage: () => import('./assets/garage.glb?inline'),
   dish: () => import('./assets/dish.glb?inline'),
   engine: () => import('./assets/engine.glb?inline'),
+  briefcase: () => import('./assets/briefcase.glb?inline'),
 };
 
 // A model file can be compressed (tools/optimize-glb.mjs: quantized, then meshopt-coded: about a third of the size).
@@ -1228,7 +1229,7 @@ const SHIP_TOON = { trim: 0xd8d4e8, dark: 0x2a2540, metal: 0x8a87a0, steel: 0x55
 const SHIP_FX = new Set(['plume', 'plumeCore', 'lift', 'engine', 'core']); // per-ship materials (they pulse)
 const FLAMES = new Set(['plume', 'plumeCore', 'lift']);
 export async function loadShipParts() {
-  const [gltf, sk, wr, ap, lt, cr, ga, di, en] = await Promise.all(['ships', 'skimmer', 'warrig', 'apc', 'landtrain', 'crane', 'garage', 'dish', 'engine'].map(loadGlb));
+  const [gltf, sk, wr, ap, lt, cr, ga, di, en, bc] = await Promise.all(['ships', 'skimmer', 'warrig', 'apc', 'landtrain', 'crane', 'garage', 'dish', 'engine', 'briefcase'].map(loadGlb));
   SHIP_PARTS = {};
   for (const name of ['shuttle', 'freighter']) {
     const root = gltf.scene.getObjectByName(name);
@@ -1273,28 +1274,34 @@ export async function loadShipParts() {
   // the salvaged engine that drops out of a wreck (tools/blender/build_engine.py)
   ENGINE_MODEL = en.scene.getObjectByName('engine');
   if (!ENGINE_MODEL) throw new Error('engine.glb has no engine');
-  ENGINE_MODEL.traverse((o) => { if (o.isMesh) { o.userData.slot = o.material.name; o.castShadow = true; } });
+  CASE_MODEL = bc.scene.getObjectByName('briefcase');
+  if (!CASE_MODEL) throw new Error('briefcase.glb has no briefcase');
+  for (const m of [ENGINE_MODEL, CASE_MODEL]) m.traverse((o) => { if (o.isMesh) { o.userData.slot = o.material.name; o.castShadow = true; } });
 }
 
-// ---- The salvaged engine (built in Blender, see build_engine.py) ----
-// A scorched engine block about 1.1 x 0.8 x 1.5 m, centred on its origin: engineModel() returns a fresh copy dressed in the game's toon
-// materials (the `hot` exhaust ports glow), each part outlined by its `ink` property. Falls back to a plain cylinder before the models load.
-let ENGINE_MODEL = null;
+// ---- Wreck salvage models (built in Blender, see build_engine.py and build_briefcase.py) ----
+// The SALVAGED ENGINE (a scorched engine block, about 1.25 x 1.1 x 1.8 m) and the CREDITS BRIEFCASE (a gold-trimmed case with the credit sign on
+// both faces, about 0.95 x 0.85 x 0.4 m), each centred on its origin. engineModel() / caseModel() return a fresh copy dressed in the game's toon
+// materials (a `hot` slot glows), each part outlined by its `ink` property; null until the models have loaded.
+let ENGINE_MODEL = null, CASE_MODEL = null;
 const ENGINE_TOON = { body: 0x6b4630, dark: 0x2a2540, metal: 0x8a87a0, steel: 0x55607a };
-export function engineModel() {
-  if (!ENGINE_MODEL) return null;
-  const root = ENGINE_MODEL.clone(true);
+const CASE_TOON = { body: 0x4a2f22, dark: 0x1c1830, trim: 0x8a87a0, gold: 0xffd23f };
+function dressLoot(template, palette) {
+  if (!template) return null;
+  const root = template.clone(true);
   const mats = new Map();
   const meshes = [];
   root.traverse((o) => { if (o.isMesh) meshes.push(o); }); // (collected first: ink() adds outline shells as it goes)
   for (const o of meshes) {
     const slot = o.userData.slot;
-    if (!mats.has(slot)) mats.set(slot, slot === 'hot' ? glow(0xff6a2a) : toon(ENGINE_TOON[slot] || 0x8a87a0));
+    if (!mats.has(slot)) mats.set(slot, slot === 'hot' ? glow(0xff6a2a) : toon(palette[slot] || 0x8a87a0));
     o.material = mats.get(slot);
     if (o.userData.ink > 0) ink(o, o.userData.ink);
   }
   return root;
 }
+export const engineModel = () => dressLoot(ENGINE_MODEL, ENGINE_TOON);
+export const caseModel = () => dressLoot(CASE_MODEL, CASE_TOON);
 
 function bakeShip(root) {
   root.updateMatrixWorld(true);
