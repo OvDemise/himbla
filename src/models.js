@@ -283,26 +283,34 @@ function addBaked(target, key, mats) {
 // chain stays on runners nobody simulates (distant figures); a simulated one hides it.
 export const SCARF_STYLE = { len: 1.3, w: 0.22, tails: 1 };
 const _sq = new THREE.Quaternion(), _sg = new THREE.Vector3(), _sw = new THREE.Vector3(), _sa = new THREE.Vector3();
-const _sg2 = new THREE.Vector3(), _st = new THREE.Vector3(), _ss = new THREE.Vector3(), _sn = new THREE.Vector3(), _sx = new THREE.Vector3(1, 0, 0), _sy = new THREE.Vector3(0, 1, 0);
+const _st = new THREE.Vector3(), _ss = new THREE.Vector3(), _sn = new THREE.Vector3(), _sx = new THREE.Vector3(1, 0, 0), _sy = new THREE.Vector3(0, 1, 0);
 const SCARF_PTS = 12;
-// The scarf's rest channel (torso frame): out of the back of the neck, left along the top of the pack, over the left shoulder
-// (behind the pauldron; +x is the runner's left, which a viewer behind sees on the left) and down its back, outside the pack's edge. At rest, and at a walk, the tails are drawn into it
-// (a soft spring that lets go as the airflow rises, so a skater's scarf streams out behind, over the pack if need be).
+// The scarf's rest channel (torso frame; +x is the runner's left, which a viewer behind sees on the left). Seen from above, the
+// tails come out of the back of the neck just left of the pack and wrap round the collar under the helmet's rim, following its
+// circle round to the left, the second lying outside the first and reaching a little further round. They then slip off the
+// shoulder behind the arm and hang down the left side of the back. At rest, and at a walk, a soft spring holds the tails in it; it
+// lets go as the airflow rises, so a skater's scarf streams out behind, over the pack if need be.
 const ease01 = (t) => { t = Math.min(1, Math.max(0, t)); return t * t * (3 - 2 * t); };
-const SCARF_GUIDE = [[-0.02, 0.93, -0.25], [0.1, 0.955, -0.25], [0.24, 0.965, -0.225], [0.34, 0.915, -0.215], [0.37, 0.8, -0.235], [0.37, 0.6, -0.27]];
-const SCARF_GUIDE_CUM = SCARF_GUIDE.reduce((a, p, i) => { a.push(i ? a[i - 1] + Math.hypot(p[0] - SCARF_GUIDE[i - 1][0], p[1] - SCARF_GUIDE[i - 1][1], p[2] - SCARF_GUIDE[i - 1][2]) : 0); return a; }, []);
-// the channel `s` metres along it for tail k (the second tail lies on the first: a little further in and a layer further back); past the end it hangs straight down
-function scarfGuide(k, s, out) {
-  const G = SCARF_GUIDE, C = SCARF_GUIDE_CUM, n = G.length - 1;
-  if (s >= C[n]) out.set(G[n][0], G[n][1] - (s - C[n]), G[n][2]);
-  else {
-    let j = 0;
-    while (C[j + 1] < s) j++;
-    const t = (s - C[j]) / (C[j + 1] - C[j]);
-    out.set(G[j][0] + (G[j + 1][0] - G[j][0]) * t, G[j][1] + (G[j + 1][1] - G[j][1]) * t, G[j][2] + (G[j + 1][2] - G[j][2]) * t);
+const SCARF_GUIDES = [0, 1].map((k) => {
+  const rho = 0.29 + 0.03 * k, th0 = (12 + 3 * k) * Math.PI / 180, th1 = (68 + 18 * k) * Math.PI / 180, n = 7;
+  const g = [];
+  for (let i = 0; i <= n; i++) { // the arc round the collar: angle from straight back, round toward the left
+    const t = i / n, th = th0 + (th1 - th0) * t;
+    g.push([rho * Math.sin(th), 0.945 - 0.03 * t, -rho * Math.cos(th)]);
   }
-  out.x -= k * 0.045; out.z -= k * 0.04;
-  return out;
+  const e = g[n];
+  g.push([e[0] + 0.05, 0.875, e[2] - 0.09 - 0.02 * k], [0.36 + 0.025 * k, 0.76, -0.235 - 0.03 * k], [0.37 + 0.025 * k, 0.55, -0.27 - 0.03 * k]); // ...and down behind the shoulder
+  const cum = g.reduce((a, q, i) => { a.push(i ? a[i - 1] + Math.hypot(q[0] - g[i - 1][0], q[1] - g[i - 1][1], q[2] - g[i - 1][2]) : 0); return a; }, []);
+  return { g, cum };
+});
+// tail k's channel `s` metres along it; past the end it hangs straight down
+function scarfGuide(k, s, out) {
+  const { g: G, cum: C } = SCARF_GUIDES[Math.min(k, 1)], n = G.length - 1;
+  if (s >= C[n]) return out.set(G[n][0], G[n][1] - (s - C[n]), G[n][2]);
+  let j = 0;
+  while (C[j + 1] < s) j++;
+  const t = (s - C[j]) / (C[j + 1] - C[j]);
+  return out.set(G[j][0] + (G[j + 1][0] - G[j][0]) * t, G[j][1] + (G[j + 1][1] - G[j][1]) * t, G[j][2] + (G[j + 1][2] - G[j][2]) * t);
 }
 // What the scarf slides over: the pack, and a crate or two on top of it (Player.setCargo), as rounded boxes in the torso frame:
 // [half-width, bottom, top, back, front, corner radius]. A box is clearance included: the tail rides on its surface.
@@ -362,7 +370,8 @@ export class ScarfSim {
       const seg = len / (SCARF_PTS - 1);
       const p = [], o = [];
       for (let i = 0; i < SCARF_PTS; i++) { p.push(new THREE.Vector3()); o.push(new THREE.Vector3()); }
-      const T = { mesh, inkMesh, root, k, seg, w: st.w * (k ? 0.85 : 1), p, o, phase: k * 0.6 };
+      const tgt = p.map((_, i) => scarfGuide(k, i * seg, new THREE.Vector3()));
+      const T = { mesh, inkMesh, root, k, tgt, seg, w: st.w * (k ? 0.85 : 1), p, o, phase: k * 0.6 };
       this.hang(T);
       this.tails.push(T);
     }
@@ -402,7 +411,11 @@ export class ScarfSim {
     const fx = _sg.x + _sw.x + _sa.x, fy = _sg.y + _sw.y + _sa.y, fz = _sg.z + _sw.z + _sa.z;
     const flut = Math.min(0.5, ws / 28);
     const boxes = cargo ? [PACK_BOX, cargo > 1 ? TWIN_BOX : CRATE_BOX] : [PACK_BOX];
-    const rest = 1 - ease01((ws - 2.5) / 6.5); // the pull into the channel: full at a stand or a walk, gone by about 9 m/s
+    // the pull into the channel: full at a stand or a walk, gone by about 9 m/s; it eases in and out (about a third of a second), so a
+    // stop from a sprint settles the tails back instead of snapping them
+    this.rw = this.rw ?? 1;
+    this.rw += ((1 - ease01((ws - 2.5) / 6.5)) - this.rw) * Math.min(1, dt * 3);
+    const rest = this.rw;
     const steps = Math.min(4, Math.ceil(dt / (1 / 120)));
     const h2 = (dt / steps) ** 2;
     for (const T of this.tails) {
@@ -415,15 +428,11 @@ export class ScarfSim {
           const ax = fx + Math.sin(this.t * 11 - i * 0.75 + T.phase) * flut * 22 * u;
           const ay = fy + Math.cos(this.t * 8.3 - i * 0.6 + T.phase) * flut * 16 * u;
           const q = p[i];
-          const vx = (q.x - o[i].x) * 0.96, vy = (q.y - o[i].y) * 0.96, vz = (q.z - o[i].z) * 0.96;
+          // the channel as a spring (firm near the neck, loose further down so the ends still sway), damped so it settles
+          const kk = rest * (i < 5 ? 55 : 12), dmp = 0.96 - rest * (i < 5 ? 0.07 : 0.03), g = T.tgt[i];
+          const vx = (q.x - o[i].x) * dmp, vy = (q.y - o[i].y) * dmp, vz = (q.z - o[i].z) * dmp;
           o[i].copy(q);
-          q.x += vx + ax * h2; q.y += vy + ay * h2; q.z += vz + fz * h2;
-        }
-        if (rest > 0.001) { // drawn into the channel: firmly near the neck and shoulder, loosely further down so it still sways
-          for (let i = 1; i < SCARF_PTS; i++) {
-            scarfGuide(T.k, i * seg, _sg2);
-            p[i].lerp(_sg2, rest * (i < 5 ? 0.3 : 0.09));
-          }
+          q.x += vx + (ax + (g.x - q.x) * kk) * h2; q.y += vy + (ay + (g.y - q.y) * kk) * h2; q.z += vz + (fz + (g.z - q.z) * kk) * h2;
         }
         for (let it = 0; it < 3; it++) {
           for (let i = 1; i < SCARF_PTS; i++) {
@@ -485,10 +494,18 @@ export class ScarfSim {
     for (let i = 0; i < SCARF_PTS; i++) {
       const u = i / (SCARF_PTS - 1);
       _st.subVectors(p[Math.min(SCARF_PTS - 1, i + 1)], p[Math.max(0, i - 1)]).normalize();
-      // the ribbon's width runs along the torso's x, squared off to the tail's direction
+      // the ribbon's width runs across the tail: along the torso's x where it hangs, and horizontally across it where it lies along
+      // the collar or the shoulder (so it lies flat there), blended; the sign follows the one before, so it never twists
       _ss.copy(_sx).addScaledVector(_st, -_sx.dot(_st));
       if (_ss.lengthSq() < 0.01) _ss.copy(_sy).addScaledVector(_st, -_sy.dot(_st));
       _ss.normalize();
+      _sn.crossVectors(_st, _sy); // (horizontal, across the tail)
+      if (_sn.lengthSq() > 0.01) {
+        _sn.normalize();
+        const flat = 1 - ease01((Math.abs(_st.y) - 0.35) / 0.45);
+        if (_sn.dot(_ss) < 0) _sn.negate();
+        _ss.lerp(_sn, flat).normalize();
+      }
       _sn.crossVectors(_st, _ss);
       const hw = (w * (1 - 0.3 * u) + (u > 0.95 ? 0.025 : 0)) / 2;
       const c = p[i];
