@@ -14,7 +14,8 @@
 //   pirateTowns [location ids]     Lights Out: the towns the clans blew up and took (pirate dens now)
 //   blackSun    true               Daedalus chapter 4: the reactor at the Forward Post stays
 //   town        {dir,name,kind,    Kepler finale: your town (hometown.js), a settlement on the map
-//               slots,bank}
+//               slots,bank}        (slots: eight building keys or null; School & Playground became Roads,
+//                                  so an old save's 'school' is read as 'roads' at load)
 //   council     {passed,next}      the Moon Council's carried motions (and when it sits next)
 //   bulletin    string|null        news to show once, on the first load after a finale
 import * as THREE from 'three';
@@ -88,6 +89,8 @@ export function applyWorldState(ws, locations) {
   // your town (late: it stays out of the crater and outpost generation, like Chimera Downs)
   if (ws.town && !locations.some((l) => l.id === 'hometown')) {
     const t = ws.town;
+    // School & Playground is gone: its plot is Roads now, free (in place: the location's slots and ws.town.slots are one array)
+    t.slots.forEach((s, i) => { if (s === 'school') t.slots[i] = 'roads'; });
     let dir = new THREE.Vector3().fromArray(t.dir).normalize();
     // never on top of another settlement (an old save could put it inside Kepler Civic Center):
     // nudge it out along the ground until it's clear
