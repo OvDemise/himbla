@@ -237,6 +237,9 @@ export function buildHomeTown(world, loc) {
   for (let i = 0; i < SLOTS; i++) { const p = slotAt(i); loc.keep.push({ x: p.x, z: p.z, r: 14.5 }); }
   (loc.slots || []).forEach((type, i) => { if (type) addBuilding(world, loc, i, type); });
   for (let i = 0; i < SLOTS; i++) if (!(loc.slots || [])[i]) addPlot(world, loc, i);
+  // a town rebuilt in place (a Council motion) has lost what traffic hung on its old group: the shuttle pad's waiting shelter goes back up
+  // (at load and at the founding the world has no traffic yet, or it has no stop here)
+  if (world.traffic) world.traffic.redress(loc);
 }
 
 function addPlot(world, loc, i) {
@@ -296,7 +299,11 @@ const LIVE = {
       : { rows: [['RING', 'Not laid yet']], note: 'The road crews lay the ring road and the links when the game next loads.' };
   },
   radio: () => ({ rows: [['MAP CHARTED', '3 km round town'], ['VOTES', 'Council sits twice as often']], note: 'Nothing to press yet.' }),
-  pad: () => ({ rows: [['HOME BASE', 'You start, recall and redeploy here']], note: 'Nothing to press.' }),
+  pad: (t) => {
+    const v = t.shuttle(), home = ['HOME BASE', 'You start, recall and redeploy here'];
+    return v ? { rows: [home, ['SHUTTLE TO', v.stops[1].loc.name], ['FLIGHT', `${(v.path.len / 1000).toFixed(1)} km`]], note: 'Nothing to press: the shuttle runs by itself. Hop in with F while it is parked on the pad.' }
+      : { rows: [home, ['SHUTTLE TO', 'No settlement in reach']], note: 'Nothing to press.' };
+  },
 };
 // what a building does the moment it is built, beyond standing on its plot: type -> (t) => a line for the page's "BUILT" message
 const ON_BUILT = {
@@ -308,6 +315,7 @@ const ON_BUILT = {
     return 'HOMESTEAD MULE UNLOCKED (V)';
   },
   radio: (t) => { t.chart(); return 'MAP CHARTED 3 KM ROUND TOWN'; },
+  pad: (t) => t.linkShuttle(),
 };
 // where F does something in town, first match wins (interact()): at(t) is a world position (null: not there), r the reach in metres,
 // use(t, player) the prompt and what F does (null: nothing here)
@@ -365,6 +373,18 @@ export class HomeTown {
     delete this.loc._bld;
     for (const s of this.game.world.traffic.stops) if (s.loc === this.loc) delete s.doors;
     this.game._homes = {};
+  }
+
+  // the town's shuttle (a flyer, see traffic.js addTownShuttle), or null before the Shuttle Pad is built or when it has nowhere to go
+  shuttle() { return this.game.world.traffic.vehicles.find((v) => v.stops && v.stops[0].loc === this.loc) || null; }
+
+  // the Shuttle Pad opens a line to the nearest settlement; the first shuttle waits at the far end and comes in. (A load that finds the pad
+  // built starts the line itself: traffic.js buildFlights.) The page's line, or '' when there is nowhere to fly to
+  linkShuttle() {
+    const tr = this.game.world.traffic;
+    tr.registerLocation(this.loc);
+    const v = tr.addTownShuttle(this.loc, { startAtB: true });
+    return v ? `SHUTTLE SERVICE TO ${v.stops[1].loc.name.toUpperCase()} OPENS: FIRST SHUTTLE ON ITS WAY` : '';
   }
 
   // F in town: the first point in POINTS you stand at gives the prompt and what F does

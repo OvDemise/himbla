@@ -49,6 +49,10 @@ const JOIN = 24; // junction connectors join the ring this far along it either s
 const JOIN_OUT = 26; // ...and leave the road lanes this far out from the ring
 const GATE_SEP = 90; // minimum ring distance between two junctions
 const PAD_APART = 26; // clear ground kept between the swept discs of two flights' pads, where the town has room (makePadStop)
+// how high your town's shuttle rises off its plot before it turns: the council hall's spire stands 26.6 m, the hull is 9 m round and a shuttle
+// leaves with its gear down (5.4 m), so a plot's flight clears the hall on any heading, with 3 m to spare and then some (the hall has no
+// collider that tall for flightPath to lift over)
+const TOWN_CLIMB = 40;
 const FILLET = 24; // drawn flare at each junction
 // Roads that were cut, and roads that end in a T on another road instead (buildSpur): the ILMB's
 // three roads east to Meridian, south-east to Tranquility and west to Aldrin became one road that
@@ -234,6 +238,30 @@ export class Traffic {
     loc.stopKeep = [];
   }
 
+  // A place that is rebuilt in place (world.rebuildLocation, when a Council motion changes it) loses what traffic hung on its old group, and the
+  // doors its passengers had learnt. This puts the waiting shelters of its pad stops back and forgets the stale buildings. (Only your town
+  // asks: its pad and the pad's lights are part of its own kit, which the rebuild bakes again; hometown.js buildHomeTown.)
+  redress(loc) {
+    delete loc._bld;
+    for (const s of this.stops) {
+      if (s.loc !== loc) continue;
+      delete s.doors;
+      if (s.shelterAt) this.shelter(loc, s.shelterAt.x, s.shelterAt.z, s.shelterAt.yaw, s.shelterAt.text, s.shelterAt.color);
+    }
+  }
+
+  // The settlement nearest to `loc` that a shuttle may fly to: open to anyone (safe, not a restricted base), a real town rather than a point of
+  // interest (the casino, the Monolith) and not a den, camp or ruin
+  nearestPort(loc) {
+    let best = null, bd = Infinity;
+    for (const l of this.w.locations) {
+      if (l === loc || l.type === 'pirate' || l.type === 'ruin' || l.camp || l.hostile || !l.safe || l.restricted || l.poi) continue;
+      const d = arcDist(loc.dir, l.dir);
+      if (d < bd) { bd = d; best = l; }
+    }
+    return best;
+  }
+
   // Settlements lay down a landing pad or two of their own; any that no transit line ended up using
   // goes (an empty pad with nothing ever landing on it, often under someone's lamp post)
   dropSparePads() {
@@ -355,10 +383,8 @@ export class Traffic {
 
   // ================= flights: pads, arcs, landings =================
 
-  // Pick (or reuse) a landing pad in open ground at the settlement's edge, facing `other`.
-  makePadStop(loc, other, spec, kind) {
-    const tw = this.toward(loc, other);
-    const keeps = this.keepouts(loc);
+  // The search half of makePadStop: the best open spot (or a registered pad) at the settlement's edge, toward heading `tw`.
+  padSpot(loc, tw, keeps, spec, kind) {
     const cands = [];
     for (const p of loc.pads || []) {
       if (p.r >= 25 || p.used) continue;
@@ -406,8 +432,17 @@ export class Traffic {
       pick.lo = pick.hi = this.groundY(loc, pick.x, pick.z);
       console.warn('[traffic] no open pad spot at', loc.id, 'for', kind);
     }
+    return pick;
+  }
+
+  // Pick (or reuse) a landing pad in open ground at the settlement's edge, facing `other`. `pin` is a pad that is already built and
+  // reserved (your town's shuttle pad, on its plot): that one is used as it is, with no search.
+  makePadStop(loc, other, spec, kind, pin = null) {
+    const tw = this.toward(loc, other);
+    const keeps = this.keepouts(loc);
+    const pick = pin ? { x: pin.x, z: pin.z, lo: 0, hi: 0, existing: pin } : this.padSpot(loc, tw, keeps, spec, kind);
     const color = kind === 'ship' ? 0xff9f1c : 0x2ec4ff;
-    let top = 0.27;
+    let top = pin ? pin.top : 0.27;
     if (pick.existing && pick.existing.r >= spec.padR * 0.8) {
       pick.existing.used = true;
     } else {
@@ -447,10 +482,11 @@ export class Traffic {
       break;
     }
     const yaw = Math.atan2(pick.x - wx, pick.z - wz);
-    this.shelter(loc, wx, wz, yaw, `${kind === 'ship' ? 'FREIGHT' : 'SHUTTLE'} > ${other.short}`, color);
+    const shelterAt = { x: wx, z: wz, yaw, text: `${kind === 'ship' ? 'FREIGHT' : 'SHUTTLE'} > ${other.short}`, color };
+    this.shelter(loc, wx, wz, yaw, shelterAt.text, color);
     loc.stopKeep.push({ x: wx, z: wz, r: 3 });
     const stop = {
-      loc, kind: 'pad', x: pick.x, z: pick.z, top, padR: spec.padR,
+      loc, kind: 'pad', x: pick.x, z: pick.z, top, padR: spec.padR, shelterAt,
       wait: { x: wx + Math.sin(yaw) * 1.8, y: this.groundY(loc, wx, wz), z: wz + Math.cos(yaw) * 1.8, g: true },
       town: this.townPoint(loc, wx, wz, 70),
       queue: [], queued: false,
@@ -463,12 +499,14 @@ export class Traffic {
     return stop;
   }
 
-  // Climb vertically off pad A, arc up to cruise, come down over pad B and settle vertically.
+  // Climb vertically off pad A, arc up to cruise, come down over pad B and settle vertically. climb: how high the vertical legs go, one number
+  // or [at A, at B].
   flightPath(sA, sB, gearH, climb, cruise, radius) {
     const P = this.P;
+    const [climbA, climbB] = Array.isArray(climb) ? climb : [climb, climb];
     const uA = sA.world.clone().normalize(), uB = sB.world.clone().normalize();
-    const start = sA.world.clone().addScaledVector(uA, gearH), topA = sA.world.clone().addScaledVector(uA, gearH + climb);
-    const end = sB.world.clone().addScaledVector(uB, gearH), topB = sB.world.clone().addScaledVector(uB, gearH + climb);
+    const start = sA.world.clone().addScaledVector(uA, gearH), topA = sA.world.clone().addScaledVector(uA, gearH + climbA);
+    const end = sB.world.clone().addScaledVector(uB, gearH), topB = sB.world.clone().addScaledVector(uB, gearH + climbB);
     const len = arcDist(uA, uB);
     const step = 20, steps = Math.max(4, Math.ceil(len / step));
     const raw = [];
@@ -504,7 +542,9 @@ export class Traffic {
     return makePath(pts);
   }
 
-  addFlyer(kind, A, B) {
+  // A transit line between two settlements. opts.pinA: the pad it uses at A (makePadStop); opts.startAtB: begin parked at B, so the first
+  // thing it does is fly in to A (a service that has just opened)
+  addFlyer(kind, A, B, opts = {}) {
     const ship = kind === 'ship';
     const n = this.vehicles.length;
     // the rig (models.js) knows its own gear height, deck box, ramp path and pad size
@@ -513,8 +553,8 @@ export class Traffic {
       ? { padR: model.padR, clearR: 31, heights: [3, 10, 20, 32], climb: 36 }
       : { padR: model.padR, clearR: 13, heights: [2, 7, 14], climb: 18 };
     const cruise = ship ? 55 + (n % 3) * 25 : 24;
-    const sA = this.makePadStop(A, B, spec, kind), sB = this.makePadStop(B, A, spec, kind);
-    const path = this.flightPath(sA, sB, model.gearH, spec.climb, cruise, model.radius);
+    const sA = this.makePadStop(A, B, spec, kind, opts.pinA), sB = this.makePadStop(B, A, spec, kind);
+    const path = this.flightPath(sA, sB, model.gearH, [opts.pinA ? TOWN_CLIMB : spec.climb, spec.climb], cruise, model.radius);
     model.root.matrixAutoUpdate = true;
     this.w.scene.add(model.root);
     const v = {
@@ -529,6 +569,7 @@ export class Traffic {
     const r = this.r();
     if (r < 0.3) { v.state = 'park'; v.dir = this.r() < 0.5 ? 1 : -1; v.s = v.dir > 0 ? 0 : path.len; v.timer = this.r() * 6; }
     else { v.state = 'fly'; v.dir = this.r() < 0.5 ? 1 : -1; v.s = path.len * (0.15 + this.r() * 0.7); }
+    if (opts.startAtB) { v.state = 'park'; v.dir = -1; v.s = path.len; v.timer = 0; }
     v.stop = v.state === 'park' ? (v.s <= 0 ? sA : sB) : null;
     sample(path, v.s, v.pos, v.hint);
     v.prevPos.copy(v.pos);
@@ -555,6 +596,17 @@ export class Traffic {
     // ships first: they need the biggest open spots
     for (const [a, b] of ships) if (L[a] && L[b]) this.addFlyer('ship', L[a], L[b]);
     for (const [a, b] of buses) if (L[a] && L[b]) this.addFlyer('bus', L[a], L[b]);
+    // last, so none of the lines above change: your town's shuttle, once it has built the Shuttle Pad
+    if (L.hometown && (L.hometown.slots || []).includes('pad')) this.addTownShuttle(L.hometown);
+  }
+
+  // Your town's shuttle: a bus from the pad on the Shuttle Pad plot to the nearest settlement it may fly to (opts as addFlyer). One at most;
+  // null when there is no pad, no such settlement, or the line already runs
+  addTownShuttle(loc, opts = {}) {
+    const pin = (loc.pads || []).find((p) => p.plot !== undefined);
+    const port = pin && this.nearestPort(loc);
+    if (!port || this.vehicles.some((v) => v.stops && v.stops[0].loc === loc)) return null;
+    return this.addFlyer('bus', loc, port, { ...opts, pinA: pin });
   }
 
 
