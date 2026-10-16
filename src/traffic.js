@@ -117,7 +117,13 @@ function chaikin(pts, passes) {
 
 function roadMaterial() {
   return new THREE.ShaderMaterial({
-    transparent: true, depthWrite: false, side: THREE.DoubleSide,
+    // A ground decal: blended like a transparent surface, but kept in the opaque queue and drawn right after the terrain
+    // (the terrain is renderOrder -1, the road -0.5, everything else 0). A transparent road was drawn after every opaque
+    // object, and its plane (4 cm over the ground) covered whatever sank below it: the soles of the player's boots, rocks'
+    // feet. Drawn this way it only has to beat the terrain, and whatever is drawn after it simply goes over it.
+    transparent: false, depthWrite: false, side: THREE.DoubleSide,
+    blending: THREE.CustomBlending, blendSrc: THREE.SrcAlphaFactor, blendDst: THREE.OneMinusSrcAlphaFactor,
+    blendSrcAlpha: THREE.OneFactor, blendDstAlpha: THREE.OneMinusSrcAlphaFactor,
     uniforms: { sunDir: { value: SUN.clone() } },
     vertexShader: `uniform vec3 sunDir; attribute float fade; attribute float mark; attribute float berm; attribute float soft; attribute float wid; varying vec2 vUv; varying float vLit; varying float vFade; varying float vEnd; varying float vMark; varying float vBerm; varying float vSoft; varying float vWid;
       void main(){
@@ -804,7 +810,7 @@ export class Traffic {
     const mesh = new THREE.Mesh(geo, this.roadMesh ? this.roadMesh.material : roadMaterial());
     mesh.matrixAutoUpdate = false;
     mesh.frustumCulled = false;
-    mesh.renderOrder = 1;
+    mesh.renderOrder = -0.5; // (after the terrain, before everything else: see roadMaterial)
     this.w.scene.add(mesh);
     if (!this.roadMesh) this.roadMesh = mesh;
     const n = this.posts.length;

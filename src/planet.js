@@ -385,6 +385,7 @@ diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.93, 0.9, 0.86), rimChip * rimCor
     geo.computeBoundingSphere();
     const mesh = new THREE.Mesh(geo, this.material);
     mesh.receiveShadow = true;
+    mesh.renderOrder = -1; // (the road decal, renderOrder -0.5 in traffic.js, draws right after the terrain and before everything else)
     // hills block the sun again (without it, a rock's shadow fell straight through the hill and
     // landed a second time beyond it); only their far sides cast (material.shadowSide), so a
     // sunlit slope can't shadow itself into jagged blotches. Only the two detailed levels cast: a
