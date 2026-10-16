@@ -13,6 +13,7 @@ import { FACTIONS } from './locations.js';
 import { saveWorldState } from './worldstate.js';
 import { SAP_NAMES } from './territory.js';
 import { ITEMS } from './alchemy.js';
+import { VEHICLES } from './vehicles.js';
 import { terminalPage, wireTerminal, stepSel, keepScroll } from './terminalUI.js';
 import { glyphHtml } from './glyphs.js';
 
@@ -77,6 +78,11 @@ export const MOTIONS = {
 const COUNCIL = ['spacecom', 'vostok', 'daedalus', 'meridian', 'kepler'];
 const VOTE_CD = 8 * 60 * 1000; // between votes (real time; the radio tower halves it)
 const SAPLING_CD = 5 * 60 * 1000; // between saplings from the farm (real time like the votes, so a reload cannot farm them: ws.town.sapNext)
+// The militia: nothing in the game besieges a town (pirates hunt YOU), so "attacked" is raiders reaching the town's gates: ALERT_HOLD seconds
+// of a hunter or raider inside ALERT_R of the hall (the barracks' guns reach 400 m). The two rovers stay out MILITIA_STAY seconds at most, or
+// until it has been quiet MILITIA_CLEAR seconds, and can be called again after MILITIA_CD (real time from the call: ws.town.defNext).
+const ALERT_R = 300, ALERT_HOLD = 1.5, MILITIA_STAY = 120, MILITIA_CLEAR = 12;
+const MILITIA_CD = 10 * 60 * 1000;
 const mmss = (ms) => { const s = Math.ceil(ms / 1000); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; };
 
 // ---------------------------------------------------------------------------------------------
@@ -306,7 +312,9 @@ export function addBuilding(world, loc, i, type) {
 // than in the page code.
 // ---------------------------------------------------------------------------------------------
 // more buttons on a built building's detail screen (numbered with the rest): type -> (t) => [{ id, label, short, tone, fn }]
-const EXTRAS = {};
+const EXTRAS = {
+  motorpool: (t) => t.powered() ? [{ id: 'garage', label: 'VEHICLES...', short: 'VEHICLES...', tone: 'go', fn: () => { t.leave(); t.garageMenu(() => t.back()); return { takeover: true }; } }] : [],
+};
 // the live rows under a built building's text: type -> (t) => { rows: [[label, value, tone?]], meter?, note? }
 const pays = (k) => () => ({ rows: [['INCOME', `₵${BUILDINGS[k].income} a minute`], ['BANK HOLDS', `₵${BANK_CAP}`]], note: 'Nothing to press: it pays into the town bank.' });
 const LIVE = {
@@ -321,7 +329,15 @@ const LIVE = {
       note: 'The healing and the income work by themselves. The nursery bench in front of the domes gives a sapling for your jar (F), free of reputation cost.',
     };
   },
-  motorpool: (t) => ({ rows: [['VEHICLE', 'Homestead Mule'], ['SUMMON', 'Press V anywhere'], ['STATUS', t.game.story.vehicles.includes('mule') ? 'UNLOCKED' : 'NOT UNLOCKED'], ['REPAIRS', 'Vehicles patched up in town']], note: 'Nothing to press: call it with V.' }),
+  motorpool: (t) => {
+    const on = t.powered(), mw = t.militiaWait();
+    return {
+      rows: [['STATUS', on ? 'READY' : 'NO POWER', on ? '' : 'bad'], ['MILITIA', mw > 0 ? `back in ${Math.ceil(mw / 60000)} min` : 'READY', mw > 0 ? 'dim' : 'gold'],
+        ['VEHICLES', `${t.game.garage.owned().length} IN THE BAYS`], ['REPAIRS', 'Vehicles patched up in town']],
+      note: on ? 'Roll a vehicle out with the button below, or at the door (F). V still calls your last one from anywhere. Two militia rovers roll out when raiders reach the town.'
+        : 'The motor pool has no power: its door and its militia are shut down.',
+    };
+  },
   barracks: () => ({ rows: [['GUNS', '2 militia guns'], ['RANGE', '400 m round town'], ['FIRE', '28 dmg + splash, every 0.8 s'], ['TARGETS', 'Pirates']], note: 'Nothing to press: the guns fire by themselves.' }),
   // (the ring road and its links are laid at load for now: until then the plot only has the road crew's depot)
   roads: (t) => {
@@ -349,6 +365,8 @@ const ON_BUILT = {
 const POINTS = [
   { id: 'hall', at: (t) => t.terminal, r: 4.5, use: (t) => ({ prompt: '<b>F</b> — MOON COUNCIL HALL', act: () => t.menu() }) },
   { id: 'farm', at: (t) => t.spot('farm'), r: 4.5, use: (t) => t.farmUse() },
+  // (driving past the door: F is the job board's, as anywhere else in town)
+  { id: 'garage', at: (t) => t.spot('motorpool'), r: 5, use: (t, P) => P.vehicle || P.rag ? null : t.powered() ? { prompt: '<b>F</b> — MOTOR POOL: YOUR VEHICLES', act: () => t.garageMenu() } : { prompt: 'MOTOR POOL — NO POWER' } },
 ];
 
 // ---------------------------------------------------------------------------------------------
@@ -362,6 +380,7 @@ export class HomeTown {
     this.saveT = 0;
     this.spots = {}; // building type -> where you stand to use it (world position; see spot())
     this.sprouts = null; // the nursery bench's grown saplings (syncFarm)
+    this.def = { rovers: [], hold: 0, scanT: 0, until: 0, seen: 0 }; // the militia call-out (callMilitia): its rovers, seconds of raiders at the gates, the 4 Hz scan clock, when it ends, when raiders were last seen
     this.skin = 'hall'; // where the page is showing: 'hall' (the terminal's dialog) or 'board' (the job board's tab)
     this.ui = null; // the page as last drawn: { sel, acts }
     this.view = null; // the board tab's next paint: { sel, msg, tone }
@@ -454,6 +473,99 @@ export class HomeTown {
     let s = this.sprouts;
     if (!s || s.parent !== this.loc.group) s = this.sprouts = this.loc.group.getObjectByName('sprouts'); // (the town's group is rebuilt when a council motion reshapes it)
     if (s) s.visible = this.saplingWait() <= 0;
+  }
+
+  // ---------- the motor pool: your vehicles, and the militia ----------
+  // The one hook for the pending garage power source: whatever ends up powering the garage (a building, an upgrade, a story flag) is
+  // checked here, and the door, the page's button and the militia all stop without it. (Gate V in Garage.toggle if it ever needs one: the
+  // physical garage is the always-on way to a vehicle, so deploy() goes to Garage.summon directly.)
+  powered() { return true; }
+
+  // the vehicles you own, each one rolled out of the bay on its number key. back: where CLOSE (and Escape) go when the page that opened this
+  // one is to come back (the hall's page: a takeover, its exit is back()); at the door it just closes
+  garageMenu(back = null) {
+    const g = this.game, G = g.garage, own = G.owned(), mw = this.militiaWait();
+    const buttons = own.map((id, i) => {
+      const cd = G.cooldown(id);
+      return { label: `${i + 1} · ${VEHICLES[id].name.toUpperCase()} — ${cd > 0 ? `REBUILDING ${Math.ceil(cd)} s` : `HULL ${Math.ceil(G.hp[id] ?? G.maxHp(id))}/${G.maxHp(id)}`}`, fn: () => this.deploy(id) };
+    });
+    buttons.push({ label: `${own.length + 1} · CLOSE`, fn: back || undefined });
+    g.dialog(`${this.state.name.toUpperCase()} · MOTOR POOL`,
+      (own.length ? '<small>Pick a vehicle to roll out of the bay. (V calls the last one you used from anywhere.)</small>' : 'The bays are empty. Vehicles come from the faction leaders as you rise in their story.')
+      + `<br><br><small>Militia rovers on call: <b>${mw > 0 ? `back in ${Math.ceil(mw / 60000)} min` : 'READY'}</b></small>`, buttons);
+  }
+
+  // roll a vehicle out of the bay, nose to the plaza, and climb in. It skips Garage.canSummon on purpose (grounded, slow): the garage is a
+  // place you walk up to, and it sets the vehicle down where it was built to stand, not beside you
+  deploy(id) {
+    const g = this.game, G = g.garage, P = g.player;
+    if (P.vehicle || P.rag || P.dead || !this.has('motorpool') || !this.powered() || !VEHICLES[id]) return;
+    if (G.cooldown(id) > 0) { g.hud.toast(`${VEHICLES[id].name} is being rebuilt: ready in ${Math.ceil(G.cooldown(id))} s.`, 2.5); return; }
+    const at = this.pt('motorpool', BAY.x, BAY.z);
+    G.choice = id;
+    G.summon(id, at, this.pt('motorpool', BAY.x, BAY.z + 30).sub(at));
+    G.enter();
+  }
+
+  // Raiders at the gates: a hunter, a raider or a chapter's troops (not a den guard, which keeps to its lair, nor a pirate who is friendly to
+  // you) within ALERT_R of the hall. Nothing besieges the town by itself: pirates come for YOU, and this is when they bring it to the gates.
+  raiders() {
+    const g = this.game, hall = this.loc.pos, out = [];
+    for (const e of g.enemies.list) {
+      if (e.dead || e.faction !== 'pirate' || e.kind === 'core' || e.home || !e.center || g.enemies.friendly(e)) continue;
+      if (e.center.distanceTo(hall) < ALERT_R) out.push(e);
+    }
+    return out;
+  }
+
+  militiaWait() {
+    const st = this.state, now = Date.now();
+    if (st.defNext > now + MILITIA_CD) st.defNext = now + MILITIA_CD; // (a clock set back since the call must not lock the militia: no wait is longer than the clock, and the saved value is corrected too)
+    return Math.max(0, (st.defNext || 0) - now);
+  }
+
+  // Two Kepler militia rovers (enemies.spawnAlly: the backup the chapters send, in Kepler's colours. Nothing of yours or theirs hits you or
+  // them; the pirates do) roll out of the bay, hunt what is at the gates and stand down when it is quiet. The wait starts now, not at the
+  // stand-down, so a fight that drags on does not hold the next call back any less
+  callMilitia() {
+    const g = this.game, st = this.state;
+    st.defNext = Date.now() + MILITIA_CD;
+    saveWorldState(this.ws);
+    const anchor = this.pt('motorpool', BAY.x, BAY.z + 12); // (where they regroup between targets: the plaza side of the bay)
+    for (let i = 0; i < 2; i++) {
+      const e = g.enemies.spawnAlly('rover', this.pt('motorpool', BAY.x + (i ? 3.4 : -3.4), BAY.z - 2), 'kepler', anchor);
+      e.keep = true; // (a chapter's end clears its backup: enemies.removeAllies leaves these)
+      this.def.rovers.push(e);
+    }
+    this.def.until = g.time + MILITIA_STAY;
+    this.def.seen = g.time;
+    g.hud.alert(`${st.name.toUpperCase()} UNDER ATTACK — MILITIA ROLLING OUT!`, '#ff9f1c', 3);
+    g.audio.alarm();
+  }
+
+  standDown() {
+    const g = this.game;
+    for (const e of this.def.rovers) if (!e.dead) { e.dead = true; e.model.root.removeFromParent(); g.fx.pop('MILITIA STANDING DOWN', e.center.clone().addScaledVector(e.body.up, 4), { color: '#ff9f1c', size: 36, life: 1.6 }); }
+    this.def.rovers = []; // (the enemies list drops dead entries by itself)
+  }
+
+  // four times a second: call the militia when raiders have been at the gates a moment, and send it home when it has gone quiet, or its time
+  // is up, or the motor pool lost its power
+  updateMilitia(dt) {
+    const g = this.game, D = this.def;
+    D.scanT -= dt;
+    if (D.scanT > 0) return;
+    D.scanT = 0.25;
+    if (!this.has('motorpool') || !this.powered()) { if (D.rovers.length) this.standDown(); return; }
+    const hot = this.raiders().length > 0;
+    if (D.rovers.length) {
+      D.rovers = D.rovers.filter((e) => !e.dead);
+      if (hot) D.seen = g.time;
+      if (!D.rovers.length || g.time > D.until || g.time - D.seen > MILITIA_CLEAR) this.standDown();
+      return;
+    }
+    D.hold = hot ? D.hold + 0.25 : 0; // (the first scan that sees them only starts the count: they have held ALERT_HOLD seconds on the seventh)
+    if (D.hold > ALERT_HOLD && this.militiaWait() <= 0 && !g.player.dead) { D.hold = 0; this.callMilitia(); }
   }
 
   // ---------- the hall's page ----------
@@ -708,7 +820,7 @@ export class HomeTown {
     if (this.saveT <= 0) { this.saveT = 30; saveWorldState(this.ws); }
     const d = P.pos.distanceTo(this.loc.pos);
     if (this.has('farm') && d < this.loc.r && !P.dead) P.health = Math.min(P.maxHealth, P.health + 4 * dt);
-    if (d < 1200) this.syncFarm();
+    if (d < 1200) { this.syncFarm(); this.updateMilitia(dt); } else if (this.def.rovers.length) this.standDown();
     if (this.has('motorpool') && d < this.loc.r && g.garage) for (const k of Object.keys(g.garage.hp || {})) g.garage.hp[k] = Math.min(g.garage.maxHp(k), g.garage.hp[k] + 20 * dt);
     if (this.has('barracks') && d < 1200) {
       this.fireCd -= dt;
