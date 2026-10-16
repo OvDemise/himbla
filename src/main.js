@@ -42,6 +42,7 @@ import { Winch } from './winch.js';
 import { Powers } from './powers.js';
 import { Tutorial } from './tutorial.js';
 import { Recall } from './recall.js';
+import { Respawn } from './respawn.js';
 import { Secrets } from './secrets.js';
 import { Settings } from './settings.js'; // settings
 import { Casino } from './casino.js'; // casino
@@ -260,6 +261,7 @@ class Game {
     this.territory = new Territory(this);
     this.story = new Story(this);
     this.town = new HomeTown(this); // your town and the Moon Council (Kepler story)
+    this.respawnPt = new Respawn(this); // where a K.O. puts you: the headquarters you set at your clinic, else your nearest clinic, else home
     this.spindle = new Spindle(this); // Meridian's finale: the asteroid (the Moon is frozen while you're there)
     this.assetRow = null; // the dev menu's flat showroom, made on first use (cheats.js, assetRow.js; not in a release build)
     this.garage = new Garage(this);
@@ -809,7 +811,9 @@ class Game {
       alien: 'Vaporised by the mothership. It does not want you to have that core.',
       void: 'You fell off the Spindle into the dark.',
     };
-    this.hud.death(`${causes[cause] || 'Knocked out.'} Med-evac fee: ₵${fee}`, this.spindle && this.spindle.active ? 'Click or press ENTER to call the recovery transit.' : null);
+    const spin = this.spindle && this.spindle.active;
+    const plan = spin ? null : this.respawnPt.plan(P.pos.clone().normalize()); // (the card says where you will wake up)
+    this.hud.death(`${causes[cause] || 'Knocked out.'} Med-evac fee: ₵${fee}`, spin ? 'Click or press ENTER to call the recovery transit.' : `Click or press ENTER to redeploy at ${plan.name}.${plan.note ? ' ' + plan.note : ''}`);
     this.state = 'dead';
     this.releasing = true;
     this.input.unlock();
@@ -830,14 +834,8 @@ class Game {
     this.enemies.clearPirates();
     this.enemies.forgive();
     this.projectiles.clear();
-    // redeploy at your nearest clinic outpost if you have one, otherwise the ILMB
-    const clinic = this.story.clinicSpawn(this.player.pos.clone().normalize());
-    if (clinic) this.story.teleportTo(clinic.dir);
-    else {
-      const h = this.home();
-      this.player.respawn(h.point, h.facing);
-      this.cam.fwd.copy(h.facing);
-    }
+    // redeploy at the headquarters you set, else your nearest clinic, else home (respawn.js)
+    this.respawnPt.deploy(this.respawnPt.plan(this.player.pos.clone().normalize()));
     this.state = 'play';
     this.input.lock();
   }

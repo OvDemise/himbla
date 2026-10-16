@@ -279,13 +279,23 @@ export function addBuilding(world, loc, i, type) {
 // than in the page code.
 // ---------------------------------------------------------------------------------------------
 // more buttons on a built building's detail screen (numbered with the rest): type -> (t) => [{ id, label, short, tone, fn }]
-const EXTRAS = {};
+const EXTRAS = {
+  // the picker is a screen of its own: the page is left first, and what you chose comes back to it as its message (back(msg, tone, tile))
+  clinic: (t) => [{ id: 'respawn', label: 'SET RESPAWN POINT...', short: 'SET RESPAWN...', tone: 'go', fn: () => { t.leave(); t.game.respawnPt.menu((msg, tone) => t.back(msg, tone, 'clinic')); return { takeover: true }; } }],
+};
 // the live rows under a built building's text: type -> (t) => { rows: [[label, value, tone?]], meter?, note? }
 const pays = (k) => () => ({ rows: [['INCOME', `₵${BUILDINGS[k].income} a minute`], ['BANK HOLDS', `₵${BANK_CAP}`]], note: 'Nothing to press: it pays into the town bank.' });
 const LIVE = {
   housing: pays('housing'),
   market: pays('market'),
-  clinic: () => ({ rows: [['EFFECT', 'You redeploy here after a K.O.'], ['NEAREST', 'The nearest clinic wins']], note: 'Nothing to press: it works when you are K.O.ed.' }),
+  // (a choice that will not take you in is told here too: the page has no room for the plan's note beside the button)
+  clinic: (t) => {
+    const g = t.game, R = g.respawnPt, plan = R.plan(g.player.pos.clone().normalize()), l = R.id && g.locations.find((x) => x.id === R.id);
+    const rows = [['REDEPLOY AT', plan.name, plan.kind === 'hq' ? 'gold' : '']];
+    if (R.id && plan.kind !== 'hq') rows.push(['YOUR CHOICE', `${l ? l.name : 'Gone'} (${(l ? R.why(l) : 'GONE').toLowerCase()})`, 'bad']);
+    else if (plan.note) rows.push(['ARRIVE AT', 'The gate: no clearance inside', 'gold']);
+    return { rows };
+  },
   farm: () => ({ rows: [['EFFECT', 'Heals 4 hull a second in town'], ['INCOME', `₵${BUILDINGS.farm.income} a minute`]], note: 'Nothing to press: it works while you stand in town.' }),
   motorpool: (t) => ({ rows: [['VEHICLE', 'Homestead Mule'], ['SUMMON', 'Press V anywhere'], ['STATUS', t.game.story.vehicles.includes('mule') ? 'UNLOCKED' : 'NOT UNLOCKED'], ['REPAIRS', 'Vehicles patched up in town']], note: 'Nothing to press: call it with V.' }),
   barracks: () => ({ rows: [['GUNS', '2 militia guns'], ['RANGE', '400 m round town'], ['FIRE', '28 dmg + splash, every 0.8 s'], ['TARGETS', 'Pirates']], note: 'Nothing to press: the guns fire by themselves.' }),
@@ -313,6 +323,8 @@ const ON_BUILT = {
 // use(t, player) the prompt and what F does (null: nothing here)
 const POINTS = [
   { id: 'hall', at: (t) => t.terminal, r: 4.5, use: (t) => ({ prompt: '<b>F</b> — MOON COUNCIL HALL', act: () => t.menu() }) },
+  // (no page behind the picker here: what you chose is a toast, in the world you are back in)
+  { id: 'clinic', at: (t) => t.spot('clinic'), r: 5, use: (t) => ({ prompt: '<b>F</b> — CLINIC: SET YOUR RESPAWN POINT', act: () => t.game.respawnPt.menu((msg) => { if (msg) t.game.hud.toast(msg, 3); }) }) },
 ];
 
 // ---------------------------------------------------------------------------------------------
@@ -490,7 +502,13 @@ export class HomeTown {
 
   // an act that opens a screen of its own closes the page first (leave()), and that screen's exit comes back to it (back())
   leave() { const g = this.game; if (g.state === 'board' || g.state === 'dialog') g.closeModal(false); }
-  back() { if (this.skin === 'board') this.game.openBoard(this.loc, 'town'); else this.menu(this.ui && this.ui.sel); }
+  // msg / tone: what the screen that was left has to say (shown once, under the buttons); sel: the tile it belongs to (a digit key can have
+  // started it from another tile)
+  back(msg = '', tone = 'ok', sel = null) {
+    sel = sel || (this.ui && this.ui.sel);
+    this.quietUntil = msg ? performance.now() + 400 : 0; // (as show(): the second half of a double-click is not meant for the page that is back)
+    if (this.skin === 'board') { this.view = { sel, msg, tone }; this.game.openBoard(this.loc, 'town'); } else this.menu(sel, msg, tone);
+  }
 
   // the chamber's first draw is the slow part of a vote: it is warmed up while the page is read (nothing to warm yet)
   warm() {}
