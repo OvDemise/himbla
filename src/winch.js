@@ -18,7 +18,8 @@
 //
 // The cable bends round structures like a rope round pegs: every 20th of a second it checks each leg of its path for a structure in the
 // way and, if there is one, bends round it: a box at the best point along its edges, a cylinder or sphere along an arc from tangent to tangent
-// (a round tower is a chain of bend points, counted as one structure; up to WRAP_MAX structures, then the cable strains against the next until it slips),
+// (a round tower is a chain of bend points, counted as one structure; up to WRAP_MAX structures). Slim things (a column, a rail) don't bend it,
+// a bend point has to be out in the open, and what it can't be bent round it passes through; your own physics and the pull sort the rest out,
 // and lets a bend go once the straight line past it has been clear, with room to spare, for a moment. You are pulled along the first
 // leg and the hook along the last. If the drum is running and you are not coming in (something solid is in the way) the cable strains,
 // creaking louder and higher while the pull builds to yank you free, and slips off after STRAIN_MAX seconds.
@@ -47,7 +48,7 @@ const MIN_STRUCT_R = 2.5; // (smaller colliders are props and rocks, not structu
 const EMBED = 0.42;      // how far the claw is driven into the surface it bites
 const EYE_OUT = 1.08;    // the grapple's eye, this far back from its tip along the shank (the cable ends there)
 const SLOT = { gold: 0xffd23f, steel: 0x9aa3b2, dark: 0x2a2540, tracer: 0xff9f1c }; // (the Kepler orange tracer strand is in every cable)
-const WRAP_MAX = 5;      // the cable bends round at most this many different structures; one more and it snags
+const WRAP_MAX = 5;      // the cable bends round at most this many different structures; it passes through any further ones
 const WRAP_PTS = 40;     // ... and has at most this many bend points in all (a round structure takes a chain of them)
 const WRAP_MIN_R = 4;    // (only structures this big, by bounding radius, bend it: boulders and props smaller than that don't)
 const WRAP_EVERY = 0.05; // seconds between wrap checks (20 Hz)
@@ -85,7 +86,7 @@ const ZERO = new THREE.Vector3();
 const _up = new THREE.Vector3(); // (the way you are pulled along the cable)
 const _ut = new THREE.Vector3(); // (the way the hook is)
 const _upv = new THREE.Vector3();
-const _hA = new THREE.Vector3(), _hB = new THREE.Vector3();
+const _hA = new THREE.Vector3(), _hB = new THREE.Vector3(), _lat = new THREE.Vector3();
 
 // what's worth hooking, and how heavy it is
 function massOf(v) {
@@ -264,19 +265,28 @@ function colliderPoint(c, p, out, nOut) {
 const _v1 = new THREE.Vector3(), _v2 = new THREE.Vector3(), _fd = new THREE.Vector3(), _e1 = new THREE.Vector3(), _e2 = new THREE.Vector3();
 const _oa = new THREE.Vector3(), _ob = new THREE.Vector3(), _wq = [];
 let _ws = 0;
+let _ignore = null; // structures this cable has given up wrapping: it passes through them (set by tendWraps while it works)
+
+// Too thin to bend a cable: a slim column, a rail, a post (judged by thickness, not height: a 14 m pillar is tall, not big). The
+// cable passes such things; wrapping it round one only ties you in knots.
+function thin(c) {
+  if (c.type === 'cyl') return c.r < 1.6;
+  if (c.type === 'sphere') return c.r < 2;
+  return Math.min(c.hx, c.hy, c.hz) < 0.6;
+}
 
 // The nearest structure the straight line a->b runs into, as { c, t }, or null. The first and last `skip` metres don't count (the
 // hook's own surface, a wall you are standing against), and a line that starts inside a collider isn't stopped by it. With `only`,
 // just that collider is tested. Colliders sit in a 64 m grid and are filed under every cell their bounds touch, so a sample
 // every 24 m along the line finds every one the line could meet.
-function blocker(cols, a, b, skip = 0.35, only = null) {
+function blocker(cols, a, b, skip = 0.35, only = null, endSkip = skip) {
   _fd.subVectors(b, a);
   const L = _fd.length();
   if (L < 1) return null;
   _fd.divideScalar(L);
   if (only) {
     const t = rayCollider(only, a, _fd, L);
-    return t > skip && t < L - skip ? { c: only, t } : null;
+    return t > skip && t < L - endSkip ? { c: only, t } : null;
   }
   let best = null, bt = Infinity;
   _ws++;
@@ -286,16 +296,24 @@ function blocker(cols, a, b, skip = 0.35, only = null) {
     for (const c of cols.query(_v1, 1, _wq)) {
       if (c._ws === _ws) continue;
       c._ws = _ws;
-      if (c.platform || c.br < WRAP_MIN_R) continue;
+      if (c.platform || c.br < WRAP_MIN_R || thin(c) || (_ignore && _ignore.has(c))) continue;
       const t = rayCollider(c, a, _fd, L);
-      if (t > skip && t < L - skip && t < bt) { bt = t; best = c; }
+      if (t > skip && t < L - endSkip && t < bt) { bt = t; best = c; }
     }
   }
   return best ? { c: best, t: bt } : null;
 }
 
-// Is the line a->b clear with `r` metres to spare on every side? (the centre line and four lines r off it)
-function clearFat(cols, a, b, r) {
+// Is p out in the open (no structure within 0.3 m of it)? A bend point inside a wall is a point you can never be drawn to.
+const _fq = [];
+function pointFree(cols, p) {
+  for (const c of cols.query(p, 1, _fq)) if (!c.platform && cols.contact(c, p, 0.3, _nv) > 0) return false;
+  return true;
+}
+
+// Is the line a->b clear with `r` metres to spare on every side? (the centre line and four lines r off it). A line that ends on a wall
+// at a shallow angle always grazes it near the end, so for the offset lines the last `endSkip` metres don't count.
+function clearFat(cols, a, b, r, endSkip = 0.35) {
   if (blocker(cols, a, b)) return false;
   _e1.subVectors(b, a).normalize();
   _e2.copy(a).normalize().cross(_e1);
@@ -306,7 +324,7 @@ function clearFat(cols, a, b, r) {
     const e = k < 2 ? _e1 : _e2, sg = k % 2 ? -r : r;
     _oa.copy(a).addScaledVector(e, sg);
     _ob.copy(b).addScaledVector(e, sg);
-    if (blocker(cols, _oa, _ob)) return false;
+    if (blocker(cols, _oa, _ob, 0.35, null, endSkip)) return false;
   }
   return true;
 }
@@ -490,7 +508,7 @@ export class Winch {
     let off, n;
     if (T.root) { _rinv.copy(T.root.matrixWorld).invert(); off = point.clone().applyMatrix4(_rinv); n = nrm.clone().transformDirection(_rinv); } // (the pose it was found in)
     else { off = point.clone().sub(T.pos()); n = nrm.clone(); }
-    return { target: T, off, goal: off.clone(), nrm: n, looked, dist, len: dist, t: 0, reel: 0, wraps: [], free: [], grp: [], wT: 0, strain: 0, creakT: 0, snagged: false };
+    return { target: T, off, goal: off.clone(), nrm: n, looked, dist, len: dist, t: 0, reel: 0, wraps: [], free: [], grp: [], ignore: new Set(), bends: new Map(), wT: 0, strain: 0, creakT: 0, snagged: false };
   }
 
   // where a handle's hook point is now
@@ -617,15 +635,21 @@ export class Winch {
   }
 
   // Twenty times a second: let go of any bend the cable has straightened past, and bend it round any structure it has run into (a
-  // corner or edge for a box, an arc for a cylinder or sphere). Returns 'changed', 'snag' (no bend left to take) or null.
+  // corner or edge for a box, an arc for a cylinder or sphere). Returns 'changed' or null. A structure it can't bend round (no free place to
+  // bend, the cap, still in the way after a bend or two) is given up on: the cable passes through it.
   tendWraps(o) {
+    try { return this.tendWrapsIn(o); } finally { _ignore = null; }
+  }
+
+  tendWrapsIn(o) {
     const cols = this.game.colliders, P = this.path, n = o.wraps.length;
+    _ignore = o.ignore;
     // letting go: only the ends of a run of bends round one structure can (the middle of an arc is held by the structure itself); with
     // you right up at the bend only a clear line is needed, otherwise the line past it must be clear with room to spare
     for (let k = n - 1; k >= 0; k--) {
       if (!(k === 0 || k === n - 1 || o.grp[k - 1] !== o.grp[k] || o.grp[k + 1] !== o.grp[k])) continue;
       const fat = Math.min(P[k].distanceTo(P[k + 1]), P[k + 1].distanceTo(P[k + 2])) < 2.5 ? 0.1 : UNWRAP_FAT;
-      if (clearFat(cols, P[k], P[k + 2], fat)) {
+      if (clearFat(cols, P[k], P[k + 2], fat, k === n - 1 ? 3 : 0.35)) { // (the hook end: a shallow line to the hook's own surface grazes it)
         o.free[k] += WRAP_EVERY;
         if (o.free[k] >= UNWRAP_HOLD) { o.wraps.splice(k, 1); o.free.splice(k, 1); o.grp.splice(k, 1); this.ropeDirty = true; return 'changed'; }
       } else o.free[k] = 0;
@@ -633,23 +657,31 @@ export class Winch {
     // bending: each leg is checked, bar the chords between two points of one arc (those can't be blocked by what they hug)
     for (let i = 0; i < this.pathN - 1; i++) {
       if (i >= 1 && i <= n - 1 && o.grp[i - 1] === o.grp[i]) continue;
-      const hit = blocker(cols, P[i], P[i + 1]);
+      // (the leg that ends on the hook forgives the last 2.5 m, as the targeting does: a ledge or a rail overlapping the wall you hooked
+      // is not in the way of a cable that is about to land)
+      const hit = blocker(cols, P[i], P[i + 1], 0.35, null, i === this.pathN - 2 ? 2.5 : 0.35);
       if (!hit) continue;
-      if (!o.grp.includes(hit.c) && new Set(o.grp).size >= WRAP_MAX) return 'snag';
+      // (what the cable can't be bent round it passes through, and your own physics and the pull sort the rest out: more structures than
+      // the cap, a structure that is still in the way after it has been bent round, no free place to bend)
+      const bends = o.bends.get(hit.c) || 0;
+      if ((!o.grp.includes(hit.c) && new Set(o.grp).size >= WRAP_MAX) || bends >= (hit.c.type === 'box' ? 4 : 2)) { o.ignore.add(hit.c); continue; }
       const A = P[i], B = P[i + 1];
       const before = this.pathLen();
       let pts = hit.c.type === 'cyl' || hit.c.type === 'sphere' ? arcPoints(hit.c, A, B) : null;
+      if (pts && !pts.every((q) => pointFree(cols, q))) pts = null; // (an arc through something else won't do: try the edges)
       if (!pts) {
         let best = null, bs = -Infinity;
         for (const p of wrapCandidates(hit.c, A, B)) {
           if (p.distanceTo(A) < 0.8 || p.distanceTo(B) < 0.8) continue;
           const clear = (blocker(cols, A, p, 0.35, hit.c) ? 0 : 1) + (blocker(cols, p, B, 0.35, hit.c) ? 0 : 1);
+          if (!pointFree(cols, p)) continue; // (a bend point has to be out in the open, or you could never be drawn to it)
           const score = clear * 1000 - (A.distanceTo(p) + p.distanceTo(B)); // (both legs clear first, then the shortest way round)
           if (score > bs) { bs = score; best = p; }
         }
         pts = best ? [best] : null;
       }
-      if (!pts || n + pts.length > WRAP_PTS) return 'snag';
+      if (!pts || n + pts.length > WRAP_PTS) { o.ignore.add(hit.c); continue; }
+      o.bends.set(hit.c, bends + 1);
       o.wraps.splice(i, 0, ...pts);
       o.free.splice(i, 0, ...pts.map(() => 0));
       o.grp.splice(i, 0, ...pts.map(() => hit.c));
@@ -658,6 +690,7 @@ export class Winch {
       o.len += Math.max(0, this.pathLen() - before); // (the drum pays out the extra the bends take, so a new wrap doesn't jerk you)
       return 'changed';
     }
+    _ignore = null;
     return null;
   }
 
@@ -688,7 +721,7 @@ export class Winch {
     if ((o.wT -= dt) <= 0) {
       o.wT = WRAP_EVERY;
       const r = this.tendWraps(o);
-      o.snagged = r === 'snag'; // (no bend left to take: the cable stays on its straight line, through the structure, and strains)
+      o.snagged = r === 'snag'; // (kept for the strain rule below; tendWraps gives up on a structure now, and the cable passes through it)
     }
     const nP = this.pathN;
     let len = this.pathLen();
@@ -730,6 +763,17 @@ export class Winch {
     else if (o.reel > 0.5 && len - o.len > LEAD * 0.5 && closeNow < 1) o.strain = Math.min(STRAIN_MAX, o.strain + dt);
     else o.strain = Math.max(0, o.strain - dt * 1.5);
     if (o.strain > 0.3 && (o.creakT -= dt) <= 0) { o.creakT = 0.28; g.audio.tone(170 + (o.strain / STRAIN_MAX) * 260, 0.1, 'sawtooth', 0.03 + 0.03 * (o.strain / STRAIN_MAX), 1.4); }
+    // (and while it strains, a jostle: a small sideways wiggle and lift on the pull, growing with the strain, so that a player wedged against
+    // a wall or a corner slides free of it and the pull carries on, instead of sitting pinned by a taut line)
+    if (o.strain > 0.25) {
+      const k = o.strain / STRAIN_MAX;
+      _lat.crossVectors(_up, upAt(P.pos, _upv));
+      if (_lat.lengthSq() > 1e-6) {
+        _lat.normalize();
+        P.vel.addScaledVector(_lat, Math.sin(o.t * 6) * (6 + 12 * k) * dt);
+        P.vel.addScaledVector(_upv, (3 + 6 * k) * dt);
+      }
+    }
     if (o.strain >= STRAIN_MAX) { this.release(); g.hud.toast(o.snagged ? 'The line snagged!' : 'The line slipped!', 1.5); g.audio.tone(300, 0.18, 'square', 0.07, 0.4); return; }
 
     if (len > o.len && len > 1e-3) {
