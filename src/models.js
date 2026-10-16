@@ -1343,7 +1343,7 @@ function bakeShip(root) {
 }
 
 const _shipHot = new THREE.Color();
-function makeShip(kind, { color, stripe }) {
+function makeShip(kind, { color, stripe, faction = 'kepler' }) {
   const B = SHIP_PARTS[kind];
   const add = { transparent: true, depthWrite: false, blending: THREE.AdditiveBlending };
   const fx = {
@@ -1360,16 +1360,28 @@ function makeShip(kind, { color, stripe }) {
     if (SHIP_GLOW[slot] !== undefined) return glow(SHIP_GLOW[slot]);
     return toon(SHIP_TOON[slot] ?? 0xff00ff);
   };
+  // The land-train's own cargo units ride in the freighter's bays (the box, the Helium-3 tanker, the explosives magazine: build_ships.py,
+  // cargo.py). Under a `cargo` pivot every slot takes the land-train's palette in the faction the freighter serves, and only that
+  // faction's `livery` pivots (its plates, numbers and marks) exist.
+  const pal = LAND_TRAIN_FACTIONS[faction] || LAND_TRAIN_FACTIONS.kepler;
+  const fac = LAND_TRAIN_FACTIONS[faction] ? faction : 'kepler';
+  const cargoMats = new Map();
+  const cargoMat = (slot) => {
+    if (!cargoMats.has(slot)) cargoMats.set(slot, slot in pal ? toon(pal[slot]) : LT_GLOW[slot] !== undefined ? glow(LT_GLOW[slot]) : toon(LT_TOON[slot] ?? 0xff00ff));
+    return cargoMats.get(slot);
+  };
   const rig = { legs: [], doors: [], ramps: [], hatches: [], plumes: [], lifts: [] };
-  const build = (node) => {
+  const build = (node, cargo = false) => {
+    if (node.role === 'livery' && node.data.faction !== fac) return null; // (the other factions' marks never exist)
+    cargo = cargo || node.role === 'cargo';
     const g = new THREE.Group();
     g.name = node.name;
     g.position.copy(node.pos);
     g.quaternion.copy(node.quat);
     for (const { slot, geo } of node.parts) {
-      const m = new THREE.Mesh(geo, matFor(slot));
-      m.castShadow = !SHIP_FX.has(slot) && SHIP_GLOW[slot] === undefined;
-      if (FLAMES.has(slot)) m.renderOrder = 2;
+      const m = new THREE.Mesh(geo, cargo ? cargoMat(slot) : matFor(slot));
+      m.castShadow = cargo ? LT_GLOW[slot] === undefined && node.role !== 'livery' : !SHIP_FX.has(slot) && SHIP_GLOW[slot] === undefined;
+      if (!cargo && FLAMES.has(slot)) m.renderOrder = 2;
       g.add(m);
     }
     if (node.ink) {
@@ -1387,7 +1399,8 @@ function makeShip(kind, { color, stripe }) {
     else if (node.role === 'plume') rig.plumes.push({ g, phase: rig.plumes.length * 1.7 });
     else if (node.role === 'lift') rig.lifts.push({ g, phase: rig.lifts.length * 2.3 });
     for (const k of node.kids) {
-      const c = build(k);
+      const c = build(k, cargo);
+      if (!c) continue;
       g.add(c);
       if (leg && k.role === 'foot') leg.foot = c;
     }
@@ -2110,8 +2123,8 @@ export function makeHoverCar({ color = 0xff7ad9, trim = 0xfff4e0 } = {}) {
 // Freighter: a deep-haul hammerhead: a long flat deck you can ride, a raked bridge tower at the
 // bow, container racks down both flanks, swept radiator wings, a four-bell engine cluster, four
 // folding legs and a belly ramp.
-export function makeFreighter({ color = 0xb8b4c8, stripe = 0xff9f1c } = {}) {
-  return makeShip('freighter', { color, stripe });
+export function makeFreighter({ color = 0xb8b4c8, stripe = 0xff9f1c, faction = 'kepler' } = {}) {
+  return makeShip('freighter', { color, stripe, faction });
 }
 
 // Captain Kade's gun truck: a mad-max monster truck on huge tyres. Kade drives (open cab, roll

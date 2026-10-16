@@ -550,7 +550,9 @@ export class Traffic {
     const ship = kind === 'ship';
     const n = this.vehicles.length;
     // the rig (models.js) knows its own gear height, deck box, ramp path and pad size
-    const model = ship ? makeFreighter({ stripe: [0xff9f1c, 0xff2e88, 0x2ec4ff][n % 3] }) : makeShuttle({ stripe: [0x2ec4ff, 0xff9f1c, 0x7dff6a, 0xc77dff][n % 4] });
+    // (a freighter's cargo wears the livery of a faction whose town it serves, as the land-trains do)
+    const owners = [A, B].map((l) => l.faction).filter((f) => LAND_TRAIN_FACTIONS[f]);
+    const model = ship ? makeFreighter({ stripe: [0xff9f1c, 0xff2e88, 0x2ec4ff][n % 3], faction: owners.length ? owners[n % owners.length] : 'kepler' }) : makeShuttle({ stripe: [0x2ec4ff, 0xff9f1c, 0x7dff6a, 0xc77dff][n % 4] });
     const spec = ship
       ? { padR: model.padR, clearR: 31, heights: [3, 10, 20, 32], climb: 36 }
       : { padR: model.padR, clearR: 13, heights: [2, 7, 14], climb: 18 };
