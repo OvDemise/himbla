@@ -29,6 +29,44 @@ const TURRET_DOWN = -0.12, TURRET_UP = 0.75; // barrel travel (rad): a little de
 const AIM_RANGE = 300; // m the aim ray is followed for the spot the turret converges on
 const SUMMON_MAX_SPEED = 2; // m/s: the fastest the runner can be moving and still call a vehicle
 
+// A faction vehicle's model, as the Garage drives it (all but the light-bike's trail, which needs the live scene). Pure:
+// the Asset Row builds the same models with it.
+export function buildVehicleModel(id) {
+  const def = VEHICLES[id];
+  let m;
+  if (id === 'skimmer') {
+    // its own hover-racer model (it has a seat of its own, too)
+    m = makeSkimmer({ color: def.color, trim: def.trim });
+    return m;
+  }
+  if (id === 'apc') {
+    m = makeApc({ color: def.color, trim: def.trim });
+    m.root.scale.setScalar(def.scale);
+    return m; // (no seat-back: the runner is buttoned up inside)
+  }
+  if (def.bike) {
+    m = makeLightBike({ color: def.color, trim: def.trim });
+    return m; // (no seat-back: you ride it like a motorcycle)
+  } else {
+    m = makeRover({ color: def.color, trim: def.trim, pirate: !!def.pirate, flag: def.trim, style: def.pirate ? 'pirate' : def.id === 'mule' || def.cargoSafe ? 'civil' : 'military' });
+    if (def.hover) {
+      for (const w of m.wheels) w.visible = false;
+      for (const s of [-1, 1]) {
+        const pad = new THREE.Mesh(new THREE.CylinderGeometry(0.9, 1.1, 0.4, 12), glow(def.trim));
+        pad.position.set(s * 1.7, 0.5, 0);
+        m.root.add(pad);
+      }
+    }
+    if (def.scale) m.root.scale.setScalar(def.scale);
+  }
+  // a seat-back so the runner looks like they're driving
+  const seat = new THREE.Mesh(new THREE.BoxGeometry(1, 1.2, 0.3), toon(0x221d33));
+  ink(seat, 0.04);
+  seat.position.set(0, 2.4, -0.6);
+  if (!def.hideRider) m.root.add(seat);
+  return m;
+}
+
 export class Garage {
   constructor(game) {
     this.game = game;
@@ -93,39 +131,9 @@ export class Garage {
   owned() { return Object.keys(VEHICLES).filter((k) => this.game.story && this.game.story.vehicles.includes(k)); }
 
   build(id) {
+    const m = buildVehicleModel(id);
     const def = VEHICLES[id];
-    let m;
-    if (id === 'skimmer') {
-      // its own hover-racer model (it has a seat of its own, too)
-      m = makeSkimmer({ color: def.color, trim: def.trim });
-      return m;
-    }
-    if (id === 'apc') {
-      m = makeApc({ color: def.color, trim: def.trim });
-      m.root.scale.setScalar(def.scale);
-      return m; // (no seat-back: the runner is buttoned up inside)
-    }
-    if (def.bike) {
-      m = makeLightBike({ color: def.color, trim: def.trim });
-      m.trail = new LightTrail(this.game.scene, def.color, { life: 1, height: 1.0 });
-      return m; // (no seat-back: you ride it like a motorcycle)
-    } else {
-      m = makeRover({ color: def.color, trim: def.trim, pirate: !!def.pirate, flag: def.trim, style: def.pirate ? 'pirate' : def.id === 'mule' || def.cargoSafe ? 'civil' : 'military' });
-      if (def.hover) {
-        for (const w of m.wheels) w.visible = false;
-        for (const s of [-1, 1]) {
-          const pad = new THREE.Mesh(new THREE.CylinderGeometry(0.9, 1.1, 0.4, 12), glow(def.trim));
-          pad.position.set(s * 1.7, 0.5, 0);
-          m.root.add(pad);
-        }
-      }
-      if (def.scale) m.root.scale.setScalar(def.scale);
-    }
-    // a seat-back so the runner looks like they're driving
-    const seat = new THREE.Mesh(new THREE.BoxGeometry(1, 1.2, 0.3), toon(0x221d33));
-    ink(seat, 0.04);
-    seat.position.set(0, 2.4, -0.6);
-    if (!def.hideRider) m.root.add(seat);
+    if (def.bike) m.trail = new LightTrail(this.game.scene, def.color, { life: 1, height: 1.0 });
     return m;
   }
 
