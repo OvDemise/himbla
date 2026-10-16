@@ -4,8 +4,8 @@
 #   exec(open(r"<repo>/tools/blender/build_hovercar.py").read())
 # Headless:  MOONRUNNER_REPO=<repo> python3 tools/blender/build_hovercar.py   (needs `pip install bpy`)
 #
-#   car_faction   the FACTION car: a low, sharp hull in the faction's livery: a racing stripe down the spine, swept tail fins and
-#                 a dark splitter. SPACECOM's car alone has a roof light bar (the `livery_spacecom` pivot, extra `faction`: the
+#   car_faction   the FACTION car: a low, sharp hull in the faction's livery: a racing stripe down the spine, swept tail fins
+#                 and a flush underside. SPACECOM's car alone has a roof light bar (the `livery_spacecom` pivot, extra `faction`: the
 #                 game keeps only the matching one); the other factions' cars have none. No emblems yet (the logos aren't made).
 #   car_civilian  the CIVILIAN car: the same hull, rounder and a hand taller: a big glass bubble, chrome
 #                 side bumpers, a single oval headlamp on the nose cone, a lengthened trunk carrying a side-on rack and luggage pod, a soft swoosh instead of a stripe, stubby tail fins.
@@ -178,8 +178,6 @@ def build_faction(R):
         y = top_y(H, x, z) - 0.012
         slope = (top_y(H, x, z + 0.1) - top_y(H, x, z - 0.1)) / 0.2
         mesh(f"vent{sx}", xf(rbox(0.09, 0.025, 0.28, 0.3, 8, 4), (x, y, z), (-math.atan(slope), 0, 0)), "dark", R, 0)
-    # a dark splitter under the nose: it starts inside the hull's underside and reaches past the nose
-    mesh("splitter", xf(extrude([(2.5, 0), (3.5, 0), (3.28, 0.07), (2.5, 0.13)], 1.0, "x"), (0, -0.44, 0)), "dark", R, 0.02)
     # lamps set into the nose and tail flanks: placed on the hull's surface, turned to its normal, half buried. The headlamp sits above
     # the chine stripe in a dark housing, so it reads whatever colour the trim is; the tail lamp is a slit on the tail flank
     for sx in (-1, 1):
