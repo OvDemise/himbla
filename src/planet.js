@@ -18,6 +18,7 @@ const WORKERS = Math.max(2, Math.min(4, ((typeof navigator !== 'undefined' && na
 function zoneMsg(z) { return { dir: [z.dir.x, z.dir.y, z.dir.z], r: z.r, late: !!z.late, zoneR: z.zoneR || 0, flatR: z.flatR, fit: !!z.fit, zrSet: z.zrSet }; }
 const AHEAD_LOD = 1; // build-ahead: chunks round where you'll be soon, up to this level of detail
 // the ink line along crater crests: how many rims the terrain shader takes, and how far out
+const ROAD_KEEP = 14; // m a boulder's centre stays from the nearest sample of a road, beyond its own radius
 const RIM_INK_MAX = 64, RIM_INK_REACH = 1500, RIM_INK_BIG = 120; // (no ink on rims bigger than that)
 const _rv = new THREE.Vector3();
 const _a = new THREE.Vector3(), _b = new THREE.Vector3(), _c = new THREE.Vector3(), _e = new THREE.Vector3();
@@ -591,6 +592,8 @@ diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.93, 0.9, 0.86), rimChip * rimCor
       if (ok && this.noBoulders) for (const c of this.noBoulders) if (p.dot(c) > this.noBouldersCos) { ok = false; break; } // (spots kept bare: the trailer)
       const s = 1.2 + Math.pow(g0(), 3) * 7;
       e.set(g0() * 3, g0() * 3, g0() * 3);
+      // (nor on a road: clear of the strip and its berm, whatever the boulder's size; clearDirs are samples of the road network, its edges included)
+      if (ok && this.clearDirs) { const cr = Math.cos((ROAD_KEEP + s) / R); for (const c of this.clearDirs) if (p.dot(c) > cr) { ok = false; break; } }
       if (!ok) continue;
       const r = this.surface(p);
       p.multiplyScalar(r + s * 0.3);
