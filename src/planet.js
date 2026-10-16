@@ -594,6 +594,8 @@ diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.93, 0.9, 0.86), rimChip * rimCor
       e.set(g0() * 3, g0() * 3, g0() * 3);
       // (nor on a road: clear of the strip and its berm, whatever the boulder's size; clearDirs are samples of the road network, its edges included)
       if (ok && this.clearDirs) { const cr = Math.cos((ROAD_KEEP + s) / R); for (const c of this.clearDirs) if (p.dot(c) > cr) { ok = false; break; } }
+      // (nor in a black lake, or at its edge: the liquid would swallow it or stand it on the surface)
+      if (ok) for (const lk of this.lakes) if (p.dot(lk.d) > lk.cos - (s + 6) / R) { ok = false; break; }
       if (!ok) continue;
       const r = this.surface(p);
       p.multiplyScalar(r + s * 0.3);
