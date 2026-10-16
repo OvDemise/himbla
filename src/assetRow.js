@@ -299,7 +299,7 @@ export class AssetRow {
     GRAV.flat = UP;
     // the Moon's HUD (contract, event, territory, objective, prompts, minimap) has nothing to say here
     this.style = document.createElement('style');
-    this.style.textContent = 'body.asset-row :is(#mission, #eventpanel, #scanchip, #techchip, #obj-arrow, #obj-marker, #zonewarn, #tip, #banner, #evpop, #terrchip, #minimap, #dilate) { display: none !important; }';
+    this.style.textContent = 'body.asset-row :is(#mission, #eventpanel, #scanchip, #techchip, #obj-arrow, #obj-marker, #zonewarn, #banner, #evpop, #terrchip, #minimap, #dilate) { display: none !important; }';
     document.head.appendChild(this.style);
     document.body.classList.add('asset-row');
     this.termCols = this.terminals.map((t) => g.colliders.add({ type: 'box', c: new THREE.Vector3(t.x, 1, t.z), hx: 0.9, hy: 1, hz: 0.6, ax: new THREE.Vector3(1, 0, 0), ay: UP.clone(), az: new THREE.Vector3(0, 0, 1) }));

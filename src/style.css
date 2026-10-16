@@ -179,12 +179,6 @@ button { font-family: var(--comic); }
 #input-mon .im-meter { fill: #e3e6ee; stroke: #aab1c3; stroke-width: 4; }
 #input-mon .im-meter-fill { fill: #3fd15f; }
 #input-mon .im-meter-t { fill: #1c2030; text-anchor: middle; dominant-baseline: central; font-family: monospace; font-weight: bold; }
-#tip {
-  position: absolute; bottom: 18px; left: 50%; transform: translateX(-50%); max-width: min(620px, 60vw);
-  background: var(--ui-bg); color: var(--ui-text); font-size: 17px; line-height: 1.35; padding: 10px 16px; border: 2px solid var(--ui-edge);
-  box-shadow: 0 0 0 2px #05030c, var(--ui-shadow);
-}
-#tip b { color: var(--yellow); font-family: var(--comic); font-weight: normal; font-size: 11px; }
 #grab { position: absolute; top: 60%; left: 50%; transform: translateX(-50%); width: 360px; text-align: center; }
 .grab-label { font-family: var(--comic); font-size: 12px; line-height: 1.4; color: var(--green); text-shadow: 2px 2px 0 #05030c; margin-bottom: 6px; animation: blink 0.3s steps(2) infinite; }
 #grab .fill { background: var(--green); width: 0; }
@@ -1260,7 +1254,7 @@ body.pad-on #board .board-tabs .foot-kb { display: none; }
 @keyframes dilate-pulse { 50% { opacity: 0.75; } }
 /* ---- trailer director (?trailer, trailer.js): no HUD, just the comic layer and the cards ---- */
 body.trailer #hud > *:not(#popups):not(#splash):not(#dilate) { display: none !important; }
-body.trailer #tutorial, body.trailer #racepanel, body.trailer #vehbar, body.trailer #tip { display: none !important; }
+body.trailer #tutorial, body.trailer #racepanel, body.trailer #vehbar { display: none !important; }
 #trailer { position: fixed; inset: 0; pointer-events: none; z-index: 100; overflow: hidden; }
 #trailer .tr-flash { position: absolute; inset: 0; background: #fffbe6; opacity: 0; }
 #trailer .tr-black { position: absolute; inset: 0; background: #05030c; opacity: 0; }

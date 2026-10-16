@@ -60,15 +60,6 @@ import { SUN, dirFromAngles, darkness, arcDist, tangent, upAt, greatCircle } fro
 for (const el of document.querySelectorAll('.app-ver')) el.textContent = `v${__APP_VERSION__}`;
 
 const SAVE_KEY = 'moonrunner-save-v1';
-const TIPS = [
-  'Hold <b>SPACE</b> to engage the Quantum-Lock skates — they grip the ground and glide without friction.',
-  'On skates, <b>A/D</b> steer you along the ground: full input carves hard, <b>W+A</b> carves gently. Aim for ramps and crater rims!',
-  'Hold <b>E</b> / <b>RIGHT MOUSE</b> for thrusters (mostly forward). <b>SHIFT</b> mag-jumps.',
-  'In the air, hold <b>Q</b> + <b>W/S</b> to flip, <b>Q</b> + <b>A/D</b> to spin. Land upright! Buses and freighters make great ramps.',
-  'Press <b>M</b> for the globe map (drag to spin). Unexplored ground stays fogged until you visit.',
-  'Factions post <b>EVENTS</b> (beacons on the map). <b>J</b> opens your Reputation Log — higher standing means better pay and faction gear.',
-  'The Moon is round — keep going and you\'ll reach the <b>DARK SIDE</b>. Your helmet lamp comes on by itself. Pirates live there.',
-];
 const CAMP_NAMES = ['Grimtooth Camp', "Vandal's Rest", 'Ashfall Hideout', 'Cutthroat Crater', 'The Junkpile'];
 
 // yield to the browser between loading steps (so the status line paints); the timer covers a hidden
@@ -316,8 +307,6 @@ class Game {
     window.addEventListener('keydown', wake, true);
     this.damageFlash = 0;
     this.currentZone = null;
-    this.tipIndex = 0;
-    this.tipTimer = 2;
     this.hurtCd = 0;
     this.boardCooldown = 0;
     this.wasDark = false;
@@ -1632,18 +1621,6 @@ class Game {
       this.hud.recallHold(this.recallHold / 1.5, loc, this.recall.activeWork().length ? `HOLD R · RECALL TO ${loc.short || loc.name.toUpperCase()} · 100 CR · FAILS YOUR JOBS${this.events.active && this.events.active.type === 'wreck' ? ' · LOSES RUSTMOON FOR GOOD' : ''}` : null);
       if (this.recallHold >= 1.5) { this.recallHold = 0; this.hud.recallHold(0); this.recall.request(); }
     } else if (this.recallHold) { this.recallHold = 0; this.hud.recallHold(0); }
-
-    if (this.tipIndex < TIPS.length && (!this.settings || this.settings.v.tips)) { // settings
-      this.tipTimer -= dt;
-      if (this.tipTimer <= 0) {
-        const el = document.getElementById('tip');
-        el.innerHTML = TIPS[this.tipIndex++];
-        el.classList.remove('hidden');
-        this.tipTimer = 8;
-        clearTimeout(this._tipHide);
-        this._tipHide = setTimeout(() => el.classList.add('hidden'), 7000);
-      }
-    }
   }
 
   trafficHit(pos, r, vel) {
