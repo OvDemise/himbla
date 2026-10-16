@@ -7,7 +7,8 @@
 #   cargo_unit("tank",  name, parent, pos)    the cryogenic Helium-3 tanker (H3 branding panels, valve cabinet, gantry walk)
 #   cargo_unit("blast", name, parent, pos)    the smooth red explosives magazine (OSHA / DOT signs, strobes, lightning rod)
 #   (low=True leaves off what stands up from a roof: the tanker's gantry walk, rails, manways and vent, the magazine's vents, strobes and
-#   rod; every unit is then a flat-topped 3.5 m, so one can stand on another in a stack)
+#   rod; every unit is then a flat-topped 3.5 m, so one can stand on another in a stack. A low tanker also gets an ISO frame, the box
+#   container's own outside size with its corner castings, so it stacks like a box and can go on the bottom of a stack)
 #
 # Each unit is a pivot with role "cargo" (extra `kind`), at `pos` in three.js axes; its origin is the middle of its footprint on the
 # underside of its rack, and its length runs along z. It holds one `livery` pivot per faction (extra `faction`; the game keeps the
@@ -153,6 +154,21 @@ def _cargo_tank(R):
         _cM(f"ring{z}", xf(torus(1.52, 0.06, 22, 4), (0, 3.3, z), (math.pi / 2, 0, 0)), "accent", R, 0.02)
     for z in (-1.8, -0.6, 0.6, 1.8):
         _cM(f"band{z}", xf(torus(1.52, 0.06, 22, 4), (0, 3.3, z), (math.pi / 2, 0, 0)), "steel", R, 0.02)
+    if _cargo_ctx["low"]:
+        # the ISO frame round the vessel: the container's outside size (castings at x +-1.5, z +-3.55, y 1.95 to 4.62), four posts, side
+        # rails top and bottom, end frames with crossed braces, so a tank container stacks (and is stacked on) like a box
+        for sx in (-1, 1):
+            for sz in (-1, 1):
+                _crb(f"fpost{sx}{sz}", 0.11, 1.37, 0.11, (sx * 1.6, 3.3, sz * 3.55), "steel", R, 0.04, 0.2)
+                _crb(f"cast{sx}{sz}", 0.2, 0.17, 0.22, (sx * 1.5, 1.95, sz * 3.55), "dark", R, 0.03, 0.2)
+                _crb(f"castT{sx}{sz}", 0.2, 0.17, 0.22, (sx * 1.5, 4.62, sz * 3.55), "dark", R, 0.03, 0.2)
+            _crb(f"fRailT{sx}", 0.09, 0.09, 3.62, (sx * 1.6, 4.66, 0), "steel", R, 0.03, 0.3)
+            _crb(f"fRailB{sx}", 0.09, 0.09, 3.62, (sx * 1.6, 1.95, 0), "steel", R, 0.03, 0.3)
+        for sz in (-1, 1):
+            _crb(f"fEndT{sz}", 1.6, 0.09, 0.09, (0, 4.66, sz * 3.55), "steel", R, 0.03, 0.3)
+            _crb(f"fEndB{sz}", 1.6, 0.09, 0.09, (0, 1.95, sz * 3.55), "steel", R, 0.03, 0.3)
+            _cbm(f"fBrace1{sz}", (-1.55, 2.0, sz * 3.58), (1.55, 4.6, sz * 3.58), 0.045, "metal", R, 0.01)
+            _cbm(f"fBrace2{sz}", (1.55, 2.0, sz * 3.58), (-1.55, 4.6, sz * 3.58), 0.045, "metal", R, 0.01)
     if not _cargo_ctx["low"]:
         _crb("walk", 0.5, 0.05, 3.1, (0, 4.82, 0), "dark", R, 0.03, 0.1)
         for z in (-3.0, -2.0, -1.0, 0.0, 1.0, 2.0, 3.0):

@@ -493,10 +493,11 @@ SR["padR"] = 11.0
 # painted for the faction it serves, short bolted radiator wings, a four-bell armoured stern block, four folding legs and a belly
 # ramp. Origin = hull centre; deck top y = +5, belly y = -5.
 #
-# FREIGHTER_VARIANT (environment) picks the build: "atlas" (the one in the game), "compact" (three bays a side and a hull 15% smaller, so
-# the same crates fill more of the ship) or "stacked" (the full size, every bay two crates high). Only "atlas" is exported to the game.
+# FREIGHTER_VARIANT (environment) picks the build: "stacked" (the one in the game: the full size, every bay two crates high, the Helium-3
+# tankers in ISO frames so they stack like boxes), "atlas" (one crate high, the first Atlas) or "compact" (three bays a side and a hull
+# 15% smaller, so the same crates fill more of the ship). The last two are studies.
 # =============================================================================================
-VARIANT = os.environ.get("FREIGHTER_VARIANT", "atlas")
+VARIANT = os.environ.get("FREIGHTER_VARIANT", "stacked")
 NB, K, STACK = {"atlas": (4, 1.0, 1), "compact": (3, 0.85, 1), "stacked": (4, 1.0, 2)}[VARIANT]
 PITCH = 9.0                      # a bay's length (the crates are 8.3 m)
 ZF = (NB - 4) * PITCH            # everything forward of the bays moves back for each bay left out
@@ -764,8 +765,9 @@ CARGO = {                    # what each bay holds, bottom to top: land-train un
               (1, 0): ["box"], (1, 1): ["tank"], (1, 2): ["box"], (1, 3): []},
     "compact": {(-1, 0): ["tank"], (-1, 1): ["box"], (-1, 2): ["blast"],
                 (1, 0): ["box"], (1, 1): ["tank"], (1, 2): []},
-    "stacked": {(-1, 0): ["box", "tank"], (-1, 1): ["blast", "box"], (-1, 2): [], (-1, 3): ["box", "blast"],
-                (1, 0): ["box", "box"], (1, 1): ["blast", "tank"], (1, 2): ["box"], (1, 3): []},
+    # (an H3 bay a side, two tank containers high: port at the stern end, starboard one in from it; and a tank on top of a box besides)
+    "stacked": {(-1, 0): ["tank", "tank"], (-1, 1): ["blast", "box"], (-1, 2): [], (-1, 3): ["box", "tank"],
+                (1, 0): ["box", "box"], (1, 1): ["tank", "tank"], (1, 2): ["blast"], (1, 3): []},
 }[VARIANT]
 
 

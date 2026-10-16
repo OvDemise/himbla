@@ -444,8 +444,8 @@ out of their bays (doors first, then the legs) on the way down and tuck away aga
 rear door drops into a ramp, the freighter lowers a belly ramp. The **shuttle-bus** is a 19 m lifting-body hopper
 with a wraparound windscreen, porthole windows, two ducted lift-fans and a lit route board on the roof; the
 **freighter** ("Atlas") is a ~70 m armoured hauler with a rideable landing deck (a big pad, kerb lights, tie-down rails), a raked bridge tower at the bow,
-a gantry cage round four cargo bays down each flank holding the land-train's own cargo (the corrugated container, the Helium-3 tanker and the explosives
-magazine, in the livery of a faction whose town the freighter serves), short radiator wings and a four-bell engine block.
+a gantry cage round four cargo bays down each flank, each two crates high, holding the land-train's own cargo (the corrugated container, the Helium-3 tanker
+in an ISO frame so it stacks like a box, and the explosives magazine, in the livery of a faction whose town the freighter serves), short radiator wings and a four-bell engine block.
 **Hitch a ride for free:** walk up to a landed shuttle-bus or freighter and press `F` to hop in (the prompt says where
 it's headed). You ride inside while the camera hangs back to watch the ship; press `F` again to hop out down the ramp,
 or bail out mid-flight through the side hatch (keeping the ship's speed, with a little style for the nerve). Passengers walk off toward town, the queue
@@ -741,7 +741,7 @@ tools/
   blender/build_runner.py  builds the runner in Blender and exports src/assets/runner.glb
   blender/build_idles.py   keys the runner's five idles on its pivots -> src/assets/idles.json (headless: `pip install bpy`, then `python3 tools/blender/build_idles.py`; `MOONRUNNER_IDLES_BLEND=idles.blend` also saves the keyed scene)
   optimize-glb.mjs         compresses the models in src/assets (quantized and meshopt-coded: about a quarter of the size); `npm run optimize:glb`, run after re-exporting a model from Blender
-  blender/build_ships.py   builds both transit ships in Blender and exports src/assets/ships.glb (the freighter's bays use cargo.py: the land-train's cargo units, mirrored from build_landtrain.py; FREIGHTER_VARIANT=compact|stacked builds the two size / stacking studies instead of the shipped one)
+  blender/build_ships.py   builds both transit ships in Blender and exports src/assets/ships.glb (the freighter's bays use cargo.py: the land-train's cargo units, mirrored from build_landtrain.py; FREIGHTER_VARIANT=atlas|compact builds the one-crate-high and the smaller-hull studies instead of the shipped two-high freighter)
   blender/cargo.py         the land-train's box container, Helium-3 tanker and explosives magazine, without their flatbed, for other models to carry
   blender/proposals/       the freighter design study: freighter_b.py (the open-truss "Girder" alternative to the chosen Atlas) and preview.py / preview_ships.py, which render a ship in the game's palette with Cycles on the CPU
   blender/build_skimmer.py builds the Daedalus skimmer -> src/assets/skimmer.glb
