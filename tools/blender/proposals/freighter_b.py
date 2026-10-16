@@ -113,7 +113,16 @@ M("bulkhead", Z(lathe([(4.2, 0.0), (5.9, 0.0), (5.9, 1.0), (5.5, 1.1), (4.2, 1.1
 M("bulkheadBand", Z(lathe([(5.88, 0.35), (5.96, 0.35), (5.96, 0.75), (5.88, 0.75)], 40), (0, HY, HZ0 - 0.6)), "hazard", FH, 0)
 for k, y in enumerate((4.0, 8.0, 12.0)):     # livery rings and rib bands
     M(f"headRing{k}", Z(lathe([(5.17, y - 0.3), (5.3, y - 0.3), (5.3, y + 0.3), (5.17, y + 0.3)], 40), (0, HY, HZ0)), "stripe" if k == 1 else "trim", FH, 0.03)
-glass = Z(lathe([(5.26, 14.6), (5.18, 14.6), (5.18, 15.2), (5.0, 15.6), (4.6, 17.0), (4.2, 17.9), (4.0, 17.9), (4.4, 17.0), (4.85, 15.6), (5.26, 15.2)], 48), (0, HY, HZ0))
+def head_r(y):
+    """The hull's radius along the command module (HEAD, linearly between its points)."""
+    for (r0, y0), (r1, y1) in zip(HEAD, HEAD[1:]):
+        if y0 <= y <= y1:
+            return r0 + (r1 - r0) * (y - y0) / ((y1 - y0) or 1)
+    return HEAD[-1][0]
+
+
+GY = [14.6, 15.0, 15.6, 16.2, 16.8, 17.4, 17.9]
+glass = Z(lathe([(head_r(y) + 0.07, y) for y in GY] + [(head_r(y) - 0.3, y) for y in reversed(GY)], 48), (0, HY, HZ0))   # (proud of the hull all the way round)
 M("headGlass", clip(glass, 1, HY + 1.4, 99), "glass", FH, 0)
 for k in range(6):               # conduit runs along the cylinder, a flange where they leave the bulkhead
     a = PI * (0.12 + k * 0.152) if k < 3 else PI * (1.12 + (k - 3) * 0.152)
