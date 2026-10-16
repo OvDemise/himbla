@@ -1,6 +1,7 @@
 // The Asset Row's catalogue (assetRow.js): the game's assets, in the order they stand along the row.
 //
-// A GROUP is { id, title, items: [item, ...] }; an ITEM is
+// A GROUP is { id, title, items: [item, ...] }: one section of the row, with its own board (a group file's default export is
+// one group, or an array of them: one per category). An ITEM is
 //
 //   id      'group.name'      unique
 //   label   'NAME BOARD'      what the board says (short, upper case)
@@ -27,4 +28,4 @@ import buildings from './buildings.js';
 import places from './places.js';
 
 // (small things first, so the first stretch of the row is cheap and dense; the places, the biggest and heaviest, last)
-export const GROUPS = [characters, props, vehicles, buildings, places];
+export const GROUPS = [characters, props, vehicles, buildings, places].flat();
