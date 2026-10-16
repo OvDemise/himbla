@@ -146,8 +146,9 @@ def build_pods(R, civ, H):
             xh = side_x(H, -0.34, z)          # the hull's flank at the strut's height
             x0, x1 = xh - 0.1, side * 0 + W_POD - 0.12
             mesh(f"strut{tag}{z}", xf(rbox((x1 - x0) / 2 + 0.02, 0.06, 0.2, 0.3, 8, 4), (side * (x0 + x1) / 2, -0.4, z)), "dark", R, 0.02)
-    # belly pan, and the four hover pads: each hangs from the hull's underside on a stem
-    mesh("belly", xf(loft([{"z": -2.7, "w": 0.8, "t": 0.08, "b": 0.12}, {"z": 0, "w": 1.15, "t": 0.1, "b": 0.14}, {"z": 2.7, "w": 0.7, "t": 0.08, "b": 0.1}], 20), (0, -0.62, 0)), "dark", R, 0.03)
+    # the underside: a dark skin cut from the hull's own bottom (so it follows the hull's contour, nose to tail, and cannot overhang it),
+    # and the four hover pads, each hanging from it on a stem
+    mesh("belly", keep(loft(grow(H, 0.02), 40, False, False), lambda c: c[1] < -0.5 * sec_at(H, c[2])["b"] and abs(c[0]) < 0.8), "dark", R, 0.02)
     for i, (x, z) in enumerate([(-1.0, 1.7), (1.0, 1.7), (-1.0, -1.7), (1.0, -1.7)]):
         yb = bot_y(H, x, z)
         mesh(f"lift{i}_stem", B((x, yb + 0.06, z), (x, -0.84, z), 0.09, 8, True), "dark", R, 0.015)
