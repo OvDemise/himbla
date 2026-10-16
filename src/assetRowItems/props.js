@@ -5,6 +5,10 @@ import weapons from './props-weapons.js';
 import nature from './props-nature.js';
 import secrets from './props-secrets.js';
 
+// (the turrets, the ILMB rocket and the mothership are shown with the vehicles and ships: vehicles.js)
+const SHOWN_WITH_VEHICLES = new Set(['prop.turret', 'prop.rocket', 'spindle.mothership']);
+for (const g of [markers, weapons, nature, secrets]) g.items = g.items.filter((it) => !SHOWN_WITH_VEHICLES.has(it.id));
+
 export default [markers, weapons, nature, secrets];
 
 /*
