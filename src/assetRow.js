@@ -199,7 +199,7 @@ export class AssetRow {
         for (const b of made.cols) {
           if (b.type === 'sphere') specs.push({ type: 'sphere', c: at(b.x, b.y, b.z), r: b.r });
           else if (b.type === 'cyl') specs.push({ type: 'cyl', c: at(b.x, 0, b.z), axis: UP.clone(), y0: b.y0, y1: b.y1, r: b.r });
-          else {
+          else if (b.type === 'box' || b.type === undefined) {
             const q = new THREE.Quaternion().setFromAxisAngle(UP, b.yaw || 0);
             specs.push({ type: 'box', c: at(b.x, b.y, b.z), hx: b.hx, hy: b.hy, hz: b.hz, ax: new THREE.Vector3(1, 0, 0).applyQuaternion(q), ay: UP.clone(), az: new THREE.Vector3(0, 0, 1).applyQuaternion(q) });
           }
