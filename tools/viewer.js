@@ -93,6 +93,16 @@ if (m === 'shuttle' || m === 'freighter') {
   rig.setRamp(num('ramp', 0));
   model.position.y = rig.gearH * num('gear', 1) + (num('gear', 1) < 1 ? 4 : 0);
   height = m === 'shuttle' ? 8 : 20;
+  // &cols=1 draws the freighter's collision boxes (the solid the world keeps round it: model.userData-free, straight from rig.decks)
+  if (Q.get('cols') === '1' && rig.decks) {
+    const cm = new THREE.LineBasicMaterial({ color: 0xff2e63, depthTest: false, transparent: true });
+    for (const d of rig.decks) {
+      const l = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(d.hx * 2, d.hy * 2, d.hz * 2)), cm);
+      l.position.set(d.x || 0, d.y, d.z);
+      l.renderOrder = 10;
+      model.add(l);
+    }
+  }
 } else if (m === 'apc') {
   // &turret=<yaw rad>&barrel=<elevation rad> to pose it; the faction colours as in the game
   const apc = makeApc({ color: Q.has('color') ? parseInt(Q.get('color'), 16) : 0x6b6f78, trim: Q.has('trim') ? parseInt(Q.get('trim'), 16) : 0xff3b5c });
