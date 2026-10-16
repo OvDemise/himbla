@@ -1202,6 +1202,7 @@ class Game {
     // the Monolith's time dilation: the world crawls, you don't
     const wdt = playing && this.alchemy.buffs.dilate > 0 ? dt * DILATE_RATE : dt;
     if (!this.away()) this.world.update(wdt, this.time, this.camera.position);
+    if (playing && !this.away()) this.player.rideCarry(); // (the deck you stand on has moved: you, your model and the camera go with it)
     this.fx.update(wdt, rdt); // (popups run on real time: a pause or the Monolith's dilation doesn't freeze or stretch them)
     dbg.lap('world');
     this.hud.update(rdt);
