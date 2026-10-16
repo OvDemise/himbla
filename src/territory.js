@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { FACTIONS } from './locations.js';
-import { toon, glow, ink } from './toon.js';
-import { arcDist, tangent, frameQuat, greatCircle, SUN, R as PLANET_R } from './geo.js';
+import { toon, ink } from './toon.js';
+import { arcDist, tangent, frameQuat, greatCircle, SUN, R as PLANET_R, collectNodes } from './geo.js';
 import { mulberry32 } from './rng.js';
 import { ITEMS } from './alchemy.js';
 import { outpostTemplate, SMALL_KINDS, FLAT_R } from './outpostModels.js';
@@ -584,11 +584,14 @@ export class Territory {
       else if (o.rubble && !this.wrecked(o)) { this.despawn(o); this.spawn(o); } // rebuilt
       if (o.guns && o.guns.length && o.model && !o.rubble) this.updateGuns(o, dt);
       if (o.rubble && o.model && d < 500 && Math.random() < dt * 6) g.fx.spawn((o.mainC || o.model.position).clone().addScaledVector(o.dir, 1.5), o.dir.clone().multiplyScalar(5), { color: 0x2a2433, size: 1.4, life: 1.6, count: 1, spread: 3 });
-      if (o.model && d < 400) o.model.traverse((m) => {
-        if (m.userData.spin) m.rotation.y += dt * 0.6;
-        if (m.userData.blink) m.visible = Math.sin(this.t * 4 + o.seed) > -0.3;
-        if (m.userData.flag) m.rotation.y = Math.sin(this.t * 2 + o.seed) * 0.25;
-      });
+      if (o.model && d < 400) {
+        const movers = o.model.userData.movers || (o.model.userData.movers = collectNodes(o.model, (m) => m.userData.spin || m.userData.blink || m.userData.flag));
+        for (const m of movers) {
+          if (m.userData.spin) m.rotation.y += dt * 0.6;
+          if (m.userData.blink) m.visible = Math.sin(this.t * 4 + o.seed) > -0.3;
+          if (m.userData.flag) m.rotation.y = Math.sin(this.t * 2 + o.seed) * 0.25;
+        }
+      }
     }
     this.updatePatrols(dt);
     // which territory am I in?

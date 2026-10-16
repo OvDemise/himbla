@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { makeRover, makeApc, makeHoverCar, makeSkimmer, makeLightBike, LightTrail } from './models.js';
+import { makeRover, makeApc, makeSkimmer, makeLightBike, LightTrail } from './models.js';
 import { fireCannon } from './weapons.js';
 import { makeBody } from './physics.js';
 import { stepRover, CRASH_SAFE } from './enemies.js';

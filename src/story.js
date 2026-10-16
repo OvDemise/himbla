@@ -1,9 +1,8 @@
 import * as THREE from 'three';
 import { FACTIONS } from './locations.js';
 import { makeRunner, makeCrate } from './models.js';
-import { makeBody, stepSkater } from './physics.js';
 import { toon, glow, ink, textSprite, nameTag } from './toon.js';
-import { arcDist, tangent, frameQuat, greatCircle, darkness } from './geo.js';
+import { arcDist, tangent, greatCircle, darkness, collectNodes } from './geo.js';
 import { pick } from './rng.js';
 import { VEHICLES } from './vehicles.js';
 import { spawnKadeTruck, updateKadeTruck, kadeDefeated, updateMortarDrop } from './kade.js';
@@ -2054,7 +2053,10 @@ export class Story {
         const s = this.active.steps[this.active.si];
         const tgt = this.stepTarget(s);
         if (tgt && this.marker) this.marker.position.copy(tgt);
-        for (const p of this.active.props) p.traverse((o) => { if (o.userData.spin) o.rotation.y += dt * 2; });
+        for (const p of this.active.props) {
+          const spinners = p.userData.spinners || (p.userData.spinners = collectNodes(p, (o) => o.userData.spin));
+          for (const o of spinners) o.rotation.y += dt * 2;
+        }
       }
     }
     this.updateOutposts(dt);

@@ -9,6 +9,9 @@ import { pixelFont } from './fonts.js';
 import { mulberry32 } from './rng.js';
 
 const $ = (id) => document.getElementById(id);
+// (the frame's lookups: the HUD elements are static page nodes, so each is found once)
+const $els = {};
+const $c = (id) => $els[id] || ($els[id] = document.getElementById(id));
 const MM_CURVE_N = 720; // samples round each great circle drawn on the minimap (~30 m apart)
 const MM_RANGE = 700; // metres from the centre to the edge of the minimap when standing still
 
@@ -463,25 +466,25 @@ export class HUD {
     const P = g.player;
     const ms = g.missions;
 
-    if (this.alertT > 0 && (this.alertT -= dt) <= 0) $('alert').classList.add('hidden');
-    if (this.toastT > 0 && (this.toastT -= dt) <= 0) $('toast').classList.add('hidden');
-    if (this.grabT > 0 && (this.grabT -= dt) <= 0) $('grab').classList.add('hidden');
-    if (this.bannerT > 0 && (this.bannerT -= dt) <= 0) $('banner').classList.add('hidden');
+    if (this.alertT > 0 && (this.alertT -= dt) <= 0) $c('alert').classList.add('hidden');
+    if (this.toastT > 0 && (this.toastT -= dt) <= 0) $c('toast').classList.add('hidden');
+    if (this.grabT > 0 && (this.grabT -= dt) <= 0) $c('grab').classList.add('hidden');
+    if (this.bannerT > 0 && (this.bannerT -= dt) <= 0) $c('banner').classList.add('hidden');
     this.updateEventPopup(dt);
-    if (this.resultT > 0) { $('result').classList.remove('hidden'); if ((this.resultT -= dt) <= 0) $('result').classList.add('hidden'); }
+    if (this.resultT > 0) { $c('result').classList.remove('hidden'); if ((this.resultT -= dt) <= 0) $c('result').classList.add('hidden'); }
 
     this.drawSpeedo(P.speed * 3.6);
     this.distressLog(dt);
-    $('hp-fill').style.width = (P.health / P.maxHealth) * 100 + '%';
+    $c('hp-fill').style.width = (P.health / P.maxHealth) * 100 + '%';
     this.updateCracks(Math.max(0, P.health / P.maxHealth));
-    $('en-fill').style.width = (P.body.energy / P.body.maxEnergy) * 100 + '%';
-    $('en-fill').style.opacity = P.body.jetLocked ? 0.45 : ''; // dimmed while the thrusters are locked out
-    const sk = $('skates');
+    $c('en-fill').style.width = (P.body.energy / P.body.maxEnergy) * 100 + '%';
+    $c('en-fill').style.opacity = P.body.jetLocked ? 0.45 : ''; // dimmed while the thrusters are locked out
+    const sk = $c('skates');
     const on = P.body.skating;
     sk.textContent = on ? 'Q-LOCK: ENGAGED' : 'Q-LOCK: OFF (BOOTS)';
     sk.classList.toggle('on', on);
     // the cash chip appears for five seconds whenever credits change, with a green + (earned) or a red − (spent)
-    const crEl = $('credits');
+    const crEl = $c('credits');
     crEl.querySelector('.cr-amt').textContent = `₵${g.credits}`;
     if (this.lastCr === undefined) this.lastCr = g.credits;
     else if (g.credits !== this.lastCr) {
@@ -501,12 +504,13 @@ export class HUD {
     crEl.classList.toggle('cr-show', this.crT > 0 || g.state === 'board');
     const wi = P.weapon || 0;
     const wtxt = P.vehicle && P.vehicle.def.turret ? `<span class="on">1</span> ${APC_CANNON.name.toUpperCase()}` : WEAPONS.map((w, i) => `<span class="${i === wi ? 'on' : ''} ${(!w.unlock || g.upgrades[w.unlock]) ? '' : 'locked'}">${i + 1}</span>`).join('') + ` ${WEAPONS[wi].name.toUpperCase()}`;
-    if (wtxt !== this.lastW) { $('weaponchip').innerHTML = wtxt; this.lastW = wtxt; }
+    if (wtxt !== this.lastW) { $c('weaponchip').innerHTML = wtxt; this.lastW = wtxt; }
     const jt = g.alchemy ? g.alchemy.hudText() : '';
-    if (jt !== this.lastJar) { $('jarchip').innerHTML = jt; $('jarchip').classList.toggle('hidden', !jt); this.lastJar = jt; }
-    $('style').textContent = ms.active ? `STYLE +₵${ms.styleValue()}${ms.styleValue(false) >= ms.active.reward ? ' MAX' : ''}` : '';
+    if (jt !== this.lastJar) { $c('jarchip').innerHTML = jt; $c('jarchip').classList.toggle('hidden', !jt); this.lastJar = jt; }
+    const styleTxt = ms.active ? `STYLE +₵${ms.styleValue()}${ms.styleValue(false) >= ms.active.reward ? ' MAX' : ''}` : '';
+    if (styleTxt !== this.lastStyle) { $c('style').textContent = styleTxt; this.lastStyle = styleTxt; }
 
-    const mp = $('mission');
+    const mp = $c('mission');
     if (ms.active) {
       const a = ms.active;
       const obj = ms.objective();

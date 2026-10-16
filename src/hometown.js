@@ -10,7 +10,6 @@ import { habDome, cabin, quonset, lattice, warehouse } from './settlements.js';
 import { makeTurret, makeRover } from './models.js';
 import { FACTIONS } from './locations.js';
 import { saveWorldState } from './worldstate.js';
-import { tangent, greatCircle } from './geo.js';
 
 const DK = 0x3a3550, LT = 0xd8d4e8, CONC = 0x8a8698, CREAM = 0xfff4e0, WARM = 0xfff6a8, KEP = 0xff9f1c, GRN = 0x7dff6a;
 export const SLOT_R = 64, SLOTS = 8;

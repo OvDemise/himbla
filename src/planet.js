@@ -2,7 +2,6 @@ import * as THREE from 'three';
 import { PLANET } from './config.js';
 import { mulberry32, smoothstep, clamp } from './rng.js';
 import { gradientMap } from './toon.js';
-import { SUN, darkness } from './geo.js';
 import { shapedRocks } from './rocks.js';
 import { rayCollider } from './physics.js';
 import { TerrainField, faceDir, dirToGrid, N, CH, CPF, N1, R, MAX_LOD } from './terrainField.js';

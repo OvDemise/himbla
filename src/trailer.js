@@ -11,7 +11,7 @@
 // The trailer never touches your saves: in this mode localStorage and sessionStorage are swapped
 // for in-memory stores before any game module reads them, so every run starts from a fresh game.
 import * as THREE from 'three';
-import { tangent, greatCircle, darkness, frameQuat, dirFromAngles } from './geo.js';
+import { tangent, frameQuat, dirFromAngles } from './geo.js';
 import { mulberry32 } from './rng.js';
 import { spliceGenes } from './chimera.js';
 import { clearEchoes } from './monolith.js';

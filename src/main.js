@@ -1407,7 +1407,8 @@ class Game {
     dbg.lap('tutorial');
     this.garage.update(dt);
     dbg.lap('garage');
-    document.getElementById('techchip').innerHTML = this.story.hudTech();
+    const tech = this.story.hudTech();
+    if (tech !== this.lastTech) { document.getElementById('techchip').innerHTML = tech; this.lastTech = tech; }
     dbg.lap('techchip');
     this.alchemy.update(dt);
     dbg.lap('alchemy');
@@ -1484,18 +1485,20 @@ class Game {
     }
     const zw = document.getElementById('zonewarn');
     const base = this.enemies.bases.find((b) => b.inside && (b.restricted || b.hostile));
+    let zwText = '';
     if (base && !base.restricted) {
-      zw.classList.remove('hidden');
-      zw.innerHTML = `⚠ ${FACTIONS[base.faction].name.toUpperCase()} DEFENSES ARE FIRING ON YOU ⚠`;
+      zwText = `⚠ ${FACTIONS[base.faction].name.toUpperCase()} DEFENSES ARE FIRING ON YOU ⚠`;
     } else if (base && !base.authorized) {
-      zw.classList.remove('hidden');
       const left = Math.max(0, 4 - base.time);
-      zw.innerHTML = base.hostile
+      zwText = base.hostile
         ? `⚠ ${base.loc.name.toUpperCase()}: WEAPONS FREE${base.time > 9 ? ' — ARTILLERY INBOUND' : ''} ⚠`
         : `⚠ RESTRICTED ZONE — ${base.loc.name.toUpperCase()} — LEAVE IN ${left.toFixed(1)}s ⚠`;
     } else if (base) {
+      zwText = base.grace ? `✔ ${(base.graceWhy || 'delivery signed for').toUpperCase()} — ${base.loc.name.toUpperCase()} · CLEARED UNTIL YOU LEAVE` : `✔ CLEARANCE ACCEPTED — ${base.loc.name.toUpperCase()}`;
+    }
+    if (zwText) {
       zw.classList.remove('hidden');
-      zw.innerHTML = base.grace ? `✔ ${(base.graceWhy || 'delivery signed for').toUpperCase()} — ${base.loc.name.toUpperCase()} · CLEARED UNTIL YOU LEAVE` : `✔ CLEARANCE ACCEPTED — ${base.loc.name.toUpperCase()}`;
+      if (zwText !== this.lastZoneWarn) { zw.innerHTML = zwText; this.lastZoneWarn = zwText; }
     } else zw.classList.add('hidden');
 
     // settlements patch you up, unless their defences are currently shooting at you

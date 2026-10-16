@@ -699,7 +699,7 @@ src/
   missions.js    contract generation, pickup/delivery, integrity, payouts
   world.js       sky, settlement layout, colliders, ambient life
   settlements.js detailed settlements, HQs and landmarks built with the outpost kit (moving parts, skate park)
-  market.js      the Meridian Exchange's stocks: a random-walk market refreshed every 15 s, read by the tower's ticker (exchangeBoard.js: a stock-board screen, drawn from it, not mounted anywhere at present)
+  market.js      the Meridian Exchange's stocks: a random-walk market refreshed every 15 s, read by the tower's ticker
   traffic.js     landing pads, ship/bus flights and passengers, roads, land-trains, cars, buggies
   wardrobe.js    wardrobe screen with live 3D preview
   trailer.js     trailer director mode (?trailer): the official trailer, shot by shot, from live gameplay

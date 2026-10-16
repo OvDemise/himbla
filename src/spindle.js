@@ -14,7 +14,7 @@ import * as THREE from 'three';
 import { Kit, T, G, GLASS, BEAM } from './outpostModels.js';
 import { toon, glow, ink } from './toon.js';
 import { mulberry32 } from './rng.js';
-import { SUN, tangent, GRAV } from './geo.js';
+import { SUN, GRAV } from './geo.js';
 import { makeShuttle, makePlanets } from './models.js';
 import { Medevac } from './medevac.js';
 import { RC, L, CIRC, START_S, CORE_S, PAD_S, wrapW, pointAt, smooth, heightAt, meshHeightAt, buildRockArrays, ROCK_S0, ROCK_S1 } from './spindleTerrain.js';

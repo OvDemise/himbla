@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { FACTIONS } from './locations.js';
 import { makeSeismo, makeTube, makeCrate, makeRover, makeFreighter, makeFigure } from './models.js';
-import { frameQuat, greatCircle, arcDist, darkness, tangent, R } from './geo.js';
+import { frameQuat, greatCircle, arcDist, darkness, tangent, collectNodes } from './geo.js';
 import { pick, randRange } from './rng.js';
 import { EVENT_RANGE } from './config.js';
 import { textSprite, toon, glow, ink } from './toon.js';
@@ -721,7 +721,10 @@ export class Events {
         if (ev.cool > 0) ev.cool -= dt;
         if (!ev.special && ev.age > OPEN_LIFETIME) { this.removeMarker(ev); this.list = this.list.filter((e) => e !== ev); this.cooldown[ev.faction] = 10; continue; }
         if (ev.marker) ev.marker.children[1].material.rotation = Math.sin(g.time * 2) * 0.05;
-        if (ev.marker) ev.marker.traverse((o) => { if (o.userData.pulse) o.scale.setScalar(1 + Math.sin(g.time * 3) * 0.08); });
+        if (ev.marker) {
+          const pulses = ev.marker.userData.pulses || (ev.marker.userData.pulses = collectNodes(ev.marker, (o) => o.userData.pulse));
+          for (const o of pulses) o.scale.setScalar(1 + Math.sin(g.time * 3) * 0.08);
+        }
       } else if (ev.state === 'active') {
         ev.t += dt;
         const u = this['update_' + ev.type];

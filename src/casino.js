@@ -67,14 +67,6 @@ function evalSlots(r) {
 // ---------- cards ----------
 const SUITS = ['♠', '♥', '♦', '♣'];
 const RANKS = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
-const cardVal = (c) => (c.r === 'A' ? 11 : ['J', 'Q', 'K'].includes(c.r) ? 10 : +c.r);
-function handValue(h) {
-  let t = 0, aces = 0;
-  for (const c of h) { t += cardVal(c); if (c.r === 'A') aces++; }
-  while (t > 21 && aces) { t -= 10; aces--; }
-  return { t, soft: aces > 0 };
-}
-const isBJ = (h) => h.length === 2 && handValue(h).t === 21;
 const hiloRank = (c) => (c.r === 'A' ? 14 : c.r === 'K' ? 13 : c.r === 'Q' ? 12 : c.r === 'J' ? 11 : +c.r);
 
 // ---------- roulette ----------
@@ -123,13 +115,10 @@ const LINES = {
   lose: ['The house thanks you for your donation.', 'Close! …Not really, but close.', 'Gravity\'s low. So are your odds.', 'Have you tried winning?', 'Keep going, you\'re due! (You are not due.)', 'That one\'s going toward the new chandelier.', 'Ooh. Unlucky. Again?'],
   broke: ['Outta credits? Rusty the loan shark has a… flexible rate. Press 7.', 'No credits, no service. Those are the rules. I made them.', 'Go deliver some packages and come back rich. Or come back poor. I\'m easy.'],
   jackpot: ['JACKPOT?! I\'m calling my mom. I\'m calling YOUR mom!', 'THE MACHINE IS SCREAMING! THE MACHINE IS SCREAMING!'],
-  bj: ['Blackjack! Smooth like a lizard.', 'Twenty-one. Show-off.'],
-  bust: ['Bust! Twenty-two is just twenty-one with ambition.', 'Too many. Story of my life.', 'Black hole got you. It happens. Mostly to you.'],
   nothing: ['NOTHING! Ha! That\'s my favourite slice.', 'It says "lol" right on it, kid.', 'The wheel giveth. Mostly the wheel taketh.'],
   vip: ['VIP upgrade! I\'ll have them warm up the velvet rope.', 'A high roller! I knew it the moment you skated in.'],
   shark: ['Rusty\'s watching you, kid. Pay your debts.', 'I\'d pay Rusty back if I were you. He bites. Literally. He\'s a shark.'],
   wait: ['Easy, easy — let it finish!', 'Patience. The Moon wasn\'t built in a day.'],
-  push: ['A push. Nobody wins. My favourite kind of boring.'],
   shop: ['Lookin\' sharp! Very… expensive.', 'Drip acquired. The Moon salutes you.'],
 };
 const SHARK = {
@@ -153,7 +142,6 @@ export class Casino {
     this.shown = game.credits;
     this.reels = [['moon', 'rocket', 'comet'], ['ufo', 'alien', 'moon'], ['comet', 'diamond', 'rocket']];
     this.shoe = [];
-    this.bj = { phase: 'idle', player: [], dealer: [], stake: 0 };
     this.rl = { bets: {}, rot: 0, ball: 0, history: [] };
     this.wheelRot = 0;
     this.hl = { phase: 'idle', card: null, pot: 0, stake: 0, streak: 0 };
@@ -247,12 +235,6 @@ export class Casino {
     const go = code === 'Space' || code === 'Enter';
     switch (this.tab) {
       case 'slots': if (go) this.spinSlots(); else if (code === 'KeyA') this.autoSpin(); break;
-      case 'bj':
-        if (go && this.bj.phase !== 'play') this.deal();
-        else if (code === 'KeyH') this.hit();
-        else if (code === 'KeyS' || (go && this.bj.phase === 'play')) this.stand();
-        else if (code === 'KeyD') this.double();
-        break;
       case 'roulette':
         if (go) this.spinRoulette();
         else if (code === 'Backspace' || code === 'KeyC') this.clearBets();
@@ -379,10 +361,6 @@ export class Casino {
       case 'betup': this.stepBet(1); break;
       case 'spin': this.spinSlots(); break;
       case 'auto': this.autoSpin(); break;
-      case 'deal': this.deal(); break;
-      case 'hit': this.hit(); break;
-      case 'stand': this.stand(); break;
-      case 'double': this.double(); break;
       case 'rspin': this.spinRoulette(); break;
       case 'rclear': this.clearBets(); break;
       case 'wfree': this.spinWheel(true); break;
@@ -399,7 +377,7 @@ export class Casino {
 
   setTab(id) {
     if (id === this.tab) return;
-    if (this.busy || this.bj.phase === 'play' || this.hl.phase === 'play') {
+    if (this.busy || this.hl.phase === 'play') {
       this.say('wait');
       this.shake(true);
       return;
@@ -557,7 +535,6 @@ export class Casino {
     body.className = `cas-body tab-${this.tab}`;
     body.innerHTML = this[`html_${this.tab}`]();
     if (this.tab === 'slots') this.drawReels();
-    if (this.tab === 'bj') this.drawBJ();
     if (this.tab === 'roulette') this.drawRoulette();
     if (this.tab === 'wheel') this.drawWheel();
     if (this.tab === 'hilo') this.drawHilo();
@@ -693,169 +670,11 @@ export class Casino {
     if (this.auto > 0 && this.tab === 'slots' && !this.el.classList.contains('hidden')) setTimeout(() => { if (this.auto > 0 && !this.busy) this.spinSlots(); }, ev.mult >= 10 || ev.jackpot ? 2000 : 650);
   }
 
-  // ================= BLACK HOLE BLACKJACK =================
-  draw() {
-    if (this.shoe.length < 60) {
-      this.shoe = [];
-      for (let d = 0; d < 6; d++) for (const s of SUITS) for (const r of RANKS) this.shoe.push({ r, s });
-      for (let i = this.shoe.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [this.shoe[i], this.shoe[j]] = [this.shoe[j], this.shoe[i]]; }
-      this.flash('SHUFFLING THE SHOE…');
-    }
-    return this.shoe.pop();
-  }
-
+  // a card as the hi-lo table shows it
   cardHTML(c, hidden = false, fresh = false) {
     if (hidden) return `<div class="card back${fresh ? ' deal' : ''}"></div>`;
     const red = c.s === '♥' || c.s === '♦';
     return `<div class="card${red ? ' red' : ''}${fresh ? ' deal' : ''}"><i>${c.r}<br>${c.s}</i><b>${c.s}</b><i class="br">${c.r}<br>${c.s}</i></div>`;
-  }
-
-  html_bj() {
-    return `<div class="bj felt">
-      <div class="bj-rules">BLACKJACK PAYS 3:2 · DEALER STANDS ON ALL 17s · 6-DECK SHOE</div>
-      <div class="bj-row"><div class="bj-label">DEALER <b data-dtot></b></div><div class="hand" data-dealer></div></div>
-      <div class="bj-msg" data-bjmsg>PLACE YOUR BET AND DEAL.</div>
-      <div class="bj-row"><div class="bj-label">YOU <b data-ptot></b></div><div class="hand" data-player></div></div>
-      <div class="bj-ctl" data-bjctl></div>
-    </div>`;
-  }
-
-  drawBJ(fresh = {}) {
-    if (this.tab !== 'bj') return;
-    const b = this.bj;
-    const hideHole = b.phase === 'play' || b.phase === 'dealing';
-    this.$('[data-dealer]').innerHTML = b.dealer.map((c, i) => this.cardHTML(c, i === 1 && hideHole, fresh.d === i)).join('');
-    this.$('[data-player]').innerHTML = b.player.map((c, i) => this.cardHTML(c, false, fresh.p === i)).join('');
-    const pv = handValue(b.player);
-    this.$('[data-ptot]').textContent = b.player.length ? `${pv.soft && pv.t <= 21 && pv.t !== 21 ? 'soft ' : ''}${pv.t}` : '';
-    this.$('[data-dtot]').textContent = b.dealer.length ? (hideHole ? `${handValue([b.dealer[0]]).t} + ?` : handValue(b.dealer).t) : '';
-    const ctl = this.$('[data-bjctl]');
-    if (b.phase === 'play') {
-      const canD = b.player.length === 2 && !b.doubled;
-      ctl.innerHTML = `<button data-act="hit">HIT <small>H</small></button><button data-act="stand">STAND <small>S</small></button><button data-act="double" ${canD ? '' : 'disabled'}>DOUBLE <small>D</small></button>`;
-    } else if (b.phase === 'dealing' || b.phase === 'dealer') ctl.innerHTML = '<button disabled>…</button>';
-    else ctl.innerHTML = `<button class="big" data-act="deal">DEAL ₵${fmt(this.bet)} <small>SPACE</small></button>`;
-  }
-
-  bjMsg(t, cls = '') {
-    const m = this.$('[data-bjmsg]');
-    if (!m) return;
-    m.textContent = t;
-    m.className = `bj-msg ${cls}`;
-  }
-
-  async deal() {
-    const b = this.bj;
-    if (b.phase === 'play' || b.phase === 'dealing' || b.phase === 'dealer') return;
-    if (!this.take(this.bet)) return;
-    Object.assign(b, { phase: 'dealing', player: [], dealer: [], stake: this.bet, doubled: false });
-    this.st.hands++;
-    this.bjMsg('DEALING…');
-    for (let k = 0; k < 4; k++) {
-      const toP = k % 2 === 0;
-      (toP ? b.player : b.dealer).push(this.draw());
-      this.audio.burst(0.05, 5000, 0.18);
-      this.drawBJ(toP ? { p: b.player.length - 1 } : { d: b.dealer.length - 1 });
-      await wait(260);
-    }
-    const pBJ = isBJ(b.player), dBJ = isBJ(b.dealer);
-    if (pBJ || dBJ) {
-      b.phase = 'done';
-      this.drawBJ();
-      if (pBJ && dBJ) { this.pay(b.stake, b.stake); this.bjMsg('BOTH BLACKJACK — PUSH.', 'push'); this.say('push'); } else if (pBJ) {
-        const w = Math.floor(b.stake * 2.5);
-        this.pay(w, b.stake);
-        this.st.bjs++;
-        this.bjMsg(`BLACKJACK! +₵${fmt(w - b.stake)}`, 'win');
-        this.burst('BLACKJACK!!', { size: 100, confetti: 50, shake: true });
-        this.fanfare();
-        this.say('bj');
-      } else { this.bjMsg('DEALER BLACKJACK. THE VOID STARES BACK.', 'lose'); this.lost('DEALER 21!'); }
-      return this.finishBJ();
-    }
-    b.phase = 'play';
-    this.bjMsg('HIT, STAND OR DOUBLE?');
-    this.drawBJ();
-  }
-
-  hit() {
-    const b = this.bj;
-    if (b.phase !== 'play') return;
-    b.player.push(this.draw());
-    this.audio.burst(0.05, 5000, 0.18);
-    const v = handValue(b.player).t;
-    this.drawBJ({ p: b.player.length - 1 });
-    if (v > 21) {
-      b.phase = 'done';
-      this.drawBJ();
-      this.bjMsg(`BUST WITH ${v}!`, 'lose');
-      this.burst('BUST!', { color: '#ff2a4a', size: 100 });
-      this.shake(true);
-      this.sadTrombone();
-      this.say('bust');
-      this.finishBJ();
-    } else if (v === 21) this.stand();
-  }
-
-  double() {
-    const b = this.bj;
-    if (b.phase !== 'play' || b.player.length !== 2 || b.doubled) return;
-    if (!this.take(b.stake)) return;
-    b.stake *= 2;
-    b.doubled = true;
-    this.flash('DOUBLE DOWN!');
-    b.player.push(this.draw());
-    this.audio.burst(0.05, 5000, 0.18);
-    const v = handValue(b.player).t;
-    this.drawBJ({ p: 2 });
-    if (v > 21) {
-      b.phase = 'done';
-      this.drawBJ();
-      this.bjMsg(`DOUBLE BUST WITH ${v}! OUCH.`, 'lose');
-      this.burst('BUST!', { color: '#ff2a4a', size: 100 });
-      this.sadTrombone();
-      this.say('bust');
-      this.finishBJ();
-    } else this.stand();
-  }
-
-  async stand() {
-    const b = this.bj;
-    if (b.phase !== 'play') return;
-    b.phase = 'dealer';
-    this.drawBJ({ d: 1 });
-    this.audio.burst(0.05, 5000, 0.18);
-    this.bjMsg('DEALER PLAYS…');
-    await wait(550);
-    while (handValue(b.dealer).t < 17) {
-      b.dealer.push(this.draw());
-      this.audio.burst(0.05, 5000, 0.18);
-      this.drawBJ({ d: b.dealer.length - 1 });
-      await wait(550);
-    }
-    b.phase = 'done';
-    this.drawBJ();
-    const p = handValue(b.player).t, d = handValue(b.dealer).t;
-    if (d > 21 || p > d) {
-      const w = b.stake * 2;
-      this.pay(w, b.stake);
-      this.bjMsg(d > 21 ? `DEALER BUSTS WITH ${d}! YOU WIN ₵${fmt(b.stake)}` : `${p} BEATS ${d}! YOU WIN ₵${fmt(b.stake)}`, 'win');
-      this.celebrate(w, b.stake);
-    } else if (p === d) {
-      this.pay(b.stake, b.stake);
-      this.bjMsg(`PUSH AT ${p}. STAKE RETURNED.`, 'push');
-      this.say('push');
-    } else {
-      this.bjMsg(`DEALER ${d} BEATS ${p}.`, 'lose');
-      this.lost();
-    }
-    this.finishBJ();
-  }
-
-  finishBJ() {
-    this.game.save();
-    this.refresh();
-    this.drawBJ();
   }
 
   // ================= CRATER ROULETTE =================

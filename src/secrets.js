@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { toon, glow, ink, textSprite } from './toon.js';
-import { frameQuat, tangent, arcDist, darkness } from './geo.js';
+import { frameQuat, tangent, arcDist } from './geo.js';
 import { SKATES } from './cosmetics.js';
 
 // The Moon's two big secrets.

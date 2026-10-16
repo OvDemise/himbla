@@ -3,7 +3,7 @@
 // reactor, charges, sensor pylons, ballot stands, phase emitters) and the outposts you found.
 // Everything is kit-built (outpostModels.js) like the settlements, so it reads as the same world.
 import * as THREE from 'three';
-import { Kit, T, G, D, GLASS, BEAM, crate, sandbags } from './outpostModels.js';
+import { Kit, T, G, GLASS, BEAM, crate, sandbags } from './outpostModels.js';
 import { rWheel, makeTurret } from './models.js';
 import { habDome, cabin, lattice, quonset } from './settlements.js';
 
