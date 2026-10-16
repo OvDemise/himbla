@@ -47,7 +47,7 @@ function rockGeo(lump, seed, detail = 2) {
 }
 
 // The kinds of rock: body colour, how lumpy, chunk colour, trail colour, and a dressing step.
-const KINDS = {
+export const KINDS = {
   stony: { w: 4, body: 0x6a5a52, lump: 0.22, chunk: 0x5a4a44, trail: 0xff8a2a, hot: 0xff6a2a },
   iron: { w: 2, body: 0x3c3f4c, lump: 0.08, chunk: 0x4a4d5a, trail: 0xfff1c0, hot: 0xffb347 },
   icy: { w: 2, body: 0xbfe6ff, lump: 0.14, chunk: 0xdff4ff, trail: 0x8fe3ff, hot: 0xe8fbff },
@@ -62,7 +62,7 @@ function pickKind() {
   return 'stony';
 }
 
-function scorchTex() {
+export function scorchTex() {
   if (SCORCH_TEX) return SCORCH_TEX;
   const c = document.createElement('canvas');
   c.width = c.height = 128;
@@ -86,6 +86,69 @@ function scorchTex() {
   return SCORCH_TEX;
 }
 
+// A rock's materials by kind: body, hot (its glow: ice shards, veins, crystals) and chunk (the debris it breaks into).
+export function meteorMats(kind) {
+  const K = KINDS[kind];
+  return { body: toon(K.body), hot: glow(K.hot), chunk: toon(K.chunk) };
+}
+
+// One rock's body, built to radius r (a lumpy unit rock stretched a little, then its kind's dressing: frost shards, glowing
+// veins, crystal clusters or pits). M = meteorMats(kind). Returns { body, geo }; the Asset Row builds its rocks with this too.
+export function makeMeteorRock(kind, M, r, seed) {
+  const K = KINDS[kind];
+  const geo = rockGeo(K.lump, seed, kind === 'iron' ? 3 : 2);
+  const body = new THREE.Group();
+  const mesh = new THREE.Mesh(geo, M.body);
+  mesh.castShadow = true;
+  ink(mesh, 0.05);
+  body.add(mesh);
+  body.scale.set(r * rand(0.85, 1.2), r * rand(0.75, 1.0), r * rand(0.9, 1.35));
+  // dressing per kind (in the unit rock's frame)
+  if (kind === 'icy') {
+    // comet ice: frosty shards poking out
+    for (let i = 0; i < 9; i++) {
+      const sp = new THREE.Mesh(new THREE.OctahedronGeometry(0.22, 0).scale(0.6, 1.8, 0.6), M.hot);
+      _a.set(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5).normalize();
+      sp.position.copy(_a).multiplyScalar(0.95);
+      sp.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), _a);
+      body.add(sp);
+    }
+  } else if (kind === 'carbon') {
+    // glowing veins: embers half-sunk all over it
+    for (let i = 0; i < 14; i++) {
+      const e = new THREE.Mesh(new THREE.SphereGeometry(rand(0.06, 0.13), 6, 4), M.hot);
+      _a.set(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5).normalize();
+      e.position.copy(_a).multiplyScalar(0.98);
+      e.scale.set(1, 1, rand(1.5, 3));
+      e.lookAt(_a.clone().multiplyScalar(2));
+      body.add(e);
+    }
+  } else if (kind === 'crystal') {
+    // clusters of glowing crystals
+    for (let c = 0; c < 3; c++) {
+      _c.set(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5).normalize();
+      for (let i = 0; i < 4; i++) {
+        const cr = new THREE.Mesh(new THREE.OctahedronGeometry(rand(0.15, 0.28), 0).scale(0.55, 1.9, 0.55), i % 2 ? M.hot : glow(0xff2e88));
+        _a.copy(_c).add(new THREE.Vector3((Math.random() - 0.5) * 0.5, (Math.random() - 0.5) * 0.5, (Math.random() - 0.5) * 0.5)).normalize();
+        cr.position.copy(_a).multiplyScalar(0.9);
+        cr.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), _a);
+        body.add(cr);
+      }
+    }
+  } else if (kind === 'iron') {
+    // regmaglypts: thumbprint pits, and a fused crust glint
+    for (let i = 0; i < 10; i++) {
+      const pit = new THREE.Mesh(new THREE.SphereGeometry(rand(0.12, 0.2), 8, 6), toon(0x23252e));
+      _a.set(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5).normalize();
+      pit.position.copy(_a).multiplyScalar(0.97);
+      pit.scale.set(1, 1, 0.35);
+      pit.lookAt(_a.clone().multiplyScalar(2));
+      body.add(pit);
+    }
+  }
+  return { body, geo };
+}
+
 export class Meteors {
   constructor(game) {
     this.game = game;
@@ -97,7 +160,7 @@ export class Meteors {
     this.chain = 0; // bounces in a row (each within CHAIN_WINDOW s of the last)
     this.lastBounce = -1e9;
     this.mats = {};
-    for (const [k, K] of Object.entries(KINDS)) this.mats[k] = { body: toon(K.body), hot: glow(K.hot), chunk: toon(K.chunk) };
+    for (const k of Object.keys(KINDS)) this.mats[k] = meteorMats(k);
   }
 
   // ---------- the shower itself ----------
@@ -156,64 +219,15 @@ export class Meteors {
     const travel = height / Math.sin(dive); // first seen ~280 m up: time to read it and plan a jump
     const pos = gp.clone().addScaledVector(fall, -travel);
     const r = rand(...SIZE);
-    const kind = pickKind(), K = KINDS[kind], M = this.mats[kind];
+    const kind = pickKind(), M = this.mats[kind];
     const seed = Math.random() * 100;
-    const geo = rockGeo(K.lump, seed, kind === 'iron' ? 3 : 2);
-    const body = new THREE.Group();
-    const mesh = new THREE.Mesh(geo, M.body);
-    mesh.castShadow = true;
-    ink(mesh, 0.05);
-    body.add(mesh);
-    body.scale.set(r * rand(0.85, 1.2), r * rand(0.75, 1.0), r * rand(0.9, 1.35));
+    const { body, geo } = makeMeteorRock(kind, M, r, seed);
     // its collision shape: three spheres strung along its longest axis (they turn with it)
     const sc = [body.scale.x, body.scale.y, body.scale.z];
     const li = sc.indexOf(Math.max(...sc));
     const minor = (sc.reduce((a, b) => a + b, 0) - sc[li]) / 2 * 0.92;
     const axis = new THREE.Vector3().setComponent(li, 1);
     const reach = Math.max(0, sc[li] - minor) * 0.85;
-    // dressing per kind (in the unit rock's frame)
-    if (kind === 'icy') {
-      // comet ice: frosty shards poking out
-      for (let i = 0; i < 9; i++) {
-        const sp = new THREE.Mesh(new THREE.OctahedronGeometry(0.22, 0).scale(0.6, 1.8, 0.6), M.hot);
-        _a.set(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5).normalize();
-        sp.position.copy(_a).multiplyScalar(0.95);
-        sp.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), _a);
-        body.add(sp);
-      }
-    } else if (kind === 'carbon') {
-      // glowing veins: embers half-sunk all over it
-      for (let i = 0; i < 14; i++) {
-        const e = new THREE.Mesh(new THREE.SphereGeometry(rand(0.06, 0.13), 6, 4), M.hot);
-        _a.set(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5).normalize();
-        e.position.copy(_a).multiplyScalar(0.98);
-        e.scale.set(1, 1, rand(1.5, 3));
-        e.lookAt(_a.clone().multiplyScalar(2));
-        body.add(e);
-      }
-    } else if (kind === 'crystal') {
-      // clusters of glowing crystals
-      for (let c = 0; c < 3; c++) {
-        _c.set(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5).normalize();
-        for (let i = 0; i < 4; i++) {
-          const cr = new THREE.Mesh(new THREE.OctahedronGeometry(rand(0.15, 0.28), 0).scale(0.55, 1.9, 0.55), i % 2 ? M.hot : glow(0xff2e88));
-          _a.copy(_c).add(new THREE.Vector3((Math.random() - 0.5) * 0.5, (Math.random() - 0.5) * 0.5, (Math.random() - 0.5) * 0.5)).normalize();
-          cr.position.copy(_a).multiplyScalar(0.9);
-          cr.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), _a);
-          body.add(cr);
-        }
-      }
-    } else if (kind === 'iron') {
-      // regmaglypts: thumbprint pits, and a fused crust glint
-      for (let i = 0; i < 10; i++) {
-        const pit = new THREE.Mesh(new THREE.SphereGeometry(rand(0.12, 0.2), 8, 6), toon(0x23252e));
-        _a.set(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5).normalize();
-        pit.position.copy(_a).multiplyScalar(0.97);
-        pit.scale.set(1, 1, 0.35);
-        pit.lookAt(_a.clone().multiplyScalar(2));
-        body.add(pit);
-      }
-    }
     const grp = new THREE.Group();
     grp.add(body);
     grp.position.copy(pos);

@@ -69,6 +69,25 @@ const NAMES = ['Gary', 'Priya', 'Tomasz', 'Little Juno', 'Ade', 'Wen', 'Marisol'
 
 const _v = new THREE.Vector3();
 
+// What a pickup looks like on the ground (dropLoot below; the Asset Row shows them too): a core in the item's colour (an octahedron;
+// an engine, a plating slab, a junk-bot box, or a pink crate), a halo ring and a thin light pillar. Returns { root, core }.
+export function makeLoot(kind, { credits = 0, crate = false } = {}) {
+  const root = new THREE.Group();
+  const color = crate ? 0xff7ad9 : credits && !kind ? 0xffd23f : new THREE.Color(ITEMS[kind].color).getHex();
+  const geo = crate ? new THREE.BoxGeometry(0.9, 0.9, 0.9) : kind === 'engine' ? new THREE.CylinderGeometry(0.5, 0.5, 0.9, 8).rotateZ(Math.PI / 2) : kind === 'plating' ? new THREE.BoxGeometry(1, 0.15, 0.8) : kind === 'junkbot' ? new THREE.BoxGeometry(0.6, 0.5, 0.6) : new THREE.OctahedronGeometry(0.45, 0);
+  const core = new THREE.Mesh(geo, toon(color));
+  ink(core, 0.05);
+  root.add(core);
+  const halo = new THREE.Mesh(new THREE.TorusGeometry(0.9, 0.06, 6, 20).rotateX(Math.PI / 2), glow(color));
+  halo.position.y = -0.6;
+  root.add(halo);
+  // a thin light pillar so it's easy to spot
+  const beam = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.25, 9, 6, 1, true), new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.45, depthWrite: false, blending: THREE.AdditiveBlending }));
+  beam.position.y = 4;
+  root.add(beam);
+  return { root, core };
+}
+
 // Containment jar + Dr. Zbornak's reactor and splice pod: scoop things up, let them stew,
 // feed them to the antimatter, breed chimeras, and occasionally mutate yourself.
 export class Alchemy {
@@ -283,19 +302,7 @@ export class Alchemy {
     const up = pos.clone().normalize();
     const land = to || pos.clone().addScaledVector(tangent(new THREE.Vector3(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5), up).normalize(), 1 + Math.random() * 2);
     const at = g.planet.ground(land, new THREE.Vector3(), 0.9);
-    const root = new THREE.Group();
-    const color = crate ? 0xff7ad9 : credits && !kind ? 0xffd23f : new THREE.Color(ITEMS[kind].color).getHex();
-    const geo = crate ? new THREE.BoxGeometry(0.9, 0.9, 0.9) : kind === 'engine' ? new THREE.CylinderGeometry(0.5, 0.5, 0.9, 8).rotateZ(Math.PI / 2) : kind === 'plating' ? new THREE.BoxGeometry(1, 0.15, 0.8) : kind === 'junkbot' ? new THREE.BoxGeometry(0.6, 0.5, 0.6) : new THREE.OctahedronGeometry(0.45, 0);
-    const core = new THREE.Mesh(geo, toon(color));
-    ink(core, 0.05);
-    root.add(core);
-    const halo = new THREE.Mesh(new THREE.TorusGeometry(0.9, 0.06, 6, 20).rotateX(Math.PI / 2), glow(color));
-    halo.position.y = -0.6;
-    root.add(halo);
-    // a thin light pillar so it's easy to spot
-    const beam = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.25, 9, 6, 1, true), new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.45, depthWrite: false, blending: THREE.AdditiveBlending }));
-    beam.position.y = 4;
-    root.add(beam);
+    const { root, core } = makeLoot(kind, { credits, crate });
     frameQuat(at.clone().normalize(), tangent(SUN.clone(), up).normalize(), root.quaternion);
     g.scene.add(root);
     const from = pos.clone().addScaledVector(up, 2);
