@@ -607,11 +607,11 @@ class Game {
         for (const h of e.inkHulls) {
           if (on) {
             if (!h.userData.geo0) h.userData.geo0 = h.geometry;
-            h.geometry = scanGeo(h.userData.inkGeo ? h.userData.inkGeo.thin : h.userData.geo0);
+            h.geometry = scanGeo(h.userData.inkGeo ? h.userData.inkGeo.scan || h.userData.inkGeo.thin : h.userData.geo0);
             h.material = SCAN_INK;
           } else {
             h.geometry = h.userData.inkGeo ? h.userData.inkGeo.thin : h.userData.geo0 || h.geometry;
-            h.material = inkMat;
+            h.material = h.userData.inkMat || inkMat;
           }
         }
       }

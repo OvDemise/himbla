@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { toon, ink, glow, inkMat } from './toon.js';
+import { toon, ink, glow, inkMat, inkMatNear } from './toon.js';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
@@ -127,7 +127,7 @@ const LENS_M = new THREE.MeshBasicMaterial({ color: 0xfff6a8 });
 // If the file can't be loaded, makeRunner falls back to the primitive build below.
 let RUNNER_PARTS = null;
 const PIVOTS = ['legL', 'legR', 'torso', 'head', 'armL', 'armR', 'foreL', 'foreR']; // (foreL/foreR: forearms, on the elbows)
-const EXTRA_PIVOTS = ['padL', 'padR', 'band', 'antenna']; // (outfit extras, hung on by cosmetics.js; optional, so an older file still loads)
+const EXTRA_PIVOTS = ['padL', 'padR', 'band', 'antenna', 'crest']; // (outfit extras, hung on by cosmetics.js; optional, so an older file still loads)
 const NO_SHADOW = new Set(['glow', 'lens', 'glint']);
 export async function loadRunnerParts() {
   try {
@@ -178,7 +178,9 @@ function bakeRunnerParts(scene) {
     let ink = null;
     if (g.ink.length) {
       const base = mergeGeometries(g.ink);
-      ink = { thin: shellAt(base, 1), fat: shellAt(base, 4) };
+      // thin and fat keep their offset apart from the surface (inkMatNear scales it with the camera's distance); scan is the old
+      // surface-plus-offset shell, which the threat scanner's red line is built from (main.js scanGeo)
+      ink = { thin: shellOff(base, 1), fat: shellOff(base, 4), scan: shellAt(base, 1) };
     }
     out[key] = { parts, ink };
   }
@@ -207,6 +209,24 @@ function inkShellGeo(geo, t) {
   g.setAttribute('position', pos.clone());
   g.setAttribute('off', new THREE.BufferAttribute(off, 3));
   g.setIndex(geo.index.clone());
+  return g;
+}
+
+// the same shell as a geometry whose `position` is the surface and whose `off` attribute is k times the offset (inkMatNear adds it back,
+// scaled by the camera's distance); its bounding sphere is grown by the longest offset
+function shellOff(base, k) {
+  const o = base.attributes.off.array, off = new Float32Array(o.length);
+  let mx = 0;
+  for (let i = 0; i < o.length; i += 3) {
+    off[i] = o[i] * k; off[i + 1] = o[i + 1] * k; off[i + 2] = o[i + 2] * k;
+    mx = Math.max(mx, Math.hypot(off[i], off[i + 1], off[i + 2]));
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', base.attributes.position);
+  g.setAttribute('off', new THREE.BufferAttribute(off, 3));
+  g.setIndex(base.index);
+  g.computeBoundingSphere();
+  g.boundingSphere.radius += mx;
   return g;
 }
 
@@ -243,10 +263,11 @@ export function runnerExtra(key, mats, fallback = null) {
     g.add(m);
   }
   if (B.ink) {
-    const h = new THREE.Mesh(B.ink.thin, inkMat);
+    const h = new THREE.Mesh(B.ink.thin, inkMatNear);
     h.castShadow = false;
     h.userData.isInk = true;
     h.userData.inkGeo = B.ink;
+    h.userData.inkMat = inkMatNear;
     g.add(h);
   }
   return g;
@@ -261,11 +282,12 @@ function addBaked(target, key, mats) {
     target.add(m);
   }
   if (B.ink) {
-    const h = new THREE.Mesh(B.ink.thin, inkMat);
+    const h = new THREE.Mesh(B.ink.thin, inkMatNear);
     h.castShadow = false;
     h.userData.isInk = true;
-    // the threat scanner swaps in the fat shell instead of scaling this one (see main.js)
+    // the threat scanner swaps in the fat shell instead of scaling this one (see main.js); inkMat is what it puts back
     h.userData.inkGeo = B.ink;
+    h.userData.inkMat = inkMatNear;
     target.add(h);
   }
 }
