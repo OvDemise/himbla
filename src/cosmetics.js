@@ -78,6 +78,7 @@ export function dressRunner(M, outfitId) {
   M.scarfStyle = { len, w, tails };
   const out = [];
   M.halo = null;
+  if (M.antenna) M.antenna.visible = !(o.extras || []).includes('halo');
   const add = (parent, mesh, outline = 0.03) => { if (outline) ink(mesh, outline); parent.add(mesh); out.push(mesh); return mesh; };
   for (const e of o.extras || []) {
     if (e === 'crest') {
@@ -96,7 +97,7 @@ export function dressRunner(M, outfitId) {
         p.scale.set(1.1, 0.7, 1);
       }
     } else if (e === 'halo') {
-      // floats above the antenna's bead (0.66), not through it, and hangs off the helmet on a magnetic spring (updateHalo)
+      // floats over the helmet on a magnetic spring (updateHalo); the antenna comes off, so the ring has nothing to pass through
       const h = add(M.head, new THREE.Mesh(EXTRA_GEO().halo, glow(o.accent)), 0);
       h.rotation.x = Math.PI / 2;
       h.position.y = HALO_Y;
@@ -118,9 +119,9 @@ export function dressRunner(M, outfitId) {
 
 // The halo hangs above the helmet as if linked to it by magnets: a spring-and-damper in the head's own frame
 // that the head's acceleration pushes on (so it lags behind a sprint, swings out in a turn, bobs on a landing)
-// and that bumps (kick) set ringing. It slides a few centimetres and tilts at most 0.25 rad, which keeps its
-// rim clear of the antenna's bead (the bead tops out at y 0.66 on the head, 0.26 from the axis).
-const HALO_Y = 0.8;
+// and that bumps (kick) set ringing. It slides a few centimetres and tilts at most 0.25 rad. A runner with a halo
+// has no antenna (dressRunner), so nothing is there for it to pass through.
+const HALO_Y = 0.62;
 const _hp = new THREE.Vector3(), _ha = new THREE.Vector3(), _hq = new THREE.Quaternion(), _hQ = new THREE.Quaternion(), _hE = new THREE.Euler();
 export class HaloSim {
   constructor(mesh) {

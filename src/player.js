@@ -629,8 +629,10 @@ export class Player {
       m.armL.rotation.z = -0.3; m.armR.rotation.z = 0.3;
       // elbows bent, hands out in front; leaning into a turn the inside arm tucks and the outside one reaches
       const bank = THREE.MathUtils.clamp(this.roll / 0.5, -1, 1);
-      m.foreL.rotation.x = -(0.3 + 0.55 * crouch) + 0.25 * bank;
-      m.foreR.rotation.x = -(0.3 + 0.55 * crouch) - 0.25 * bank;
+      // (leaned right over at full speed the hands are already forward, so the bend halves: 0.85 -> 0.43)
+      const bend = (0.3 + 0.55 * crouch) * (1 - 0.5 * crouch);
+      m.foreL.rotation.x = -bend + 0.25 * bank * (1 - 0.5 * crouch);
+      m.foreR.rotation.x = -bend - 0.25 * bank * (1 - 0.5 * crouch);
     } else {
       const run = Math.min(1, sp / 6);
       m.body.position.y = base + Math.abs(s) * 0.12 * run;

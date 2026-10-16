@@ -366,8 +366,10 @@ mesh("torso_plate", xf(superquad(0.215, 0.145, 0.035, 0.3, 0.3, 16, 8), (0, 0.65
 mesh("torso_plateInset", xf(superquad(0.17, 0.1, 0.012, 0.3, 0.3, 14, 6), (0, 0.655, 0), (-0.06, 0, 0), fn=cwrap(0.355, 0.315)), "helmet", T, 0)
 chev = extrude([(-0.11, 0.03), (0.0, -0.05), (0.11, 0.03), (0.11, 0.075), (0.0, -0.005), (-0.11, 0.075)], 0.016, "z")
 mesh("torso_chevron", xf(chev, (0, 0.635, 0), (-0.06, 0, 0), fn=cwrap(0.366, 0.326)), "accent", T, 0)
-mesh("torso_light", xf(superquad(0.02, 0.02, 0.01, 1, 1, 8, 6), (0.135, 0.73, 0), (-0.06, 0, 0), fn=cwrap(0.358, 0.32)), "glow", T, 0)
-mesh("torso_light2", xf(superquad(0.02, 0.02, 0.01, 1, 1, 8, 6), (-0.135, 0.73, 0), (-0.06, 0, 0), fn=cwrap(0.358, 0.32)), "glow", T, 0)
+# (the dots: their x offset is in the geometry, so the wrap curves them round the plate with the chevron; a translation
+# applied after the wrap left them flat, 2.5 cm proud of the curved plate)
+mesh("torso_light", xf(xf(superquad(0.02, 0.02, 0.008, 1, 1, 8, 6), (0.135, 0, 0)), (0, 0.73, 0), (-0.06, 0, 0), fn=cwrap(0.366, 0.326)), "glow", T, 0)
+mesh("torso_light2", xf(xf(superquad(0.02, 0.02, 0.008, 1, 1, 8, 6), (-0.135, 0, 0)), (0, 0.73, 0), (-0.06, 0, 0), fn=cwrap(0.366, 0.326)), "glow", T, 0)
 # utility belt with a buckle and side pouches
 mesh("torso_belt", xf(torus(0.262, 0.042, 20, 5, 1.1), (0, 0.3, 0), s=(1, 1, 0.8)), "dark", T, 0.02)
 mesh("torso_buckle", xf(superquad(0.075, 0.05, 0.025, 0.25, 0.25, 12, 6), (0, 0.3, 0.215)), "accent", T, 0.02)
@@ -435,9 +437,11 @@ for s in (-1, 1):
     mesh(f"head_podRing{tag}", xf(torus(0.06, 0.012, 16, 4), (s * 0.4, -0.01, -0.03), (0, 0, math.pi / 2)), "glow", H, 0)
 mesh("head_rim", xf(torus(0.282, 0.036, 20, 5), (0, -0.195, 0)), "dark", H, 0.02)
 # antenna with a glowing bead, and the helmet lamp on the right temple
-mesh("head_antennaBase", xf(lathe([(0, 0), (0.04, 0), (0.035, 0.04), (0.015, 0.06), (0, 0.06)], 10), (0.22, 0.27, -0.1), (0, 0, -0.05)), "dark", H, 0.01)
-mesh("head_antenna", tube([(0.22, 0.3, -0.1), (0.222, 0.45, -0.11), (0.226, 0.57, -0.12)], [0.014, 0.012, 0.01], 6), "dark", H, 0)
-mesh("head_bead", xf(superquad(0.055, 0.055, 0.055, 1, 1, 10, 6), (0.226, 0.6, -0.12)), "glow", H, 0)
+# (on a pivot of its own, so an outfit with a halo can leave it off)
+AN = pivot("antenna", (0, 0, 0), H)
+mesh("head_antennaBase", xf(lathe([(0, 0), (0.04, 0), (0.035, 0.04), (0.015, 0.06), (0, 0.06)], 10), (0.22, 0.27, -0.1), (0, 0, -0.05)), "dark", AN, 0.01)
+mesh("head_antenna", tube([(0.22, 0.3, -0.1), (0.222, 0.45, -0.11), (0.226, 0.57, -0.12)], [0.014, 0.012, 0.01], 6), "dark", AN, 0)
+mesh("head_bead", xf(superquad(0.055, 0.055, 0.055, 1, 1, 10, 6), (0.226, 0.6, -0.12)), "glow", AN, 0)
 mesh("head_lamp", xf(lathe([(0, -0.05), (0.06, -0.05), (0.07, 0.03), (0.062, 0.05), (0, 0.05)], 12), (0.3, 0.15, 0.17), (math.pi / 2, 0, 0)), "dark", H, 0.015)
 mesh("head_lens", xf(superquad(0.05, 0.05, 0.03, 1, 1, 12, 6), (0.3, 0.15, 0.225)), "lens", H, 0)
 

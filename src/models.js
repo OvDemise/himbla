@@ -127,7 +127,7 @@ const LENS_M = new THREE.MeshBasicMaterial({ color: 0xfff6a8 });
 // If the file can't be loaded, makeRunner falls back to the primitive build below.
 let RUNNER_PARTS = null;
 const PIVOTS = ['legL', 'legR', 'torso', 'head', 'armL', 'armR', 'foreL', 'foreR']; // (foreL/foreR: forearms, on the elbows)
-const EXTRA_PIVOTS = ['padL', 'padR', 'band']; // (outfit extras, hung on by cosmetics.js; optional, so an older file still loads)
+const EXTRA_PIVOTS = ['padL', 'padR', 'band', 'antenna']; // (outfit extras, hung on by cosmetics.js; optional, so an older file still loads)
 const NO_SHADOW = new Set(['glow', 'lens', 'glint']);
 export async function loadRunnerParts() {
   try {
@@ -521,6 +521,8 @@ export function makeRunner({
   const head = new THREE.Group();
   head.position.y = 1.18;
   torso.add(head);
+  const antenna = new THREE.Group(); // (its own group: an outfit with a halo takes it off, see dressRunner)
+  head.add(antenna);
   if (!baked) {
     // primitive fallback (only if runner.glb failed to load)
     const trunk = part(G.torso, suitM, 0, 0, 0, 0.04);
@@ -551,11 +553,12 @@ export function makeRunner({
     head.add(glint);
     for (const side of [-1, 1]) head.add(part(G.pod, accentM, side * 0.352, -0.01, -0.03, 0.02));
     head.add(part(G.rim, dark, 0, -0.215, 0, 0.02));
-    head.add(part(G.antenna, dark, 0.22, 0.38, -0.1, 0));
-    head.add(part(G.bead, glowM, 0.22, 0.6, -0.1, 0));
+    antenna.add(part(G.antenna, dark, 0.22, 0.38, -0.1, 0));
+    antenna.add(part(G.bead, glowM, 0.22, 0.6, -0.1, 0));
   } else {
     addBaked(torso, 'torso', mats);
     addBaked(head, 'head', mats);
+    if (RUNNER_PARTS.antenna) addBaked(antenna, 'antenna', mats);
   }
   if (pirate) {
     const band = runnerExtra('band', { accent: toon(0xd7263d), dark: toon(0x3a0f18) });
@@ -612,7 +615,7 @@ export function makeRunner({
   }
 
   root.scale.setScalar(scale);
-  return { root, trick, body, bodyBase: -1.2, torso, head, legL: legs[0], legR: legs[1], armL: arms[0], armR: arms[1], foreL: fores[0], foreR: fores[1], scarf: scarfPivot, cargoSlot, glowM, accent, mats: { suit: suitM, accent: accentM, helmet: helmetM, visor: visorM, scarf: scarfM, collar: collarM, glow: glowM, skate: skateM } };
+  return { root, trick, body, bodyBase: -1.2, torso, head, legL: legs[0], legR: legs[1], antenna, armL: arms[0], armR: arms[1], foreL: fores[0], foreR: fores[1], scarf: scarfPivot, cargoSlot, glowM, accent, mats: { suit: suitM, accent: accentM, helmet: helmetM, visor: visorM, scarf: scarfM, collar: collarM, glow: glowM, skate: skateM } };
 }
 
 // ---- townsfolk ----
