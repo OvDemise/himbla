@@ -143,6 +143,7 @@ function applyCouncil(ws, locations) {
   }
   if (passed.includes('militiaPact')) {
     for (const l of locations) if (l.faction === 'kepler' && l.defense && !l.militia) { l.militia = true; l.defense = { ...l.defense, turrets: (l.defense.turrets || 0) + 2 }; }
-    sell('kepler', { key: 'v_mule', name: 'Kepler Homestead Mule', desc: 'VEHICLE: the soft-riding hauler, yours to call with V', cost: 2500, max: 1, vehicle: 'mule' });
+    // (not the Mule: the Kepler story already gives it to the only players who can call a vote)
+    sell('kepler', { key: 'v_carrier', name: 'Kepler Militia Carrier', desc: 'VEHICLE: the militia\'s armoured hauler with a turret cannon, yours to call with V', cost: 3500, max: 1, vehicle: 'carrier' });
   }
 }
