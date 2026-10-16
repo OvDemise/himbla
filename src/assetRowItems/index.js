@@ -9,10 +9,12 @@
 //                             anything is built, so they must be right to within a few metres (the checks compare them
 //                             with what is really built, tools/asset-row-check.mjs)
 //   big     true              a place wider than 100 m: stands in lane B instead of lane A
-//   solid   false             no colliders (the default: the item's own `cols`, or one box round what it built)
+//   solid   false             no colliders at all (the default: the item's own `cols`, or one box round what it built)
+//   labelH, labelZ  metres    the name board's height, and its distance in front of the footprint (the default board is big: a small
+//                             low item can shrink it and push it out of the way)
 //   make(ctx)                 builds it: ctx = { game, moon } (moon: the Moon's planet, for what needs its look). Returns
 //                               { root,            an Object3D standing on y = 0, with an IDENTITY transform of its own
-//                                 cols?,           colliders in root's frame: [{ type: 'box'|'cyl'|'sphere', ... }] as
+//                                 cols?,           colliders in root's frame (an empty array = none, e.g. a line of figures): [{ type: 'box'|'cyl'|'sphere', ... }] as
 //                                                  outpostTemplate gives them (box: x y z hx hy hz yaw; cyl: x z y0 y1 r;
 //                                                  sphere: x y z r)
 //                                 update?(dt, t),  called every frame while it is built (a spinner, a blinker, a lifted gear)

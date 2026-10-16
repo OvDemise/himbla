@@ -172,16 +172,16 @@ export class AssetRow {
     this.root.add(inst);
     inst.updateMatrixWorld(true);
     // the name board, on the walking side
-    const bh = Math.min(10, Math.max(1.1, Math.max(e.w, e.d) * 0.05 + 0.9));
+    const bh = e.it.labelH || Math.min(10, Math.max(1.1, Math.max(e.w, e.d) * 0.05 + 0.9));
     const label = board(e.it.label || e.it.id, bh, COLOR[e.lane]);
-    label.position.set(0, bh * 0.5 + 0.3, e.d / 2 + 3 + bh * 0.4);
+    label.position.set(0, bh * 0.5 + 0.3, e.d / 2 + (e.it.labelZ ?? 3 + bh * 0.4));
     inst.add(label);
     // colliders: the item's own (kit-built things carry real specs) or one box round what was built
     if (e.it.solid !== false) {
       const specs = [];
       // (obj sits inside inst; the specs are in obj's frame, which differs from inst's only by obj.position: a pure translation)
       const at = (x, y, z) => new THREE.Vector3(e.x + obj.position.x + x, y, e.z + obj.position.z + z);
-      if (made.cols && made.cols.length) {
+      if (made.cols) { // (an array, even an empty one, is the item's own word on it; none at all: one box round what was built)
         for (const b of made.cols) {
           if (b.type === 'sphere') specs.push({ type: 'sphere', c: at(b.x, b.y, b.z), r: b.r });
           else if (b.type === 'cyl') specs.push({ type: 'cyl', c: at(b.x, 0, b.z), axis: UP.clone(), y0: b.y0, y1: b.y1, r: b.r });
