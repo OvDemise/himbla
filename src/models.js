@@ -1227,8 +1227,8 @@ export function makeRover({ color = 0x7b2ff7, trim = 0xffd23f, pirate = true, fl
 let SHIP_PARTS = null;
 const SHIP_GLOW = { glass: 0x9be7ff, window: 0xfff6a8, cabin: 0xfff1b0, red: 0xff2a4a, green: 0x7dff6a, white: 0xffffff, sign: 0xffd23f, bay: 0x0c0915 };
 const SHIP_TOON = { trim: 0xd8d4e8, dark: 0x2a2540, metal: 0x8a87a0, steel: 0x55607a, deck: 0x5b5870, hazard: 0xffd23f, cargo0: 0xffd23f, cargo1: 0x2ec4ff, cargo2: 0xff3b5c, cargo3: 0x7dff6a };
-const SHIP_FX = new Set(['plume', 'plumeCore', 'lift', 'engine', 'core']); // per-ship materials (they pulse)
-const FLAMES = new Set(['plume', 'plumeCore', 'lift']);
+const SHIP_FX = new Set(['plume', 'plumeCore', 'lift', 'engine', 'core', 'beacon']); // per-ship materials (they pulse)
+const FLAMES = new Set(['plume', 'plumeCore', 'lift', 'beacon']);
 export async function loadShipParts() {
   const [gltf, sk, wr, ap, lt, cr, ga, di, en, bc, hc] = await Promise.all(['ships', 'skimmer', 'warrig', 'apc', 'landtrain', 'crane', 'garage', 'dish', 'engine', 'briefcase', 'hovercar'].map(loadGlb));
   SHIP_PARTS = {};
@@ -1359,6 +1359,7 @@ function makeShip(kind, { color, stripe, faction = 'kepler' }) {
     lift: new THREE.MeshBasicMaterial({ color: 0x8fd8ff, opacity: 0.6, ...add }),
     engine: new THREE.MeshBasicMaterial({ color: 0xff9f1c }),
     core: new THREE.MeshBasicMaterial({ color: 0xfff3c0 }),
+    beacon: new THREE.MeshBasicMaterial({ color: 0xff4a3a, opacity: 0.4, ...add }), // (the glow round the mast light)
   };
   const matFor = (slot) => {
     if (SHIP_FX.has(slot)) return fx[slot];
@@ -1377,7 +1378,7 @@ function makeShip(kind, { color, stripe, faction = 'kepler' }) {
     if (!cargoMats.has(slot)) cargoMats.set(slot, slot in pal ? toon(pal[slot]) : LT_GLOW[slot] !== undefined ? glow(LT_GLOW[slot]) : toon(LT_TOON[slot] ?? 0xff00ff));
     return cargoMats.get(slot);
   };
-  const rig = { legs: [], doors: [], ramps: [], hatches: [], plumes: [], lifts: [] };
+  const rig = { legs: [], doors: [], ramps: [], hatches: [], plumes: [], lifts: [], blinkers: [], cranes: [] };
   const build = (node, cargo = false) => {
     if (node.role === 'livery' && node.data.faction !== fac) return null; // (the other factions' marks never exist)
     cargo = cargo || node.role === 'cargo';
@@ -1398,8 +1399,10 @@ function makeShip(kind, { color, stripe, faction = 'kepler' }) {
       g.add(h);
     }
     const d = node.data;
-    let leg = null;
-    if (node.role === 'leg') rig.legs.push(leg = { g, fold: d.fold, foot: null });
+    let leg = null, crane = null;
+    if (node.role === 'blinker') rig.blinkers.push({ g, phase: d.phase || 0 }); // (the mast's flashing light)
+    else if (node.role === 'trolley') rig.cranes.push(crane = { g, side: d.side, min: d.travelMin, max: d.travelMax, drop: d.dropMax, z0: g.position.z, hoist: null, hoistY: 0, cables: [] });
+    else if (node.role === 'leg') rig.legs.push(leg = { g, fold: d.fold, foot: null });
     else if (node.role === 'door') rig.doors.push({ g, open: d.open });
     else if (node.role === 'ramp') rig.ramps.push({ g, closed: d.closed, opened: d.opened });
     else if (node.role === 'hatch') rig.hatches.push(g);
@@ -1410,6 +1413,8 @@ function makeShip(kind, { color, stripe, faction = 'kepler' }) {
       if (!c) continue;
       g.add(c);
       if (leg && k.role === 'foot') leg.foot = c;
+      if (crane && k.role === 'hoist') { crane.hoist = c; crane.hoistY = c.position.y; }
+      else if (crane && k.role === 'cable') crane.cables.push(c);
     }
     return g;
   };
@@ -1455,6 +1460,11 @@ function makeShip(kind, { color, stripe, faction = 'kepler' }) {
         const s = lift * pulse(P.phase, 19), w = 0.85 + 0.15 * s;
         P.g.scale.set(w, Math.max(0.05, s), w);
       }
+      // the mast's light: a double flash every 1.25 s
+      for (const L of rig.blinkers) {
+        const ph = (((t * 0.8 + L.phase) % 1) + 1) % 1;
+        L.g.visible = ph < 0.09 || (ph > 0.19 && ph < 0.28);
+      }
       const p = pulse(0, 15);
       fx.plume.opacity = 0.42 + 0.22 * Math.min(1, main) * p;
       fx.plumeCore.opacity = 0.6 + 0.3 * Math.min(1, main);
@@ -1464,9 +1474,25 @@ function makeShip(kind, { color, stripe, faction = 'kepler' }) {
       fx.core.color.setHex(0x8a6a4a).lerp(_shipHot.setHex(0xfffbe8), heat);
     },
   };
+  // The gantry cranes (a trolley on each side's rail, built over that side's first empty bay): `work` 0..1 is how much they are sweeping the
+  // bays, t a clock, `lower` 0..1 whether they may lower their spreaders (only over their own bay, and only while the ship is down). At
+  // work 0 each rests where it is built; at 1 it runs the whole of its rail, easing and dwelling at the ends.
+  ship.setCrane = (work, t, lower) => {
+    for (const C of rig.cranes) {
+      const span = C.max - C.min;
+      const home = -C.min / span;
+      const sweep = THREE.MathUtils.smoothstep(0.5 + 0.5 * Math.sin(t * 0.32 + C.side * 1.9), 0.1, 0.9);
+      const dz = C.min + span * (home + (sweep - home) * work);
+      C.g.position.z = C.z0 + dz;
+      const drop = Math.max(0.12, C.drop * lower * THREE.MathUtils.smoothstep(THREE.MathUtils.clamp(1.3 - Math.abs(dz) / 1.6, 0, 1), 0, 1));
+      if (C.hoist) C.hoist.position.y = C.hoistY - drop;
+      for (const cb of C.cables) cb.scale.y = drop;
+    }
+  };
   ship.setGear(1);
   ship.setRamp(0);
   ship.setThrust(0, 0, 0);
+  ship.setCrane(0, 0, 0);
   return ship;
 }
 

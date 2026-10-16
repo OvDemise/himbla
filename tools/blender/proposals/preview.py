@@ -11,9 +11,9 @@ GAME = {
     "body": 0xb8b4c8, "stripe": 0xff9f1c, "trim": 0xd8d4e8, "dark": 0x2a2540, "metal": 0x8a87a0, "steel": 0x55607a, "deck": 0x5b5870,
     "hazard": 0xffd23f, "cargo0": 0xffd23f, "cargo1": 0x2ec4ff, "cargo2": 0xff3b5c, "cargo3": 0x7dff6a,
     "glass": 0x9be7ff, "window": 0xfff6a8, "cabin": 0xfff1b0, "red": 0xff2a4a, "green": 0x7dff6a, "white": 0xffffff, "sign": 0xffd23f,
-    "bay": 0x0c0915, "engine": 0xff9f1c, "core": 0xfff5c0, "plume": 0xff8a1f, "plumeCore": 0xfff0cc, "lift": 0x8fd8ff,
+    "bay": 0x0c0915, "engine": 0xff9f1c, "core": 0xfff5c0, "plume": 0xff8a1f, "plumeCore": 0xfff0cc, "lift": 0x8fd8ff, "beacon": 0xff5040,
 }
-EMIT = {"glass", "window", "cabin", "red", "green", "white", "sign", "engine", "core", "plume", "plumeCore", "lift"}
+EMIT = {"glass", "window", "cabin", "red", "green", "white", "sign", "engine", "core", "plume", "plumeCore", "lift", "beacon"}
 
 VIEWS = {
     "front34": dict(az=-38, el=22, dist=1.35, aim=(0, 0, 0)),     # bow toward the camera's right, from above

@@ -2329,6 +2329,14 @@ export class Traffic {
     v.fwd.set(0, 0, 1).applyQuaternion(v.root.quaternion);
     M.setRamp(v.open);
     M.setThrust(main, lift, v.clock);
+    if (M.setCrane) {
+      // the freighter's gantry cranes work the bays while it stands on its pad (the spreaders go down only over their own bay, and are hoisted
+      // again before it lifts off)
+      const down = v.state === 'park' && !v.closing;
+      v.craneW = (v.craneW || 0) + ((down && v.timer > 2 ? 1 : 0) - (v.craneW || 0)) * Math.min(1, dt * 0.7);
+      v.craneL = (v.craneL || 0) + ((down ? 1 : 0) - (v.craneL || 0)) * Math.min(1, dt * 1.2);
+      M.setCrane(v.craneW, v.clock, v.craneL);
+    }
     this.syncDeck(v, camPos);
   }
 
