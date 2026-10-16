@@ -143,6 +143,10 @@ const ground = {
       },
     },
     {
+      id: 'veh.carrier', label: 'KEPLER MILITIA CARRIER', w: 10, d: 9,
+      make: () => { const m = buildVehicleModel('carrier'); return { root: pose(m.root, YAW) }; },
+    },
+    {
       id: 'veh.lightbike', label: 'MERIDIAN COURIER LIGHT-BIKE', w: 6, d: 4,
       make: () => { const m = buildVehicleModel('van'); return { root: pose(m.root, YAW) }; },
     },

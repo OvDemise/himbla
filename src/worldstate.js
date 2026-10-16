@@ -14,9 +14,13 @@
 //   pirateTowns [location ids]     Lights Out: the towns the clans blew up and took (pirate dens now)
 //   blackSun    true               Daedalus chapter 4: the reactor at the Forward Post stays
 //   town        {dir,name,kind,    Kepler finale: your town (hometown.js), a settlement on the map
-//               slots,bank}        (slots: eight building keys or null; School & Playground became Roads,
-//                                  so an old save's 'school' is read as 'roads' at load)
+//               slots,bank,radio}  (slots: eight building keys or null; School & Playground became Roads,
+//                                  so an old save's 'school' is read as 'roads' at load; radio: the Radio Tower's
+//                                  sweep of the world map, { d: [x,y,z], r metres, on, n cells, f: [location ids] },
+//                                  radio.js)
 //   council     {passed,next}      the Moon Council's carried motions (and when it sits next)
+//   respawnAt   string|null        the headquarters (location id) you set at your town's clinic to redeploy at after a
+//                                  K.O. (respawn.js); null = your nearest clinic, else home
 //   bulletin    string|null        news to show once, on the first load after a finale
 import * as THREE from 'three';
 import { FACTIONS, SHOPS } from './locations.js';
@@ -27,7 +31,7 @@ const KEY = 'moonrunner-world-v1';
 export function loadWorldState() {
   let d = null;
   try { d = JSON.parse(localStorage.getItem(KEY) || 'null'); } catch { /* fresh */ }
-  return { conquered: {}, piratesGone: false, lawless: false, razed: [], town: null, council: null, bulletin: null, ...(d || {}) };
+  return { conquered: {}, piratesGone: false, lawless: false, razed: [], town: null, council: null, respawnAt: null, bulletin: null, ...(d || {}) };
 }
 
 export function saveWorldState(ws) {
@@ -139,6 +143,7 @@ function applyCouncil(ws, locations) {
   }
   if (passed.includes('militiaPact')) {
     for (const l of locations) if (l.faction === 'kepler' && l.defense && !l.militia) { l.militia = true; l.defense = { ...l.defense, turrets: (l.defense.turrets || 0) + 2 }; }
-    sell('kepler', { key: 'v_mule', name: 'Kepler Homestead Mule', desc: 'VEHICLE: the soft-riding hauler, yours to call with V', cost: 2500, max: 1, vehicle: 'mule' });
+    // (not the Mule: the Kepler story already gives it to the only players who can call a vote)
+    sell('kepler', { key: 'v_carrier', name: 'Kepler Militia Carrier', desc: 'VEHICLE: the militia\'s armoured hauler with a turret cannon, yours to call with V', cost: 3500, max: 1, vehicle: 'carrier' });
   }
 }
