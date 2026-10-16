@@ -15,6 +15,12 @@
 // structure's collider) doesn't budge at all. A traffic vehicle you've dragged off its route eases back onto
 // it when you let go (traffic.js applyTug), and a rover's own driving takes it back. SAT-7 doesn't move
 // at all: hook it and you go round with it.
+//
+// The cable bends round structures like a rope round pegs: every 20th of a second it checks each leg of its path for a structure in the
+// way and, if there is one, bends round the best point along that structure's edges (up to WRAP_MAX bends; a fourth snags the line),
+// and lets a bend go once the straight line past it has been clear, with room to spare, for a moment. You are pulled along the first
+// leg and the hook along the last. If the drum is running and you are not coming in (something solid is in the way) the cable strains,
+// creaking louder and higher, and slips off after STRAIN_MAX seconds.
 import * as THREE from 'three';
 import { upAt } from './geo.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
@@ -39,6 +45,12 @@ const MIN_STRUCT_R = 2.5; // (smaller colliders are props and rocks, not structu
 const EMBED = 0.42;      // how far the claw is driven into the surface it bites
 const EYE_OUT = 1.08;    // the grapple's eye, this far back from its tip along the shank (the cable ends there)
 const SLOT = { gold: 0xffd23f, steel: 0x9aa3b2, dark: 0x2a2540, tracer: 0xff9f1c }; // (the Kepler orange tracer strand is in every cable)
+const WRAP_MAX = 3;      // the cable bends round at most this many structure corners; a fourth and it snags
+const WRAP_EVERY = 0.05; // seconds between wrap checks (20 Hz)
+const WRAP_MARGIN = 0.4; // a wrap point stands this far outside the corner it bends round
+const UNWRAP_FAT = 0.5;  // a wrap lets go only when the straight line past it is clear with this much room to spare (so it can't flicker)
+const UNWRAP_HOLD = 0.2; // ... and has been for this long
+const STRAIN_MAX = 1.5;  // seconds the drum can strain against something that won't give before the line slips
 const MAX_PIECES = Math.ceil(RANGE * 1.6) + 8; // (a metre of cable each, up to where the line snaps)
 
 const _d = new THREE.Vector3();
@@ -64,6 +76,10 @@ const _hn = new THREE.Vector3();
 const _nv = new THREE.Vector3();
 const _nn = new THREE.Vector3();
 const ZERO = new THREE.Vector3();
+const _up = new THREE.Vector3(); // (the way you are pulled along the cable)
+const _ut = new THREE.Vector3(); // (the way the hook is)
+const _upv = new THREE.Vector3();
+const _hA = new THREE.Vector3(), _hB = new THREE.Vector3();
 
 // what's worth hooking, and how heavy it is
 function massOf(v) {
@@ -224,6 +240,103 @@ function colliderPoint(c, p, out, nOut) {
   return out.copy(c.c).addScaledVector(c.ax, l[0]).addScaledVector(c.ay, l[1]).addScaledVector(c.az, l[2]);
 }
 
+
+// ---- wrapping: the cable bends round structures' corners like a rope round pegs ----
+const _v1 = new THREE.Vector3(), _v2 = new THREE.Vector3(), _fd = new THREE.Vector3(), _e1 = new THREE.Vector3(), _e2 = new THREE.Vector3();
+const _oa = new THREE.Vector3(), _ob = new THREE.Vector3(), _wq = [];
+let _ws = 0;
+
+// The nearest structure the straight line a->b runs into, as { c, t }, or null. The first and last `skip` metres don't count (the
+// hook's own surface, a wall you are standing against), and a line that starts inside a collider isn't stopped by it. With `only`,
+// just that collider is tested. Colliders sit in a 64 m grid and are filed under every cell their bounds touch, so a sample
+// every 24 m along the line finds every one the line could meet.
+function blocker(cols, a, b, skip = 0.35, only = null) {
+  _fd.subVectors(b, a);
+  const L = _fd.length();
+  if (L < 1) return null;
+  _fd.divideScalar(L);
+  if (only) {
+    const t = rayCollider(only, a, _fd, L);
+    return t > skip && t < L - skip ? { c: only, t } : null;
+  }
+  let best = null, bt = Infinity;
+  _ws++;
+  const n = Math.max(1, Math.ceil(L / 24));
+  for (let i = 0; i <= n; i++) {
+    _v1.lerpVectors(a, b, i / n);
+    for (const c of cols.query(_v1, 1, _wq)) {
+      if (c._ws === _ws) continue;
+      c._ws = _ws;
+      if (c.platform || c.br < MIN_STRUCT_R) continue;
+      const t = rayCollider(c, a, _fd, L);
+      if (t > skip && t < L - skip && t < bt) { bt = t; best = c; }
+    }
+  }
+  return best ? { c: best, t: bt } : null;
+}
+
+// Is the line a->b clear with `r` metres to spare on every side? (the centre line and four lines r off it)
+function clearFat(cols, a, b, r) {
+  if (blocker(cols, a, b)) return false;
+  _e1.subVectors(b, a).normalize();
+  _e2.copy(a).normalize().cross(_e1);
+  if (_e2.lengthSq() < 1e-6) _e2.set(0, 1, 0).cross(_e1);
+  _e2.normalize();
+  _e1.crossVectors(_e1, _e2).normalize(); // (a perpendicular to the line and to _e2)
+  for (let k = 0; k < 4; k++) {
+    const e = k < 2 ? _e1 : _e2, sg = k % 2 ? -r : r;
+    _oa.copy(a).addScaledVector(e, sg);
+    _ob.copy(b).addScaledVector(e, sg);
+    if (blocker(cols, _oa, _ob)) return false;
+  }
+  return true;
+}
+
+// Where a cable from A to B could bend round structure c: for each edge of a box, the point along it that makes the path A->edge->B
+// shortest (a rope bends round an edge where that is least, not at its ends); the same for a cylinder's rim and its sides, and a
+// ring round a sphere. Each stands WRAP_MARGIN outside the surface.
+const _ep = new THREE.Vector3();
+function wrapCandidates(c, A, B) {
+  const out = [];
+  const along = (p0, p1, outward) => { // the best point of the segment p0->p1 (ternary search on the path length, which is convex along it)
+    let lo = 0, hi = 1;
+    for (let k = 0; k < 18; k++) {
+      const m1 = lo + (hi - lo) / 3, m2 = hi - (hi - lo) / 3;
+      _ep.lerpVectors(p0, p1, m1); const f1 = A.distanceTo(_ep) + _ep.distanceTo(B);
+      _ep.lerpVectors(p0, p1, m2); const f2 = A.distanceTo(_ep) + _ep.distanceTo(B);
+      if (f1 < f2) hi = m2; else lo = m1;
+    }
+    out.push(new THREE.Vector3().lerpVectors(p0, p1, (lo + hi) / 2).addScaledVector(outward, WRAP_MARGIN));
+  };
+  if (c.type === 'box') {
+    const ax = [c.ax, c.ay, c.az], h = [c.hx, c.hy, c.hz];
+    for (let i = 0; i < 3; i++) {
+      const j = (i + 1) % 3, k = (i + 2) % 3;
+      for (const sj of [-1, 1]) for (const sk of [-1, 1]) {
+        const mid = c.c.clone().addScaledVector(ax[j], sj * h[j]).addScaledVector(ax[k], sk * h[k]);
+        const p0 = mid.clone().addScaledVector(ax[i], -h[i]), p1 = mid.clone().addScaledVector(ax[i], h[i]);
+        along(p0, p1, _v2.copy(ax[j]).multiplyScalar(sj).addScaledVector(ax[k], sk).normalize());
+      }
+    }
+    return out;
+  }
+  const axis = c.type === 'cyl' ? c.axis : _fd.subVectors(B, A).normalize();
+  _e1.set(1, 0, 0); if (Math.abs(axis.x) > 0.9) _e1.set(0, 1, 0);
+  _e1.cross(axis).normalize();
+  _e2.crossVectors(axis, _e1);
+  for (let k = 0; k < 16; k++) {
+    const a = k * Math.PI / 8;
+    const rad = new THREE.Vector3().addScaledVector(_e1, Math.cos(a)).addScaledVector(_e2, Math.sin(a));
+    if (c.type === 'cyl') {
+      const p0 = c.c.clone().addScaledVector(axis, c.y0).addScaledVector(rad, c.r), p1 = c.c.clone().addScaledVector(axis, c.y1).addScaledVector(rad, c.r);
+      along(p0, p1, rad); // (the side)
+      out.push(p0.clone().addScaledVector(_v2.copy(rad).addScaledVector(axis, -1).normalize(), WRAP_MARGIN)); // (the two rims)
+      out.push(p1.clone().addScaledVector(_v2.copy(rad).addScaledVector(axis, 1).normalize(), WRAP_MARGIN));
+    } else out.push(c.c.clone().addScaledVector(rad, c.r + WRAP_MARGIN));
+  }
+  return out;
+}
+
 export class Winch {
   constructor(game) {
     this.game = game;
@@ -233,6 +346,14 @@ export class Winch {
     this.pickT = 0;
     this.pts = Array.from({ length: SEG + 1 }, () => new THREE.Vector3());
     this.old = Array.from({ length: SEG + 1 }, () => new THREE.Vector3());
+    this.path = Array.from({ length: WRAP_MAX + 2 }, () => new THREE.Vector3()); // hand, the wrap points, the hook (rebuilt every frame)
+    this.pathN = 0;
+    this.poly = Array.from({ length: WRAP_MAX + 2 }, () => new THREE.Vector3()); // the same, ending at the grapple's eye (what is drawn)
+    this.pin = [0, SEG]; // the cable's points that sit on a wrap point (or an end)
+    this.pinned = new Uint8Array(SEG + 1);
+    this.restSeg = new Float32Array(SEG);
+    this.ropeDirty = true;
+    this.legs = [];
     this.strand = null; // the cable: an instance per metre of the model's twisted strand (winch.glb), once it has loaded
     this.tracer = null;
     this.hook = new THREE.Group(); // (the grapple goes on it when winch.glb arrives)
@@ -313,7 +434,7 @@ export class Winch {
     let off, n;
     if (T.root) { _rinv.copy(T.root.matrixWorld).invert(); off = point.clone().applyMatrix4(_rinv); n = nrm.clone().transformDirection(_rinv); } // (the pose it was found in)
     else { off = point.clone().sub(T.pos()); n = nrm.clone(); }
-    return { target: T, off, goal: off.clone(), nrm: n, looked, dist, len: dist, t: 0, reel: 0 };
+    return { target: T, off, goal: off.clone(), nrm: n, looked, dist, len: dist, t: 0, reel: 0, wraps: [], free: [], wT: 0, strain: 0, creakT: 0 };
   }
 
   // where a handle's hook point is now
@@ -402,6 +523,7 @@ export class Winch {
     this.cand = null;
     this.tick = h.len;
     for (let i = 0; i <= SEG; i++) { this.pts[i].lerpVectors(hand, anchor, i / SEG); this.old[i].copy(this.pts[i]); }
+    this.ropeDirty = true;
     g.fx.pop('HITCHED!', null, { color: '#ff9f1c', size: 46, life: 0.7 });
     g.audio.burst(0.12, 3000, 0.25);
     g.audio.tone(380, 0.25, 'sawtooth', 0.08, 2.2);
@@ -417,6 +539,57 @@ export class Winch {
   }
 
   hand(out) { const P = this.game.player; return out.copy(P.center).addScaledVector(P.up, 0.4); }
+
+  // The cable's path: your hand, each wrap point, the hook (into this.path; returns the number of points) and its length
+  buildPath(o, hand, anchor) {
+    const P = this.path;
+    P[0].copy(hand);
+    for (let i = 0; i < o.wraps.length; i++) P[i + 1].copy(o.wraps[i]);
+    const k = o.wraps.length + 1;
+    P[k].copy(anchor);
+    this.pathN = k + 1;
+    return k + 1;
+  }
+
+  pathLen() {
+    let L = 0;
+    for (let i = 0; i < this.pathN - 1; i++) L += this.path[i].distanceTo(this.path[i + 1]);
+    return L;
+  }
+
+  // Twenty times a second: let go of any wrap the cable has straightened past, and bend it round the corner of any structure it has
+  // run into. Returns 'changed', 'snag' (a fourth wrap is needed) or null.
+  tendWraps(o) {
+    const cols = this.game.colliders, P = this.path;
+    for (let k = o.wraps.length - 1; k >= 0; k--) {
+      if (clearFat(cols, P[k], P[k + 2], UNWRAP_FAT)) {
+        o.free[k] += WRAP_EVERY;
+        if (o.free[k] >= UNWRAP_HOLD) { o.wraps.splice(k, 1); o.free.splice(k, 1); this.ropeDirty = true; return 'changed'; }
+      } else o.free[k] = 0;
+    }
+    for (let i = 0; i < this.pathN - 1; i++) {
+      const hit = blocker(cols, P[i], P[i + 1]);
+      if (!hit) continue;
+      if (o.wraps.length >= WRAP_MAX) return 'snag';
+      const A = P[i], B = P[i + 1];
+      const before = this.pathLen();
+      let best = null, bs = -Infinity;
+      for (const p of wrapCandidates(hit.c, A, B)) {
+        if (p.distanceTo(A) < 0.8 || p.distanceTo(B) < 0.8) continue;
+        const clear = (blocker(cols, A, p, 0.35, hit.c) ? 0 : 1) + (blocker(cols, p, B, 0.35, hit.c) ? 0 : 1);
+        const score = clear * 1000 - (A.distanceTo(p) + p.distanceTo(B)); // (both legs clear first, then the shortest way round)
+        if (score > bs) { bs = score; best = p; }
+      }
+      if (!best) return 'snag';
+      o.wraps.splice(i, 0, best);
+      o.free.splice(i, 0, 0);
+      this.ropeDirty = true;
+      this.buildPath(o, _hA.copy(P[0]), _hB.copy(P[this.pathN - 1])); // (copies: the rebuild overwrites the points it reads)
+      o.len += Math.max(0, this.pathLen() - before); // (the drum pays out the extra the bend takes, so a new wrap doesn't jerk you)
+      return 'changed';
+    }
+    return null;
+  }
 
   // every frame (after the player has moved): the drum reels you in and the cable pulls when it's taut
   update(dt, held) {
@@ -440,14 +613,23 @@ export class Winch {
     o.t += dt;
     const T = o.target;
     if (!held || o.t > HOLD || !this.hasHand() || !T.alive()) { this.release(); return; }
-    const anchor = this.anchorOf(o, _b);
-    const hand = this.hand(_a);
-    _d.copy(hand).sub(anchor);
-    let len = _d.length();
+    this.buildPath(o, this.hand(_a), this.anchorOf(o, _b));
+    // (the wraps: checked 20 times a second, off the path as it was drawn last frame)
+    if ((o.wT -= dt) <= 0) {
+      o.wT = WRAP_EVERY;
+      const r = this.tendWraps(o);
+      if (r === 'snag') { this.release(); g.hud.toast('The line snagged!', 1.5); g.audio.tone(160, 0.2, 'sawtooth', 0.08, 0.5); return; }
+    }
+    const nP = this.pathN;
+    let len = this.pathLen();
     if (len > RANGE * 1.6) { this.release(); g.hud.toast('The line snapped!', 1.5); return; }
-    if (len > 1e-3) _n.copy(_d).divideScalar(len); // from the hook to you
+    // the two ends: you are pulled along the first leg, the hook along the last (with no wraps they are one line, opposite ways)
+    const P0 = this.path[0], P1 = this.path[1], Pn = this.path[nP - 1], Pm = this.path[nP - 2];
+    _up.subVectors(P1, P0); if (_up.lengthSq() > 1e-8) _up.normalize();
+    _ut.subVectors(Pm, Pn); if (_ut.lengthSq() > 1e-8) _ut.normalize();
 
-    o.len = Math.min(o.len, Math.max(REST, len + 0.1)); // (the cable is only ever as long as the gap: a ratchet takes up any slack)
+    o.len = Math.min(o.len, Math.max(REST, len + 0.1)); // (the cable is only ever as long as the path: a ratchet takes up any slack)
+    const closeNow = P.vel.dot(_up) + T.vel().dot(_ut); // (how fast the two ends are closing, along the cable)
     // the drum: spools up gently, runs steady, and eases to a stop with REST metres of cable left
     const remain = o.len - REST;
     if (remain > 0.02) {
@@ -455,77 +637,111 @@ export class Winch {
       o.reel += Math.max(-REEL_DEC * 2.5 * dt, Math.min(REEL_ACC * dt, want - o.reel)); // (it spools up slower than it winds down)
       o.len = Math.min(o.len, Math.max(REST, o.len - o.reel * dt, len - LEAD));
       // you're drawn up to the drum's speed (and held back from overshooting it), a bounded tug each frame
-      const closing = -(P.vel.dot(_n) - T.vel().dot(_n));
+      const closing = closeNow;
       if (closing < o.reel) {
         const dv = Math.min(o.reel - closing, PULL_ACC * dt);
-        P.vel.addScaledVector(_n, -dv);
-        T.push(_a.copy(_n).multiplyScalar(dv)); // (the other end takes the reaction; a building takes none)
+        P.vel.addScaledVector(_up, dv);
+        T.push(_a.copy(_ut).multiplyScalar(dv)); // (the other end takes the reaction; a building takes none)
       } else if (closing > o.reel + 0.4) {
-        P.vel.addScaledVector(_n, Math.min(closing - o.reel, PULL_ACC * dt));
+        P.vel.addScaledVector(_up, -Math.min(closing - o.reel, PULL_ACC * dt));
       }
       // the drum's ratchet: a tick for every metre taken in
       if (this.tick - o.len > 1.5) { this.tick = o.len; g.audio.tone(170 + Math.min(o.reel, REEL_MAX) * 5, 0.03, 'square', 0.035, 1); }
     } else {
       if (o.reel > 0) { o.reel = 0; g.audio.tone(120, 0.12, 'square', 0.07, 0.6); } // the clunk as the drum locks
       // (the arrival: whatever inward speed is left is taken off in a couple of strides, so you stop short of the hook)
-      const closing = -(P.vel.dot(_n) - T.vel().dot(_n));
-      if (closing > 0.05 && len < REST + 1.5) P.vel.addScaledVector(_n, Math.min(closing, PULL_ACC * dt));
+      if (closeNow > 0.05 && len < REST + 1.5) P.vel.addScaledVector(_up, -Math.min(closeNow, PULL_ACC * dt));
     }
+
+    // the strain: the drum is running but you are not coming in (something is in the way, or what you hooked won't budge); it creaks
+    // louder and higher, and after a moment the line slips off, gently
+    if (o.reel > 0.5 && len - o.len > LEAD * 0.5 && closeNow < 1) o.strain = Math.min(STRAIN_MAX, o.strain + dt);
+    else o.strain = Math.max(0, o.strain - dt * 1.5);
+    if (o.strain > 0.3 && (o.creakT -= dt) <= 0) { o.creakT = 0.28; g.audio.tone(170 + (o.strain / STRAIN_MAX) * 260, 0.1, 'sawtooth', 0.03 + 0.03 * (o.strain / STRAIN_MAX), 1.4); }
+    if (o.strain >= STRAIN_MAX) { this.release(); g.hud.toast('The line slipped!', 1.5); g.audio.tone(300, 0.18, 'square', 0.07, 0.4); return; }
 
     if (len > o.len && len > 1e-3) {
       const mP = 1, mT = T.mass;
       const share = mT / (mP + mT); // (you take almost all of the correction; it takes a little)
       // positions: back to the cable's length
       const over = len - o.len;
-      P.body.pos.addScaledVector(_n, -over * share);
-      T.shift(_d.copy(_n).multiplyScalar(over * (1 - share)));
+      P.body.pos.addScaledVector(_up, over * share);
+      T.shift(_d.copy(_ut).multiplyScalar(over * (1 - share)));
       // velocities: no moving apart along the cable (the swing, the tow, the drag all come from this)
-      const rel = P.vel.dot(_n) - T.vel().dot(_n);
+      const rel = -(P.vel.dot(_up) + T.vel().dot(_ut));
       if (rel > 0) {
         const j = rel / (1 / mP + 1 / mT);
-        P.vel.addScaledVector(_n, -j / mP);
-        T.push(_d.copy(_n).multiplyScalar(j));
+        P.vel.addScaledVector(_up, j / mP);
+        T.push(_d.copy(_ut).multiplyScalar(j));
       }
       // a taut cable lifts you off the ground (so it can swing you)
-      if (_n.dot(upAt(P.pos)) < -0.3) { P.body.grounded = false; P.body.sinceContact = 1; }
+      if (_up.dot(upAt(P.pos)) > 0.3) { P.body.grounded = false; P.body.sinceContact = 1; }
       if (o.reel === 0 && Math.random() < dt * 3) g.audio.tone(140 + Math.random() * 60, 0.08, 'sawtooth', 0.025, 1.3); // the cable creaks
     }
-    o.dist = this.hand(_a).distanceTo(this.anchorOf(o, _b));
-    if (o.t > HOLD - 2 && Math.floor(o.t * 4) !== Math.floor((o.t - dt) * 4)) g.audio.tone(1200, 0.05, 'square', 0.04); // (running out)
-    this.drawRope(dt, this.hand(_a), this.anchorOf(o, _b), o.len, this.normalOf(o, _nn));
+    o.dist = len;
+    this.buildPath(o, this.hand(_a), this.anchorOf(o, _b));
+    this.drawRope(dt, o.len, this.normalOf(o, _nn));
   }
 
-  // A verlet cable between your hand and the hook: dead straight when taut, a stiff steel hang when it's slack.
-  drawRope(dt, a, b, len, nrm = null) {
-    const g = this.game;
-    const pts = this.pts, old = this.old;
-    const up = upAt(a, new THREE.Vector3());
-    const hookEnd = b; // (the surface point the claw is driven into, along the surface's normal; the cable runs to the grapple's eye)
-    const N = (nrm ? _hn.copy(nrm) : _hn.copy(a).sub(hookEnd)).normalize();
-    b = _eye.copy(hookEnd).addScaledVector(N, EYE_OUT - EMBED);
-    const dist = a.distanceTo(b);
-    const rest = Math.max(len - (EYE_OUT - EMBED), dist) / SEG;
+  // A verlet cable along the path from your hand through the wrap points to the hook: dead straight when taut, a stiff steel hang when
+  // it's slack. The wrap points are pins the cable is held on; between two pins it is a rope of its own.
+  drawRope(dt, len, nrm = null) {
+    const pts = this.pts, old = this.old, path = this.path, poly = this.poly;
+    const k = this.pathN - 1;
+    const up = upAt(path[0], _upv);
+    const hookEnd = path[k]; // (the surface point the claw is driven into, along the surface's normal; the cable runs to the grapple's eye)
+    const N = (nrm ? _hn.copy(nrm) : _hn.copy(path[k - 1]).sub(hookEnd)).normalize();
+    for (let i = 0; i < k; i++) poly[i].copy(path[i]);
+    poly[k].copy(hookEnd).addScaledVector(N, EYE_OUT - EMBED); // (the cable ends at the eye)
+    const legs = this.legs;
+    legs.length = 0;
+    let total = 0;
+    for (let i = 0; i < k; i++) { const l = poly[i].distanceTo(poly[i + 1]); legs.push(l); total += l; }
+    // which of the cable's points sit on the pins: re-laid along the path whenever the wraps change
+    if (this.ropeDirty || this.pin.length !== k + 1) {
+      const pin = [0];
+      let used = 0;
+      for (let i = 0; i < k - 1; i++) {
+        const left = k - 1 - i; // legs still to place after this one
+        const want = Math.round(SEG * legs[i] / (total || 1));
+        const n = Math.max(2, Math.min(want, SEG - used - 2 * left));
+        used += n;
+        pin.push(used);
+      }
+      pin.push(SEG);
+      this.pin = pin;
+      this.pinned.fill(0);
+      for (const p of pin) this.pinned[p] = 1;
+      for (let m = 0; m < k; m++) for (let i = pin[m]; i <= pin[m + 1]; i++) { pts[i].lerpVectors(poly[m], poly[m + 1], (i - pin[m]) / (pin[m + 1] - pin[m])); old[i].copy(pts[i]); }
+      this.ropeDirty = false;
+    }
+    const pin = this.pin, pinned = this.pinned;
+    // each stretch of cable between pins: as long as its leg, plus its share of any slack
+    const slack = Math.max(1, (len - (EYE_OUT - EMBED)) / (total || 1));
+    for (let m = 0; m < k; m++) { const r = legs[m] * slack / (pin[m + 1] - pin[m]); for (let i = pin[m]; i < pin[m + 1]; i++) this.restSeg[i] = r; }
     const gdt = 3.5 * dt * dt;
     for (let i = 1; i < SEG; i++) {
+      if (pinned[i]) continue;
       const p = pts[i], q = old[i];
       const vx = (p.x - q.x) * 0.9, vy = (p.y - q.y) * 0.9, vz = (p.z - q.z) * 0.9;
       q.copy(p);
       p.x += vx - up.x * gdt; p.y += vy - up.y * gdt; p.z += vz - up.z * gdt;
     }
-    pts[0].copy(a); pts[SEG].copy(b);
+    for (let m = 0; m <= k; m++) pts[pin[m]].copy(poly[m]);
     for (let it = 0; it < 10; it++) {
       for (let i = 0; i < SEG; i++) {
         const p = pts[i], q = pts[i + 1];
         _d.subVectors(q, p);
         const l = _d.length() || 1e-6;
-        const k = (l - rest) / l;
-        if (i === 0) q.addScaledVector(_d, -k);
-        else if (i === SEG - 1) p.addScaledVector(_d, k);
-        else { p.addScaledVector(_d, k * 0.5); q.addScaledVector(_d, -k * 0.5); }
+        const kk = (l - this.restSeg[i]) / l;
+        if (pinned[i] && pinned[i + 1]) continue;
+        if (pinned[i]) q.addScaledVector(_d, -kk);
+        else if (pinned[i + 1]) p.addScaledVector(_d, kk);
+        else { p.addScaledVector(_d, kk * 0.5); q.addScaledVector(_d, -kk * 0.5); }
       }
       // (the stiffness: a steel cable resists bending, so each point is eased toward the line through its neighbours)
-      for (let i = 1; i < SEG; i++) pts[i].lerp(_d.addVectors(pts[i - 1], pts[i + 1]).multiplyScalar(0.5), 0.2);
-      pts[0].copy(a); pts[SEG].copy(b);
+      for (let i = 1; i < SEG; i++) if (!pinned[i]) pts[i].lerp(_d.addVectors(pts[i - 1], pts[i + 1]).multiplyScalar(0.5), 0.2);
+      for (let m = 0; m <= k; m++) pts[pin[m]].copy(poly[m]);
     }
     this.hook.visible = true;
     this.hook.position.copy(hookEnd).addScaledVector(N, -EMBED);
@@ -580,7 +796,7 @@ export class Winch {
 
   // the Z chip's line
   status() {
-    if (this.on) return this.on.reel > 0 ? `REELING ${Math.round(this.on.dist)} m` : `HITCHED ${Math.ceil(HOLD - this.on.t)} s`;
+    if (this.on) return this.on.strain > 0.4 ? 'LINE STRAINING' : this.on.reel > 0 ? `REELING ${Math.round(this.on.dist)} m` : `HITCHED ${Math.ceil(HOLD - this.on.t)} s`;
     if (this.cd > 0) return `${Math.ceil(this.cd)} s`;
     const equipped = this.game.powers && this.game.powers.current() === 'winch';
     const c = equipped ? this.cand : this.hasHand() ? this.pick() : null; // (the power wheel asks for the ones not equipped)
