@@ -18,6 +18,7 @@ const GLB = {
   crane: () => import('./assets/crane.glb?inline'),
   garage: () => import('./assets/garage.glb?inline'),
   dish: () => import('./assets/dish.glb?inline'),
+  engine: () => import('./assets/engine.glb?inline'),
 };
 
 // A model file can be compressed (tools/optimize-glb.mjs: quantized, then meshopt-coded: about a third of the size).
@@ -1227,7 +1228,7 @@ const SHIP_TOON = { trim: 0xd8d4e8, dark: 0x2a2540, metal: 0x8a87a0, steel: 0x55
 const SHIP_FX = new Set(['plume', 'plumeCore', 'lift', 'engine', 'core']); // per-ship materials (they pulse)
 const FLAMES = new Set(['plume', 'plumeCore', 'lift']);
 export async function loadShipParts() {
-  const [gltf, sk, wr, ap, lt, cr, ga, di] = await Promise.all(['ships', 'skimmer', 'warrig', 'apc', 'landtrain', 'crane', 'garage', 'dish'].map(loadGlb));
+  const [gltf, sk, wr, ap, lt, cr, ga, di, en] = await Promise.all(['ships', 'skimmer', 'warrig', 'apc', 'landtrain', 'crane', 'garage', 'dish', 'engine'].map(loadGlb));
   SHIP_PARTS = {};
   for (const name of ['shuttle', 'freighter']) {
     const root = gltf.scene.getObjectByName(name);
@@ -1269,6 +1270,30 @@ export async function loadShipParts() {
     if (!station) throw new Error('dish.glb has no dish_' + kind);
     SHIP_PARTS['dish_' + kind] = bakeShip(station);
   }
+  // the salvaged engine that drops out of a wreck (tools/blender/build_engine.py)
+  ENGINE_MODEL = en.scene.getObjectByName('engine');
+  if (!ENGINE_MODEL) throw new Error('engine.glb has no engine');
+  ENGINE_MODEL.traverse((o) => { if (o.isMesh) { o.userData.slot = o.material.name; o.castShadow = true; } });
+}
+
+// ---- The salvaged engine (built in Blender, see build_engine.py) ----
+// A scorched engine block about 1.1 x 0.8 x 1.5 m, centred on its origin: engineModel() returns a fresh copy dressed in the game's toon
+// materials (the `hot` exhaust ports glow), each part outlined by its `ink` property. Falls back to a plain cylinder before the models load.
+let ENGINE_MODEL = null;
+const ENGINE_TOON = { body: 0x6b4630, dark: 0x2a2540, metal: 0x8a87a0, steel: 0x55607a };
+export function engineModel() {
+  if (!ENGINE_MODEL) return null;
+  const root = ENGINE_MODEL.clone(true);
+  const mats = new Map();
+  const meshes = [];
+  root.traverse((o) => { if (o.isMesh) meshes.push(o); }); // (collected first: ink() adds outline shells as it goes)
+  for (const o of meshes) {
+    const slot = o.userData.slot;
+    if (!mats.has(slot)) mats.set(slot, slot === 'hot' ? glow(0xff6a2a) : toon(ENGINE_TOON[slot] || 0x8a87a0));
+    o.material = mats.get(slot);
+    if (o.userData.ink > 0) ink(o, o.userData.ink);
+  }
+  return root;
 }
 
 function bakeShip(root) {

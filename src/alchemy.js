@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { PHYS } from './config.js';
-import { makeFigure } from './models.js';
+import { makeFigure, engineModel } from './models.js';
 import { toon, glow, ink } from './toon.js';
 import { frameQuat, tangent, greatCircle, SUN, arcDist } from './geo.js';
 import { pick, mulberry32 } from './rng.js';
@@ -75,8 +75,10 @@ export function makeLoot(kind, { credits = 0, crate = false } = {}) {
   const root = new THREE.Group();
   const color = crate ? 0xff7ad9 : credits && !kind ? 0xffd23f : new THREE.Color(ITEMS[kind].color).getHex();
   const geo = crate ? new THREE.BoxGeometry(0.9, 0.9, 0.9) : kind === 'engine' ? new THREE.CylinderGeometry(0.5, 0.5, 0.9, 8).rotateZ(Math.PI / 2) : kind === 'plating' ? new THREE.BoxGeometry(1, 0.15, 0.8) : kind === 'junkbot' ? new THREE.BoxGeometry(0.6, 0.5, 0.6) : new THREE.OctahedronGeometry(0.45, 0);
-  const core = new THREE.Mesh(geo, toon(color));
-  ink(core, 0.05);
+  // (an engine is the Blender-built model once the models have loaded: models.js engineModel)
+  const eng = kind === 'engine' && !crate ? engineModel() : null;
+  const core = eng || new THREE.Mesh(geo, toon(color));
+  if (!eng) ink(core, 0.05);
   root.add(core);
   const halo = new THREE.Mesh(new THREE.TorusGeometry(0.9, 0.06, 6, 20).rotateX(Math.PI / 2), glow(color));
   halo.position.y = -0.6;

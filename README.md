@@ -740,6 +740,7 @@ tools/
   optimize-glb.mjs         compresses the models in src/assets (quantized and meshopt-coded: about a quarter of the size); `npm run optimize:glb`, run after re-exporting a model from Blender
   blender/build_ships.py   builds both transit ships in Blender and exports src/assets/ships.glb
   blender/build_skimmer.py builds the Daedalus skimmer -> src/assets/skimmer.glb
+  blender/build_engine.py  builds the salvaged engine that drops out of wrecks -> src/assets/engine.glb
   blender/build_warrig.py  builds the pirate war-rig -> src/assets/warrig.glb
   blender/build_apc.py     builds the Vostok APC and its turret -> src/assets/apc.glb (also runs headless: `pip install bpy`, then `MOONRUNNER_REPO=. python3 tools/blender/build_apc.py`)
   blender/build_landtrain.py builds the Moonliner and Prospector tractors and trailers -> src/assets/landtrain.glb (also runs headless, like build_apc.py)
