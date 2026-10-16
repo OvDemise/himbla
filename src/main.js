@@ -1502,7 +1502,12 @@ class Game {
     }
     // V: tap to call / board / leave; hold (with more than one vehicle) for the radial picker.
     // (Limp in a ragdoll there's no calling a vehicle: the wheel closes and a press in flight is dropped.)
-    if (this.player.rag) { if (this.garage.radial) this.garage.closeRadial(false); this.vHold = 0; }
+    // (Nor while the Hitch-Line has you: a vehicle can't be dropped onto the end of a cable.)
+    if (this.player.rag || this.winch.on) {
+      if (this.garage.radial) this.garage.closeRadial(false);
+      if (this.winch.on && this.input.pressed('KeyV')) this.hud.toast('Let go of the Hitch-Line first.', 1.5);
+      this.vHold = 0;
+    }
     else if (this.input.pressed('KeyV') && this.boardCooldown <= 0 && !this.rides.ride) this.vHold = 1e-4;
     if (this.vHold) {
       if (this.input.down('KeyV')) {
