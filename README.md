@@ -407,7 +407,7 @@ front doors and press `F` at a station
   mouse, Space or click to drop; hold Space for a stream of balls.
 - The **Classic Games** cabinets open the slots / roulette / prize wheel / high-low overlay (blackjack now
   lives only at the 3D table); the prize
-  counter (Lucky Chips cosmetics) and Rusty the loan shark are at the back. VIP tiers still raise max bets.
+  counter (Lucky Chips cosmetics) is at the back. VIP tiers still raise max bets.
 
 ## Territory
 
@@ -720,7 +720,8 @@ src/
   territory.js   faction territory, small outposts, patrols
   vehicles.js    drivable faction vehicles
   settings.js    settings menu + key remapping
-  casino.js      Lucky Crater Casino games, VIP, prizes, loan shark (casinoWorld.js: the building)
+  casino.js      Lucky Crater Casino games, VIP, prizes (casinoWorld.js: the building)
+  pixelIcons.js  the classic-games overlay's pixel-art sprites (slot symbols, the pit boss, chips, cards' suits…) as plain rows of palette letters
   cosmetics.js   outfits, skate finishes, laser colours, wardrobe
   race.js        Chimera Downs: racecourse, race card, betting, locked race camera, chaos racing
   rides.js       hop-in rides: free transit-ship rides and the Funpark's ferris wheel and carousel

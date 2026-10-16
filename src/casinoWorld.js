@@ -8,7 +8,7 @@ import { PEGS, SEGS, SLOTS, MULTS, SPACING, DROP_Y, DIVIDER_TOP, slotEdge, slotC
 // The Lucky Crater Casino: a neon box in the sun with a spinning sign, a giant tumbling die, a
 // roulette wheel the size of a house and a carpet lined with slot machines. Walk in through the
 // open doors for the big three: a BLACKJACK table, the DUCK DERBY track and a giant PLINKO board,
-// plus the CLASSIC GAMES cabinets (the old overlay casino) and the prize counter / loan shark.
+// plus the CLASSIC GAMES cabinets (the old overlay casino) and the prize counter.
 // Game logic lives in casinoGames.js; this file only builds the place and hands back the props.
 
 function mesh(geo, mat, outline = 0.12) {
@@ -815,7 +815,7 @@ export function buildCasino(w, loc) {
   put(con, P.x, P.z + 6, 0);
   col({ type: 'box', x: P.x, y: 0.7, z: P.z + 6, hx: 1.8, hy: 0.7, hz: 0.7 });
 
-  // ---------- CLASSIC GAMES corner + prize counter / loan shark ----------
+  // ---------- CLASSIC GAMES corner + prize counter ----------
   CLASSIC.zs.forEach((z, i) => {
     put(slotCabinet([0xc77dff, 0x2ee6ff, 0xff9f1c][i], ['777', 'JKP', 'BAR'][i]), CLASSIC.x, z, 0, -Math.PI / 2);
     col({ type: 'box', x: CLASSIC.x, y: 2.5, z, hx: 1.2, hy: 2.5, hz: 1.6 });
@@ -947,7 +947,7 @@ export function buildCasino(w, loc) {
   ['trophy', 'rocket', 'crown', 'helmet'].forEach((kind, i) => stand(kind, CX - 1.35 + i * 0.9, 1.76, 0));
   ['duck', 'mite', 'gem', 'star'].forEach((kind, i) => stand(kind, CX - 1.35 + i * 0.9, 2.48, 0, kind === 'gem' || kind === 'star'));
 
-  // the till at the clerk's end, a service bell and the chip stacks at the shark's end
+  // the till at the clerk's end, a service bell and the chip stacks at the other end
   const till = new THREE.Group();
   till.add(mesh(new THREE.BoxGeometry(0.7, 0.34, 0.55), pm.steel, 0.03));
   const screen = new THREE.Mesh(new THREE.PlaneGeometry(0.42, 0.21), new THREE.MeshBasicMaterial({ map: screenTex('CHIPS', '#16703d') }));
@@ -971,14 +971,12 @@ export function buildCasino(w, loc) {
     for (let s = 0; s < n; s++) pcPut(mesh(new THREE.CylinderGeometry(0.17, 0.17, 0.06, 12), toon(chipCols[(s + i) % chipCols.length]), 0.01), 2.6 + i * 0.36, 1.67 + s * 0.065, 0.25);
   });
 
-  // the header: two gold posts, a plum bar with a PRIZES board over the clerk and a LOANS board over the shark, chase bulbs, pennants
+  // the header: two gold posts, a plum bar with a PRIZES board, chase bulbs, pennants
   for (const sx of [-1, 1]) pcPut(mesh(new THREE.CylinderGeometry(0.09, 0.09, 3.0, 8), pm.gold, 0.04), sx * 3.45, 3.14, -0.1);
   pcBox(PCL, 0.9, 0.26, pm.plum, 0, 4.25, -0.1, 0.04);
   pcBox(PCL + 0.1, 0.07, 0.3, pm.gold, 0, 4.72, -0.1, 0.01);
   pcBox(PCL + 0.1, 0.07, 0.3, pm.gold, 0, 3.8, -0.1, 0.01);
-  const board = (text, opts, lx) => pcPut(new THREE.Mesh(new THREE.PlaneGeometry(2.7, 0.7), new THREE.MeshBasicMaterial({ map: neonTex(text, { w: 512, h: 128, ...opts }) })), lx, 4.25, 0.05);
-  board('PRIZES', { color: '#ffd23f', edge: '#ff2e88' }, -1.8);
-  board('RUSTY\'S LOANS', { color: '#7dff3a', edge: '#ff2a4a' }, 1.8);
+  pcPut(new THREE.Mesh(new THREE.PlaneGeometry(3.4, 0.85), new THREE.MeshBasicMaterial({ map: neonTex('PRIZES', { w: 512, h: 128, color: '#ffd23f', edge: '#ff2e88' }) })), 0, 4.25, 0.05);
   const smallBulb = new THREE.SphereGeometry(0.07, 6, 5);
   for (let i = 0; i <= 22; i++) {
     const lx = -3.45 + i * 0.3;
@@ -1006,13 +1004,8 @@ export function buildCasino(w, loc) {
     inst.frustumCulled = false; // (spread right round the building: always one draw)
     put(inst, 0, 0);
   });
-  const prSign = new THREE.Mesh(new THREE.PlaneGeometry(8, 2), new THREE.MeshBasicMaterial({ map: neonTex('PRIZE COUNTER', { color: '#ffd23f', edge: '#ff2e88', sub: 'CHIPS → DRIP · RUSTY\'S LOANS IN THE BACK' }) }));
+  const prSign = new THREE.Mesh(new THREE.PlaneGeometry(8, 2), new THREE.MeshBasicMaterial({ map: neonTex('PRIZE COUNTER', { color: '#ffd23f', edge: '#ff2e88', sub: 'CHIPS → DRIP' }) }));
   put(prSign, W - 1.15, PRIZE.z, 6.5, -Math.PI / 2);
-  const shark = makeFigure({ suit: 0x6d7a8f, helmet: 0x9aa7bb, visor: 0xff2a4a });
-  const fin = mesh(new THREE.ConeGeometry(0.3, 0.8, 3), toon(0x6d7a8f), 0.03);
-  fin.position.set(0, 2.6, -0.1);
-  shark.root.add(fin);
-  put(shark.root, PRIZE.x + 1.5, PRIZE.z + 1.5, 0, -Math.PI / 2);
   const clerk = makeFigure({ suit: 0xff7ad9, helmet: 0xfff4e0, visor: 0x2ee6ff });
   put(clerk.root, PRIZE.x + 1.5, PRIZE.z - 1.5, 0, -Math.PI / 2);
 
