@@ -68,6 +68,20 @@ function board(text, height, color = '#ffd23f') {
   return s;
 }
 
+// the box round what is drawn: visible meshes only (a hidden plume or ghost does not count), each by its own geometry's box
+// moved into place (a tilted part is not swelled to its rotated corners the way Box3.setFromObject does)
+const _gb = new THREE.Box3();
+function drawnBox(obj) {
+  const box = new THREE.Box3();
+  obj.updateMatrixWorld(true);
+  obj.traverseVisible((o) => {
+    if (!(o.isMesh || o.isPoints) || o.isInstancedMesh || !o.geometry) return;
+    if (!o.geometry.boundingBox) o.geometry.computeBoundingBox();
+    box.union(_gb.copy(o.geometry.boundingBox).applyMatrix4(o.matrixWorld));
+  });
+  return box;
+}
+
 const disposeTree = (root) => {
   root.traverse((o) => {
     if (o.geometry) o.geometry.dispose();
@@ -166,7 +180,7 @@ export class AssetRow {
     inst.add(obj);
     // (centre the footprint on its slot: a factory's own origin may sit off to one side; measured with inst at the origin)
     inst.updateMatrixWorld(true);
-    const box = new THREE.Box3().setFromObject(obj);
+    const box = drawnBox(obj);
     if (!box.isEmpty()) { const c = box.getCenter(new THREE.Vector3()); obj.position.x -= c.x; obj.position.z -= c.z; }
     inst.position.set(e.x, 0, e.z);
     this.root.add(inst);
@@ -191,7 +205,7 @@ export class AssetRow {
           }
         }
       } else if (!box.isEmpty()) {
-        const b2 = new THREE.Box3().setFromObject(obj), c2 = b2.getCenter(new THREE.Vector3()), s2 = b2.getSize(new THREE.Vector3());
+        const b2 = drawnBox(obj), c2 = b2.getCenter(new THREE.Vector3()), s2 = b2.getSize(new THREE.Vector3());
         specs.push({ type: 'box', c: c2, hx: s2.x / 2, hy: s2.y / 2, hz: s2.z / 2, ax: new THREE.Vector3(1, 0, 0), ay: UP.clone(), az: new THREE.Vector3(0, 0, 1) });
       }
       e.cols = specs.map((s) => g.colliders.add(s));
