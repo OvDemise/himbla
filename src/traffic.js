@@ -42,13 +42,19 @@ function segDist2(a, b, c) {
 const FREIGHT = [['tank', 'cargo', 'blast'], ['cargo', 'tank', 'blast'], ['tank', 'tank', 'blast'], ['tank', 'cargo', 'cargo']];
 const TRAIN_HP = 400, BUGGY_HP = 120, CAR_HP = 90;
 const _z = new THREE.Vector3(0, 0, 1);
+const _eu = new THREE.Euler();
 // ring roads round each connected town
 const RING_GAP = 32; // ring centreline this far outside the settlement radius (past buildings / plateau edge)
 const RING_PUSH = 90; // pushed out up to this much more where something is in the way
 const JOIN = 24; // junction connectors join the ring this far along it either side of a road
 const JOIN_OUT = 26; // ...and leave the road lanes this far out from the ring
 const GATE_SEP = 90; // minimum ring distance between two junctions
+const GATE_NEAR = GATE_SEP * 0.6; // ...and the least a junction laid late (addTownRoads, on a ring that is already built) may be from one that stands: their flares (24 m a side) clear each other
 const PAD_APART = 26; // clear ground kept between the swept discs of two flights' pads, where the town has room (makePadStop)
+// how high your town's shuttle rises off its plot before it turns: the council hall's spire stands 26.6 m, the hull is 9 m round and a shuttle
+// leaves with its gear down (5.4 m), so a plot's flight clears the hall on any heading, with 3 m to spare and then some (the hall has no
+// collider that tall for flightPath to lift over)
+const TOWN_CLIMB = 40;
 const FILLET = 24; // drawn flare at each junction
 // Roads that were cut, and roads that end in a T on another road instead (buildSpur): the ILMB's
 // three roads east to Meridian, south-east to Tranquility and west to Aldrin became one road that
@@ -60,6 +66,7 @@ const TEES = [{ from: 'ilmb', on: ['meridian', 'tranq'] }];
 const EXTRA_ROADS = [['mine', 'vostok']];
 const T_ARM = 30; // metres from a T's centre where the lanes stop and the turning connectors take over
 const STOP_IN = 50; // the stop is at least this far along its stretch of ring (room for a land-train)
+const pairKey = (a, b) => (a.id < b.id ? `${a.id}|${b.id}` : `${b.id}|${a.id}`); // (the name of the road between two settlements)
 
 function part(geo, mat, x = 0, y = 0, z = 0, outline = 0.05) {
   const m = new THREE.Mesh(geo, mat);
@@ -218,14 +225,44 @@ export class Traffic {
     this.pool = [];
     this.platforms = []; // trailer decks
     this._buf = [];
-    this.L = Object.fromEntries(world.locations.map((l) => [l.id, l]));
-    for (const loc of world.locations) {
-      loc._inv = loc.group.matrixWorld.clone().invert();
-      loc.stopKeep = [];
-    }
+    this.L = {};
+    for (const loc of world.locations) this.registerLocation(loc);
     this.buildRoads();
     this.buildFlights();
     this.dropSparePads();
+  }
+
+  // Let traffic know a place: the constructor does it for every settlement that exists at boot, and the town a finale founds mid-game (main.js
+  // applyWorldLive) comes through here, so a flyer or a road can be laid to it live. Idempotent.
+  registerLocation(loc) {
+    if (this.L[loc.id] === loc) return;
+    this.L[loc.id] = loc;
+    loc._inv = loc.group.matrixWorld.clone().invert();
+    loc.stopKeep = [];
+  }
+
+  // A place that is rebuilt in place (world.rebuildLocation, when a Council motion changes it) loses what traffic hung on its old group, and the
+  // doors its passengers had learnt. This puts the waiting shelters of its pad stops back and forgets the stale buildings. (Only your town
+  // asks: its pad and the pad's lights are part of its own kit, which the rebuild bakes again; hometown.js buildHomeTown.)
+  redress(loc) {
+    delete loc._bld;
+    for (const s of this.stops) {
+      if (s.loc !== loc) continue;
+      delete s.doors;
+      if (s.shelterAt) this.shelter(loc, s.shelterAt.x, s.shelterAt.z, s.shelterAt.yaw, s.shelterAt.text, s.shelterAt.color);
+    }
+  }
+
+  // The settlement nearest to `loc` that a shuttle may fly to: open to anyone (safe, not a restricted base), a real town rather than a point of
+  // interest (the casino, the Monolith) and not a den, camp or ruin
+  nearestPort(loc) {
+    let best = null, bd = Infinity;
+    for (const l of this.w.locations) {
+      if (l === loc || l.type === 'pirate' || l.type === 'ruin' || l.camp || l.hostile || !l.safe || l.restricted || l.poi) continue;
+      const d = arcDist(loc.dir, l.dir);
+      if (d < bd) { bd = d; best = l; }
+    }
+    return best;
   }
 
   // Settlements lay down a landing pad or two of their own; any that no transit line ended up using
@@ -349,10 +386,8 @@ export class Traffic {
 
   // ================= flights: pads, arcs, landings =================
 
-  // Pick (or reuse) a landing pad in open ground at the settlement's edge, facing `other`.
-  makePadStop(loc, other, spec, kind) {
-    const tw = this.toward(loc, other);
-    const keeps = this.keepouts(loc);
+  // The search half of makePadStop: the best open spot (or a registered pad) at the settlement's edge, toward heading `tw`.
+  padSpot(loc, tw, keeps, spec, kind) {
     const cands = [];
     for (const p of loc.pads || []) {
       if (p.r >= 25 || p.used) continue;
@@ -400,8 +435,17 @@ export class Traffic {
       pick.lo = pick.hi = this.groundY(loc, pick.x, pick.z);
       console.warn('[traffic] no open pad spot at', loc.id, 'for', kind);
     }
+    return pick;
+  }
+
+  // Pick (or reuse) a landing pad in open ground at the settlement's edge, facing `other`. `pin` is a pad that is already built and
+  // reserved (your town's shuttle pad, on its plot): that one is used as it is, with no search.
+  makePadStop(loc, other, spec, kind, pin = null) {
+    const tw = this.toward(loc, other);
+    const keeps = this.keepouts(loc);
+    const pick = pin ? { x: pin.x, z: pin.z, lo: 0, hi: 0, existing: pin } : this.padSpot(loc, tw, keeps, spec, kind);
     const color = kind === 'ship' ? 0xff9f1c : 0x2ec4ff;
-    let top = 0.27;
+    let top = pin ? pin.top : 0.27;
     if (pick.existing && pick.existing.r >= spec.padR * 0.8) {
       pick.existing.used = true;
     } else {
@@ -441,10 +485,11 @@ export class Traffic {
       break;
     }
     const yaw = Math.atan2(pick.x - wx, pick.z - wz);
-    this.shelter(loc, wx, wz, yaw, `${kind === 'ship' ? 'FREIGHT' : 'SHUTTLE'} > ${other.short}`, color);
+    const shelterAt = { x: wx, z: wz, yaw, text: `${kind === 'ship' ? 'FREIGHT' : 'SHUTTLE'} > ${other.short}`, color };
+    this.shelter(loc, wx, wz, yaw, shelterAt.text, color);
     loc.stopKeep.push({ x: wx, z: wz, r: 3 });
     const stop = {
-      loc, kind: 'pad', x: pick.x, z: pick.z, top, padR: spec.padR,
+      loc, kind: 'pad', x: pick.x, z: pick.z, top, padR: spec.padR, shelterAt,
       wait: { x: wx + Math.sin(yaw) * 1.8, y: this.groundY(loc, wx, wz), z: wz + Math.cos(yaw) * 1.8, g: true },
       town: this.townPoint(loc, wx, wz, 70),
       queue: [], queued: false,
@@ -457,12 +502,14 @@ export class Traffic {
     return stop;
   }
 
-  // Climb vertically off pad A, arc up to cruise, come down over pad B and settle vertically.
+  // Climb vertically off pad A, arc up to cruise, come down over pad B and settle vertically. climb: how high the vertical legs go, one number
+  // or [at A, at B].
   flightPath(sA, sB, gearH, climb, cruise, radius) {
     const P = this.P;
+    const [climbA, climbB] = Array.isArray(climb) ? climb : [climb, climb];
     const uA = sA.world.clone().normalize(), uB = sB.world.clone().normalize();
-    const start = sA.world.clone().addScaledVector(uA, gearH), topA = sA.world.clone().addScaledVector(uA, gearH + climb);
-    const end = sB.world.clone().addScaledVector(uB, gearH), topB = sB.world.clone().addScaledVector(uB, gearH + climb);
+    const start = sA.world.clone().addScaledVector(uA, gearH), topA = sA.world.clone().addScaledVector(uA, gearH + climbA);
+    const end = sB.world.clone().addScaledVector(uB, gearH), topB = sB.world.clone().addScaledVector(uB, gearH + climbB);
     const len = arcDist(uA, uB);
     const step = 20, steps = Math.max(4, Math.ceil(len / step));
     const raw = [];
@@ -498,17 +545,21 @@ export class Traffic {
     return makePath(pts);
   }
 
-  addFlyer(kind, A, B) {
+  // A transit line between two settlements. opts.pinA: the pad it uses at A (makePadStop); opts.startAtB: begin parked at B, so the first
+  // thing it does is fly in to A (a service that has just opened)
+  addFlyer(kind, A, B, opts = {}) {
     const ship = kind === 'ship';
     const n = this.vehicles.length;
     // the rig (models.js) knows its own gear height, deck box, ramp path and pad size
-    const model = ship ? makeFreighter({ stripe: [0xff9f1c, 0xff2e88, 0x2ec4ff][n % 3] }) : makeShuttle({ stripe: [0x2ec4ff, 0xff9f1c, 0x7dff6a, 0xc77dff][n % 4] });
+    // (a freighter's cargo wears the livery of a faction whose town it serves, as the land-trains do)
+    const owners = [A, B].map((l) => l.faction).filter((f) => LAND_TRAIN_FACTIONS[f]);
+    const model = ship ? makeFreighter({ stripe: [0xff9f1c, 0xff2e88, 0x2ec4ff][n % 3], faction: owners.length ? owners[n % owners.length] : 'kepler' }) : makeShuttle({ stripe: [0x2ec4ff, 0xff9f1c, 0x7dff6a, 0xc77dff][n % 4] });
     const spec = ship
       ? { padR: model.padR, clearR: 31, heights: [3, 10, 20, 32], climb: 36 }
       : { padR: model.padR, clearR: 13, heights: [2, 7, 14], climb: 18 };
     const cruise = ship ? 55 + (n % 3) * 25 : 24;
-    const sA = this.makePadStop(A, B, spec, kind), sB = this.makePadStop(B, A, spec, kind);
-    const path = this.flightPath(sA, sB, model.gearH, spec.climb, cruise, model.radius);
+    const sA = this.makePadStop(A, B, spec, kind, opts.pinA), sB = this.makePadStop(B, A, spec, kind);
+    const path = this.flightPath(sA, sB, model.gearH, [opts.pinA ? TOWN_CLIMB : spec.climb, spec.climb], cruise, model.radius);
     model.root.matrixAutoUpdate = true;
     this.w.scene.add(model.root);
     const v = {
@@ -523,6 +574,7 @@ export class Traffic {
     const r = this.r();
     if (r < 0.3) { v.state = 'park'; v.dir = this.r() < 0.5 ? 1 : -1; v.s = v.dir > 0 ? 0 : path.len; v.timer = this.r() * 6; }
     else { v.state = 'fly'; v.dir = this.r() < 0.5 ? 1 : -1; v.s = path.len * (0.15 + this.r() * 0.7); }
+    if (opts.startAtB) { v.state = 'park'; v.dir = -1; v.s = path.len; v.timer = 0; }
     v.stop = v.state === 'park' ? (v.s <= 0 ? sA : sB) : null;
     sample(path, v.s, v.pos, v.hint);
     v.prevPos.copy(v.pos);
@@ -549,6 +601,17 @@ export class Traffic {
     // ships first: they need the biggest open spots
     for (const [a, b] of ships) if (L[a] && L[b]) this.addFlyer('ship', L[a], L[b]);
     for (const [a, b] of buses) if (L[a] && L[b]) this.addFlyer('bus', L[a], L[b]);
+    // last, so none of the lines above change: your town's shuttle, once it has built the Shuttle Pad
+    if (L.hometown && (L.hometown.slots || []).includes('pad')) this.addTownShuttle(L.hometown);
+  }
+
+  // Your town's shuttle: a bus from the pad on the Shuttle Pad plot to the nearest settlement it may fly to (opts as addFlyer). One at most;
+  // null when there is no pad, no such settlement, or the line already runs
+  addTownShuttle(loc, opts = {}) {
+    const pin = (loc.pads || []).find((p) => p.plot !== undefined);
+    const port = pin && this.nearestPort(loc);
+    if (!port || this.vehicles.some((v) => v.stops && v.stops[0].loc === loc)) return null;
+    return this.addFlyer('bus', loc, port, { ...opts, pinA: pin });
   }
 
 
@@ -565,10 +628,17 @@ export class Traffic {
   // the town's single ring-side stop, then keeps going round the ring to whichever road it wants
   // next (so nothing ever needs a U-turn - a dead-end town is simply a lap of its ring).
 
-  buildRoads() {
-    // (the casino joins in like a town: a ring road round its grounds and traffic dropping punters off)
-    const safe = this.w.locations.filter((l) => l.safe && !l.restricted && (!l.poi || l.type === 'casino') && l.type !== 'pirate');
-    const key = (a, b) => (a.id < b.id ? `${a.id}|${b.id}` : `${b.id}|${a.id}`);
+  // The towns that get roads. The casino joins in like a town (a ring road round its grounds and traffic
+  // dropping punters off); your own town only once it has built Roads (or is the one being given them).
+  townsOnRoads(extra = null) {
+    return this.w.locations.filter((l) => l.safe && !l.restricted && (!l.poi || l.type === 'casino') && l.type !== 'pirate'
+      && (l.type !== 'hometown' || l === extra || (l.slots || []).includes('roads')));
+  }
+
+  // Which of those towns are joined by a road (a set of 'idA|idB' keys): everything within SAFE_ROAD, each town's
+  // nearest neighbour, a few second links, then the hand-made cuts and extras.
+  linkPairs(safe) {
+    const key = pairKey;
     const pairs = new Set();
     const has = (a, b) => pairs.has(key(a, b));
     const dist = (a, b) => arcDist(a.dir, b.dir);
@@ -587,6 +657,11 @@ export class Traffic {
     }
     for (const [a, b] of CUT_ROADS) if (this.L[a] && this.L[b]) pairs.delete(key(this.L[a], this.L[b]));
     for (const [a, b] of EXTRA_ROADS) if (this.L[a] && this.L[b]) pairs.add(key(this.L[a], this.L[b]));
+    return pairs;
+  }
+
+  buildRoads() {
+    const pairs = this.linkPairs(this.townsOnRoads());
     this.roadGeo = { pos: [], uv: [], fade: [], mark: [], berm: [], soft: [], wid: [], idx: [] };
     this.posts = [];
     this.pieces = [];
@@ -610,6 +685,111 @@ export class Traffic {
     this.pieces.forEach((pc, i) => { pc.id = i; this.finishPiece(pc); });
     for (const R of this.rings.values()) this.ringStop(R);
     for (const R of this.rings.values()) this.garageLink(R);
+    this.flushRoadBatch();
+    this.roadVehicles = [];
+    let civil = 0; // (the Vostok road is numbered -1 so the other roads keep their services)
+    for (const road of this.roads) this.populateRoad(road, road.A.restricted || (road.B && road.B.restricted) ? -1 : civil++);
+    this.populateGarage();
+  }
+
+  // The settlements a road from `loc` joins under the standard rules (the pairs a load would lay for it), in the order a load lays the roads.
+  linkPartners(loc) {
+    const safe = this.townsOnRoads(loc), pairs = this.linkPairs(safe);
+    return safe.filter((b) => b !== loc && pairs.has(pairKey(loc, b))).sort((p, q) => (pairKey(loc, p) < pairKey(loc, q) ? -1 : 1));
+  }
+
+  // Lay your town's ring road and its links the moment it builds Roads (hometown.js layRoads): the ring a load would make (ringProfile) and the
+  // roads a load would lay for it (linkPartners, in a load's order and way round), added to the running network. A settlement that nothing
+  // joined at boot (Hertzsprung, out on its own) gets its ring in the same pass, so the road reaches it like any other. It is not quite what a
+  // load makes. The rings that were laid at boot have no junction for the new road, so at their end each link turns round in a U-turn connector
+  // (and traffic on those rings never turns into it), and a road with a U-turn has no land-trains: they would fold in it. The next load lays the
+  // whole two-way network. Returns { ring, links, roads }, or null when the town already has its ring. It is all or nothing: a failure part-way
+  // puts every piece, mesh and vehicle back and throws (but for the tidying that comes last, see the end).
+  addTownRoads(loc) {
+    if (this.rings.has(loc)) return null;
+    this.registerLocation(loc);
+    const partners = this.linkPartners(loc);
+    if (!partners.length) return { ring: null, links: [], roads: [] };
+    const fresh = partners.filter((b) => !this.rings.has(b));
+    // what to put back if it fails: the network's lengths, and what the new roads add to each settlement they touch (fences, gates, its group)
+    const was = {
+      pieces: this.pieces.length, roads: this.roads.length, gates: this.gates.length, stops: this.stops.length, lines: this.mapLines.length,
+      vehicles: this.vehicles.length, crawlers: this.crawlers.length, drivers: this.roadVehicles.length, decks: this.platforms.length, scene: new Set(this.w.scene.children),
+      ends: [loc, ...partners].map((l) => ({
+        l, towns: this.towns.has(l) ? this.towns.get(l).length : -1, keep: l.stopKeep.length, gates: this.rings.has(l) ? this.rings.get(l).gates.length : -1,
+        kids: l.group.children.length, cols: (l._cols || []).length, ring: l.ring, ringStop: l.ringStop,
+      })),
+    };
+    let rings = [], roads = [];
+    try {
+      for (const l of [loc, ...fresh]) delete l._bld; // (the colliders that stand now, not those the last passenger saw)
+      this.roadGeo = { pos: [], uv: [], fade: [], mark: [], berm: [], soft: [], wid: [], idx: [] };
+      this.posts = [];
+      rings = [loc, ...fresh].map((l) => { const R = this.ringProfile(l); this.rings.set(l, R); return R; });
+      for (const k of partners.map((b) => pairKey(loc, b)).sort()) {
+        const [a, b] = k.split('|'), P = this.L[a === loc.id ? b : a], RP = this.rings.get(P), all = RP.gates;
+        // (a load lays this road in its turn, when the partner's ring has only the junctions of the roads named before it and of no T: it puts
+        // this road's end where it now chooses. A junction that stands now, of a road named after this one, may be in the way (a load would have
+        // laid that one round this): then the end goes to the nearest spot that keeps GATE_NEAR from every junction that stands)
+        let near = null;
+        if (!fresh.includes(P)) {
+          RP.gates = all.filter((e) => e.gate.road.eB && pairKey(e.gate.road.A, e.gate.road.B) < k);
+          const at = this.ringGate(RP, loc);
+          if (all.some((e) => Math.min(Math.abs(e.i - at.i), RP.M - Math.abs(e.i - at.i)) * RP.step < GATE_NEAR)) { RP.gates = all; near = { loc: P, apart: GATE_NEAR }; }
+        }
+        const own = RP.gates, m = own.length;
+        try { this.buildRoad(this.L[a], this.L[b], near); } finally { RP.gates = all; }
+        if (own !== all && own.length > m) all.push(own[m]);
+      }
+      for (const R of rings) this.buildRing(R.loc, R);
+      roads = this.roads.slice(was.roads);
+      for (const road of roads) {
+        const g = road.A === loc ? road.gates[1] : road.gates[0]; // (the partner's end)
+        if (fresh.includes(g.loc)) continue; // (its ring has the junction)
+        road.uturn = true;
+        const u = this.newPiece('j', this.bez(g.inEnd, g.inDir, g.outStart, g.outDir), { town: g.loc, vlim: 6, uturn: true });
+        g.in.next = [u];
+        u.next = [g.out];
+        this.drawJoin(this.rings.get(g.loc), g.e); // (a plain T would do for the cars, not for the eye)
+      }
+      for (let i = was.pieces; i < this.pieces.length; i++) { const pc = this.pieces[i]; pc.id = i; this.finishPiece(pc); }
+      for (const R of rings) this.ringStop(R);
+      this.flushRoadBatch();
+      roads.forEach((road) => this.populateRoad(road, this.roads.indexOf(road), !road.uturn));
+      this._chunks = null; // (the maps' road lines)
+    } catch (e) {
+      this.pieces.length = was.pieces; this.roads.length = was.roads; this.gates.length = was.gates; this.stops.length = was.stops; this.mapLines.length = was.lines;
+      this.vehicles.length = was.vehicles; this.crawlers.length = was.crawlers; this.roadVehicles.length = was.drivers; this.platforms.length = was.decks;
+      for (const o of this.w.scene.children.slice()) if (!was.scene.has(o)) o.removeFromParent(); // (the road meshes and posts, the vehicles and their trailers)
+      for (const w of was.ends) {
+        w.l.stopKeep.length = w.keep;
+        if (w.towns < 0) this.towns.delete(w.l); else this.towns.get(w.l).length = w.towns;
+        if (w.gates < 0) this.rings.delete(w.l); else this.rings.get(w.l).gates.length = w.gates;
+        for (const o of w.l.group.children.slice(w.kids)) o.removeFromParent();
+        for (const c of (w.l._cols || []).splice(w.cols)) this.C.remove(c);
+        w.l.ring = w.ring; w.l.ringStop = w.ringStop;
+      }
+      this.roadGeo = null; this.posts = null;
+      throw e;
+    }
+    // The roads stand and are driven now. What is left only tidies up round them, and a fault in it is no reason to take them down again:
+    // it is logged and the crews are done (a rock left on a road, a berm left closed at the other end of a link).
+    for (const road of roads) {
+      if (!road.uturn) continue;
+      const g = road.A === loc ? road.gates[1] : road.gates[0];
+      try { this.openJoin(this.rings.get(g.loc), g.e); } catch (e) { console.warn('[traffic] could not open the ring of', g.loc.id, 'for the road from', loc.id, e); }
+    }
+    try {
+      for (const pc of this.pieces.slice(was.pieces)) for (let i = 0; i < pc.path.pts.length; i += 10) this.P.clearSpot(pc.path.pts[i]); // (rocks keep off the new roads)
+    } catch (e) { console.warn('[traffic] could not clear the rocks off the new roads', e); }
+    return { ring: rings[0], links: partners, roads };
+  }
+
+  // Make what the road builders have laid so far (this.roadGeo, this.posts) into drawn meshes: one road mesh, and the delineator posts (a white
+  // post with a dark band, an amber reflector looking up and down the road and a lit cap, set clear of the shoulder, one every ~110 m: three
+  // instanced draw calls for the lot). A load flushes once, for the whole network (this.roadMesh); a road laid live (addTownRoads) flushes a
+  // batch of its own, which shares the first mesh's material.
+  flushRoadBatch() {
     const G = this.roadGeo;
     const geo = new THREE.BufferGeometry();
     geo.setAttribute('position', new THREE.Float32BufferAttribute(G.pos, 3));
@@ -621,15 +801,12 @@ export class Traffic {
     geo.setAttribute('wid', new THREE.Float32BufferAttribute(G.wid, 1));
     geo.setIndex(G.idx);
     geo.computeBoundingSphere();
-    const mesh = new THREE.Mesh(geo, roadMaterial());
+    const mesh = new THREE.Mesh(geo, this.roadMesh ? this.roadMesh.material : roadMaterial());
     mesh.matrixAutoUpdate = false;
     mesh.frustumCulled = false;
     mesh.renderOrder = 1;
     this.w.scene.add(mesh);
-    this.roadMesh = mesh;
-    this.roadGeo = null;
-    // delineator posts every ~110 m: a white post with a dark band, an amber reflector looking up and down the road
-    // (and a lit cap), set clear of the shoulder; three instanced draw calls for every road
+    if (!this.roadMesh) this.roadMesh = mesh;
     const n = this.posts.length;
     if (n) {
       const postM = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.11, 0.15, 1.8, 6).translate(0, 0.9, 0), toon(0xe8e4f4), n);
@@ -644,11 +821,8 @@ export class Traffic {
       for (const m of [postM, bandM, lensM, capM]) { m.frustumCulled = false; m.matrixAutoUpdate = false; this.w.scene.add(m); }
       postM.castShadow = true;
     }
+    this.roadGeo = null;
     this.posts = null;
-    this.roadVehicles = [];
-    let civil = 0; // (the Vostok road is numbered -1 so the other roads keep their services)
-    for (const road of this.roads) this.populateRoad(road, road.A.restricted || (road.B && road.B.restricted) ? -1 : civil++);
-    this.populateGarage();
   }
 
   // Every k-th point of a world-space polyline as a unit direction (the last point always stays).
@@ -739,11 +913,12 @@ export class Traffic {
 
   // Where a road from `other` joins this town's ring: as straight toward it as possible, on an
   // unbulged stretch with open ground outside, and well clear of the other junctions.
-  ringGate(R, other) {
+  ringGate(R, other, apart = GATE_SEP) {
     const loc = R.loc, M = R.M, TAU = Math.PI * 2;
     const tw = this.toward(loc, other);
-    const keeps = this.keepouts(loc);
-    const sep = (i) => R.gates.every((g) => { const d = Math.abs(g.i - i); return Math.min(d, M - d) * R.step >= GATE_SEP; });
+    // (not the ring's own fences: a road that comes to a ring laid earlier, addTownRoads at a settlement's old ring, would find every spot taken)
+    const keeps = this.keepouts(loc).filter((k) => !k.ring);
+    const sep = (i) => R.gates.every((g) => { const d = Math.abs(g.i - i); return Math.min(d, M - d) * R.step >= apart; });
     const idx = (a) => ((Math.round((a / TAU) * M) % M) + M) % M;
     const kink = (i) => {
       let k = 0;
@@ -959,11 +1134,11 @@ export class Traffic {
     }
   }
 
-  buildRoad(A, B) {
+  buildRoad(A, B, near = null) {
     const RA = this.rings.get(A), RB = this.rings.get(B);
-    const eA = this.ringGate(RA, B);
+    const eA = this.ringGate(RA, B, near && near.loc === A ? near.apart : GATE_SEP);
     RA.gates.push(eA);
-    const eB = this.ringGate(RB, A);
+    const eB = this.ringGate(RB, A, near && near.loc === B ? near.apart : GATE_SEP);
     RB.gates.push(eB);
     const dA = this.ringExit(eA, 0), dA1 = this.ringExit(eA, 24), dA2 = this.ringExit(eA, 52), dB = this.ringExit(eB, 0), dB1 = this.ringExit(eB, 24), dB2 = this.ringExit(eB, 52);
     const line = this.roadCentreline(A, B, [dA, dA1, dA2], [dB, dB1, dB2]);
@@ -1220,6 +1395,37 @@ export class Traffic {
     });
   }
 
+  // The flared join of a road's end `e` (a gate of ring R) with the ring: a curved fillet each side of the road, road centreline -> ring centreline.
+  drawJoin(R, e) {
+    const M = R.M, cl = e.gate.cl, wrap = (i) => ((i % M) + M) % M;
+    let k = 1;
+    while (k < cl.length - 1 && cl[k].distanceTo(cl[0]) < FILLET) k++;
+    const q = cl[k], tIn = cl[k - 1].clone().sub(cl[k]).normalize();
+    const m = Math.max(2, Math.round(FILLET / R.step));
+    for (const d of [1, -1]) {
+      const j = e.i + d * m;
+      this.drawLine(this.bez(q, tIn, R.W[wrap(j)], R.tan[wrap(j)].clone().multiplyScalar(d), 10, 0.5), 0, 1, (t) => smooth(t / 0.3) * smooth((1 - t) / 0.3), true);
+    }
+  }
+
+  // A road that reaches a ring after the ring was drawn (addTownRoads, at the other settlement's end): the ring's outer berm and its ruts make
+  // way for the junction, as buildRing makes them for the junctions it knows of (the same fall-offs, never raising what is there). The ring's
+  // strip is in the first road mesh, a load drew it.
+  openJoin(R, e) {
+    const A = this.roadMesh.geometry.attributes, n = ROAD_LAT.length, M = R.M, outer = R.din > 0 ? -1 : 1;
+    for (let i = 0; i <= M; i++) {
+      const d = Math.abs(e.i - (i % M)), dg = Math.min(d, M - d) * R.step;
+      if (dg >= 38) continue;
+      const b = smooth((dg - 12) / 10), mk = smooth((dg - 24) / 14);
+      for (let k = 0; k < n; k++) {
+        const at = R.stripBase + i * n + k;
+        A.mark.array[at] = Math.min(A.mark.array[at], mk);
+        if (ROAD_LAT[k] === 0 || Math.sign(ROAD_LAT[k]) === outer) A.berm.array[at] = Math.min(A.berm.array[at], b);
+      }
+    }
+    A.mark.needsUpdate = A.berm.needsUpdate = true;
+  }
+
   // The ring itself: one closed strip, a flared join for each road, lanes and junction connectors.
   buildRing(loc, R) {
     const P = this.P, M = R.M, kd = R.kd;
@@ -1238,6 +1444,7 @@ export class Traffic {
     // closed strip (the last row repeats the first)
     {
       const base = this.roadGeo.pos.length / 3;
+      R.stripBase = base; // (openJoin finds the strip's rows by it)
       let s = 0;
       for (let i = 0; i <= M; i++) {
         if (i) s += W[wrap(i)].distanceTo(W[i - 1]);
@@ -1266,18 +1473,8 @@ export class Traffic {
     const gates = R.gates.sort((p, q) => p.i - q.i);
     const n = gates.length;
     loc.ring = { radius: Math.round(R.Rb), max: Math.round(R.maxR), gates: n };
-    // flared joins: a curved fillet each side of the road, road centreline -> ring centreline
-    for (const e of gates) {
-      const gt = e.gate, cl = gt.cl;
-      let k = 1;
-      while (k < cl.length - 1 && cl[k].distanceTo(cl[0]) < FILLET) k++;
-      const q = cl[k], tIn = cl[k - 1].clone().sub(cl[k]).normalize();
-      const m = Math.max(2, Math.round(FILLET / R.step));
-      for (const d of [1, -1]) {
-        const j = e.i + d * m;
-        this.drawLine(this.bez(q, tIn, W[wrap(j)], laneT(d, j), 10, 0.5), 0, 1, (t) => smooth(t / 0.3) * smooth((1 - t) / 0.3), true);
-      }
-    }
+    // flared joins
+    for (const e of gates) this.drawJoin(R, e);
     // delineator posts on the outside of the ring, away from the junctions
     const outSide = -R.din;
     const near = (i, list, dist) => list.some((gi) => { const d = Math.abs(gi - i); return Math.min(d, M - d) * R.step < dist; });
@@ -1288,8 +1485,8 @@ export class Traffic {
       P.ground(p, p);
       this.posts.push({ pos: p, q: frameQuat(W[i].clone().normalize(), tan[i], new THREE.Quaternion()) });
     }
-    // pads (laid out after the roads) keep off the ring
-    for (let i = 0; i < M; i += 2) { const p = this.ringLocal(R, i); loc.stopKeep.push({ x: p.x, z: p.z, r: 10 }); }
+    // pads (laid out after the roads) keep off the ring (tagged: ringGate leaves them out, see there)
+    for (let i = 0; i < M; i += 2) { const p = this.ringLocal(R, i); loc.stopKeep.push({ x: p.x, z: p.z, r: 10, ring: true }); }
     if (!n) return;
     // ---- pieces ----
     const span = (d, from, to) => { const out = []; for (let i = from; d > 0 ? i <= to : i >= to; i += d) out.push(lane(d, i)); return out; };
@@ -1356,7 +1553,7 @@ export class Traffic {
   ringStop(R) {
     const loc = R.loc, M = R.M, d = R.din;
     if (!R.arcs) return;
-    const keeps = this.keepouts(loc, false);
+    const keeps = [...this.keepouts(loc, false), ...loc.stopKeep.filter((k) => k.flyPad)]; // (a ring laid late goes round the pads that landed before it)
     const bl = this.buildings(loc);
     const wrap = (i) => ((i % M) + M) % M;
     let best = null;
@@ -1403,12 +1600,13 @@ export class Traffic {
     const yaw = Math.atan2(sL.x - sx, sL.z - sz);
     const names = (this.towns.get(loc) || []).map((g) => g.other.short);
     const text = `ROADS > ${names.slice(0, 3).join(' ')}${names.length > 3 ? ' +' : ''}`;
-    this.shelter(loc, sx, sz, yaw, text, 0xff9f1c);
+    const shelterAt = { x: sx, z: sz, yaw, text, color: 0xff9f1c }; // (redress hangs it up again after the town is rebuilt in place)
+    this.shelter(loc, sx, sz, yaw, text, shelterAt.color);
     loc.stopKeep.push({ x: sx, z: sz, r: 3 });
     const wait = { x: sx + Math.sin(yaw) * 1.8, y: this.groundY(loc, sx, sz), z: sz + Math.cos(yaw) * 1.8, g: true };
     const r = Math.hypot(sx, sz) || 1;
     pc.stop = {
-      loc, kind: 'road', piece: pc, s, world: p, wait, origin: wait,
+      loc, kind: 'road', piece: pc, s, world: p, wait, origin: wait, shelterAt,
       town: this.townPoint(loc, sx - (sx / r) * 4, sz - (sz / r) * 4, 90),
       queue: [], queued: false,
     };
@@ -1484,7 +1682,7 @@ export class Traffic {
   // Put a land-train, two hover-cars and a buggy on each road, each with somewhere to go. The road into a
   // restricted base (Vostok-9) carries only that faction's own pair of trains, a Moonliner and a Prospector
   // running from the Helium-3 exchange to the bastion and back, one on each lane.
-  populateRoad(road, k) {
+  populateRoad(road, k, trains = true) {
     const military = k < 0;
     const add = (v, lane) => {
       const pc = road.lanes[lane === undefined ? Math.floor(this.r() * road.lanes.length) : lane];
@@ -1504,7 +1702,7 @@ export class Traffic {
     const specs = military
       ? [{ faction: base.faction, type: 'moonliner', cars: ['pax', 'pax', 'pax'] }, { faction: base.faction, type: 'prospector', cars: FREIGHT[0] }]
       : [this.trainSpec(road, k)];
-    specs.forEach((spec, n) => {
+    (trains ? specs : []).forEach((spec, n) => {
       const lt = makeLandTrain(spec);
       this.w.scene.add(lt.root);
       for (const t of lt.trailers) this.w.scene.add(t.root);
@@ -1523,11 +1721,13 @@ export class Traffic {
     });
     if (military) return;
     // hover-cars: hop over slower traffic instead of queueing (the jar can scoop these)
+    // (one is a faction car in the livery of the road's faction, the other a civilian car in one of the civilian paints)
+    const carFaction = this.trainSpec(road, k).faction;
     for (let i = 0; i < 2; i++) {
-      const m = makeHoverCar({ color: [0xff7ad9, 0x2ec4ff, 0x7dff6a, 0xffd23f][(k + i) % 4] });
+      const m = makeHoverCar(i === 0 ? { faction: carFaction } : { paint: k });
       m.root.matrixAutoUpdate = true;
       this.w.scene.add(m.root);
-      const v = add({ ...m, kind: 'car', vmax: 22 + this.r() * 6, acc: 4, front: 2, tail: 2, waitT: 4, deck: [1.45, 1.1, 3.1], deckY: 0, quat: m.root.quaternion, view: 800, radius: 2.8, hoverH: 1.8, hp: CAR_HP, maxHp: CAR_HP, hitR: 3.0, credits: 30 });
+      const v = add({ ...m, kind: 'car', vmax: 22 + this.r() * 6, acc: 4, front: 2.4, tail: 2.4, waitT: 4, deck: [1.7, 1.3, 3.6], deckY: 0, quat: m.root.quaternion, view: 800, radius: 3.3, hoverH: 1.9, hp: CAR_HP, maxHp: CAR_HP, hitR: 3.5, credits: 30, bobPh: this.r() * 6.28 });
       this.vehicles.push(v);
     }
     // buggy (old-style crawler): queues behind slower traffic
@@ -1855,6 +2055,13 @@ export class Traffic {
     g.blastHooks.push((pos, radius, damage, owner) => this.blast(pos, radius, damage, owner));
   }
 
+  // How far a hover-car bobs on its lift: slow and shallow (about a 0.05 m swell at 0.15 Hz and a finer ripple), each car on its own
+  // phase. (It used to ride the distance along the road, so at speed it bounced several times a second.)
+  carBob(v) {
+    const ph = v.bobPh || 0;
+    return Math.sin(this.t * 0.9 + ph) * 0.05 + Math.sin(this.t * 1.7 + ph * 1.7) * 0.02;
+  }
+
   centre(v, out) { return out.copy(v.pos).addScaledVector(_u.copy(v.pos).normalize(), v.kind === 'buggy' ? 1.8 : v.kind === 'car' ? 0.4 : 2.6); }
 
   // Does a shot's segment (a -> b) hit any road vehicle, a land-train's trailers included? (A trailer
@@ -1940,6 +2147,7 @@ export class Traffic {
     for (const wk of this.walkers) if (wk.owner === v && !wk.done) this.release(wk);
     this.char(v, true);
     if (v.beacon) v.beacon.visible = false;
+    if (v.beacons) for (const b of v.beacons) b.visible = false;
     if (!g) return;
     const c = this.centre(v, new THREE.Vector3()), up = c.clone().normalize();
     g.fx.explosion(c, v.kind === 'buggy' ? 7 : 11, true);
@@ -1961,7 +2169,7 @@ export class Traffic {
   // Back on the road later, somewhere the camera can't see it appear.
   respawn(v, camPos) {
     // (the Vostok supply trains come back on their own road, and nothing else is put on it)
-    const lanes = this.roads.filter((r) => !!(r.A.restricted || (r.B && r.B.restricted)) === !!v.shuttle).flatMap((r) => r.lanes).filter((pc) => pc.len > 300);
+    const lanes = this.roads.filter((r) => !!(r.A.restricted || (r.B && r.B.restricted)) === !!v.shuttle && !(r.uturn && v.kind === 'landtrain')).flatMap((r) => r.lanes).filter((pc) => pc.len > 300);
     const h = { i: 0, f: 0 };
     for (let tries = 0; tries < 8 && lanes.length; tries++) {
       const pc = lanes[Math.floor(this.r() * lanes.length)];
@@ -2121,6 +2329,14 @@ export class Traffic {
     v.fwd.set(0, 0, 1).applyQuaternion(v.root.quaternion);
     M.setRamp(v.open);
     M.setThrust(main, lift, v.clock);
+    if (M.setCrane) {
+      // the freighter's gantry cranes work the bays while it stands on its pad (the spreaders go down only over their own bay, and are hoisted
+      // again before it lifts off)
+      const down = v.state === 'park' && !v.closing;
+      v.craneW = (v.craneW || 0) + ((down && v.timer > 2 ? 1 : 0) - (v.craneW || 0)) * Math.min(1, dt * 0.7);
+      v.craneL = (v.craneL || 0) + ((down ? 1 : 0) - (v.craneL || 0)) * Math.min(1, dt * 1.2);
+      M.setCrane(v.craneW, v.clock, v.craneL);
+    }
     this.syncDeck(v, camPos);
   }
 
@@ -2171,7 +2387,7 @@ export class Traffic {
     _f.divideScalar(d);
     v.cur = Math.min(v.vmax * 0.5, v.cur + v.acc * dt);
     v.pos.addScaledVector(_f, Math.min(d, v.cur * dt));
-    P.ground(v.pos, v.pos, v.hoverH + 0.3 + Math.sin(this.t * 2) * 0.12);
+    P.ground(v.pos, v.pos, v.hoverH + 0.3 + this.carBob(v));
     if (dt > 0) v.vel.copy(v.pos).sub(v.prevPos).divideScalar(dt);
     v.fwd.copy(_f);
     v.root.visible = this.seen(v, camPos);
@@ -2265,11 +2481,11 @@ export class Traffic {
     const lt = v.kind === 'landtrain';
     const up = this.roadFrame(v, v.s, lt ? 2.9 : v.front * 0.7, lt ? 2.9 : Math.max(2, v.front * 0.7), v.hintF, v.hintR, v.pos, _f, _fp, _rp);
     if (v.kind === 'car') {
-      v.hover += ((over || 0) - v.hover) * Math.min(1, dt * 2.5);
+      v.hover += ((over || 0) - v.hover) * Math.min(1, dt * 1.4);
       // (a wreck has lost its lift: it sits on the road)
       if (v.state === 'wreck') v.dropH = Math.max(0, (v.dropH ?? v.hoverH) - dt * 6);
       else v.dropH = v.hoverH;
-      v.pos.addScaledVector(up, v.dropH + (v.state === 'wreck' ? 0.3 : v.hover + Math.sin(this.t * 2 + v.s) * 0.12));
+      v.pos.addScaledVector(up, v.dropH + (v.state === 'wreck' ? 0.3 : v.hover + this.carBob(v)));
     }
     this.applyTug(v, dt);
     if (dt > 0) v.vel.copy(v.pos).sub(v.prevPos).divideScalar(dt);
@@ -2289,6 +2505,10 @@ export class Traffic {
     } else {
       v.root.position.copy(v.pos);
       frameQuat(up, _f, v.root.quaternion);
+      if (v.kind === 'car' && v.state !== 'wreck') { // (a hover-car wallows gently on its lift: about a degree of roll and pitch, slow)
+        const ph = v.bobPh || 0;
+        v.root.quaternion.multiply(_q.setFromEuler(_eu.set(Math.sin(this.t * 0.6 + ph * 1.3) * 0.012, 0, Math.sin(this.t * 0.8 + ph) * 0.018)));
+      }
     }
     if (v.roll) { v.root.quaternion.multiply(_q.setFromAxisAngle(_z, v.roll)); v.root.position.addScaledVector(up, -0.4); }
     if (v.wheels) {
@@ -2296,6 +2516,7 @@ export class Traffic {
       for (const w of v.wheels) w.rotation.x += spin;
     }
     if (v.beacon && v.state !== 'wreck') v.beacon.visible = Math.sin(this.t * 6) > -0.2;
+    if (v.beacons && v.state !== 'wreck') for (const b of v.beacons) b.visible = Math.sin(this.t * 7 + b.userData.phase * Math.PI) > 0; // (SPACECOM's light bar: the two lamps take turns)
     if (v.trailers) {
       v.trailers.forEach((t, i) => {
         const p = t.plat;
@@ -2391,7 +2612,7 @@ export class Traffic {
 
   // Keep a vehicle's deck colliders in the spatial hash while it is near the camera: one box for a
   // flyer or hover-car (deck / deckY / deckZ), or the list of boxes in the model's own frame for a
-  // land-train unit (decks: hx, hy, hz, y, z each).
+  // land-train unit or the freighter (decks: hx, hy, hz, y, z each, and x for a box off the middle line).
   syncDeck(s, camPos) {
     const near = s.pos.distanceToSquared(camPos) < 350 * 350;
     this.dropDeck(s);
@@ -2403,7 +2624,7 @@ export class Traffic {
     boxes.forEach((d, i) => {
       const c = s.deckCols[i];
       c.ax.copy(_a); c.ay.copy(_b); c.az.copy(_c);
-      c.c.copy(s.pos).addScaledVector(_b, d.y).addScaledVector(_c, d.z);
+      c.c.copy(s.pos).addScaledVector(_a, d.x || 0).addScaledVector(_b, d.y).addScaledVector(_c, d.z);
       c.hx = d.hx; c.hy = d.hy; c.hz = d.hz;
       this.C.add(c);
     });

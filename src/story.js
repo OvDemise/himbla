@@ -37,7 +37,7 @@ export const TECH = {
 // Modules for outposts you found (the base-builder part).
 export const MODULES = {
   greenhouse: { name: 'Greenhouse', cost: 600, icon: 'greenhouse', tint: '#7dff6a', feature: 'Heals you within 60 m', desc: 'Heals you while you are nearby.' },
-  clinic: { name: 'Clinic', cost: 800, icon: 'clinic', tint: '#ff2a4a', feature: 'K.O. respawn point', desc: 'You redeploy here after a K.O. (nearest clinic wins).' },
+  clinic: { name: 'Clinic', cost: 800, icon: 'clinic', tint: '#ff2a4a', feature: 'K.O. respawn point', desc: 'You redeploy here after a K.O. (nearest clinic wins), unless you have set a charted headquarters as your respawn point (at your town\'s clinic).' },
   beacon: { name: 'Beacon Tower', cost: 700, icon: 'beacon', tint: '#2ee6ff', feature: 'Charts the map · fast travel', desc: 'Charts a wide circle of map around it and links to your other beacons for fast travel.' },
   turret: { name: 'Militia Turret', cost: 900, icon: 'turret', tint: '#ff9f1c', feature: 'Shoots pirates within 300 m', desc: 'A manned gun on a tall stand. Shoots pirates within 300 m.' },
   turret2: { name: 'Second Militia Turret', cost: 900, needs: 'turret', icon: 'turret2', tint: '#ff9f1c', feature: 'A second gun by the gate', desc: 'A second gun on a stand of its own beside the gate. Shoots pirates within 300 m.' },
@@ -212,9 +212,9 @@ const CHAPTERS = {
       title: 'The Survey',
       brief: '"A homestead is lovely. But the Moon needs a proper town of ours, a real one, and the councils want YOU to choose where. I\'ve three spots in mind. Go and see each one, then tell me."',
       steps: [{ t: 'survey', sites: [
-        { site: 'hertz', min: 700, max: 1000, clear: 320, kind: 'ice', name: 'Shadow Crater', note: 'Water ice under the dark: the town\'s bank fills faster. But the dark side is pirate country.' },
-        { site: 'aldrin', min: 800, max: 1100, clear: 320, kind: 'plain', name: 'Sunlit Plain', note: 'Flat, bright and right by the traffic lanes: a busy, easy place to live.' },
-        { site: 'kepler', min: 900, max: 1200, clear: 320, kind: 'ridge', name: 'High Ridge', note: 'You can see half the Moon from up there: the town\'s guns and radio reach further.' },
+        { site: 'hertz', min: 700, max: 1000, clear: 320, town: true, kind: 'ice', name: 'Shadow Crater', note: 'Water ice under the dark: the town\'s bank fills faster. But the dark side is pirate country.' },
+        { site: 'aldrin', min: 800, max: 1100, clear: 320, town: true, kind: 'plain', name: 'Sunlit Plain', note: 'Flat, bright and right by the traffic lanes: a busy, easy place to live.' },
+        { site: 'kepler', min: 900, max: 1200, clear: 320, town: true, kind: 'ridge', name: 'High Ridge', note: 'You can see half the Moon from up there: the town\'s guns and radio reach further.' },
       ], hold: 3, r: 40, label: 'Survey the three sites' }],
       reward: { credits: 780, vehicle: 'mule' },
       outro: '"A fine choice. I\'ve sent you a Homestead Mule for the hauling to come. Press V. Now: the town core."',
@@ -596,10 +596,11 @@ export class Story {
       return { pos: g.planet.ground(o.dir, new THREE.Vector3()), outpost: o };
     }
     if (sel.site) {
-      // the flattest of a dozen candidates: fights on a crater's rim or a slope were clunky
+      // the flattest of a dozen candidates: fights on a crater's rim or a slope were clunky. A town site is judged by the ground
+      // under the whole town instead (townScore), and must keep off roads, unbuilt outposts and lakes (the plateau would cut them).
       const l = locOf(sel.site);
       const clear = sel.clear || 150;
-      let best = null, bestScore = Infinity;
+      let best = null, bestScore = Infinity, spare = null, spareScore = Infinity;
       for (let tries = 0, ok = 0; tries < 90 && ok < 12; tries++) {
         const dist = sel.min + Math.random() * (sel.max - sel.min);
         const t = tangent(new THREE.Vector3(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5), l.dir).normalize();
@@ -607,11 +608,16 @@ export class Story {
         if (g.locations.some((x) => arcDist(d, x.dir) < (x.zoneR || x.r) + clear)) continue;
         if (T.outposts.some((o) => arcDist(d, o.dir) < 120)) continue;
         if (g.world.lakes.some((lk) => arcDist(d, lk.d) < lk.rad + 30)) continue;
+        if (sel.town && T.siteClash(d)) {
+          // (kept only if nothing clear turns up: a candidate that crowds a road is better than the fixed fallback below)
+          if (!best) { const sc = this.townScore(d); if (sc < spareScore) { spareScore = sc; spare = d; } }
+          continue;
+        }
         ok++;
-        const sc = this.roughness(d);
+        const sc = sel.town ? this.townScore(d) : this.roughness(d);
         if (sc < bestScore) { bestScore = sc; best = d; }
       }
-      if (best) return { pos: g.planet.ground(best, new THREE.Vector3()) };
+      if (best || spare) return { pos: g.planet.ground(best || spare, new THREE.Vector3()) };
       return { pos: g.planet.ground(greatCircle(l.dir, tangent(new THREE.Vector3(1, 0, 0), l.dir).normalize(), sel.min), new THREE.Vector3()) };
     }
     return null;
@@ -995,9 +1001,39 @@ export class Story {
     return sum / 8 + rim;
   }
 
+  // How badly the ground round a point suits a town (lower is better): the heights along the point's up, every 20 m out to 240 m,
+  // 16 to a ring. The plateau is cut to the mean ground under the footprint (r <= 80, by area), so 'dev' is the worst cut or
+  // fill inside it (r <= 90: the hall, the eight plots and the aprons), and 'skirt' is the worst on the blend ring (r >= 200),
+  // where a crater wall would be a cliff at the plateau's edge. The skirt counts a quarter as much: it is only a slope.
+  townScore(dir) {
+    const P = this.game.planet;
+    const d = dir.clone().normalize();
+    const t1 = tangent(new THREE.Vector3(1, 0, 0), d).normalize(), t2 = new THREE.Vector3().crossVectors(d, t1);
+    const p = new THREE.Vector3(), hs = [];
+    let sum = 0, area = 0;
+    for (let r = 0; r <= 240; r += 20) {
+      const n = r ? 16 : 1;
+      for (let i = 0; i < n; i++) {
+        const a = (i / n) * Math.PI * 2;
+        p.copy(d).multiplyScalar(P.R).addScaledVector(t1, Math.cos(a) * r).addScaledVector(t2, Math.sin(a) * r).normalize();
+        const h = P.surface(p) * p.dot(d);
+        hs.push(r, h);
+        if (r <= 80) { const w = r || 1; sum += h * w; area += w; }
+      }
+    }
+    const mean = sum / area;
+    let dev = 0, skirt = 0;
+    for (let i = 0; i < hs.length; i += 2) {
+      const e = Math.abs(hs[i + 1] - mean);
+      if (hs[i] <= 90) dev = Math.max(dev, e);
+      if (hs[i] >= 200) skirt = Math.max(skirt, e);
+    }
+    return dev + 0.25 * skirt;
+  }
+
   // A town site when the survey was skipped (cheats): the first candidate that's well clear.
   defaultTownSite() {
-    const r = this.resolve({ site: 'aldrin', min: 800, max: 1100, clear: 320 });
+    const r = this.resolve({ site: 'aldrin', min: 800, max: 1100, clear: 320, town: true });
     this.townSite = { dir: r.pos.clone().normalize().toArray(), kind: 'plain', name: 'Pike\'s Landing', outpost: null };
     this.save();
   }
@@ -1704,8 +1740,8 @@ export class Story {
     const has = (m) => o.modules.includes(m);
     if (k === 'greenhouse') return { rows: [['EFFECT', 'Heals 4 hull / s'], ['RANGE', '60 m round the hub'], ['STATUS', 'ACTIVE']], note: 'Nothing to press: it works while you stand near it.' };
     if (k === 'clinic') {
-      const near = this.clinicSpawn(P.pos.clone().normalize());
-      return { rows: [['EFFECT', 'You redeploy here after a K.O.'], ['NEAREST CLINIC', near === o ? 'THIS ONE (to you)' : 'Another is nearer to you', near === o ? '' : 'dim']] };
+      const near = this.clinicSpawn(P.pos.clone().normalize()), plan = this.game.respawnPt.plan(P.pos.clone().normalize());
+      return { rows: [['EFFECT', 'You redeploy here after a K.O.'], ['REDEPLOY AT', plan.name, plan.kind === 'hq' ? 'gold' : ''], ['NEAREST CLINIC', near === o ? 'THIS ONE (to you)' : 'Another is nearer to you', near === o ? '' : 'dim']] };
     }
     if (k === 'beacon') {
       const linked = this.myOutposts().filter((x) => x !== o && x.modules.includes('beacon')).length;
@@ -1866,7 +1902,7 @@ export class Story {
   clinicSpawn(from) {
     let best = null, bd = Infinity;
     const T = this.game.town;
-    if (T && T.has('clinic')) { const p = T.slotWorld('clinic'); if (p) { best = { dir: p.clone().normalize() }; bd = arcDist(from, best.dir); } }
+    if (T && T.has('clinic')) { const p = T.slotWorld('clinic'); if (p) { best = { dir: p.clone().normalize(), name: `${T.state.name} clinic` }; bd = arcDist(from, best.dir); } }
     for (const o of this.myOutposts()) {
       if (!o.modules.includes('clinic')) continue;
       const d = arcDist(from, o.dir);

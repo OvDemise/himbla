@@ -520,8 +520,9 @@ export class Enemies {
   }
 
   removeAllies() {
-    for (const e of this.list) if (e.faction === 'ally') { e.dead = true; e.model.root.removeFromParent(); }
-    this.list = this.list.filter((e) => e.faction !== 'ally');
+    // (keep: the town's militia rovers, hometown.js, aren't a chapter's backup: its end doesn't stand them down)
+    for (const e of this.list) if (e.faction === 'ally' && !e.keep) { e.dead = true; e.model.root.removeFromParent(); }
+    this.list = this.list.filter((e) => e.faction !== 'ally' || e.keep);
   }
 
   // Rustmoon pirates leave you alone once you've joined them — unless you start it.
@@ -841,7 +842,9 @@ export class Enemies {
           const nh = this.hunters(), skip = nh >= 3;
           const got = skip ? 1 : this.spawnSquad(1 + Math.floor(Math.random() * 2));
           this.dbgDarkTry = { at: g.time, n: (this.dbgDarkTry ? this.dbgDarkTry.n : 0) + 1, skip, got, hunters: nh }; // (dev overlay)
-          this.darkTimer = got ? randRange(20, 34) : 4; // (a failed attempt tries again soon)
+          // (Daedalus Dark-Side Cloak: +5 s per level between checks, doubled on Daedalus ground)
+          const cloak = (g.upgrades.cloak || 0) * 5 * (g.territory && g.territory.current === 'daedalus' ? 2 : 1);
+          this.darkTimer = got ? randRange(20, 34) + cloak : 4; // (a failed attempt tries again soon)
           this.pirateTimer = Math.max(this.pirateTimer, 14);
         }
       }
@@ -1503,7 +1506,7 @@ export class Enemies {
 
   // Clear line of fire: terrain plus solid colliders (walls, bastions, buildings) along the
   // way, sampled every couple of metres; the last stretch next to the target is ignored.
-  clearShot(from, to) {
+  clearShot(from, to, ignore = null) {
     const g = this.game;
     if (!g.planet.visible(from, to)) return false;
     const C = g.colliders;
@@ -1512,7 +1515,7 @@ export class Enemies {
     for (let i = 0; i < n; i++) {
       if (len * (1 - i / n) < 2.5) break;
       _sv.lerpVectors(from, to, i / n);
-      for (const c of C.query(_sv, 0.4, _near)) if (C.contact(c, _sv, 0.3, _sn) > 0) return false;
+      for (const c of C.query(_sv, 0.4, _near)) if (!(ignore && c.platform === ignore) && C.contact(c, _sv, 0.3, _sn) > 0) return false;
     }
     return true;
   }

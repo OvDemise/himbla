@@ -25,6 +25,7 @@
 //                                               left stick  move the cursor   right stick  zoom
 //                                               RT, hold    grab the globe and drag it round
 //                                               LB / RB, hold  turn the map round
+//                                               A  send a sweep, X  stop / resume it (from the Radio Tower)
 //                                               B / View    close
 //                                               PLINKO
 //                                               left stick / d-pad ←/→  aim the chute
@@ -163,6 +164,7 @@ export class Gamepad {
     else if (roul) this.roulette(btn, pressed, trig, lx, ly, dt);
     else if (st === 'casino' && g.casino.mode) this.seated(g.casino.mode, btn, pressed, trig, lx, ly, dt);
     else if (st === 'dead') { this.releaseAll(); if (pressed(B.A) || pressed(B.START)) document.getElementById('death').click(); }
+    else if (st === 'cutscene') { this.releaseAll(); if (pressed(B.A) || pressed(B.B) || pressed(B.START)) this.tap('Space'); } // (the cutscenes skip on Space: the recall shuttle, the med-evac and the council's vote)
     else this.ui(btn, pressed, lx, ly, ry, dt);
     this.prev = btn;
   }
@@ -433,7 +435,8 @@ export class Gamepad {
     this.game.globe.padUpdate(lx, ly, trig(B.RT) > 0.35, ry, (btn[B.RB] ? 1 : 0) - (btn[B.LB] ? 1 : 0), dt);
     // (View closes on the release, so letting go of it can't be read as the tap that opens the map)
     if (pressed(B.B) || pressed(B.START)) this.key('Escape');
-    else if (pressed(B.A)) this.game.globe.padClick(); // (the dev menu's click-to-teleport)
+    else if (pressed(B.A)) this.game.globe.padClick(); // (the Radio Tower's sweep, or the dev menu's click-to-teleport)
+    else if (pressed(B.X) && this.game.globe.mode === 'radio') this.game.globe.radioToggle(); // (stop / resume the sweep)
     else if (released(B.VIEW)) this.tap('KeyM');
   }
 

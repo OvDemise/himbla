@@ -14,7 +14,8 @@ const _g = { f: 0, i: 0, j: 0 };
 // them busy, few enough that what they're making is still what's wanted)
 const WORKERS = Math.max(2, Math.min(4, ((typeof navigator !== 'undefined' && navigator.hardwareConcurrency) || 4) - 2)), IN_FLIGHT = 4;
 // a plateau as a worker needs it (the zone objects are whole locations: just the numbers)
-function zoneMsg(z) { return { dir: [z.dir.x, z.dir.y, z.dir.z], r: z.r, late: !!z.late, zoneR: z.zoneR || 0 }; }
+// (a fitted town sends its plane as zrSet, which the worker takes as it is rather than fitting again)
+function zoneMsg(z) { return { dir: [z.dir.x, z.dir.y, z.dir.z], r: z.r, late: !!z.late, zoneR: z.zoneR || 0, flatR: z.flatR, fit: !!z.fit, zrSet: z.zrSet }; }
 const AHEAD_LOD = 1; // build-ahead: chunks round where you'll be soon, up to this level of detail
 // the ink line along crater crests: how many rims the terrain shader takes, and how far out
 const RIM_INK_MAX = 64, RIM_INK_REACH = 1500, RIM_INK_BIG = 120; // (no ink on rims bigger than that)
@@ -72,10 +73,23 @@ export class Planet extends TerrainField {
   }
 
   // A settlement founded mid-game (main.js applyWorldLive): a plateau like the ones built at boot.
-  addZone(z) {
-    this.addZoneData(z);
+  // `swallow` lists the directions of founding-outpost plateaus the settlement grows over: they come
+  // out first (else a 40 m flat at the old ground outlasts the town as a pit under its hall), and
+  // their chunks are redone along with the town's.
+  addZone(z, swallow = []) {
+    for (const d of swallow) {
+      const u = d.clone().normalize();
+      const flat = this.flats.find((f) => f.dir.dot(u) > 0.999999);
+      if (!flat) continue;
+      const r = flat.r;
+      this.removeFlatData(u);
+      this.tellWorkers({ type: 'unflat', dir: u.toArray() });
+      this.redo(u, r);
+    }
+    this.addZoneData(z); // (fits the plane here, once)
     this.tellWorkers({ type: 'zone', zone: zoneMsg(z) });
-    this.redo(z.dir, z.r);
+    this.redo(z.dir, z.fr);
+    this.rimInfo = null; this.rimRails = null; // (crater lips and grind rails worked out for ground that is now flat)
   }
 
   // Drop the terrain chunks (and their boulders) round a plateau so they rebuild with it.

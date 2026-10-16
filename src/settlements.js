@@ -2478,10 +2478,9 @@ export function dressCasinoLot(world, loc, makeCar) {
     }
   });
   // the parked cars (shared baked models), each a solid block to bump into
-  const pal = [0xff7ad9, 0x2ec4ff, 0x7dff6a, 0xffd23f, 0xff9f1c, 0xd8d4e8, 0xc77dff];
   cars.forEach(([x, z, yaw], i) => {
-    const m = makeCar({ color: pal[(i * 5) % pal.length] });
-    world.put(m.root, loc, x, z, 1.05, yaw + (((i * 7) % 5) - 2) * 0.03);
-    world.col(loc, { type: 'box', x, y: 1.1, z, hx: 1.35, hy: 1.1, hz: 2.6, yaw });
+    const m = makeCar({ paint: i * 2 }); // (civilian cars, the paints in turn)
+    world.put(m.root, loc, x, z, 1.15, yaw + (((i * 7) % 5) - 2) * 0.03);
+    world.col(loc, { type: 'box', x, y: 1.2, z, hx: 1.7, hy: 1.2, hz: 3.1, yaw });
   });
 }

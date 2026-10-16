@@ -249,7 +249,7 @@ Daedalus, and vice versa.
 - **Faction gear:** each HQ sells unique gear gated by reputation: SPACECOM Seeker Module (homing),
   Meridian Gyro-Edges (steering) and Market Uplink (pay), the Kepler Twin Cradle (carry two contracts at
   once, crates stacked; both waypoints on the HUD), Vostok Flak Weave (health, knockback), Daedalus
-  Overcharger (fire rate) and Rustmoon Shadow Rig (harder to hit). Kepler also sells the **Hitch-Line Winch**: hold `Z` to cable onto a vehicle within 85 m and ride its pull for up to 10 s, swinging under flying transits or trailing behind rovers and land-trains (they're heavy; drag one off its route and it eases back on). Rustmoon's black market at the Hold
+  Overcharger (fire rate) and Rustmoon Shadow Rig (harder to hit). Kepler also sells the **Hitch-Line Winch**: hold `Z` to fire a steel cable onto a vehicle or a structure within 120 m (the hook bites the nearest surface; whatever the reticle is on wins, else the target closest to it, and a faint tow-line marker shows what it will hook). The drum reels you in smoothly, easing to a stop with about 2 m of cable left, and you can hold for up to 20 s, swinging under flying transits or trailing behind rovers and land-trains (they're heavy; drag one off its route and it eases back on). Rustmoon's black market at the Hold
   stocks the ILMB kit and other factions' upgrades, weapons, tech and vehicles, each one brought in by a
   smuggling run that carries it as a payload (named on the job board).
 - **Clearance:** FRIENDLY (10+) with Vostok or Daedalus means their turrets stop shooting you and you
@@ -443,8 +443,9 @@ with their main thrusters pulsing, slow down and land on a pad at the edge of ea
 out of their bays (doors first, then the legs) on the way down and tuck away again after take-off; the shuttle-bus's
 rear door drops into a ramp, the freighter lowers a belly ramp. The **shuttle-bus** is a 19 m lifting-body hopper
 with a wraparound windscreen, porthole windows, two ducted lift-fans and a lit route board on the roof; the
-**freighter** is a ~70 m hauler with a rideable flat deck (landing circle and all), a bridge tower at the bow,
-container racks down both flanks, swept radiator wings and a four-bell engine cluster.
+**freighter** ("Atlas") is a ~70 m armoured hauler with a rideable landing deck (a big pad, kerb lights, tie-down rails), a raked bridge tower at the bow,
+a gantry cage round four cargo bays down each flank, each two crates high, holding the land-train's own cargo (the corrugated container, the Helium-3 tanker
+in an ISO frame so it stacks like a box, and the explosives magazine, in the livery of a faction whose town the freighter serves), short radiator wings and a four-bell engine block.
 **Hitch a ride for free:** walk up to a landed shuttle-bus or freighter and press `F` to hop in (the prompt says where
 it's headed). You ride inside while the camera hangs back to watch the ship; press `F` again to hop out down the ramp,
 or bail out mid-flight through the side hatch (keeping the ship's speed, with a little style for the nerve). Passengers walk off toward town, the queue
@@ -733,23 +734,31 @@ src/
   assets/crane.glb   the tower crane (lattice mast, ballasted base, slewing head with cab, trolley and hook)
   assets/garage.glb  the Meridian motor-pool garages: the main one (three bays with open and shut doors, workshop fit-outs, service office, fuel yard, roof plant) and a small two-bay one
   assets/dish.glb    the two stations for the research arrays' big dishes: the cryo receiver (a banded Helium-3 vessel with a stair, valve cabinet and branding panel) and the gantry station (a lattice mast, container control rooms, battery bank, fuel tank), each with the dish, its yaw and tilt pivots and a livery and number for every faction and dish
+  assets/winch.glb   the Hitch-Line Winch's grapple (a gold three-fluke claw, collar, shank and eye) and a metre of twisted steel cable with an orange tracer strand, which the game lays along the line, a piece per metre
+  assets/towmark.png the winch's tow-line marker for the HUD (brackets, a dashed ring and a hook glyph, white on clear, rendered in Blender and tinted by a CSS mask)
   assets/outposts.glb  the Relay Mast and Watchtower outposts, intact and wrecked (a pilot, off unless the URL has `?outpostGlb`; contract in docs/outpost-glb.md)
 tools/
   blender/build_runner.py  builds the runner in Blender and exports src/assets/runner.glb
   blender/build_idles.py   keys the runner's five idles on its pivots -> src/assets/idles.json (headless: `pip install bpy`, then `python3 tools/blender/build_idles.py`; `MOONRUNNER_IDLES_BLEND=idles.blend` also saves the keyed scene)
   optimize-glb.mjs         compresses the models in src/assets (quantized and meshopt-coded: about a quarter of the size); `npm run optimize:glb`, run after re-exporting a model from Blender
-  blender/build_ships.py   builds both transit ships in Blender and exports src/assets/ships.glb
+  blender/build_ships.py   builds both transit ships in Blender and exports src/assets/ships.glb (the freighter's bays use cargo.py: the land-train's cargo units, mirrored from build_landtrain.py; FREIGHTER_VARIANT=atlas|compact builds the one-crate-high and the smaller-hull studies instead of the shipped two-high freighter)
+  blender/cargo.py         the land-train's box container, Helium-3 tanker and explosives magazine, without their flatbed, for other models to carry
+  blender/proposals/       the freighter design study: freighter_b.py (the open-truss "Girder" alternative to the chosen Atlas) and preview.py / preview_ships.py, which render a ship in the game's palette with Cycles on the CPU
   blender/build_skimmer.py builds the Daedalus skimmer -> src/assets/skimmer.glb
+  blender/build_engine.py  builds the salvaged engine that drops out of wrecks -> src/assets/engine.glb
+  blender/build_briefcase.py builds the credits briefcase that drops out of wrecks -> src/assets/briefcase.glb
+  blender/build_hovercar.py builds the faction and civilian hover-cars -> src/assets/hovercar.glb (the road cars, the casino car park, the Asset Row)
   blender/build_warrig.py  builds the pirate war-rig -> src/assets/warrig.glb
   blender/build_apc.py     builds the Vostok APC and its turret -> src/assets/apc.glb (also runs headless: `pip install bpy`, then `MOONRUNNER_REPO=. python3 tools/blender/build_apc.py`)
   blender/build_landtrain.py builds the Moonliner and Prospector tractors and trailers -> src/assets/landtrain.glb (also runs headless, like build_apc.py)
   blender/build_crane.py   builds the tower crane -> src/assets/crane.glb (also runs headless, like build_apc.py)
   blender/build_garage.py  builds the main and small motor-pool garages -> src/assets/garage.glb (also runs headless)
   blender/build_dish.py    builds the cryo receiver and gantry station dish arrays -> src/assets/dish.glb (also runs headless)
+  blender/build_winch.py   builds the winch's grapple and cable piece -> src/assets/winch.glb and renders the tow-line marker -> src/assets/towmark.png (also runs headless: `pip install bpy`, then `MOONRUNNER_REPO=. python3 tools/blender/build_winch.py`)
   blender/build_outposts.py builds the Relay Mast and Watchtower -> src/assets/outposts.glb (also runs headless; `npm run check:outposts` checks the file)
   blender/decals.py        flat lettering, emblems, hazard stripes and safety signs (no textures) the land-train builder execs after kit.py
   blender/kit.py           shared geometry/material/export helpers every Blender builder execs (the runner and ships keep their own variants of a few)
-  viewer.html              dev-only model viewer (npm run dev, then /tools/viewer.html?m=shuttle|freighter|apc|landtrain|crane|garage|dish|outpost|mite|lineup…; dish takes &kind=cryo|gantry&faction=…&no=01..04&size=30&tilt=<rad>&sweep=1; apc takes &turret=<rad>&barrel=<rad>; landtrain takes &type=moonliner|prospector&faction=spacecom|vostok|kepler|meridian&cars=pax,tank,cargo,blast&unit=<n>)
+  viewer.html              dev-only model viewer (npm run dev, then /tools/viewer.html?m=shuttle|freighter|apc|landtrain|crane|garage|dish|outpost|mite|lineup…; freighter takes &faction=spacecom|vostok|kepler|meridian (the cargo's livery); dish takes &kind=cryo|gantry&faction=…&no=01..04&size=30&tilt=<rad>&sweep=1; apc takes &turret=<rad>&barrel=<rad>; landtrain takes &type=moonliner|prospector&faction=spacecom|vostok|kepler|meridian&cars=pax,tank,cargo,blast&unit=<n>)
 ```
 
 **Editing the runner:** run `tools/blender/build_runner.py` in Blender (Scripting tab, or
@@ -758,4 +767,4 @@ tools/
 that outfits recolour, and the scarf stays a 4-link chain driven by `ScarfSim`. The standing idles are keyed
 on the same pivots by `tools/blender/build_idles.py` and played by `src/idles.js`.
 
-**Models and the bundle:** each model file in `src/assets` is its own chunk (imported on demand in `src/models.js`, inlined as a data URI so the desktop build, which runs from file://, needs no fetch), so the game's code is a small file of its own and each model is cached separately. The vehicle, ship, crane, garage and dish models are stored compressed: after re-exporting one from Blender, run `npm run optimize:glb` (a plain file still loads, it is just bigger). `runner.glb` and `outposts.glb` are left plain.
+**Models and the bundle:** each model file in `src/assets` is its own chunk (imported on demand in `src/models.js`, inlined as a data URI so the desktop build, which runs from file://, needs no fetch), so the game's code is a small file of its own and each model is cached separately. The vehicle, ship, crane, garage and dish models are stored compressed: after re-exporting one from Blender, run `npm run optimize:glb` (a plain file still loads, it is just bigger). `runner.glb`, `outposts.glb` and `winch.glb` are left plain.

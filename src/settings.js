@@ -71,7 +71,6 @@ export const SCHEMA = {
     { key: 'camHeight', label: 'Camera height', type: 'range', min: -1, max: 4, step: 0.1, def: 0, fmt: (v) => `${v > 0 ? '+' : ''}${v.toFixed(1)} m` },
     { key: 'shoulder', label: 'Shoulder offset', type: 'range', min: -2.5, max: 2.5, step: 0.1, def: 0, fmt: (v) => (Math.abs(v) < 0.05 ? 'CENTRE' : `${Math.abs(v).toFixed(1)} m ${v < 0 ? 'LEFT' : 'RIGHT'}`) },
     { key: 'camSmooth', label: 'Camera smoothing', type: 'range', min: 0, max: 3, step: 0.1, def: 1, fmt: (v) => (v < 0.05 ? 'OFF' : mult(v)) },
-    { key: 'tips', label: 'Show tips', type: 'toggle', def: true },
     { key: 'minimap', label: 'Minimap', type: 'toggle', def: true },
     { key: 'hudScale', label: 'HUD scale', type: 'range', min: 0.6, max: 1.4, step: 0.05, def: 1, fmt: pct },
     { key: 'units', label: 'Speed units', type: 'choice', def: 'kmh', options: [['kmh', 'KM/H'], ['ms', 'M/S']] },
@@ -308,7 +307,6 @@ export class Settings {
     const unit = document.querySelector('#speedo .unit');
     if (unit) unit.textContent = v.units === 'ms' ? 'M/S' : 'KM/H';
     if (g.hud) g.hud.lastSpeedTxt = '';
-    if (!v.tips) { const t = document.getElementById('tip'); if (t) t.classList.add('hidden'); }
     this.updateHelp();
   }
 

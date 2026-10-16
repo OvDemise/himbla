@@ -179,12 +179,6 @@ button { font-family: var(--comic); }
 #input-mon .im-meter { fill: #e3e6ee; stroke: #aab1c3; stroke-width: 4; }
 #input-mon .im-meter-fill { fill: #3fd15f; }
 #input-mon .im-meter-t { fill: #1c2030; text-anchor: middle; dominant-baseline: central; font-family: monospace; font-weight: bold; }
-#tip {
-  position: absolute; bottom: 18px; left: 50%; transform: translateX(-50%); max-width: min(620px, 60vw);
-  background: var(--ui-bg); color: var(--ui-text); font-size: 17px; line-height: 1.35; padding: 10px 16px; border: 2px solid var(--ui-edge);
-  box-shadow: 0 0 0 2px #05030c, var(--ui-shadow);
-}
-#tip b { color: var(--yellow); font-family: var(--comic); font-weight: normal; font-size: 11px; }
 #grab { position: absolute; top: 60%; left: 50%; transform: translateX(-50%); width: 360px; text-align: center; }
 .grab-label { font-family: var(--comic); font-size: 12px; line-height: 1.4; color: var(--green); text-shadow: 2px 2px 0 #05030c; margin-bottom: 6px; animation: blink 0.3s steps(2) infinite; }
 #grab .fill { background: var(--green); width: 0; }
@@ -413,8 +407,8 @@ body:has(#title:not(.hidden)) #hud { visibility: hidden; }
 #racepanel .race-row span { margin-left: auto; color: var(--ui-muted); font-size: 13px; }
 #racepanel .race-row.mine { background: rgba(125, 255, 58, 0.18); font-weight: bold; }
 @media (max-width: 600px) { #racepanel { width: calc(100% - 32px); top: 110px; } }
-#scanchip.chip { position: absolute; top: 16px; left: 50%; transform: translateX(-50%); color: #fff; background: #b8001a; border-color: #ff4a5e; font-size: 9px; white-space: nowrap; width: max-content; animation: blink 0.8s steps(2) infinite; }
-@keyframes scanpulse { from { opacity: 1; } to { opacity: 0.6; } }
+#scanchip.chip { position: absolute; top: 16px; left: 50%; transform: translateX(-50%); color: #fff; background: #b8001a; border-color: #ff4a5e; font-size: 9px; white-space: nowrap; width: max-content; animation: scanpulse 1.3s ease-in-out infinite alternate; }
+@keyframes scanpulse { from { opacity: 1; } to { opacity: 0.45; } }
 .swatch { display: inline-block; width: 12px; height: 12px; border: 2px solid #05030c; margin-right: 4px; vertical-align: -2px; }
 
 /* ---- settings ---- */
@@ -775,6 +769,16 @@ body:has(#title:not(.hidden)) #hud { visibility: hidden; }
 #cinebars .cb-skip { position: absolute; bottom: calc(11vh + 12px); right: 24px; color: var(--ui-muted); font-family: var(--comic); font-size: 8px; opacity: 0.85; }
 #cinebars.cb-out { opacity: 0; transition: opacity 0.4s; }
 body.medevac #hud > *:not(#popups):not(#cinebars) { visibility: hidden; } /* (the Spindle med-evac cutscene: just the picture and its caption) */
+/* ---- the Moon Council vote cutscene (chamber.js) ---- */
+body.council #hud > *:not(#popups):not(#cinebars) { visibility: hidden; } /* (just the picture, its caption and the speech bubble; stays up through the roll call on black) */
+#cinebars .cb-say { position: absolute; left: 50%; bottom: calc(11vh + 16px); transform: translateX(-50%); width: min(720px, calc(100vw - 48px)); background: var(--ui-bg); color: var(--ui-text); font-family: var(--body); font-size: 20px; line-height: 1.3; padding: 10px 14px 9px; border: 2px solid var(--yellow); box-shadow: 0 0 0 2px #05030c, var(--ui-shadow); }
+#cinebars .cb-say b { display: block; font-family: var(--comic); font-size: 10px; color: var(--yellow); margin-bottom: 4px; letter-spacing: 1px; }
+#cinebars .cb-cap small { color: var(--ui-muted); }
+#cinebars .cb-bang { position: absolute; left: 50%; top: 40%; font-family: var(--comic); font-size: clamp(40px, 9vw, 110px); color: var(--yellow); text-shadow: 6px 6px 0 #ff2e88, -3px -3px 0 #05030c, 3px -3px 0 #05030c, -3px 3px 0 #05030c; transform: translate(-50%, -50%) rotate(-6deg); animation: cs-bang 0.25s steps(5) both; }
+@keyframes cs-bang { from { transform: translate(-50%, -50%) scale(0.2) rotate(-14deg); opacity: 0; } to { transform: translate(-50%, -50%) scale(1) rotate(-6deg); opacity: 1; } }
+#dialog .vote-roll .rc { opacity: 0; animation: rc-in 0.01s linear forwards; animation-delay: calc(0.5s + var(--i) * 0.6s); } /* (the roll call: one member at a time) */
+#dialog .vote-roll .dlg-btns { opacity: 0; animation: rc-in 0.01s linear forwards; animation-delay: var(--at, 0s); } /* (the buttons' labels would give the verdict away: they wait for it, announce() sets --at) */
+@keyframes rc-in { to { opacity: 1; } }
 @keyframes cbin { from { transform: scaleY(0); } to { transform: scaleY(1); } }
 #jarchip .artifact-slot { color: #7dffd4; text-shadow: 0 0 8px #7dffd4; }
 /* ---- rail lance scope ---- */
@@ -1073,6 +1077,17 @@ body.trailer #vehbar { display: none !important; }
 .nametag { position: absolute; left: 0; top: 0; transform-origin: 50% 100%; white-space: nowrap; font-family: var(--comic); font-size: 10px; line-height: 1; padding: 5px 7px 4px; color: var(--tc); background: #120a1e; border: 2px solid #05030c; box-shadow: inset 0 -2px 0 color-mix(in srgb, var(--tc) 55%, transparent), 2px 2px 0 #05030c; }
 .nametag::after { content: ''; position: absolute; left: 50%; bottom: -7px; margin-left: -5px; border: 5px solid transparent; border-top-color: #05030c; border-bottom: 0; }
 .nametag.off { display: none; }
+/* the Hitch-Line Winch's tow-line marker (winch.js drawMarker): faint on a target in reach, brighter on what the reticle is on, orange once hooked */
+#towmark { position: absolute; left: 0; top: 0; z-index: 1; pointer-events: none; display: flex; flex-direction: column; align-items: center; opacity: 0.5; transition: opacity 0.15s; }
+#towmark.hidden { display: none; }
+#towmark { filter: drop-shadow(0 0 2px var(--ink)); }
+#towmark i { display: block; width: 44px; height: 44px; background: var(--paper); -webkit-mask: var(--tm) center / contain no-repeat; mask: var(--tm) center / contain no-repeat; }
+#towmark span { margin-top: -2px; font-family: var(--comic); font-size: 9px; color: var(--paper); text-shadow: 0 0 3px var(--ink), 1px 1px 0 var(--ink); }
+#towmark.looked { opacity: 0.85; }
+#towmark.looked i { background: var(--yellow); }
+#towmark.hooked { opacity: 0.9; }
+#towmark.hooked i { background: #ff9f1c; }
+#towmark.hooked span { color: #ff9f1c; }
 /* the hover tips (chimeracard.js installTips) */
 [data-tip] { cursor: help; }
 .cc-part[data-tip]:hover, .cc-lbl[data-tip]:hover, .cc-grade[data-tip]:hover { filter: brightness(1.35); }
@@ -1218,6 +1233,17 @@ body.trailer #vehbar { display: none !important; }
 body.pad-on #board .foot-pad { display: inline-flex; }
 body.pad-on #board .foot-kb { display: none; }
 @media (max-width: 700px) { #board.term .term-status { grid-template-columns: 1fr; } }
+/* the board's tabs (CONTRACTS | COUNCIL HALL in your town): a strip under the title, the active tab in the board's colour */
+#board.term .board-tabs { flex: none; display: flex; align-items: flex-end; gap: 6px; padding: 8px 14px 0; background: #0b0a14; border-bottom: 3px solid #23302a; }
+#board.term .board-tabs button { font-family: var(--comic); font-size: 10px; line-height: 1; padding: 8px 12px 7px; cursor: pointer; color: var(--ph-dim); background: #0b1410; border: 2px solid #23302a; border-bottom: 0; }
+#board.term .board-tabs button:hover { color: var(--ph); border-color: var(--ph-dim); }
+#board.term .board-tabs button.on { color: #05030c; background: var(--fc, var(--yellow)); border-color: var(--fc, var(--yellow)); padding-bottom: 9px; margin-bottom: -3px; }
+#board.term .board-tabs .bt-hint { margin-left: auto; align-self: center; font-family: var(--comic); font-size: 8px; color: var(--ph-dim); padding-bottom: 4px; }
+#board.term .board-tabs .foot-pad { display: none; align-items: center; gap: 4px; }
+body.pad-on #board .board-tabs .foot-pad { display: inline-flex; }
+body.pad-on #board .board-tabs .foot-kb { display: none; }
+#board.term.tab-town .board-scroll { display: flex; flex-direction: column; overflow: hidden; } /* (the page fills the board; only its tiles scroll) */
+#board.term.tab-town .otm.bare { flex: 1 1 auto; min-height: 0; }
 /* the Monolith's time dilation: a cold, slow-shutter edge round the screen */
 #dilate {
   position: absolute; inset: 0; pointer-events: none;
@@ -1228,7 +1254,7 @@ body.pad-on #board .foot-kb { display: none; }
 @keyframes dilate-pulse { 50% { opacity: 0.75; } }
 /* ---- trailer director (?trailer, trailer.js): no HUD, just the comic layer and the cards ---- */
 body.trailer #hud > *:not(#popups):not(#splash):not(#dilate) { display: none !important; }
-body.trailer #tutorial, body.trailer #racepanel, body.trailer #vehbar, body.trailer #tip { display: none !important; }
+body.trailer #tutorial, body.trailer #racepanel, body.trailer #vehbar { display: none !important; }
 #trailer { position: fixed; inset: 0; pointer-events: none; z-index: 100; overflow: hidden; }
 #trailer .tr-flash { position: absolute; inset: 0; background: #fffbe6; opacity: 0; }
 #trailer .tr-black { position: absolute; inset: 0; background: #05030c; opacity: 0; }
@@ -1376,6 +1402,25 @@ body.dark-side #powradial .pr-item.cur.on { border-color: #8f7bff; }
 #globe-legend.folded .lg-tab:hover, #globe-legend.folded .lg-tab.pad-focus { background: var(--cyan); color: #05030c; }
 #globe-legend .lg-tab-t { writing-mode: vertical-rl; letter-spacing: 2px; }
 @media (max-width: 1000px) { #globe-legend { width: 168px; } #globe-legend .lg-row { font-size: 12px; } }
+/* the Radio Tower's panel, beside the globe when the map is opened from the tower: the legend's comic look */
+#globe-radio { position: relative; width: 214px; flex: none; background: var(--ui-bg); color: var(--ui-text); border: 2px solid var(--ui-edge); box-shadow: 0 0 0 2px #05030c, var(--ui-shadow); cursor: default; }
+#globe-radio .gr-head { padding: 8px 10px 7px; border-bottom: 2px solid var(--ui-edge); background: var(--ui-bg2, rgba(26, 20, 48, 0.95)); font-family: var(--comic); font-size: 10px; color: var(--yellow); letter-spacing: 1px; }
+#globe-radio .gr-body { padding: 8px 10px 10px; display: flex; flex-direction: column; gap: 6px; }
+#globe-radio .gr-name { font-size: 14px; color: var(--ui-muted); }
+#globe-radio .gr-row { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+#globe-radio .gr-row label { font-family: var(--comic); font-size: 7px; color: var(--ui-violet); }
+#globe-radio .gr-row b { font-weight: normal; font-size: 15px; color: var(--cyan); }
+#globe-radio .gr-row b.cr { font-family: var(--comic); font-size: 9px; line-height: 1.3; white-space: nowrap; } /* (the body face draws a 5 like an S: figures use the display face) */
+#globe-radio .gr-row b.off { color: var(--ui-muted); }
+#globe-radio .gr-row b.done { color: var(--yellow); }
+#globe-radio .gr-bar { background: var(--cyan); }
+#globe-radio .gr-found { font-size: 13px; line-height: 1.2; color: var(--green); }
+#globe-radio .gr-msg { font-size: 13px; line-height: 1.2; color: #ff7a8a; }
+#globe-radio .gr-btn { font-family: var(--comic); font-size: 10px; line-height: 1.2; padding: 9px 8px 7px; cursor: pointer; background: var(--cyan); color: #05030c; border: 2px solid #05030c; box-shadow: 3px 3px 0 #05030c; }
+#globe-radio .gr-btn:disabled { background: var(--ui-bg3); color: var(--ui-muted); cursor: default; box-shadow: none; }
+#globe-radio .gr-help { font-size: 12px; line-height: 1.25; color: var(--ui-muted); }
+/* narrow windows: the legend steps aside and the panel lies over the globe's lower left, without its help text */
+@media (max-width: 1100px) { #globe-wrap.radio #globe-legend { display: none; } .globe-row { position: relative; } #globe-radio { position: absolute; left: 6px; bottom: 6px; width: 188px; z-index: 2; background: rgba(18, 12, 32, 0.92); } #globe-radio .gr-help { display: none; } }
 
 /* save slot tools (load game): export / import / restore / delete, stacked beside the card */
 .sv-tools { flex: none; width: 104px; display: flex; flex-direction: column; gap: 4px; }
@@ -1409,7 +1454,7 @@ body.dark-side #powradial .pr-item.cur.on { border-color: #8f7bff; }
 .otm-stat b.gold { color: var(--yellow); text-shadow: 0 0 8px rgba(255, 210, 63, 0.5); }
 
 /* the tiles. An icon is three paths (--i1 body, --i2 accent, --i3 shade): unbuilt tiles are the dimmed set, built ones are lit in their own tint */
-.otm-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.otm-grid { display: grid; grid-template-columns: repeat(var(--cols, 4), minmax(0, 1fr)); gap: 8px; } /* (--cols: spec.cols; the narrow-screen rules below still win) */
 .otm-tile { position: relative; display: flex; flex-direction: column; align-items: center; gap: 5px; min-height: 122px; padding: 12px 6px 8px; text-align: center; cursor: pointer; font-family: var(--body); color: var(--ui-muted); background: var(--ui-bg2); border: 2px solid var(--ui-edge); --i1: #6c6490; --i2: #4a4270; --i3: #3d3466; }
 .otm-tile:hover { border-color: var(--ui-muted); background: var(--ui-bg3); }
 .otm-tile.built { color: var(--ui-text); background: #0f1c16; border-color: #2f4a3c; --i1: var(--paper); --i2: var(--tint, var(--green)); --i3: #a39bc6; }
@@ -1454,6 +1499,8 @@ body.dark-side #powradial .pr-item.cur.on { border-color: #8f7bff; }
 .otm-act.short { background: #2a1018; color: #ff7a8a; border-color: #ff2a4a; } /* (can't afford it: still clickable, it answers in the panel) */
 .otm-act.short .otm-key { background: #ff2a4a; color: #05030c; border-color: #05030c; }
 .otm-act:hover, .otm-act.pad-focus { background: var(--cyan); color: #05030c; }
+.otm-acts { display: flex; flex-direction: column; gap: 6px; } /* (a building can carry several buttons) */
+.otm-act.vote { background: var(--ui-violet); }
 .otm-note { font-family: var(--comic); font-size: 8px; line-height: 1.5; color: var(--ui-dim); }
 .otm-msg { min-height: 1.2em; font-family: var(--comic); font-size: 9px; line-height: 1.4; color: var(--green); }
 .otm-msg.bad { color: #ff7a8a; animation: shake 0.3s linear; }
@@ -1478,3 +1525,13 @@ body.pad-on .otm-foot .foot-kb { display: none; }
 .otm-tile.locked { border-style: dashed; opacity: 0.72; }
 .otm-tile.locked .otm-chip { background: transparent; color: var(--ui-dim); }
 .otm-pill.locked { background: var(--ui-bg3); color: var(--ui-dim); }
+/* spec.side, wide screens: the tiles on the left and the detail screen the full height on the right (the town's page; below 900 px it stacks like the outposts') */
+@media (min-width: 900px) {
+  .otm.side { display: grid; grid-template-columns: minmax(0, 1fr) min(400px, 42%); grid-template-rows: auto minmax(0, 1fr) auto; }
+  .otm.side:not(.bare) { height: min(700px, calc(100vh - 38px)); max-height: none; }
+  .otm.side .otm-head, .otm.side .otm-foot { grid-column: 1 / -1; }
+  .otm.side .otm-body { grid-row: 2; grid-column: 1; padding-right: 6px; }
+  .otm.side .otm-detail { grid-row: 2; grid-column: 2; min-height: 0; margin: 12px 12px 12px 6px; overflow-y: auto; grid-template-columns: 64px minmax(0, 1fr); }
+  .otm.side .otm-d-art { width: 64px; height: 64px; }
+  #dialog .dlg.otm-dlg.town { width: min(1000px, calc(100vw - 32px)); }
+}

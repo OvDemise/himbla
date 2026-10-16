@@ -18,6 +18,9 @@ const GLB = {
   crane: () => import('./assets/crane.glb?inline'),
   garage: () => import('./assets/garage.glb?inline'),
   dish: () => import('./assets/dish.glb?inline'),
+  engine: () => import('./assets/engine.glb?inline'),
+  briefcase: () => import('./assets/briefcase.glb?inline'),
+  hovercar: () => import('./assets/hovercar.glb?inline'),
 };
 
 // A model file can be compressed (tools/optimize-glb.mjs: quantized, then meshopt-coded: about a third of the size).
@@ -1224,10 +1227,10 @@ export function makeRover({ color = 0x7b2ff7, trim = 0xffd23f, pirate = true, fl
 let SHIP_PARTS = null;
 const SHIP_GLOW = { glass: 0x9be7ff, window: 0xfff6a8, cabin: 0xfff1b0, red: 0xff2a4a, green: 0x7dff6a, white: 0xffffff, sign: 0xffd23f, bay: 0x0c0915 };
 const SHIP_TOON = { trim: 0xd8d4e8, dark: 0x2a2540, metal: 0x8a87a0, steel: 0x55607a, deck: 0x5b5870, hazard: 0xffd23f, cargo0: 0xffd23f, cargo1: 0x2ec4ff, cargo2: 0xff3b5c, cargo3: 0x7dff6a };
-const SHIP_FX = new Set(['plume', 'plumeCore', 'lift', 'engine', 'core']); // per-ship materials (they pulse)
-const FLAMES = new Set(['plume', 'plumeCore', 'lift']);
+const SHIP_FX = new Set(['plume', 'plumeCore', 'lift', 'engine', 'core', 'beacon']); // per-ship materials (they pulse)
+const FLAMES = new Set(['plume', 'plumeCore', 'lift', 'beacon']);
 export async function loadShipParts() {
-  const [gltf, sk, wr, ap, lt, cr, ga, di] = await Promise.all(['ships', 'skimmer', 'warrig', 'apc', 'landtrain', 'crane', 'garage', 'dish'].map(loadGlb));
+  const [gltf, sk, wr, ap, lt, cr, ga, di, en, bc, hc] = await Promise.all(['ships', 'skimmer', 'warrig', 'apc', 'landtrain', 'crane', 'garage', 'dish', 'engine', 'briefcase', 'hovercar'].map(loadGlb));
   SHIP_PARTS = {};
   for (const name of ['shuttle', 'freighter']) {
     const root = gltf.scene.getObjectByName(name);
@@ -1269,7 +1272,43 @@ export async function loadShipParts() {
     if (!station) throw new Error('dish.glb has no dish_' + kind);
     SHIP_PARTS['dish_' + kind] = bakeShip(station);
   }
+  // the salvaged engine that drops out of a wreck (tools/blender/build_engine.py)
+  ENGINE_MODEL = en.scene.getObjectByName('engine');
+  if (!ENGINE_MODEL) throw new Error('engine.glb has no engine');
+  // the hover-cars (tools/blender/build_hovercar.py): the faction car and the civilian car
+  for (const name of ['car_faction', 'car_civilian']) {
+    const car = hc.scene.getObjectByName(name);
+    if (!car) throw new Error('hovercar.glb has no ' + name);
+    SHIP_PARTS[name] = bakeShip(car);
+  }
+  CASE_MODEL = bc.scene.getObjectByName('briefcase');
+  if (!CASE_MODEL) throw new Error('briefcase.glb has no briefcase');
+  for (const m of [ENGINE_MODEL, CASE_MODEL]) m.traverse((o) => { if (o.isMesh) { o.userData.slot = o.material.name; o.castShadow = true; } });
 }
+
+// ---- Wreck salvage models (built in Blender, see build_engine.py and build_briefcase.py) ----
+// The SALVAGED ENGINE (a scorched engine block, about 1.25 x 1.1 x 1.8 m) and the CREDITS BRIEFCASE (a gold-trimmed case with the credit sign on
+// both faces, about 0.95 x 0.85 x 0.4 m), each centred on its origin. engineModel() / caseModel() return a fresh copy dressed in the game's toon
+// materials (a `hot` slot glows), each part outlined by its `ink` property; null until the models have loaded.
+let ENGINE_MODEL = null, CASE_MODEL = null;
+const ENGINE_TOON = { body: 0x6b4630, dark: 0x2a2540, metal: 0x8a87a0, steel: 0x55607a };
+const CASE_TOON = { body: 0x4a2f22, dark: 0x1c1830, trim: 0x8a87a0, gold: 0xffd23f };
+function dressLoot(template, palette) {
+  if (!template) return null;
+  const root = template.clone(true);
+  const mats = new Map();
+  const meshes = [];
+  root.traverse((o) => { if (o.isMesh) meshes.push(o); }); // (collected first: ink() adds outline shells as it goes)
+  for (const o of meshes) {
+    const slot = o.userData.slot;
+    if (!mats.has(slot)) mats.set(slot, slot === 'hot' ? glow(0xff6a2a) : toon(palette[slot] || 0x8a87a0));
+    o.material = mats.get(slot);
+    if (o.userData.ink > 0) ink(o, o.userData.ink);
+  }
+  return root;
+}
+export const engineModel = () => dressLoot(ENGINE_MODEL, ENGINE_TOON);
+export const caseModel = () => dressLoot(CASE_MODEL, CASE_TOON);
 
 function bakeShip(root) {
   root.updateMatrixWorld(true);
@@ -1311,7 +1350,7 @@ function bakeShip(root) {
 }
 
 const _shipHot = new THREE.Color();
-function makeShip(kind, { color, stripe }) {
+function makeShip(kind, { color, stripe, faction = 'kepler' }) {
   const B = SHIP_PARTS[kind];
   const add = { transparent: true, depthWrite: false, blending: THREE.AdditiveBlending };
   const fx = {
@@ -1320,6 +1359,7 @@ function makeShip(kind, { color, stripe }) {
     lift: new THREE.MeshBasicMaterial({ color: 0x8fd8ff, opacity: 0.6, ...add }),
     engine: new THREE.MeshBasicMaterial({ color: 0xff9f1c }),
     core: new THREE.MeshBasicMaterial({ color: 0xfff3c0 }),
+    beacon: new THREE.MeshBasicMaterial({ color: 0xff4a3a, opacity: 0.4, ...add }), // (the glow round the mast light)
   };
   const matFor = (slot) => {
     if (SHIP_FX.has(slot)) return fx[slot];
@@ -1328,16 +1368,28 @@ function makeShip(kind, { color, stripe }) {
     if (SHIP_GLOW[slot] !== undefined) return glow(SHIP_GLOW[slot]);
     return toon(SHIP_TOON[slot] ?? 0xff00ff);
   };
-  const rig = { legs: [], doors: [], ramps: [], hatches: [], plumes: [], lifts: [] };
-  const build = (node) => {
+  // The land-train's own cargo units ride in the freighter's bays (the box, the Helium-3 tanker, the explosives magazine: build_ships.py,
+  // cargo.py). Under a `cargo` pivot every slot takes the land-train's palette in the faction the freighter serves, and only that
+  // faction's `livery` pivots (its plates, numbers and marks) exist.
+  const pal = LAND_TRAIN_FACTIONS[faction] || LAND_TRAIN_FACTIONS.kepler;
+  const fac = LAND_TRAIN_FACTIONS[faction] ? faction : 'kepler';
+  const cargoMats = new Map();
+  const cargoMat = (slot) => {
+    if (!cargoMats.has(slot)) cargoMats.set(slot, slot in pal ? toon(pal[slot]) : LT_GLOW[slot] !== undefined ? glow(LT_GLOW[slot]) : toon(LT_TOON[slot] ?? 0xff00ff));
+    return cargoMats.get(slot);
+  };
+  const rig = { legs: [], doors: [], ramps: [], hatches: [], plumes: [], lifts: [], blinkers: [], cranes: [] };
+  const build = (node, cargo = false) => {
+    if (node.role === 'livery' && node.data.faction !== fac) return null; // (the other factions' marks never exist)
+    cargo = cargo || node.role === 'cargo';
     const g = new THREE.Group();
     g.name = node.name;
     g.position.copy(node.pos);
     g.quaternion.copy(node.quat);
     for (const { slot, geo } of node.parts) {
-      const m = new THREE.Mesh(geo, matFor(slot));
-      m.castShadow = !SHIP_FX.has(slot) && SHIP_GLOW[slot] === undefined;
-      if (FLAMES.has(slot)) m.renderOrder = 2;
+      const m = new THREE.Mesh(geo, cargo ? cargoMat(slot) : matFor(slot));
+      m.castShadow = cargo ? LT_GLOW[slot] === undefined && node.role !== 'livery' : !SHIP_FX.has(slot) && SHIP_GLOW[slot] === undefined;
+      if (!cargo && FLAMES.has(slot)) m.renderOrder = 2;
       g.add(m);
     }
     if (node.ink) {
@@ -1347,17 +1399,22 @@ function makeShip(kind, { color, stripe }) {
       g.add(h);
     }
     const d = node.data;
-    let leg = null;
-    if (node.role === 'leg') rig.legs.push(leg = { g, fold: d.fold, foot: null });
+    let leg = null, crane = null;
+    if (node.role === 'blinker') rig.blinkers.push({ g, phase: d.phase || 0 }); // (the mast's flashing light)
+    else if (node.role === 'trolley') rig.cranes.push(crane = { g, side: d.side, min: d.travelMin, max: d.travelMax, drop: d.dropMax, z0: g.position.z, hoist: null, hoistY: 0, cables: [] });
+    else if (node.role === 'leg') rig.legs.push(leg = { g, fold: d.fold, foot: null });
     else if (node.role === 'door') rig.doors.push({ g, open: d.open });
     else if (node.role === 'ramp') rig.ramps.push({ g, closed: d.closed, opened: d.opened });
     else if (node.role === 'hatch') rig.hatches.push(g);
     else if (node.role === 'plume') rig.plumes.push({ g, phase: rig.plumes.length * 1.7 });
     else if (node.role === 'lift') rig.lifts.push({ g, phase: rig.lifts.length * 2.3 });
     for (const k of node.kids) {
-      const c = build(k);
+      const c = build(k, cargo);
+      if (!c) continue;
       g.add(c);
       if (leg && k.role === 'foot') leg.foot = c;
+      if (crane && k.role === 'hoist') { crane.hoist = c; crane.hoistY = c.position.y; }
+      else if (crane && k.role === 'cable') crane.cables.push(c);
     }
     return g;
   };
@@ -1369,6 +1426,12 @@ function makeShip(kind, { color, stripe }) {
   const ship = {
     root, kind, size: kind === 'freighter' ? 30 : 10,
     gearH: d.gearH, deck: [...d.deck], deckY: d.deckY, deckZ: d.deckZ, radius: d.radius, padR: d.padR,
+    // the solid boxes the world keeps round it (traffic.js syncDeck): (hx, hy, hz, x, y, z) groups in the ship's frame, when the model has them
+    // (the freighter: hull, tower, bells, wings, cages and crates); otherwise the one deck box above
+    decks: d.collide && d.collide.length ? Array.from({ length: Math.floor(d.collide.length / 6) }, (_, i) => {
+      const b = d.collide.slice(i * 6, i * 6 + 6);
+      return { hx: b[0], hy: b[1], hz: b[2], x: b[3], y: b[4], z: b[5] };
+    }) : undefined,
     inside: v3(d.inside), rampTop: v3(d.rampTop), rampBottom: v3(d.rampBottom),
     gearK: 1, rampK: 0,
     // 0 = stowed in the bays, 1 = down and locked: the doors swing open first, then the legs
@@ -1403,6 +1466,11 @@ function makeShip(kind, { color, stripe }) {
         const s = lift * pulse(P.phase, 19), w = 0.85 + 0.15 * s;
         P.g.scale.set(w, Math.max(0.05, s), w);
       }
+      // the mast's light: a double flash every 1.25 s
+      for (const L of rig.blinkers) {
+        const ph = (((t * 0.8 + L.phase) % 1) + 1) % 1;
+        L.g.visible = ph < 0.09 || (ph > 0.19 && ph < 0.28);
+      }
       const p = pulse(0, 15);
       fx.plume.opacity = 0.42 + 0.22 * Math.min(1, main) * p;
       fx.plumeCore.opacity = 0.6 + 0.3 * Math.min(1, main);
@@ -1412,9 +1480,25 @@ function makeShip(kind, { color, stripe }) {
       fx.core.color.setHex(0x8a6a4a).lerp(_shipHot.setHex(0xfffbe8), heat);
     },
   };
+  // The gantry cranes (a trolley on each side's rail, built over that side's first empty bay): `work` 0..1 is how much they are sweeping the
+  // bays, t a clock, `lower` 0..1 whether they may lower their spreaders (only over their own bay, and only while the ship is down). At
+  // work 0 each rests where it is built; at 1 it runs the whole of its rail, easing and dwelling at the ends.
+  ship.setCrane = (work, t, lower) => {
+    for (const C of rig.cranes) {
+      const span = C.max - C.min;
+      const home = -C.min / span;
+      const sweep = THREE.MathUtils.smoothstep(0.5 + 0.5 * Math.sin(t * 0.32 + C.side * 1.9), 0.1, 0.9);
+      const dz = C.min + span * (home + (sweep - home) * work);
+      C.g.position.z = C.z0 + dz;
+      const drop = Math.max(0.12, C.drop * lower * THREE.MathUtils.smoothstep(THREE.MathUtils.clamp(1.3 - Math.abs(dz) / 1.6, 0, 1), 0, 1));
+      if (C.hoist) C.hoist.position.y = C.hoistY - drop;
+      for (const cb of C.cables) cb.scale.y = drop;
+    }
+  };
   ship.setGear(1);
   ship.setRamp(0);
   ship.setThrust(0, 0, 0);
+  ship.setCrane(0, 0, 0);
   return ship;
 }
 
@@ -2024,62 +2108,72 @@ export class LightTrail {
   dispose() { this.mesh.removeFromParent(); this.mesh.geometry.dispose(); this.mesh.material.dispose(); }
 }
 
-// Hover-car: a smooth flattened capsule with a bubble canopy, a rub-strip round the waist, slim
-// side pods, swept fins and lights set into the skin. Built at the old size (4.8 long) and scaled
-// up 1.15 (traffic.js sizes its deck and hit radius to match).
-export const CAR_SCALE = 1.15;
-export function makeHoverCar({ color = 0xff7ad9, trim = 0xfff4e0 } = {}) {
-  const root = new THREE.Group();
-  const body = baked(`car2|${color}|${trim}`, (k) => {
-    const DK = KT(0x1d1a29);
-    // the hull: a capsule squashed a little top to bottom
-    k.add(new THREE.CapsuleGeometry(1.1, 2.6, 8, 16).rotateX(Math.PI / 2).scale(1, 0.82, 1), KT(color), 0, 0, 0, { outline: 0.08 });
-    // the waist: a thin rub-strip that follows the hull round, and a darker belly pan under it
-    k.add(new THREE.CapsuleGeometry(1.14, 2.6, 6, 16).rotateX(Math.PI / 2).scale(1, 0.1, 1), KT(trim), 0, -0.12, 0, { outline: 0 });
-    k.add(new THREE.CapsuleGeometry(0.9, 2.4, 6, 12).rotateX(Math.PI / 2).scale(1, 0.32, 1), DK, 0, -0.62, 0, { outline: 0 });
-    // canopy: a glass bubble on a trim collar, with a roof spine
-    k.add(new THREE.SphereGeometry(0.95, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2).scale(1, 0.9, 1.25), KG(0x9be7ff), 0, 0.42, 0.2, { outline: 0.05 });
-    k.add(new THREE.TorusGeometry(0.95, 0.07, 4, 20).scale(1, 1.25, 1), KT(trim), 0, 0.44, 0.2, { rx: Math.PI / 2, outline: 0 });
-    k.add(new THREE.TorusGeometry(1.0, 0.05, 4, 16, Math.PI).scale(1.22, 0.88, 1), KT(trim), 0, 0.42, 0.2, { ry: Math.PI / 2, outline: 0 }); // (a roof hoop over the bubble)
-    // hood: two vent slots and a little badge
-    for (const sx of [-1, 1]) k.add(new THREE.BoxGeometry(0.1, 0.04, 0.7), DK, sx * 0.32, 0.62, 1.75, { rx: 0.35, outline: 0 });
-    k.add(new THREE.CylinderGeometry(0.12, 0.12, 0.04, 10), KG(trim), 0, 0.55, 2.1, { rx: 0.9, outline: 0 });
-    // lights: lenses sunk into the nose and tail so only their faces show
-    for (const sx of [-1, 1]) {
-      k.add(new THREE.SphereGeometry(0.2, 10, 6).scale(1.5, 0.55, 0.6), KG(0xfff6a8), sx * 0.55, 0.05, 2.2, { outline: 0 });
-      k.add(new THREE.SphereGeometry(0.2, 10, 6).scale(1.4, 0.5, 0.6), KG(0xff2a4a), sx * 0.55, 0.08, -2.2, { outline: 0 });
+// ---- The hover-cars (built in Blender, see build_hovercar.py) ----
+// The smallest road vehicle, in two sets from one body style, about 6.5 m long and 3.9 m over the pods: the FACTION car (a low, sharp
+// hull in a faction's colours; SPACECOM's alone carries the roof light bar) and the CIVILIAN car (a rounder two-tone with a side-on rack and luggage on its lengthened trunk,
+// in one of CAR_PAINTS: none black, none a faction colour). Slots: body, roof (the civilian number plate; the paints' cream), stripe (faction trim / civilian accent), trim,
+// dark, and the glowing glass, lamp, tail, lift (the four hover pads) and beaconA / beaconB (the light bar's two lamps).
+export const CAR_FACTIONS = {
+  spacecom: { body: 0xf2ecdc, stripe: 0xffd23f }, // white and yellow
+  vostok: { body: 0x6b6f78, stripe: 0xff3b5c }, // slate and red
+  kepler: { body: 0xff9f1c, stripe: 0x6a8f3a }, // orange and the Mule's green (cream hid the headlamps)
+  meridian: { body: 0x2ec4ff, stripe: 0x16385e }, // cyan and navy
+};
+export const CAR_PAINTS = [
+  { name: 'Bubblegum', body: 0xff7ad9, roof: 0xfff4e0, stripe: 0xffd0ee },
+  { name: 'Turquoise', body: 0x1fc7b0, roof: 0xf0dfb8, stripe: 0xfff4e0 },
+  { name: 'Periwinkle', body: 0x7b8cff, roof: 0xf4f0ff, stripe: 0xffe08a },
+  { name: 'Mocha', body: 0x9a6b4f, roof: 0xf1e2cf, stripe: 0xe8b88a },
+  { name: 'Seafoam', body: 0x8ee6c0, roof: 0xffffff, stripe: 0xffb3a1 },
+];
+const CAR_GLOW = { glass: 0x9be7ff, lamp: 0xfff6a8, tail: 0xff2a4a, beaconA: 0xff2a4a, beaconB: 0x2e7bff };
+// faction: the car's faction (one of CAR_FACTIONS, else it is a civilian car); paint: which of CAR_PAINTS the civilian car wears.
+// Returns { root, size, beacons } (the light bar's lamp groups, each with userData.phase 0 or 1, for traffic to alternate).
+export function makeHoverCar({ faction = null, paint = 0 } = {}) {
+  const fac = CAR_FACTIONS[faction];
+  const B = SHIP_PARTS[fac ? 'car_faction' : 'car_civilian'];
+  const pal = fac ? { ...fac, trim: 0x8a87a0, dark: 0x2a2540, lift: 0x7be0ff } : { ...CAR_PAINTS[((paint % CAR_PAINTS.length) + CAR_PAINTS.length) % CAR_PAINTS.length], trim: 0xd8d4e8, dark: 0x5b5870, lift: 0xffe6a8 };
+  const mats = new Map();
+  const matFor = (slot) => {
+    if (!mats.has(slot)) mats.set(slot, slot === 'lift' || slot in CAR_GLOW ? glow(pal[slot] ?? CAR_GLOW[slot]) : toon(pal[slot] ?? 0xff00ff));
+    return mats.get(slot);
+  };
+  const beacons = [];
+  const build = (node) => {
+    if (node.role === 'livery' && node.data.faction !== faction) return null; // (SPACECOM's light bar is the only livery part)
+    const g = new THREE.Group();
+    g.name = node.name;
+    g.position.copy(node.pos);
+    g.quaternion.copy(node.quat);
+    for (const { slot, geo } of node.parts) {
+      const m = new THREE.Mesh(geo, matFor(slot));
+      m.castShadow = !(slot === 'lift' || slot in CAR_GLOW);
+      g.add(m);
     }
-    k.add(new THREE.BoxGeometry(0.7, 0.05, 0.08), KG(0xff2a4a), 0, 0.3, -2.13, { rx: -0.5, outline: 0 }); // brake bar
-    k.add(new THREE.BoxGeometry(0.5, 0.22, 0.05), KT(0xfff4e0), 0, -0.3, -2.22, { rx: 0.25, outline: 0.02 }); // plate
-    for (const sx of [-1, 1]) {
-      // side pods: slim capsules tucked against the hull, an intake ring up front, a warm vent at the back
-      k.add(new THREE.CapsuleGeometry(0.34, 1.9, 4, 10).rotateX(Math.PI / 2), KT(trim), sx * 1.12, -0.45, -0.25, { outline: 0.04 });
-      k.add(new THREE.TorusGeometry(0.3, 0.07, 4, 12), DK, sx * 1.12, -0.45, 1.0, { outline: 0 });
-      k.add(new THREE.CylinderGeometry(0.22, 0.26, 0.12, 10).rotateX(Math.PI / 2), KG(0xff9f1c), sx * 1.12, -0.45, -1.55, { outline: 0 });
-      // door seam and a handle
-      k.add(new THREE.BoxGeometry(0.03, 0.55, 0.04), DK, sx * 1.07, 0.1, 0.9, { rz: sx * 0.25, outline: 0 });
-      k.add(new THREE.BoxGeometry(0.04, 0.06, 0.28), KT(trim), sx * 1.06, 0.25, 0.4, { rz: sx * 0.3, outline: 0 });
-      // mirrors on stalks
-      k.beam([sx * 0.85, 0.5, 0.95], [sx * 1.15, 0.62, 1.0], 0.03, DK, { outline: 0 });
-      k.add(new THREE.SphereGeometry(0.13, 8, 6).scale(1, 0.7, 0.5), KT(color), sx * 1.2, 0.64, 1.0, { outline: 0.02 });
-      // swept tail fins
-      k.add(new THREE.BoxGeometry(0.08, 0.7, 0.8), KT(color), sx * 0.55, 0.75, -1.9, { rz: sx * -0.45, rx: -0.5, outline: 0.03 });
-      k.add(new THREE.BoxGeometry(0.09, 0.12, 0.5), KT(trim), sx * 0.7, 1.02, -2.05, { rz: sx * -0.45, rx: -0.5, outline: 0 });
+    if (node.ink) {
+      const h = new THREE.Mesh(node.ink, inkMat);
+      h.castShadow = false;
+      h.userData.isInk = true;
+      g.add(h);
     }
-    // a whip antenna with a tip light
-    k.beam([-0.5, 0.6, -1.5], [-0.62, 1.7, -1.75], 0.02, DK, { outline: 0 });
-    k.ball(0.06, KG(0xff2a4a), -0.62, 1.72, -1.75, { outline: 0 });
-  });
-  body.scale.setScalar(CAR_SCALE);
-  root.add(body);
-  return { root, size: 3 * CAR_SCALE };
+    if (node.role === 'beacon') { g.userData.phase = node.data.phase || 0; beacons.push(g); }
+    for (const k of node.kids) {
+      const c = build(k);
+      if (c) g.add(c);
+    }
+    return g;
+  };
+  const root = build(B);
+  root.position.set(0, 0, 0);
+  root.quaternion.identity();
+  return { root, size: 3 * 1.15 * 1.18, beacons };
 }
 
 // Freighter: a deep-haul hammerhead: a long flat deck you can ride, a raked bridge tower at the
 // bow, container racks down both flanks, swept radiator wings, a four-bell engine cluster, four
 // folding legs and a belly ramp.
-export function makeFreighter({ color = 0xb8b4c8, stripe = 0xff9f1c } = {}) {
-  return makeShip('freighter', { color, stripe });
+export function makeFreighter({ color = 0xb8b4c8, stripe = 0xff9f1c, faction = 'kepler' } = {}) {
+  return makeShip('freighter', { color, stripe, faction });
 }
 
 // Captain Kade's gun truck: a mad-max monster truck on huge tyres. Kade drives (open cab, roll
