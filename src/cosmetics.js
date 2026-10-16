@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { toon, glow, ink } from './toon.js';
 import { Wardrobe } from './wardrobe.js';
+import { DEV_TOOLS } from './devtools.js';
 
 // Suits. Each faction sells a base outfit (FRIENDLY) and an elite one (HONORED).
 export const OUTFITS = {
@@ -31,6 +32,10 @@ export const SKATES = {
   survivor: { name: 'Dark-Side Survivors', cost: 1500, req: 0, color: 0x7dff3a, trail: 0x7dff3a, unlock: { stat: 'darkDeliveries', n: 5, text: 'Deliver 5 contracts on the dark side' }, tone: 'hum' },
   prism: { name: 'Prism Drive', cost: 2500, req: 50, color: 0xff2e88, trail: 'rainbow', rainbow: true, tone: 'glide' },
 };
+
+// The dev skates: in every build but a release one (devtools.js), in your wardrobe from the start. Missing-texture magenta with an
+// acid-green trail; the hum is the classic one, and the dev menu's SKATE SOUND page tunes its pitch and octave.
+if (DEV_TOOLS) SKATES.dev = { name: 'Dev Skates', color: 0xff00ff, trail: 0x39ff14, dev: true, tone: 'hum' };
 
 export const LASERS = [
   { name: 'Ice Blue', color: 0x9be7ff },
@@ -184,7 +189,7 @@ export class Cosmetics {
 
   owned(kind, id) {
     if (kind === 'outfit') return id === 'courier' || (this.game.upgrades['outfit_' + id] || 0) > 0;
-    return id === 'stock' || (this.game.upgrades['skates_' + id] || 0) > 0;
+    return id === 'stock' || (DEV_TOOLS && id === 'dev') || (this.game.upgrades['skates_' + id] || 0) > 0;
   }
 
   // the jar on your pack: only there to show once Dr. Zbornak has sold you one

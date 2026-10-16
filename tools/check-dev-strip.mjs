@@ -51,7 +51,7 @@ if (!process.argv.includes('--static')) {
     return { text, bytes };
   };
   // strings that only the dev tools carry (a menu title, a storage key, the Asset Row's name and so on)
-  const MARKS = ['DEV MENU', 'FULL CHEAT MENU', 'mr-dev-unlocked', 'CLICK MAP TO TELEPORT', 'SPAWN PIRATE SQUAD', 'INPUT & CONTROLLER MONITOR', 'ASSET ROW', 'DEBUG OVERLAY', 'CPU TIME BY STAGE', 'FETCH & PULL UPSTREAM', 'dev-btn-pause', 'Meteor Spawn (dev)', 'PREPARING THE TRAILER'];
+  const MARKS = ['DEV MENU', 'FULL CHEAT MENU', 'mr-dev-unlocked', 'CLICK MAP TO TELEPORT', 'SPAWN PIRATE SQUAD', 'INPUT & CONTROLLER MONITOR', 'ASSET ROW', 'DEBUG OVERLAY', 'CPU TIME BY STAGE', 'FETCH & PULL UPSTREAM', 'dev-btn-pause', 'Meteor Spawn (dev)', 'PREPARING THE TRAILER', 'Dev Skates', 'SKATE SOUND'];
   const dev = build('production'), rel = build('release');
   for (const m of MARKS) {
     if (!dev.text.includes(m)) fail(`"${m}" is not in the normal build, so this check proves nothing about it (stale string?)`);

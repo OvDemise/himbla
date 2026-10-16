@@ -6,6 +6,9 @@ export class Audio {
     this.mix = { hum: 1, wind: 1 }; // per-layer level trims for the ambient loops (the trailer lowers them)
     this.levelFloor = 0; // the roaming groove never drops below this (the trailer keeps it up)
     this.skateTone = 'hum'; // which skate voice sings (cosmetics: each pair of skates has one)
+    this.skateOct = 0; // the dev menu's skate sound: whole octaves and semitones on top of the voice's own pitch
+    this.skateSemi = 0;
+    this.humPreviewUntil = 0; // (and the dev menu's HEAR IT: the hum plays for a moment although the world is frozen)
   }
 
   init() {
@@ -540,9 +543,11 @@ export class Audio {
     // rumble swells with speed but stays low and soft (no high-frequency hiss at top speed)
     this.windG.gain.setTargetAtTime(Math.min(0.5, s) * 0.16 * (grounded ? 1 : 0.6) * this.mix.wind * k, t, 0.15);
     this.windF.frequency.setTargetAtTime(140 + Math.min(1, s) * 380, t, 0.15);
-    this.humG.gain.setTargetAtTime(skating && grounded ? (0.05 + s * 0.06) * this.mix.hum * k : 0, t, 0.05);
-    const f0 = 55 + s * 120;
-    for (const v of Object.values(this.skateVoices)) v.pitch(f0, t, s);
+    const hear = performance.now() < this.humPreviewUntil; // (HEAR IT: the hum at a cruising speed, only the hum)
+    const hs = hear ? Math.max(s, 0.5) : s;
+    this.humG.gain.setTargetAtTime(hear || (skating && grounded) ? (0.05 + hs * 0.06) * this.mix.hum * (hear ? 1 : k) : 0, t, 0.05);
+    const f0 = (55 + hs * 120) * 2 ** (this.skateOct + this.skateSemi / 12);
+    for (const v of Object.values(this.skateVoices)) v.pitch(f0, t, hs);
     this.jetG.gain.setTargetAtTime(thrusting && !quiet ? 0.16 : 0, t, 0.05);
     this.crowdBoost = Math.max(0, this.crowdBoost - 0.006);
     this.updateMusic(speed);

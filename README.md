@@ -95,7 +95,7 @@ Vite's hot reload restarts the page.
 | `Q` + `A`/`D` (air) | Spins |
 | Left mouse | Fire the selected weapon (the Pulse Spinner homes slightly; its splash can disc-jump you) |
 | `1` `2` `3` `4` | Switch weapon: Pulse Spinner, Vostok Scattergun, Daedalus Rail Lance, Rustmoon Junk Mortar |
-| `C` | Wardrobe: cycle owned outfits, skate finishes and pulse-disc colours; `J` in the wardrobe shows or hides the containment jar |
+| `C` | Wardrobe: cycle owned outfits, skate finishes and pulse-disc colours (dev builds also have the magenta Dev Skates); `J` in the wardrobe shows or hides the containment jar |
 | `N` | Music on / off |
 | `V` (hold: radial) | Call / board / leave your faction vehicle; hold to pick one (story unlock) |
 | `Z` · mouse wheel | Use your selected **power** · step through your powers. Powers: Phase Dash, the Teleporter (`T` too), the Slipstream Vanes (steer in the air for 10 s), the Kepler Hitch-Line Winch (hold) and the pen link (`P` too) |

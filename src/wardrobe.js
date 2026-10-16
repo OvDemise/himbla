@@ -4,6 +4,7 @@ import { toon, glow } from './toon.js';
 import { OUTFITS, SKATES, LASERS, dressRunner, dressSkates } from './cosmetics.js';
 import { makeJarMesh } from './alchemy.js';
 import { FACTIONS, LOCATIONS, TIERS } from './locations.js';
+import { DEV_TOOLS } from './devtools.js';
 
 // The wardrobe screen (C): a live turntable preview of the runner on the left, click-to-equip
 // grids for outfits / skate finishes / pulse-disc colours on the right. Hovering or arrowing
@@ -86,6 +87,7 @@ export class Wardrobe {
       if (d.unlock) lines.push(`Unlock first: ${d.unlock.text} (${Math.min(d.unlock.n, g.stats[d.unlock.stat] || 0)}/${d.unlock.n}).`);
       return { tag: d.unlock ? 'MERIDIAN · TASK' : d.req ? `MERIDIAN · ${tierFor(d.req).name}` : 'MERIDIAN', lines };
     }
+    if (DEV_TOOLS && d.dev) return { tag: 'DEV', lines: ['Dev builds only: not in the release game. The dev menu\'s SKATE SOUND page (pitch and octave) tunes how they hum.'] };
     if (d.alien) return { tag: 'LEGENDARY', lines: ['Not sold anywhere. One pair lies sealed behind an ancient gate, and the socket wants an artifact.'] };
     return { tag: 'SECRET', lines: ['Not sold anywhere. Keep exploring.'] };
   }
