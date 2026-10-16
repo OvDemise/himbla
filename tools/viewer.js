@@ -87,7 +87,7 @@ function outpostStats(t) {
 const m = Q.get('m') || 'shuttle';
 let model, rig = null, anim = null, height = 2;
 if (m === 'shuttle' || m === 'freighter') {
-  rig = m === 'shuttle' ? makeShuttle({ stripe: Q.has('stripe') ? parseInt(Q.get('stripe'), 16) : undefined }) : makeFreighter({});
+  rig = m === 'shuttle' ? makeShuttle({ stripe: Q.has('stripe') ? parseInt(Q.get('stripe'), 16) : undefined }) : makeFreighter({ faction: Q.get('faction') || undefined });
   model = rig.root;
   rig.setGear(num('gear', 1));
   rig.setRamp(num('ramp', 0));

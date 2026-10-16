@@ -51,6 +51,45 @@ def palette():
         m.diffuse_color = (*col, 1)
 
 
+# the land-train palette the game paints cargo units with (Kepler's livery here)
+CARGO_GAME = {
+    "body": 0xff9f1c, "stripe": 0xfff4e0, "accent": 0x6a8f3a, "label": 0x2a2540, "dark": 0x2a2540, "steel": 0x55607a, "metal": 0x8a87a0,
+    "tire": 0x1d1a29, "white": 0xf3eee4, "hazard": 0xffd23f, "tank": 0xc6d6ea, "brand": 0x14a3b8, "redsafe": 0xc9202e, "orange": 0xff7a1a,
+    "blue": 0x1d63d6, "hot": 0xff9f1c, "tail": 0xff2a4a, "lamp": 0xfff6a8, "glass": 0x9be7ff, "window": 0xfff6a8, "green": 0x7dff6a,
+}
+CARGO_EMIT = {"hot", "tail", "lamp", "glass", "window", "green"}
+
+
+def cargo_palette():
+    """Meshes under a "cargo" pivot take the land-train palette (the game does the same), not the ship's."""
+    made = {}
+    for o in bpy.data.objects:
+        if o.type != "MESH" or not o.data.materials:
+            continue
+        p, under = o.parent, False
+        while p:
+            if p.get("role") == "cargo":
+                under = True
+                break
+            p = p.parent
+        slot = o.data.materials[0].name
+        if not under or slot.startswith("cargo:"):
+            continue
+        m = made.get(slot)
+        if m is None:
+            m = made[slot] = bpy.data.materials.new("cargo:" + slot)
+            col = srgb(CARGO_GAME.get(slot, 0xff00ff))
+            m.use_nodes = True
+            nt = m.node_tree
+            nt.nodes.clear()
+            out = nt.nodes.new("ShaderNodeOutputMaterial")
+            emit = slot in CARGO_EMIT
+            sh = nt.nodes.new("ShaderNodeEmission" if emit else "ShaderNodeBsdfDiffuse")
+            sh.inputs["Color"].default_value = (*col, 1)
+            nt.links.new(sh.outputs["Emission" if emit else "BSDF"], out.inputs["Surface"])
+        o.data.materials[0] = m
+
+
 def stage():
     scn = bpy.context.scene
     scn.render.engine = "CYCLES"
@@ -95,6 +134,7 @@ def stage():
 
 def render_views(root, prefix, length=66.0, views=None):
     palette()
+    cargo_palette()
     stage()
     for o in bpy.data.objects:   # (the thruster and lift-jet flames only burn in flight: leave them out of the portraits)
         if o.type == "MESH" and o.data.materials and o.data.materials[0].name in ("plume", "plumeCore", "lift"):

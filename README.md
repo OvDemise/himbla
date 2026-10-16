@@ -443,8 +443,9 @@ with their main thrusters pulsing, slow down and land on a pad at the edge of ea
 out of their bays (doors first, then the legs) on the way down and tuck away again after take-off; the shuttle-bus's
 rear door drops into a ramp, the freighter lowers a belly ramp. The **shuttle-bus** is a 19 m lifting-body hopper
 with a wraparound windscreen, porthole windows, two ducted lift-fans and a lit route board on the roof; the
-**freighter** is a ~70 m hauler with a rideable flat deck (landing circle and all), a bridge tower at the bow,
-container racks down both flanks, swept radiator wings and a four-bell engine cluster.
+**freighter** ("Atlas") is a ~70 m armoured hauler with a rideable landing deck (a big pad, kerb lights, tie-down rails), a raked bridge tower at the bow,
+a gantry cage round four cargo bays down each flank holding the land-train's own cargo (the corrugated container, the Helium-3 tanker and the explosives
+magazine, in the livery of a faction whose town the freighter serves), short radiator wings and a four-bell engine block.
 **Hitch a ride for free:** walk up to a landed shuttle-bus or freighter and press `F` to hop in (the prompt says where
 it's headed). You ride inside while the camera hangs back to watch the ship; press `F` again to hop out down the ramp,
 or bail out mid-flight through the side hatch (keeping the ship's speed, with a little style for the nerve). Passengers walk off toward town, the queue
@@ -740,7 +741,9 @@ tools/
   blender/build_runner.py  builds the runner in Blender and exports src/assets/runner.glb
   blender/build_idles.py   keys the runner's five idles on its pivots -> src/assets/idles.json (headless: `pip install bpy`, then `python3 tools/blender/build_idles.py`; `MOONRUNNER_IDLES_BLEND=idles.blend` also saves the keyed scene)
   optimize-glb.mjs         compresses the models in src/assets (quantized and meshopt-coded: about a quarter of the size); `npm run optimize:glb`, run after re-exporting a model from Blender
-  blender/build_ships.py   builds both transit ships in Blender and exports src/assets/ships.glb
+  blender/build_ships.py   builds both transit ships in Blender and exports src/assets/ships.glb (the freighter's bays use cargo.py: the land-train's cargo units, mirrored from build_landtrain.py)
+  blender/cargo.py         the land-train's box container, Helium-3 tanker and explosives magazine, without their flatbed, for other models to carry
+  blender/proposals/       the freighter design study: freighter_b.py (the open-truss "Girder" alternative to the chosen Atlas) and preview.py / preview_ships.py, which render a ship in the game's palette with Cycles on the CPU
   blender/build_skimmer.py builds the Daedalus skimmer -> src/assets/skimmer.glb
   blender/build_engine.py  builds the salvaged engine that drops out of wrecks -> src/assets/engine.glb
   blender/build_briefcase.py builds the credits briefcase that drops out of wrecks -> src/assets/briefcase.glb
@@ -755,7 +758,7 @@ tools/
   blender/build_outposts.py builds the Relay Mast and Watchtower -> src/assets/outposts.glb (also runs headless; `npm run check:outposts` checks the file)
   blender/decals.py        flat lettering, emblems, hazard stripes and safety signs (no textures) the land-train builder execs after kit.py
   blender/kit.py           shared geometry/material/export helpers every Blender builder execs (the runner and ships keep their own variants of a few)
-  viewer.html              dev-only model viewer (npm run dev, then /tools/viewer.html?m=shuttle|freighter|apc|landtrain|crane|garage|dish|outpost|mite|lineup…; dish takes &kind=cryo|gantry&faction=…&no=01..04&size=30&tilt=<rad>&sweep=1; apc takes &turret=<rad>&barrel=<rad>; landtrain takes &type=moonliner|prospector&faction=spacecom|vostok|kepler|meridian&cars=pax,tank,cargo,blast&unit=<n>)
+  viewer.html              dev-only model viewer (npm run dev, then /tools/viewer.html?m=shuttle|freighter|apc|landtrain|crane|garage|dish|outpost|mite|lineup…; freighter takes &faction=spacecom|vostok|kepler|meridian (the cargo's livery); dish takes &kind=cryo|gantry&faction=…&no=01..04&size=30&tilt=<rad>&sweep=1; apc takes &turret=<rad>&barrel=<rad>; landtrain takes &type=moonliner|prospector&faction=spacecom|vostok|kepler|meridian&cars=pax,tank,cargo,blast&unit=<n>)
 ```
 
 **Editing the runner:** run `tools/blender/build_runner.py` in Blender (Scripting tab, or
