@@ -1218,6 +1218,17 @@ body.trailer #vehbar { display: none !important; }
 body.pad-on #board .foot-pad { display: inline-flex; }
 body.pad-on #board .foot-kb { display: none; }
 @media (max-width: 700px) { #board.term .term-status { grid-template-columns: 1fr; } }
+/* the board's tabs (CONTRACTS | COUNCIL HALL in your town): a strip under the title, the active tab in the board's colour */
+#board.term .board-tabs { flex: none; display: flex; align-items: flex-end; gap: 6px; padding: 8px 14px 0; background: #0b0a14; border-bottom: 3px solid #23302a; }
+#board.term .board-tabs button { font-family: var(--comic); font-size: 10px; line-height: 1; padding: 8px 12px 7px; cursor: pointer; color: var(--ph-dim); background: #0b1410; border: 2px solid #23302a; border-bottom: 0; }
+#board.term .board-tabs button:hover { color: var(--ph); border-color: var(--ph-dim); }
+#board.term .board-tabs button.on { color: #05030c; background: var(--fc, var(--yellow)); border-color: var(--fc, var(--yellow)); padding-bottom: 9px; margin-bottom: -3px; }
+#board.term .board-tabs .bt-hint { margin-left: auto; align-self: center; font-family: var(--comic); font-size: 8px; color: var(--ph-dim); padding-bottom: 4px; }
+#board.term .board-tabs .foot-pad { display: none; align-items: center; gap: 4px; }
+body.pad-on #board .board-tabs .foot-pad { display: inline-flex; }
+body.pad-on #board .board-tabs .foot-kb { display: none; }
+#board.term.tab-town .board-scroll { display: flex; flex-direction: column; overflow: hidden; } /* (the page fills the board; only its tiles scroll) */
+#board.term.tab-town .otm.bare { flex: 1 1 auto; min-height: 0; }
 /* the Monolith's time dilation: a cold, slow-shutter edge round the screen */
 #dilate {
   position: absolute; inset: 0; pointer-events: none;
