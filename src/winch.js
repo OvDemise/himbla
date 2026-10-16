@@ -17,7 +17,8 @@
 // at all: hook it and you go round with it.
 //
 // The cable bends round structures like a rope round pegs: every 20th of a second it checks each leg of its path for a structure in the
-// way and, if there is one, bends round the best point along that structure's edges (up to WRAP_MAX bends; one more and the cable strains against it until it slips),
+// way and, if there is one, bends round it: a box at the best point along its edges, a cylinder or sphere along an arc from tangent to tangent
+// (a round tower is a chain of bend points, counted as one structure; up to WRAP_MAX structures, then the cable strains against the next until it slips),
 // and lets a bend go once the straight line past it has been clear, with room to spare, for a moment. You are pulled along the first
 // leg and the hook along the last. If the drum is running and you are not coming in (something solid is in the way) the cable strains,
 // creaking louder and higher while the pull builds to yank you free, and slips off after STRAIN_MAX seconds.
@@ -31,7 +32,8 @@ import markUrl from './assets/towmark.png?inline';
 
 const RANGE = 120;       // how far the cable reaches
 const HOLD = 20;         // seconds before the line lets go on its own
-const SEG = 20;          // cable points (for the sag when it's slack)
+const SEG = 20;          // cable points (for the sag when it's slack); more when it has many bends to follow, up to SEG_MAX
+const SEG_MAX = 56;
 const REST = 2;          // metres of cable left between you and the hook when the reel has finished
 const REEL_MAX = 18;     // m/s: the drum's top speed
 const REEL_ACC = 6;      // m/s²: how gently the drum spools up
@@ -45,7 +47,8 @@ const MIN_STRUCT_R = 2.5; // (smaller colliders are props and rocks, not structu
 const EMBED = 0.42;      // how far the claw is driven into the surface it bites
 const EYE_OUT = 1.08;    // the grapple's eye, this far back from its tip along the shank (the cable ends there)
 const SLOT = { gold: 0xffd23f, steel: 0x9aa3b2, dark: 0x2a2540, tracer: 0xff9f1c }; // (the Kepler orange tracer strand is in every cable)
-const WRAP_MAX = 5;      // the cable bends round at most this many structure corners; one more and it snags
+const WRAP_MAX = 5;      // the cable bends round at most this many different structures; one more and it snags
+const WRAP_PTS = 40;     // ... and has at most this many bend points in all (a round structure takes a chain of them)
 const WRAP_MIN_R = 4;    // (only structures this big, by bounding radius, bend it: boulders and props smaller than that don't)
 const WRAP_EVERY = 0.05; // seconds between wrap checks (20 Hz)
 const WRAP_MARGIN = 0.4; // a wrap point stands this far outside the corner it bends round
@@ -353,6 +356,42 @@ function wrapCandidates(c, A, B) {
   return out;
 }
 
+// Round structures (a cylinder, a sphere) are wrapped by an arc, not by pegs: the cable leaves the line from A on the tangent, lies on the
+// surface (standing a little off it) the short way round, and leaves on the tangent to B. Returns the chain of points, A->B (none of
+// them A or B). A cylinder is wrapped in the plane across its axis (the cable climbs or falls along it evenly); a sphere in the plane
+// through its centre, A and B.
+const TAU = Math.PI * 2;
+const _a1 = new THREE.Vector3(), _a2 = new THREE.Vector3(), _a3 = new THREE.Vector3(), _a4 = new THREE.Vector3();
+function arcPoints(c, A, B) {
+  const r = c.r, R = r + Math.min(1.2, Math.max(WRAP_MARGIN, 0.06 * r)), O = c.c;
+  const a = _a1;
+  if (c.type === 'cyl') a.copy(c.axis);
+  else { a.subVectors(A, O).cross(_a2.subVectors(B, O)); if (a.lengthSq() < 1e-6) return null; a.normalize(); }
+  const hA = _a2.subVectors(A, O).dot(a), hB = _a3.subVectors(B, O).dot(a);
+  const vA = _a2.subVectors(A, O).addScaledVector(a, -hA);
+  const e1 = new THREE.Vector3(), e2 = new THREE.Vector3();
+  if (vA.lengthSq() < 1e-6) { e1.set(1, 0, 0); if (Math.abs(a.x) > 0.9) e1.set(0, 1, 0); e1.cross(a).normalize(); } else e1.copy(vA).normalize();
+  e2.crossVectors(a, e1);
+  const dA = vA.length();
+  const vB = _a4.subVectors(B, O).addScaledVector(a, -hB);
+  const xB = vB.dot(e1), yB = vB.dot(e2), dB = Math.hypot(xB, yB), thB = Math.atan2(yB, xB);
+  const alpha = dA > R ? Math.acos(R / dA) : 0, tA = dA > R ? Math.sqrt(dA * dA - R * R) : 0;
+  const beta = dB > R ? Math.acos(R / dB) : 0, tB = dB > R ? Math.sqrt(dB * dB - R * R) : 0;
+  const mod = (x) => ((x % TAU) + TAU) % TAU;
+  const d1 = mod((thB - beta) - alpha);      // round the one way (counter-clockwise)
+  const d2 = mod(-alpha - (thB + beta));     // and the other
+  const dir = d1 <= d2 ? 1 : -1, delta = dir > 0 ? d1 : d2, s0 = dir * alpha;
+  const step = Math.min(Math.PI / 6, 1.8 * Math.acos(r / R)); // (small enough that a chord between two points stays outside the surface)
+  const n = Math.max(1, Math.ceil(delta / step));
+  const total = tA + R * delta + tB || 1;
+  const out = [];
+  for (let k = 0; k <= n; k++) {
+    const ang = s0 + dir * delta * k / n, h = hA + (hB - hA) * ((tA + R * delta * k / n) / total);
+    out.push(new THREE.Vector3().copy(O).addScaledVector(a, h).addScaledVector(e1, Math.cos(ang) * R).addScaledVector(e2, Math.sin(ang) * R));
+  }
+  return out;
+}
+
 export class Winch {
   constructor(game) {
     this.game = game;
@@ -360,14 +399,15 @@ export class Winch {
     this.cd = 0;
     this.cand = null; // what Z would hook right now (while the winch is equipped)
     this.pickT = 0;
-    this.pts = Array.from({ length: SEG + 1 }, () => new THREE.Vector3());
-    this.old = Array.from({ length: SEG + 1 }, () => new THREE.Vector3());
-    this.path = Array.from({ length: WRAP_MAX + 2 }, () => new THREE.Vector3()); // hand, the wrap points, the hook (rebuilt every frame)
+    this.pts = Array.from({ length: SEG_MAX + 1 }, () => new THREE.Vector3());
+    this.old = Array.from({ length: SEG_MAX + 1 }, () => new THREE.Vector3());
+    this.path = Array.from({ length: WRAP_PTS + 2 }, () => new THREE.Vector3()); // hand, the wrap points, the hook (rebuilt every frame)
     this.pathN = 0;
-    this.poly = Array.from({ length: WRAP_MAX + 2 }, () => new THREE.Vector3()); // the same, ending at the grapple's eye (what is drawn)
+    this.poly = Array.from({ length: WRAP_PTS + 2 }, () => new THREE.Vector3()); // the same, ending at the grapple's eye (what is drawn)
     this.pin = [0, SEG]; // the cable's points that sit on a wrap point (or an end)
-    this.pinned = new Uint8Array(SEG + 1);
-    this.restSeg = new Float32Array(SEG);
+    this.pinned = new Uint8Array(SEG_MAX + 1);
+    this.restSeg = new Float32Array(SEG_MAX);
+    this.nseg = SEG;
     this.ropeDirty = true;
     this.legs = [];
     this.strand = null; // the cable: an instance per metre of the model's twisted strand (winch.glb), once it has loaded
@@ -450,7 +490,7 @@ export class Winch {
     let off, n;
     if (T.root) { _rinv.copy(T.root.matrixWorld).invert(); off = point.clone().applyMatrix4(_rinv); n = nrm.clone().transformDirection(_rinv); } // (the pose it was found in)
     else { off = point.clone().sub(T.pos()); n = nrm.clone(); }
-    return { target: T, off, goal: off.clone(), nrm: n, looked, dist, len: dist, t: 0, reel: 0, wraps: [], free: [], wT: 0, strain: 0, creakT: 0, snagged: false };
+    return { target: T, off, goal: off.clone(), nrm: n, looked, dist, len: dist, t: 0, reel: 0, wraps: [], free: [], grp: [], wT: 0, strain: 0, creakT: 0, snagged: false };
   }
 
   // where a handle's hook point is now
@@ -542,7 +582,7 @@ export class Winch {
     this.cand = null;
     this.tick = h.len;
     for (let i = 0; i <= SEG; i++) { this.pts[i].lerpVectors(hand, anchor, i / SEG); this.old[i].copy(this.pts[i]); }
-    this.ropeDirty = true;
+    this.ropeDirty = true; this.nseg = SEG; this.curve = null;
     g.fx.pop('HITCHED!', null, { color: '#ff9f1c', size: 46, life: 0.7 });
     g.audio.burst(0.12, 3000, 0.25);
     g.audio.tone(380, 0.25, 'sawtooth', 0.08, 2.2);
@@ -576,35 +616,46 @@ export class Winch {
     return L;
   }
 
-  // Twenty times a second: let go of any wrap the cable has straightened past, and bend it round the corner of any structure it has
-  // run into. Returns 'changed', 'snag' (a fourth wrap is needed) or null.
+  // Twenty times a second: let go of any bend the cable has straightened past, and bend it round any structure it has run into (a
+  // corner or edge for a box, an arc for a cylinder or sphere). Returns 'changed', 'snag' (no bend left to take) or null.
   tendWraps(o) {
-    const cols = this.game.colliders, P = this.path;
-    for (let k = o.wraps.length - 1; k >= 0; k--) {
-      if (clearFat(cols, P[k], P[k + 2], UNWRAP_FAT)) {
+    const cols = this.game.colliders, P = this.path, n = o.wraps.length;
+    // letting go: only the ends of a run of bends round one structure can (the middle of an arc is held by the structure itself); with
+    // you right up at the bend only a clear line is needed, otherwise the line past it must be clear with room to spare
+    for (let k = n - 1; k >= 0; k--) {
+      if (!(k === 0 || k === n - 1 || o.grp[k - 1] !== o.grp[k] || o.grp[k + 1] !== o.grp[k])) continue;
+      const fat = Math.min(P[k].distanceTo(P[k + 1]), P[k + 1].distanceTo(P[k + 2])) < 2.5 ? 0.1 : UNWRAP_FAT;
+      if (clearFat(cols, P[k], P[k + 2], fat)) {
         o.free[k] += WRAP_EVERY;
-        if (o.free[k] >= UNWRAP_HOLD) { o.wraps.splice(k, 1); o.free.splice(k, 1); this.ropeDirty = true; return 'changed'; }
+        if (o.free[k] >= UNWRAP_HOLD) { o.wraps.splice(k, 1); o.free.splice(k, 1); o.grp.splice(k, 1); this.ropeDirty = true; return 'changed'; }
       } else o.free[k] = 0;
     }
+    // bending: each leg is checked, bar the chords between two points of one arc (those can't be blocked by what they hug)
     for (let i = 0; i < this.pathN - 1; i++) {
+      if (i >= 1 && i <= n - 1 && o.grp[i - 1] === o.grp[i]) continue;
       const hit = blocker(cols, P[i], P[i + 1]);
       if (!hit) continue;
-      if (o.wraps.length >= WRAP_MAX) return 'snag';
+      if (!o.grp.includes(hit.c) && new Set(o.grp).size >= WRAP_MAX) return 'snag';
       const A = P[i], B = P[i + 1];
       const before = this.pathLen();
-      let best = null, bs = -Infinity;
-      for (const p of wrapCandidates(hit.c, A, B)) {
-        if (p.distanceTo(A) < 0.8 || p.distanceTo(B) < 0.8) continue;
-        const clear = (blocker(cols, A, p, 0.35, hit.c) ? 0 : 1) + (blocker(cols, p, B, 0.35, hit.c) ? 0 : 1);
-        const score = clear * 1000 - (A.distanceTo(p) + p.distanceTo(B)); // (both legs clear first, then the shortest way round)
-        if (score > bs) { bs = score; best = p; }
+      let pts = hit.c.type === 'cyl' || hit.c.type === 'sphere' ? arcPoints(hit.c, A, B) : null;
+      if (!pts) {
+        let best = null, bs = -Infinity;
+        for (const p of wrapCandidates(hit.c, A, B)) {
+          if (p.distanceTo(A) < 0.8 || p.distanceTo(B) < 0.8) continue;
+          const clear = (blocker(cols, A, p, 0.35, hit.c) ? 0 : 1) + (blocker(cols, p, B, 0.35, hit.c) ? 0 : 1);
+          const score = clear * 1000 - (A.distanceTo(p) + p.distanceTo(B)); // (both legs clear first, then the shortest way round)
+          if (score > bs) { bs = score; best = p; }
+        }
+        pts = best ? [best] : null;
       }
-      if (!best) return 'snag';
-      o.wraps.splice(i, 0, best);
-      o.free.splice(i, 0, 0);
+      if (!pts || n + pts.length > WRAP_PTS) return 'snag';
+      o.wraps.splice(i, 0, ...pts);
+      o.free.splice(i, 0, ...pts.map(() => 0));
+      o.grp.splice(i, 0, ...pts.map(() => hit.c));
       this.ropeDirty = true;
       this.buildPath(o, _hA.copy(P[0]), _hB.copy(P[this.pathN - 1])); // (copies: the rebuild overwrites the points it reads)
-      o.len += Math.max(0, this.pathLen() - before); // (the drum pays out the extra the bend takes, so a new wrap doesn't jerk you)
+      o.len += Math.max(0, this.pathLen() - before); // (the drum pays out the extra the bends take, so a new wrap doesn't jerk you)
       return 'changed';
     }
     return null;
@@ -718,18 +769,22 @@ export class Winch {
     legs.length = 0;
     let total = 0;
     for (let i = 0; i < k; i++) { const l = poly[i].distanceTo(poly[i + 1]); legs.push(l); total += l; }
+    // how many points the cable has: more when it has many bends to follow
+    const nseg = Math.min(SEG_MAX, Math.max(SEG, 3 * k));
     // which of the cable's points sit on the pins: re-laid along the path whenever the wraps change
-    if (this.ropeDirty || this.pin.length !== k + 1) {
+    if (this.ropeDirty || this.pin.length !== k + 1 || nseg !== this.nseg) {
+      this.nseg = nseg;
+      this.curve = null;
       const pin = [0];
       let used = 0;
       for (let i = 0; i < k - 1; i++) {
         const left = k - 1 - i; // legs still to place after this one
-        const want = Math.round(SEG * legs[i] / (total || 1));
-        const n = Math.max(2, Math.min(want, SEG - used - 2 * left));
+        const want = Math.round(nseg * legs[i] / (total || 1));
+        const n = Math.max(1, Math.min(want, nseg - used - left));
         used += n;
         pin.push(used);
       }
-      pin.push(SEG);
+      pin.push(nseg);
       this.pin = pin;
       this.pinned.fill(0);
       for (const p of pin) this.pinned[p] = 1;
@@ -741,7 +796,7 @@ export class Winch {
     const slack = Math.max(1, (len - (EYE_OUT - EMBED)) / (total || 1));
     for (let m = 0; m < k; m++) { const r = legs[m] * slack / (pin[m + 1] - pin[m]); for (let i = pin[m]; i < pin[m + 1]; i++) this.restSeg[i] = r; }
     const gdt = 3.5 * dt * dt;
-    for (let i = 1; i < SEG; i++) {
+    for (let i = 1; i < nseg; i++) {
       if (pinned[i]) continue;
       const p = pts[i], q = old[i];
       const vx = (p.x - q.x) * 0.9, vy = (p.y - q.y) * 0.9, vz = (p.z - q.z) * 0.9;
@@ -750,7 +805,7 @@ export class Winch {
     }
     for (let m = 0; m <= k; m++) pts[pin[m]].copy(poly[m]);
     for (let it = 0; it < 10; it++) {
-      for (let i = 0; i < SEG; i++) {
+      for (let i = 0; i < nseg; i++) {
         const p = pts[i], q = pts[i + 1];
         _d.subVectors(q, p);
         const l = _d.length() || 1e-6;
@@ -761,7 +816,7 @@ export class Winch {
         else { p.addScaledVector(_d, kk * 0.5); q.addScaledVector(_d, -kk * 0.5); }
       }
       // (the stiffness: a steel cable resists bending, so each point is eased toward the line through its neighbours)
-      for (let i = 1; i < SEG; i++) if (!pinned[i]) pts[i].lerp(_d.addVectors(pts[i - 1], pts[i + 1]).multiplyScalar(0.5), 0.2);
+      for (let i = 1; i < nseg; i++) if (!pinned[i]) pts[i].lerp(_d.addVectors(pts[i - 1], pts[i + 1]).multiplyScalar(0.5), 0.2);
       for (let m = 0; m <= k; m++) pts[pin[m]].copy(poly[m]);
     }
     this.hook.visible = true;
@@ -770,7 +825,7 @@ export class Winch {
     if (!this.strand) return;
     // the cable model, a metre at a time, laid along the line (each stretched to the length of its stretch of it)
     // (one curve for good, over the same point objects: it only has to be told they moved, and 60 arc-length steps are plenty for 20 points)
-    const curve = this.curve ||= Object.assign(new THREE.CatmullRomCurve3(pts), { arcLengthDivisions: 60 });
+    const curve = this.curve ||= Object.assign(new THREE.CatmullRomCurve3(pts.slice(0, this.nseg + 1)), { arcLengthDivisions: 100 });
     curve.needsUpdate = true;
     const n = Math.min(MAX_PIECES, Math.max(1, Math.round(curve.getLength())));
     let p0 = curve.getPointAt(0, _a), p1 = _b;

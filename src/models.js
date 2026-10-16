@@ -283,8 +283,32 @@ function addBaked(target, key, mats) {
 // chain stays on runners nobody simulates (distant figures); a simulated one hides it.
 export const SCARF_STYLE = { len: 1.3, w: 0.22, tails: 1 };
 const _sq = new THREE.Quaternion(), _sg = new THREE.Vector3(), _sw = new THREE.Vector3(), _sa = new THREE.Vector3();
-const _st = new THREE.Vector3(), _ss = new THREE.Vector3(), _sn = new THREE.Vector3(), _sx = new THREE.Vector3(1, 0, 0), _sy = new THREE.Vector3(0, 1, 0);
+const _sg2 = new THREE.Vector3(), _st = new THREE.Vector3(), _ss = new THREE.Vector3(), _sn = new THREE.Vector3(), _sx = new THREE.Vector3(1, 0, 0), _sy = new THREE.Vector3(0, 1, 0);
 const SCARF_PTS = 12;
+// The scarf's rest channel (torso frame): out of the back of the neck, left along the top of the pack, over the left shoulder
+// (behind the pauldron; +x is the runner's left, which a viewer behind sees on the left) and down its back, outside the pack's edge. At rest, and at a walk, the tails are drawn into it
+// (a soft spring that lets go as the airflow rises, so a skater's scarf streams out behind, over the pack if need be).
+const ease01 = (t) => { t = Math.min(1, Math.max(0, t)); return t * t * (3 - 2 * t); };
+const SCARF_GUIDE = [[-0.02, 0.93, -0.25], [0.1, 0.955, -0.25], [0.24, 0.965, -0.225], [0.34, 0.915, -0.215], [0.37, 0.8, -0.235], [0.37, 0.6, -0.27]];
+const SCARF_GUIDE_CUM = SCARF_GUIDE.reduce((a, p, i) => { a.push(i ? a[i - 1] + Math.hypot(p[0] - SCARF_GUIDE[i - 1][0], p[1] - SCARF_GUIDE[i - 1][1], p[2] - SCARF_GUIDE[i - 1][2]) : 0); return a; }, []);
+// the channel `s` metres along it for tail k (the second tail lies on the first: a little further in and a layer further back); past the end it hangs straight down
+function scarfGuide(k, s, out) {
+  const G = SCARF_GUIDE, C = SCARF_GUIDE_CUM, n = G.length - 1;
+  if (s >= C[n]) out.set(G[n][0], G[n][1] - (s - C[n]), G[n][2]);
+  else {
+    let j = 0;
+    while (C[j + 1] < s) j++;
+    const t = (s - C[j]) / (C[j + 1] - C[j]);
+    out.set(G[j][0] + (G[j + 1][0] - G[j][0]) * t, G[j][1] + (G[j + 1][1] - G[j][1]) * t, G[j][2] + (G[j + 1][2] - G[j][2]) * t);
+  }
+  out.x -= k * 0.045; out.z -= k * 0.04;
+  return out;
+}
+// What the scarf slides over: the pack, and a crate or two on top of it (Player.setCargo), as rounded boxes in the torso frame:
+// [half-width, bottom, top, back, front, corner radius]. A box is clearance included: the tail rides on its surface.
+const PACK_BOX = [0.29, 0.2, 0.935, -0.51, -0.18, 0.1];
+const CRATE_BOX = [0.39, 0.3, 0.95, -1.11, -0.34, 0.03];  // one crate: 0.7 across, 0.56 high, 0.62 above the hip, 0.72 behind
+const TWIN_BOX = [0.39, 0.3, 1.45, -1.11, -0.34, 0.03];   // the Twin Cradle's second crate stacked on it
 
 // one tail: a strip of box sections (4 verts a point), and the same again for its ink shell
 function scarfStrip(n) {
@@ -320,7 +344,6 @@ export class ScarfSim {
     if (this.tails) for (const t of this.tails) { t.mesh.removeFromParent(); t.mesh.geometry.dispose(); t.inkMesh.geometry.dispose(); }
     const links = m.scarf.userData.links;
     if (links && links[0]) links[0].visible = false;
-    const piv = m.scarf.position;
     const mat = m.mats ? m.mats.scarf : toon(0xffd23f, { side: THREE.DoubleSide });
     this.tails = [];
     for (let k = 0; k < (st.tails || 1); k++) {
@@ -334,25 +357,21 @@ export class ScarfSim {
       mesh.frustumCulled = inkMesh.frustumCulled = false;
       mesh.castShadow = true;
       m.torso.add(mesh);
-      // the roots: over the right shoulder, outside the pack's edge, so a tail hangs down the side of the pack rather than
-      // lying on its lid. A second tail rests on the first: a hand's breadth in, a little higher and a layer further back
-      const root = new THREE.Vector3(0.33 - k * 0.04, piv.y - 0.03 + k * 0.012, piv.z + 0.13 - k * 0.04);
+      // the root: out of the back of the neck collar, under the helmet's rim: where the channel starts
+      const root = scarfGuide(k, 0, new THREE.Vector3());
       const seg = len / (SCARF_PTS - 1);
       const p = [], o = [];
       for (let i = 0; i < SCARF_PTS; i++) { p.push(new THREE.Vector3()); o.push(new THREE.Vector3()); }
-      const T = { mesh, inkMesh, root, seg, w: st.w * (k ? 0.85 : 1), p, o, phase: k * 0.6 };
+      const T = { mesh, inkMesh, root, k, seg, w: st.w * (k ? 0.85 : 1), p, o, phase: k * 0.6 };
       this.hang(T);
       this.tails.push(T);
     }
   }
 
-  // one tail's chain hanging down the back from its root, with no motion in it
+  // one tail's chain lying in the rest channel, with no motion in it
   hang(T) {
-    const { p, o, root, seg } = T;
-    for (let i = 0; i < SCARF_PTS; i++) {
-      p[i].set(root.x + i * 0.004, root.y - i * seg * 0.95, Math.min(root.z - 0.06 * Math.min(i, 3), -0.2) - i * seg * 0.1);
-      o[i].copy(p[i]);
-    }
+    const { p, o, seg, k } = T;
+    for (let i = 0; i < SCARF_PTS; i++) { scarfGuide(k, i * seg, p[i]); o[i].copy(p[i]); }
   }
 
   // back to hanging at rest, and forget the last velocity (so no swing is read out of a teleport): for
@@ -362,10 +381,9 @@ export class ScarfSim {
     for (const T of this.tails || []) this.hang(T);
   }
 
-  // vel: the body's world velocity; up: world up at the body. The gear on your back: back = how
-  // far behind the spine it reaches, top = its top edge, hw = its half-width (pack 0.55/0.94,
-  // one crate 1.14/1.0, the Kepler twin stack 1.14/1.48)
-  update(dt, vel, up, { back = 0.55, top = 0.94, hw } = {}) {
+  // vel: the body's world velocity; up: world up at the body. cargo: how many crates ride on the pack (0, 1, or 2 for the
+  // Twin Cradle): the tails slide over the pack, and over the crates too
+  update(dt, vel, up, { cargo = 0 } = {}) {
     if (dt <= 0) return;
     const m = this.m;
     if (!this.tails || this.key !== JSON.stringify(m.scarfStyle || SCARF_STYLE)) this.build();
@@ -380,10 +398,11 @@ export class ScarfSim {
     else _sa.set(0, 0, 0);
     if (_sa.length() > 20) _sa.setLength(20); // (a respawn or a teleport isn't a swing)
     this.prevVel = (this.prevVel || new THREE.Vector3()).copy(vel);
-    // (a light breeze to the right keeps it off the middle of your back)
-    const fx = _sg.x + _sw.x + _sa.x + 1.2, fy = _sg.y + _sw.y + _sa.y, fz = _sg.z + _sw.z + _sa.z;
+    // (a faint breeze to the right keeps the tails from lying dead centre)
+    const fx = _sg.x + _sw.x + _sa.x, fy = _sg.y + _sw.y + _sa.y, fz = _sg.z + _sw.z + _sa.z;
     const flut = Math.min(0.5, ws / 28);
-    const halfW = hw ?? (back > 1 ? 0.42 : 0.3);
+    const boxes = cargo ? [PACK_BOX, cargo > 1 ? TWIN_BOX : CRATE_BOX] : [PACK_BOX];
+    const rest = 1 - ease01((ws - 2.5) / 6.5); // the pull into the channel: full at a stand or a walk, gone by about 9 m/s
     const steps = Math.min(4, Math.ceil(dt / (1 / 120)));
     const h2 = (dt / steps) ** 2;
     for (const T of this.tails) {
@@ -399,6 +418,12 @@ export class ScarfSim {
           const vx = (q.x - o[i].x) * 0.96, vy = (q.y - o[i].y) * 0.96, vz = (q.z - o[i].z) * 0.96;
           o[i].copy(q);
           q.x += vx + ax * h2; q.y += vy + ay * h2; q.z += vz + fz * h2;
+        }
+        if (rest > 0.001) { // drawn into the channel: firmly near the neck and shoulder, loosely further down so it still sways
+          for (let i = 1; i < SCARF_PTS; i++) {
+            scarfGuide(T.k, i * seg, _sg2);
+            p[i].lerp(_sg2, rest * (i < 5 ? 0.3 : 0.09));
+          }
         }
         for (let it = 0; it < 3; it++) {
           for (let i = 1; i < SCARF_PTS; i++) {
@@ -418,13 +443,24 @@ export class ScarfSim {
           }
           for (let i = 1; i < SCARF_PTS; i++) {
             const q = p[i];
-            // stay behind your back, and out of the gear on it (out through whichever face is nearest)
+            // stay behind your back, and out of the gear on it: rounded boxes (the pack's own shape, the crates') that the tail
+            // slides over: out through the nearest face
             if (q.z > -0.18) q.z = -0.18;
-            if (q.y < top && q.y > 0.2 && q.z > -back && Math.abs(q.x) < halfW) {
-              const dTop = top - q.y, dBack = q.z + back, dSide = halfW - Math.abs(q.x);
-              if (dTop <= dBack && dTop <= dSide) q.y = top;
-              else if (dSide <= dBack) q.x = Math.sign(q.x || 1) * halfW;
-              else q.z = -back;
+            for (const B of boxes) {
+              const hx = B[0], yl = B[1], yh = B[2], zb = B[3], zf = B[4], br = Math.min(B[5], hx, (yh - yl) / 2, (zf - zb) / 2);
+              const cy = (yl + yh) / 2, cz = (zb + zf) / 2;
+              const dx = Math.abs(q.x) - (hx - br), dy = Math.abs(q.y - cy) - ((yh - yl) / 2 - br), dz = Math.abs(q.z - cz) - ((zf - zb) / 2 - br);
+              const ox = Math.max(dx, 0), oy = Math.max(dy, 0), oz = Math.max(dz, 0);
+              const out = Math.hypot(ox, oy, oz);
+              const d = out + Math.min(Math.max(dx, dy, dz), 0) - br; // (signed distance to the box: negative inside)
+              if (d >= 0) continue;
+              let nx, ny, nz;
+              if (out > 1e-6) { nx = (ox / out) * Math.sign(q.x || 1); ny = (oy / out) * Math.sign(q.y - cy || 1); nz = (oz / out) * Math.sign(q.z - cz || 1); }
+              else if (dx >= dy && dx >= dz) { nx = Math.sign(q.x || 1); ny = nz = 0; }
+              else if (dy >= dz) { ny = Math.sign(q.y - cy || 1); nx = nz = 0; }
+              else { nz = Math.sign(q.z - cz || 1); nx = ny = 0; }
+              q.x -= nx * d; q.y -= ny * d; q.z -= nz * d;
+              o[i].lerp(q, 0.05); // (a little friction: it settles on the pack rather than skating off it)
             }
           }
         }
