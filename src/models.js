@@ -285,21 +285,19 @@ export const SCARF_STYLE = { len: 1.3, w: 0.22, tails: 1 };
 const _sq = new THREE.Quaternion(), _sg = new THREE.Vector3(), _sw = new THREE.Vector3(), _sa = new THREE.Vector3();
 const _st = new THREE.Vector3(), _ss = new THREE.Vector3(), _sn = new THREE.Vector3(), _sx = new THREE.Vector3(1, 0, 0), _sy = new THREE.Vector3(0, 1, 0);
 const SCARF_PTS = 12;
-// The scarf's rest channel (torso frame; +x is the runner's left, which a viewer behind sees on the left). Seen from above, the
-// tails come out of the back of the neck just left of the pack and wrap round the collar under the helmet's rim, following its
-// circle round to the left, the second lying outside the first and reaching a little further round. They then slip off the
-// shoulder behind the arm and hang down the left side of the back. At rest, and at a walk, a soft spring holds the tails in it; it
+const SCARF_GAP = 0.034; // two ribbons lying on each other: 2 x 0.018 thick, less a hair
+// The scarf's rest channel (torso frame; +x is the runner's left, which a viewer behind sees on the left). The tails come out of
+// the neck on its left-back, under the helmet's rim, run a short way over the top of the shoulder, slip off it behind the arm and
+// hang down the left side of the back, the second lying on the first. At rest, and at a walk, a soft spring holds the tails in it; it
 // lets go as the airflow rises, so a skater's scarf streams out behind, over the pack if need be.
 const ease01 = (t) => { t = Math.min(1, Math.max(0, t)); return t * t * (3 - 2 * t); };
 const SCARF_GUIDES = [0, 1].map((k) => {
-  const rho = 0.29, th0 = 12 * Math.PI / 180, th1 = (68 - 3 * k) * Math.PI / 180, n = 7; // (the second lies on the first, a ribbon's thickness above it, and ends a little earlier)
-  const g = [];
-  for (let i = 0; i <= n; i++) { // the arc round the collar: angle from straight back, round toward the left
-    const t = i / n, th = th0 + (th1 - th0) * t;
-    g.push([rho * Math.sin(th), 0.945 - 0.03 * t + 0.042 * k, -rho * Math.cos(th)]);
-  }
-  const e = g[n];
-  g.push([e[0] + 0.05 + 0.01 * k, 0.875, e[2] - 0.08 - 0.03 * k], [0.36 + 0.01 * k, 0.76, -0.235 - 0.045 * k], [0.37 + 0.01 * k, 0.55, -0.27 - 0.045 * k]); // ...and down behind the shoulder, the second a layer further back // ...and down behind the shoulder
+  // from the left-back of the collar (50 degrees round from straight back, under the helmet's rim) a short way over the top of the shoulder...
+  const rho = 0.29, rad = Math.PI / 180, g = [];
+  for (const [deg, y] of [[50, 0.945], [59, 0.935], [68, 0.915]]) g.push([rho * Math.sin(deg * rad), y + 0.042 * k, -rho * Math.cos(deg * rad)]); // (the second tail lies on the first)
+  const e = g[2];
+  // ...then off it behind the arm, and down the left side of the back; the second tail a layer further back
+  g.push([e[0] + 0.05, 0.875 + 0.02 * k, e[2] - 0.08 - 0.03 * k], [0.36 + 0.01 * k, 0.76, -0.235 - 0.045 * k], [0.37 + 0.01 * k, 0.55, -0.27 - 0.045 * k]);
   const cum = g.reduce((a, q, i) => { a.push(i ? a[i - 1] + Math.hypot(q[0] - g[i - 1][0], q[1] - g[i - 1][1], q[2] - g[i - 1][2]) : 0); return a; }, []);
   return { g, cum };
 });
@@ -482,13 +480,29 @@ export class ScarfSim {
         }
       }
     }
-    // tails lie on each other, never through each other (the later one is the outer layer)
+    // tails lie on each other, never through each other (the later one is the outer layer): each point of the outer tail keeps its
+    // distance from the nearest point on the inner tail's chain (not from the point with the same number, which sits somewhere else
+    // along a chain of a different length, and made the pair twitch against their springs)
     for (let k = 1; k < this.tails.length; k++) {
       const A = this.tails[k - 1].p, B = this.tails[k].p;
       for (let i = 1; i < SCARF_PTS; i++) {
-        _st.subVectors(B[i], A[i]);
-        const d = _st.length();
-        if (d < 0.04) { if (d < 1e-5) _st.set(0, 0, -1); else _st.divideScalar(d); B[i].addScaledVector(_st, (0.04 - d) * 0.6); A[i].addScaledVector(_st, -(0.04 - d) * 0.4); }
+        let best = 1e9, bj = 1, bt = 0;
+        for (let j = 1; j < SCARF_PTS; j++) {
+          _st.subVectors(A[j], A[j - 1]);
+          const l2 = _st.lengthSq() || 1e-9;
+          const t = Math.min(1, Math.max(0, _ss.subVectors(B[i], A[j - 1]).dot(_st) / l2));
+          const d2 = _sn.copy(A[j - 1]).addScaledVector(_st, t).distanceToSquared(B[i]);
+          if (d2 < best) { best = d2; bj = j; bt = t; }
+        }
+        const d = Math.sqrt(best);
+        if (d >= SCARF_GAP) continue;
+        _st.copy(A[bj - 1]).lerp(A[bj], bt);            // (the nearest point on the inner tail)
+        _ss.subVectors(B[i], _st);
+        if (d < 1e-5) _ss.set(0, 0.7, -0.7); else _ss.divideScalar(d);
+        const push = (SCARF_GAP - d) * 0.5;
+        B[i].addScaledVector(_ss, push);
+        A[bj].addScaledVector(_ss, -push * bt);
+        if (bj > 1) A[bj - 1].addScaledVector(_ss, -push * (1 - bt));
       }
     }
     for (const T of this.tails) { for (let i = 1; i < SCARF_PTS; i++) gearPush(T.p[i], T.o[i], boxes); this.draw(T); } // (the pair's push can't drive a tail into the pack)
