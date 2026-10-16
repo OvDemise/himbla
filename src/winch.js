@@ -71,7 +71,7 @@ function massOf(v) {
   if (v.kind === 'bus') return 6; // (the little transit shuttles)
   if (v.kind === 'landtrain') return 14;
   if (v.kind === 'buggy') return 5; // (the crawler buggies)
-  if (v.kind === 'car') return 2.2;
+  if (v.kind === 'car') return 2.6;
   return 6;
 }
 

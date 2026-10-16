@@ -177,11 +177,13 @@ const ground = {
       },
     },
     {
-      // traffic's four paints, then the casino car park's extra three
-      id: 'veh.hover-cars', label: 'HOVER-CARS · 7 PAINTS', w: 30, d: 11,
+      // the four faction cars (SPACECOM's with its light bar), then the five civilian paints
+      id: 'veh.hover-cars', label: 'HOVER-CARS · 4 FACTION, 5 CIVILIAN', w: 36, d: 12,
       make: () => {
-        const paints = [0xff7ad9, 0x2ec4ff, 0x7dff6a, 0xffd23f, 0xff9f1c, 0xd8d4e8, 0xc77dff];
-        return { root: brick(paints.map((color) => part(pose(makeHoverCar({ color }).root, YAW_ROW, 1.05))), 7.5, 5) };
+        const cars = [...['spacecom', 'vostok', 'kepler', 'meridian'].map((faction) => makeHoverCar({ faction })), ...[0, 1, 2, 3, 4].map((paint) => makeHoverCar({ paint }))];
+        const ups = cars.map((m) => part(pose(m.root, YAW_ROW, 1.15)));
+        const beacons = cars.flatMap((m) => m.beacons);
+        return { root: brick(ups, 8.5, 6.5, 5), update: beacons.length ? (dt, t) => { for (const b of beacons) b.visible = Math.sin(t * 7 + b.userData.phase * Math.PI) > 0; } : undefined };
       },
     },
     {
