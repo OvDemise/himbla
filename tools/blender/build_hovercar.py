@@ -4,11 +4,11 @@
 #   exec(open(r"<repo>/tools/blender/build_hovercar.py").read())
 # Headless:  MOONRUNNER_REPO=<repo> python3 tools/blender/build_hovercar.py   (needs `pip install bpy`)
 #
-#   car_faction   the FACTION car: a low, sharp hull in the faction's livery: a racing stripe down the spine, a roof light bar,
-#                 swept tail fins, a dark splitter, and the faction's emblem on a plate on each door (one `livery` pivot per
-#                 faction, extra `faction`; the game keeps only the matching one).
+#   car_faction   the FACTION car: a low, sharp hull in the faction's livery: a racing stripe down the spine, swept tail fins and
+#                 a dark splitter. SPACECOM's car alone has a roof light bar (the `livery_spacecom` pivot, extra `faction`: the
+#                 game keeps only the matching one); the other factions' cars have none. No emblems yet (the logos aren't made).
 #   car_civilian  the CIVILIAN car: the same hull, rounder and a hand taller: a big glass bubble under a two-tone roof, chrome
-#                 bumpers, round headlamps, a roof rack with a luggage pod, a soft swoosh instead of a stripe, stubby tail fins.
+#                 side bumpers, a single round headlamp on the nose cone, a roof rack with a luggage pod, a soft swoosh instead of a stripe, stubby tail fins.
 #
 # Both are about 6.5 m long and 3.9 m over the pods (1.18 x the old car's footprint of 5.5 x 3.3 m), authored in three.js axes
 # (x right, y up, +z nose), centred on the hull's middle like the old car.
@@ -160,9 +160,9 @@ def build_pods(R, civ, H):
 def build_faction(R):
     H = HULL_F
     mesh("hull", loft(H, 40), "body", R, 0.07)
-    # the livery stripe down the spine, and a chine line down each flank (broken at the door plate)
+    # the livery stripe down the spine, and a chine line down each flank
     mesh("spine", keep(loft(grow(H, 0.02), 40, False, False), lambda c: abs(c[0]) < 0.2 and c[1] > 0.3), "stripe", R, 0)
-    mesh("chine", keep(loft(grow(H, 0.025), 40, False, False), lambda c: abs(c[1] + 0.02) < 0.06 and abs(c[0]) > 0.5 and not (-0.5 < c[2] < 0.8)), "stripe", R, 0)
+    mesh("chine", keep(loft(grow(H, 0.025), 40, False, False), lambda c: abs(c[1] + 0.02) < 0.06 and abs(c[0]) > 0.5), "stripe", R, 0)
     # a low, tinted teardrop canopy whose flat base sits inside the hull (its rim buried under the deck)
     cano = [
         {"z": -1.5, "w": 0.55, "t": 0.2, "b": 0.0, "yc": 0.5, "eT": 2.6},
@@ -202,33 +202,19 @@ def build_faction(R):
         r = (0, 0, sx * -0.2)
         mesh(f"fin{sx}", xf(extrude(outline, 0.06, "x"), t, r), "body", R, 0.03)
         mesh(f"finTip{sx}", xf(extrude(tip, 0.075, "x"), t, r), "stripe", R, 0)
-    # a roof light bar standing on the canopy: two alternating lamps (pivots with role beacon, extra phase)
+    # SPACECOM's roof light bar standing on the canopy: it belongs to the spacecom `livery` pivot, so only that faction's car has it
+    # (two alternating lamps: pivots with role beacon, extra phase)
+    LS = pivot("livery_spacecom", (0, 0, 0), R, role="livery", faction="spacecom")
     yc = top_y(cano, 0, 0.35)
-    mesh("barBase", xf(rbox(0.5, 0.06, 0.12, 0.3, 8, 4), (0, yc, 0.35)), "dark", R, 0.02)
+    mesh("barBase", xf(rbox(0.5, 0.06, 0.12, 0.3, 8, 4), (0, yc, 0.35)), "dark", LS, 0.02)
     for sx, slot in ((-1, "beaconA"), (1, "beaconB")):
-        B_ = pivot(f"beacon{sx}", (sx * 0.27, yc + 0.07, 0.35), R, role="beacon", phase=0 if sx < 0 else 1)
+        B_ = pivot(f"beacon{sx}", (sx * 0.27, yc + 0.07, 0.35), LS, role="beacon", phase=0 if sx < 0 else 1)
         mesh(f"beacon{sx}_lens", xf(superquad(0.2, 0.08, 0.09, 0.8, 0.8, 10, 6)), slot, B_, 0)
     # a whip antenna rooted in the rear deck, on a little base
     ax, az = -0.5, -1.9
     ay = top_y(H, ax, az)
     mesh("whipBase", xf(lathe([(0.0, -0.05), (0.07, -0.05), (0.07, 0.04), (0.03, 0.07), (0, 0.07)], 10), (ax, ay, az)), "dark", R, 0)
     mesh("whip", B((ax, ay, az), (ax - 0.1, ay + 1.0, az - 0.3), 0.02, 5, True), "dark", R, 0)
-    # a door plate on each flank: a flat slab that starts inside the hull and stands proud of the curve everywhere, carrying the emblem
-    zc, hy, hz = 0.15, 0.3, 0.33
-    for side in (-1, 1):
-        xs = [side_x(H, y, z) for y in (-hy, 0, hy) for z in (zc - hz, zc, zc + hz)]
-        x_out, x_in = max(xs) + 0.05, min(xs) - 0.08
-        mesh(f"doorPlate{side}", xf(rbox((x_out - x_in) / 2, hy + 0.03, hz + 0.03, 0.15, 8, 5), (side * (x_in + x_out) / 2, 0, zc)), "dark", R, 0.015)
-        DOOR_X[side] = x_out
-    for f in FACTIONS:
-        L = pivot(f"livery_{f}", (0, 0, 0), R, role="livery", faction=f)
-        for side in (-1, 1):
-            d = side_dec(side, DOOR_X[side] + 0.003, 0.0, zc)
-            emblem(d, f, 0, 0, 0.27, 0)
-            d.build(f"emblem_{f}_{side}", L)
-
-
-DOOR_X = {}
 
 
 def build_civilian(R):
@@ -259,24 +245,30 @@ def build_civilian(R):
     mesh("luggage", xf(rbox(0.46, 0.17, 0.62, 0.35, 12, 6), (0, RY + 0.12, -0.05)), "stripe", R, 0.03)
     for z in (-0.3, 0.3):
         mesh(f"strap{z}", xf(rbox(0.475, 0.19, 0.025, 0.2, 10, 4), (0, RY + 0.12, z - 0.05)), "trim", R, 0)
-    # round headlamps and tail lamps in chrome bezels, set into the nose and tail flanks and turned to the surface
+    # round tail lamps in chrome bezels, set into the tail flanks and turned to the surface
     for sx in (-1, 1):
-        p, yaw = flank(H, sx, 0.0, 2.8)
-        q = mount(p, yaw, 0.03)
-        mesh(f"head{sx}", xf(lathe([(0, 0), (0.17, 0), (0.17, 0.06), (0, 0.06)], 14), q, (PI / 2, yaw, 0)), "lamp", R, 0)
-        mesh(f"bezel{sx}", xf(torus(0.185, 0.035, 14, 5), (q[0] + math.sin(yaw) * 0.05, q[1], q[2] + math.cos(yaw) * 0.05), (PI / 2, yaw, 0)), "trim", R, 0.008)
         p, yaw = flank(H, sx, 0.12, -3.0)
         q = mount(p, yaw, 0.03)
         mesh(f"tail{sx}", xf(lathe([(0, 0), (0.13, 0), (0.13, 0.06), (0, 0.06)], 12), q, (PI / 2, yaw, 0)), "tail", R, 0)
         mesh(f"tailBezel{sx}", xf(torus(0.145, 0.03, 12, 5), (q[0] + math.sin(yaw) * 0.05, q[1], q[2] + math.cos(yaw) * 0.05), (PI / 2, yaw, 0)), "trim", R, 0)
+    # one round headlamp on the nose cone, in a chrome bezel, its back half inside the cone (the end cap sits at z = 3.1)
+    zn = H[-1]["z"]
+    yn = H[-1].get("yc", 0.0) + (H[-1]["t"] - H[-1]["b"]) / 2
+    mesh("head", xf(lathe([(0, -0.05), (0.125, -0.05), (0.125, 0.04), (0, 0.04)], 16), (0, yn, zn), (PI / 2, 0, 0)), "lamp", R, 0)
+    mesh("headBezel", xf(torus(0.14, 0.028, 16, 5), (0, yn, zn + 0.03), (PI / 2, 0, 0)), "trim", R, 0.008)
     # chrome bumpers that wrap the nose and the tail along the hull's own flank (no bar hanging in the air)
-    def bumper(name, zs, y, tip_z):
-        """A tube along the left flank, round the tip and back up the right flank, 5 cm proud of the surface."""
+    def bumper(name, zs, y, tip_z=None):
+        """A tube along the left flank, 5 cm proud of the surface, and (with a tip) round the tip and back up the right flank;
+        without a tip, a separate piece on each flank."""
         L = [(-(side_x(H, y, z) + 0.05), y, z) for z in zs]
         Rr = [(side_x(H, y, z) + 0.05, y, z) for z in reversed(zs)]
-        pts = L + [(0.0, y, tip_z)] + Rr
-        mesh(name, tube(pts, [0.04] * len(pts), 8, True), "trim", R, 0.02)
-    bumper("bumperF", [1.9, 2.3, 2.7, 2.95], -0.1, 3.14)
+        if tip_z is None:
+            mesh(name + "L", tube(L, [0.04] * len(L), 8, True), "trim", R, 0.02)
+            mesh(name + "R", tube(Rr, [0.04] * len(Rr), 8, True), "trim", R, 0.02)
+        else:
+            pts = L + [(0.0, y, tip_z)] + Rr
+            mesh(name, tube(pts, [0.04] * len(pts), 8, True), "trim", R, 0.02)
+    bumper("bumperF", [1.9, 2.3, 2.7, 2.95], -0.1)
     bumper("bumperR", [-2.2, -2.6, -2.95, -3.15], -0.1, -3.3)
     yp = (top_y(H, 0, -3.22) + bot_y(H, 0, -3.22)) / 2 + 0.05
     mesh("plate", xf(rbox(0.22, 0.07, 0.03, 0.3, 6, 4), (0, yp, -3.22)), "roof", R, 0.012)
