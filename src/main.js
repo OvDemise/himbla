@@ -245,7 +245,7 @@ class Game {
 
     this.credits = 250;
     this.stats = { deliveries: 0, bestTrick: 0 };
-    this.upgrades = { capacitor: 0, armor: 0, dampers: 0, spinner: 0, seeker: 0, gyro: 0, cradle: 0, flak: 0, overcharge: 0, shadow: 0, jar: 0, scatter: 0, rail: 0, mortar: 0, uplink: 0, twin: 0, winch: 0 };
+    this.upgrades = { capacitor: 0, armor: 0, dampers: 0, spinner: 0, seeker: 0, gyro: 0, cradle: 0, flak: 0, overcharge: 0, shadow: 0, jar: 0, scatter: 0, rail: 0, mortar: 0, uplink: 0, twin: 0, winch: 0, cloak: 0 };
     this.load();
     this.race = new Race(this);
     this.rides = new Rides(this);

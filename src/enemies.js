@@ -842,7 +842,9 @@ export class Enemies {
           const nh = this.hunters(), skip = nh >= 3;
           const got = skip ? 1 : this.spawnSquad(1 + Math.floor(Math.random() * 2));
           this.dbgDarkTry = { at: g.time, n: (this.dbgDarkTry ? this.dbgDarkTry.n : 0) + 1, skip, got, hunters: nh }; // (dev overlay)
-          this.darkTimer = got ? randRange(20, 34) : 4; // (a failed attempt tries again soon)
+          // (Daedalus Dark-Side Cloak: +5 s per level between checks, doubled on Daedalus ground)
+          const cloak = (g.upgrades.cloak || 0) * 5 * (g.territory && g.territory.current === 'daedalus' ? 2 : 1);
+          this.darkTimer = got ? randRange(20, 34) + cloak : 4; // (a failed attempt tries again soon)
           this.pirateTimer = Math.max(this.pirateTimer, 14);
         }
       }
