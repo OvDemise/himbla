@@ -36,7 +36,8 @@ const PICK_EVERY = 0.1;  // seconds between targeting scans
 const MIN_COS = 0.35;    // how far off the reticle a target can be (cosine of the angle)
 const MIN_GAP = 4;       // too close to hook
 const MIN_STRUCT_R = 2.5; // (smaller colliders are props and rocks, not structures)
-const HOOK_LEN = 1.05;   // the grapple's length: the cable runs to its eye, this far off the surface
+const EMBED = 0.42;      // how far the claw is driven into the surface it bites
+const EYE_OUT = 1.08;    // the grapple's eye, this far back from its tip along the shank (the cable ends there)
 const SLOT = { gold: 0xffd23f, steel: 0x9aa3b2, dark: 0x2a2540, tracer: 0xff9f1c }; // (the Kepler orange tracer strand is in every cable)
 const MAX_PIECES = Math.ceil(RANGE * 1.6) + 8; // (a metre of cable each, up to where the line snaps)
 
@@ -53,15 +54,16 @@ const _hp = new THREE.Vector3();
 const _q = new THREE.Quaternion();
 const _inv = new THREE.Matrix4();
 const _ray = new THREE.Ray();
-const _box = new THREE.Box3();
 const _cols = [];
 const _eye = new THREE.Vector3();
 const _m = new THREE.Matrix4();
 const _s = new THREE.Vector3(1, 1, 1);
 const _z = new THREE.Vector3(0, 0, 1);
 const _dir = new THREE.Vector3();
+const _hn = new THREE.Vector3();
+const _nv = new THREE.Vector3();
+const _nn = new THREE.Vector3();
 const ZERO = new THREE.Vector3();
-const _localBoxes = new WeakMap();
 
 // what's worth hooking, and how heavy it is
 function massOf(v) {
@@ -73,29 +75,110 @@ function massOf(v) {
   return 6;
 }
 
-// A model's hull in its own frame (measured once), so "the nearest surface" follows it round as it turns. Only its solid,
-// visible meshes count (not the shadow blob, the glow or the flames under it), and the bottom of it is left out, so the hook
-// goes on the body and not on whatever hangs beneath.
+// ---- aiming at a model: its real meshes (not a box round them, which for a long hull with a boom and a gantry is mostly air) ----
+const _parts = new WeakMap();
+const _rc = new THREE.Raycaster();
+const _rinv = new THREE.Matrix4();
+const _im = new THREE.Matrix4();
+const _wp = new THREE.Vector3();
+const _wl = new THREE.Vector3();
+const _np = new THREE.Vector3();
+const _lc = new THREE.Vector3();
+const _wc = new THREE.Vector3();
 const _bb = new THREE.Box3();
-function localBox(root) {
-  let b = _localBoxes.get(root);
-  if (b) return b;
+const _hits = [];
+const aim = { point: new THREE.Vector3(), nrm: new THREE.Vector3(), looked: false };
+
+// A model's solid meshes (not the shadow blob, the glow or the flames), and the height below which it's underside: the
+// bottom third of its hull, so the hook goes on the body and not on whatever hangs beneath. Measured once, in its own frame.
+function partsOf(root) {
+  let p = _parts.get(root);
+  if (p) return p;
   root.updateWorldMatrix(true, true);
-  _inv.copy(root.matrixWorld).invert();
-  b = new THREE.Box3();
+  _rinv.copy(root.matrixWorld).invert();
+  const list = [], hull = new THREE.Box3();
   root.traverse((o) => {
     if (!o.isMesh || o.isInstancedMesh || !o.geometry) return;
     const m = Array.isArray(o.material) ? o.material[0] : o.material;
     if (!m || m.transparent || m.depthWrite === false || m.side === THREE.BackSide || m.blending === THREE.AdditiveBlending) return;
-    for (let p = o; p; p = p.parent) { if (!p.visible) return; if (p === root) break; }
     if (!o.geometry.boundingBox) o.geometry.computeBoundingBox();
-    _bb.copy(o.geometry.boundingBox).applyMatrix4(_m.multiplyMatrices(_inv, o.matrixWorld));
-    b.union(_bb);
+    list.push(o);
+    if (shown(o, root)) hull.union(_bb.copy(o.geometry.boundingBox).applyMatrix4(_im.multiplyMatrices(_rinv, o.matrixWorld)));
   });
-  if (b.isEmpty()) b.set(new THREE.Vector3(-1.5, -1.5, -1.5), new THREE.Vector3(1.5, 1.5, 1.5));
-  b.min.y += (b.max.y - b.min.y) * 0.3;
-  _localBoxes.set(root, b);
-  return b;
+  p = { list, cutY: hull.isEmpty() ? -Infinity : hull.min.y + (hull.max.y - hull.min.y) * 0.3 };
+  _parts.set(root, p);
+  return p;
+}
+
+function shown(o, root) {
+  for (let q = o; q; q = q.parent) { if (!q.visible) return false; if (q === root) break; }
+  return true;
+}
+
+// a hit's surface normal (world), facing the side the ray came from
+function hitNormal(h, dir, out) {
+  if (h.face) out.copy(h.face.normal).transformDirection(h.object.matrixWorld); else out.copy(dir).negate();
+  if (out.dot(dir) > 0) out.negate();
+  return out.normalize();
+}
+
+// Where the sightline meets a model's surface; failing that, the spot on it nearest the reticle (snapped onto the surface).
+// Fills `aim` (all in the pose last drawn, the meshes' own matrices being from the same pass) and returns it, or null.
+function modelHit(root, eye, look) {
+  const P = partsOf(root);
+  _rinv.copy(root.matrixWorld).invert();
+  _hits.length = 0;
+  let near = null, nearAng = Infinity;
+  for (const o of P.list) {
+    if (!shown(o, root)) continue;
+    const bb = o.geometry.boundingBox;
+    _im.copy(o.matrixWorld).invert();
+    _lo.copy(eye).applyMatrix4(_im);
+    _ld.copy(look).transformDirection(_im);
+    _ray.origin.copy(_lo);
+    _ray.direction.copy(_ld);
+    if (!bb.containsPoint(_lo) && _ray.intersectBox(bb, _hp)) {
+      _wp.copy(_hp).applyMatrix4(o.matrixWorld);
+      if (_wl.copy(_wp).applyMatrix4(_rinv).y >= P.cutY) _hits.push({ o, t: eye.distanceTo(_wp) });
+    }
+    nearestOnBox(bb, _lo, _hp);
+    _wp.copy(_hp).applyMatrix4(o.matrixWorld);
+    if (_wl.copy(_wp).applyMatrix4(_rinv).y < P.cutY) continue;
+    _to.copy(_wp).sub(eye);
+    const d = _to.length();
+    const c = d > 1e-3 ? _to.dot(look) / d : 0;
+    if (c > 0.2 && 1 - c < nearAng) { nearAng = 1 - c; near = o; _np.copy(_wp); }
+  }
+  if (_hits.length) {
+    _hits.sort((a, b) => a.t - b.t);
+    _rc.set(eye, look);
+    _rc.far = 400;
+    for (let i = 0; i < _hits.length && i < 6; i++) {
+      const h = _rc.intersectObject(_hits[i].o, false)[0];
+      if (!h || _wl.copy(h.point).applyMatrix4(_rinv).y < P.cutY) continue;
+      aim.point.copy(h.point);
+      aim.looked = true;
+      hitNormal(h, look, aim.nrm);
+      return aim;
+    }
+  }
+  if (!near) return null;
+  // the spot nearest the reticle: in from there toward the middle of that piece finds the surface under it
+  near.geometry.boundingBox.getCenter(_lc);
+  _wc.copy(_lc).applyMatrix4(near.matrixWorld);
+  _dir.copy(_wc).sub(_np);
+  const L = _dir.length();
+  aim.looked = false;
+  if (L > 1e-3) {
+    _dir.divideScalar(L);
+    _rc.set(_np, _dir);
+    _rc.far = L + 1;
+    const h = _rc.intersectObject(near, false)[0];
+    if (h) { aim.point.copy(h.point); hitNormal(h, _dir, aim.nrm); return aim; }
+  }
+  aim.point.copy(_np);
+  aim.nrm.copy(eye).sub(_np).normalize();
+  return aim;
 }
 
 // the point on (or in) box b nearest to p; from inside, the nearest face
@@ -110,26 +193,12 @@ function nearestOnBox(b, p, out) {
   return out;
 }
 
-// the surface point of a model nearest to the eye, or where the sightline meets it (returns true when it does)
-function modelPoint(root, eye, look, out) {
-  const b = localBox(root);
-  root.updateWorldMatrix(true, false);
-  _inv.copy(root.matrixWorld).invert();
-  _lo.copy(eye).applyMatrix4(_inv);
-  _ld.copy(look).transformDirection(_inv);
-  _ray.origin.copy(_lo);
-  _ray.direction.copy(_ld);
-  const hit = !b.containsPoint(_lo) && _ray.intersectBox(b, _hp);
-  if (!hit) nearestOnBox(b, _lo, _hp);
-  out.copy(_hp).applyMatrix4(root.matrixWorld);
-  return !!hit;
-}
-
-// the point on a structure's surface nearest to p (colliders: sphere, box or cylinder)
-function colliderPoint(c, p, out) {
+// the point on a structure's surface nearest to p (colliders: sphere, box or cylinder), and the surface's normal there
+function colliderPoint(c, p, out, nOut) {
   _d.copy(p).sub(c.c);
   if (c.type === 'sphere') {
     const l = _d.length() || 1;
+    nOut.copy(_d).divideScalar(l);
     return out.copy(c.c).addScaledVector(_d, c.r / l);
   }
   if (c.type === 'cyl') {
@@ -138,19 +207,20 @@ function colliderPoint(c, p, out) {
     const qh = Math.min(Math.max(h, c.y0), c.y1);
     _n.copy(_d).addScaledVector(a, -h); // (the radial part)
     const rad = _n.length();
-    const rr = (h < c.y0 || h > c.y1) ? Math.min(rad, c.r) : c.r; // (past an end: the cap; alongside: the wall)
+    const cap = h < c.y0 || h > c.y1;
     out.copy(c.c).addScaledVector(a, qh);
-    return rad > 1e-5 ? out.addScaledVector(_n, rr / rad) : out.addScaledVector(a, 0);
+    if (rad > 1e-5) out.addScaledVector(_n, (cap ? Math.min(rad, c.r) : c.r) / rad);
+    if (cap) nOut.copy(a).multiplyScalar(h > c.y1 ? 1 : -1); else if (rad > 1e-5) nOut.copy(_n).divideScalar(rad); else nOut.copy(a);
+    return out;
   }
-  const l = [_d.dot(c.ax), _d.dot(c.ay), _d.dot(c.az)], h = [c.hx, c.hy, c.hz];
-  let inside = true;
-  for (let i = 0; i < 3; i++) { if (Math.abs(l[i]) > h[i]) inside = false; l[i] = Math.max(-h[i], Math.min(h[i], l[i])); }
-  if (inside) { // (from inside: out through the nearest face)
-    let k = 0, best = Infinity;
-    const lp = [_d.dot(c.ax), _d.dot(c.ay), _d.dot(c.az)];
-    for (let i = 0; i < 3; i++) { const gap = h[i] - Math.abs(lp[i]); if (gap < best) { best = gap; k = i; } }
-    l[k] = Math.sign(lp[k] || 1) * h[k];
-  }
+  const axes = [c.ax, c.ay, c.az], h = [c.hx, c.hy, c.hz];
+  const lp = [_d.dot(c.ax), _d.dot(c.ay), _d.dot(c.az)];
+  let k = 0, best = -Infinity;
+  for (let i = 0; i < 3; i++) { const ex = Math.abs(lp[i]) - h[i]; if (ex > best) { best = ex; k = i; } } // (the face it's nearest, or past most)
+  const l = lp.map((v, i) => Math.max(-h[i], Math.min(h[i], v)));
+  const sg = Math.sign(lp[k] || 1);
+  if (best < 0) l[k] = sg * h[k]; // (from inside: out through that face)
+  nOut.copy(axes[k]).multiplyScalar(sg);
   return out.copy(c.c).addScaledVector(c.ax, l[0]).addScaledVector(c.ay, l[1]).addScaledVector(c.az, l[2]);
 }
 
@@ -196,16 +266,21 @@ export class Winch {
     const out = [];
     const tr = g.world.traffic;
     const near = (p) => p.distanceToSquared(P.pos) < (RANGE + 25) * (RANGE + 25);
-    const traffic = (v) => ({
-      obj: v, mass: massOf(v), flying: !v.piece && !v.offroad && !!v.path, root: v.root,
-      pos: () => v.pos,
-      vel: () => v.vel,
+    // (a land-train's trailers are targets in their own right: each has a model and a position, and pulling on one pulls the whole train)
+    const traffic = (v, t = null) => ({
+      obj: t || v, mass: massOf(v), flying: !v.piece && !v.offroad && !!v.path, root: t ? t.root : v.root,
+      pos: () => (t ? t.plat.pos : v.pos),
+      vel: () => (t ? t.plat.vel : v.vel),
       alive: () => v.root.visible && v.state !== 'dead' && v.state !== 'wreck' && !(v.captured > 0),
       push: (J) => { v.tug ||= new THREE.Vector3(); v.tugVel ||= new THREE.Vector3(); v.tugVel.addScaledVector(J, 1 / massOf(v)); },
       shift: (d) => { v.tug ||= new THREE.Vector3(); v.tugVel ||= new THREE.Vector3(); v.tug.add(d); },
     });
     if (tr) {
-      for (const v of tr.vehicles) if (v.root && v.root.visible && v.state !== 'dead' && near(v.pos)) out.push(traffic(v));
+      for (const v of tr.vehicles) {
+        if (!v.root || !v.root.visible || v.state === 'dead') continue;
+        if (near(v.pos)) out.push(traffic(v));
+        if (v.trailers) for (const t of v.trailers) if (t.root && t.root.visible && near(t.plat.pos)) out.push(traffic(v, t));
+      }
       for (const c of tr.crawlers || []) if (c.root && c.root.visible && near(c.pos)) out.push(traffic(c));
     }
     // rovers of every side (pirate rigs, patrols, allies, the bosses, Kade's truck): yank them around in a fight
@@ -232,11 +307,13 @@ export class Winch {
     return { obj: { kind: 'structure' }, col: c, mass: 1e6, flying: false, root: null, pos: () => c.mid, vel: () => ZERO, alive: () => true, push: () => {}, shift: () => {} };
   }
 
-  // A hook point on target T, kept in the frame of what you see (its model; a structure has none and keeps the world point as
-  // an offset from its middle), so it rides the vehicle however it bobs, banks or is dragged.
-  handle(T, point, looked, dist) {
-    const off = T.root ? T.root.worldToLocal(point.clone()) : point.clone().sub(T.pos());
-    return { target: T, off, goal: off.clone(), looked, dist, len: dist, t: 0, reel: 0 };
+  // A hook point on target T, and the surface's normal there, kept in the frame of what you see (its model; a structure has none and
+  // keeps them as they are, the point as an offset from its middle), so the hook rides the vehicle however it bobs, banks or is dragged.
+  handle(T, point, nrm, looked, dist) {
+    let off, n;
+    if (T.root) { _rinv.copy(T.root.matrixWorld).invert(); off = point.clone().applyMatrix4(_rinv); n = nrm.clone().transformDirection(_rinv); } // (the pose it was found in)
+    else { off = point.clone().sub(T.pos()); n = nrm.clone(); }
+    return { target: T, off, goal: off.clone(), nrm: n, looked, dist, len: dist, t: 0, reel: 0 };
   }
 
   // where a handle's hook point is now
@@ -244,6 +321,13 @@ export class Winch {
     const T = h.target;
     if (T.root) return T.root.localToWorld(out.copy(h.off));
     return out.copy(h.off).add(T.pos());
+  }
+
+  // which way the surface faces there now
+  normalOf(h, out) {
+    out.copy(h.nrm);
+    if (h.target.root) out.applyQuaternion(h.target.root.getWorldQuaternion(_q));
+    return out.normalize();
   }
 
   // What Z would hook: the nearest surface of whatever the reticle is on; failing that, whatever's closest to
@@ -256,7 +340,7 @@ export class Winch {
     const look = g.camera.getWorldDirection(_look);
     const prev = this.cand && this.cand.target; // (what's marked now keeps a lead, so the lock doesn't flicker between two near ones)
     const best = []; // (the top four, best first)
-    const offer = (T, col, looked) => {
+    const offer = (T, col, looked, nrm) => {
       const dP = P.center.distanceTo(_pt);
       if (dP > RANGE || dP < MIN_GAP) return;
       _to.copy(_pt).sub(eye);
@@ -266,26 +350,28 @@ export class Winch {
       const sticky = prev && (col ? prev.col === col : T.obj === prev.obj) ? 0.6 : 0;
       const score = (looked ? 10 : cos * 4) - dP / RANGE + sticky;
       if (best.length >= 4 && score <= best[3].score) return;
-      best.push({ T, col, looked, dP, score, point: _pt.clone() });
+      best.push({ T, col, looked, dP, score, point: _pt.clone(), nrm: nrm.clone() });
       best.sort((p, q) => q.score - p.score);
       if (best.length > 4) best.pop();
     };
     for (const T of this.targets()) {
       if (!T.alive()) continue;
-      const looked = T.root ? modelPoint(T.root, eye, look, _pt) : (_pt.copy(T.pos()), false);
-      offer(T, null, looked);
+      if (T.root) {
+        const hit = modelHit(T.root, eye, look);
+        if (hit) { _pt.copy(hit.point); offer(T, null, hit.looked, hit.nrm); }
+      } else { _pt.copy(T.pos()); offer(T, null, false, _nv.copy(eye).sub(_pt).normalize()); }
     }
     for (const c of g.colliders.query(P.pos, RANGE + 20, _cols)) {
       if (c.platform || c.br < MIN_STRUCT_R) continue;
       if (c.mid.distanceTo(P.pos) - c.br > RANGE) continue;
       const t = rayCollider(c, eye, look, RANGE + 80);
       const looked = t < Infinity;
-      if (looked) _pt.copy(look).multiplyScalar(t).add(eye); else colliderPoint(c, eye, _pt);
-      offer(null, c, looked);
+      if (looked) { _pt.copy(look).multiplyScalar(t).add(eye); colliderPoint(c, _pt, _wp, _nv); _nv.normalize(); } else colliderPoint(c, eye, _pt, _nv);
+      offer(null, c, looked, _nv);
     }
     for (const b of best) {
       if (!g.enemies.clearShot(eye, b.point)) continue;
-      return this.handle(b.T || this.structure(b.col), b.point, b.looked, b.dP);
+      return this.handle(b.T || this.structure(b.col), b.point, b.nrm, b.looked, b.dP);
     }
     return null;
   }
@@ -405,20 +491,19 @@ export class Winch {
     }
     o.dist = this.hand(_a).distanceTo(this.anchorOf(o, _b));
     if (o.t > HOLD - 2 && Math.floor(o.t * 4) !== Math.floor((o.t - dt) * 4)) g.audio.tone(1200, 0.05, 'square', 0.04); // (running out)
-    this.drawRope(dt, this.hand(_a), this.anchorOf(o, _b), o.len);
+    this.drawRope(dt, this.hand(_a), this.anchorOf(o, _b), o.len, this.normalOf(o, _nn));
   }
 
   // A verlet cable between your hand and the hook: dead straight when taut, a stiff steel hang when it's slack.
-  drawRope(dt, a, b, len) {
+  drawRope(dt, a, b, len, nrm = null) {
     const g = this.game;
     const pts = this.pts, old = this.old;
     const up = upAt(a, new THREE.Vector3());
-    const hookEnd = b;
-    b = _eye.copy(a).sub(hookEnd); // (the cable ends at the grapple's eye, a hook's length off the surface)
-    const bl = b.length();
-    b.multiplyScalar(bl > HOOK_LEN * 3 ? HOOK_LEN / bl : 0).add(hookEnd);
+    const hookEnd = b; // (the surface point the claw is driven into, along the surface's normal; the cable runs to the grapple's eye)
+    const N = (nrm ? _hn.copy(nrm) : _hn.copy(a).sub(hookEnd)).normalize();
+    b = _eye.copy(hookEnd).addScaledVector(N, EYE_OUT - EMBED);
     const dist = a.distanceTo(b);
-    const rest = Math.max(len - HOOK_LEN, dist) / SEG;
+    const rest = Math.max(len - (EYE_OUT - EMBED), dist) / SEG;
     const gdt = 3.5 * dt * dt;
     for (let i = 1; i < SEG; i++) {
       const p = pts[i], q = old[i];
@@ -442,8 +527,8 @@ export class Winch {
       pts[0].copy(a); pts[SEG].copy(b);
     }
     this.hook.visible = true;
-    this.hook.position.copy(hookEnd);
-    this.hook.lookAt(a); // (the claw faces into the surface, the eye toward you)
+    this.hook.position.copy(hookEnd).addScaledVector(N, -EMBED);
+    this.hook.quaternion.setFromUnitVectors(_z, N); // (the claw faces into the surface, the eye out along its normal)
     if (!this.strand) return;
     // the cable model, a metre at a time, laid along the line (each stretched to the length of its stretch of it)
     const curve = new THREE.CatmullRomCurve3(pts);
