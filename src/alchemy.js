@@ -693,78 +693,7 @@ export class Alchemy {
     this.mutMeshes = [];
     const M = P.model;
     const add = (parent, mesh) => { parent.add(mesh); this.mutMeshes.push(mesh); return mesh; };
-    if (has('wheels')) for (const leg of [M.legL, M.legR]) {
-      const w = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.32, 0.22, 12).rotateZ(Math.PI / 2), toon(0x221d33));
-      ink(w, 0.03);
-      w.position.set(0, -0.98, 0.05);
-      add(leg, w);
-    }
-    if (has('wings')) for (const s of [-1, 1]) {
-      const wing = new THREE.Mesh(new THREE.PlaneGeometry(1.6, 0.9), new THREE.MeshBasicMaterial({ color: 0xb8e986, transparent: true, opacity: 0.55, side: THREE.DoubleSide }));
-      wing.position.set(s * 0.95, 0.85, -0.45);
-      wing.rotation.y = s * 0.5;
-      wing.userData.flap = s;
-      add(M.torso, wing);
-    }
-    if (has('arms')) for (const s of [-1, 1]) {
-      const arm = new THREE.Mesh(new THREE.CapsuleGeometry(0.09, 0.42, 3, 6), toon(0xff4f2e));
-      ink(arm, 0.03);
-      arm.position.set(s * 0.48, 0.28, 0.1);
-      arm.rotation.z = s * 0.9;
-      add(M.torso, arm);
-    }
-    if (has('void')) {
-      const aura = new THREE.Mesh(new THREE.SphereGeometry(1.4, 16, 12), new THREE.MeshBasicMaterial({ color: 0x7b2ff7, transparent: true, opacity: 0.16, depthWrite: false, blending: THREE.AdditiveBlending }));
-      aura.position.y = 0.6;
-      add(M.torso, aura);
-    }
-    if (has('stone')) for (let i = 0; i < 4; i++) {
-      const sp = new THREE.Mesh(new THREE.OctahedronGeometry(0.18, 0), glow(0x2ee6ff));
-      sp.scale.set(0.6, 1.8, 0.6);
-      // along the flanks of the backpack, clear of the scarf, crate and jar
-      sp.position.set((i < 2 ? -1 : 1) * 0.36, 0.8 - (i % 2) * 0.26, -0.28);
-      sp.rotation.z = (i < 2 ? 1 : -1) * 1.0;
-      add(M.torso, sp);
-    }
-    if (has('claws')) for (const arm of [M.armL, M.armR]) for (let k = 0; k < 3; k++) {
-      const c = new THREE.Mesh(new THREE.ConeGeometry(0.04, 0.22, 4), toon(0xfff4e0));
-      c.position.set((k - 1) * 0.06, -0.78, 0.06);
-      c.rotation.x = Math.PI;
-      add(arm, c);
-    }
-    if (has('roots')) for (const leg of [M.legL, M.legR]) for (let k = 0; k < 3; k++) {
-      const r = new THREE.Mesh(new THREE.ConeGeometry(0.035, 0.5, 4), toon(0x6b4a2a));
-      r.position.set((k - 1) * 0.09, -0.7, -0.1);
-      r.rotation.set(-0.5, 0, (k - 1) * 0.6);
-      add(leg, r);
-      const leaf = new THREE.Mesh(new THREE.ConeGeometry(0.08, 0.22, 4), toon(0x5fbf4a));
-      leaf.position.set((k - 1) * 0.12, -0.35, 0.12);
-      leaf.rotation.z = (k - 1) * 0.8;
-      add(leg, leaf);
-    }
-    if (has('psi')) for (const s of [-1, 1]) {
-      const ant = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.02, 0.4, 5), toon(0x7dd87a));
-      ant.position.set(s * 0.12, 0.52, -0.02);
-      ant.rotation.z = -s * 0.35;
-      add(M.head, ant);
-      const tip = new THREE.Mesh(new THREE.SphereGeometry(0.05, 8, 6), glow(0xfff27a));
-      tip.position.set(s * 0.19, 0.7, -0.02);
-      add(M.head, tip);
-    }
-    if (has('hawk')) {
-      const lens = new THREE.Mesh(new THREE.TorusGeometry(0.11, 0.025, 6, 14), toon(0xffd23f));
-      lens.position.set(0.17, 0.25, 0.38);
-      add(M.head, lens);
-      const glass = new THREE.Mesh(new THREE.CircleGeometry(0.1, 14), glow(0xfff6a8));
-      glass.position.set(0.17, 0.25, 0.39);
-      add(M.head, glass);
-    }
-    if (has('blood')) {
-      const band = new THREE.Mesh(new THREE.TorusGeometry(0.36, 0.06, 6, 16), toon(0xd7263d));
-      band.rotation.x = Math.PI / 2;
-      band.position.y = 0.12;
-      add(M.head, band);
-    }
+    buildMutationMeshes(M, has, add);
   }
 
   // ---------- per-frame ----------
@@ -856,18 +785,7 @@ export class Alchemy {
   addFollower(kind) {
     const g = this.game;
     const P = g.player;
-    let root;
-    if (kind === 'rock') {
-      root = new THREE.Group();
-      const body = new THREE.Mesh(new THREE.DodecahedronGeometry(1, 0), toon(0x8d8898));
-      ink(body, 0.08);
-      body.position.y = 1;
-      root.add(body);
-      for (const s of [-1, 1]) { const eye = new THREE.Mesh(new THREE.SphereGeometry(0.18, 6, 4), glow(0x2ee6ff)); eye.position.set(s * 0.35, 1.3, 0.85); root.add(eye); }
-    } else {
-      const f = makeFigure({ suit: 0x8a6a4a, helmet: 0x6b5a3a, visor: 0xffd23f, scale: 0.7 });
-      root = f.root;
-    }
+    const root = makeFollowerModel(kind);
     root.position.copy(P.pos);
     g.scene.add(root);
     this.followers.push({ root, kind, vy: 0, h: 0, t: 0 });
@@ -994,6 +912,101 @@ export class Alchemy {
     if (buff) parts.push(`<div class="buffs">${buff}</div>`);
     if (this.mutations.length) parts.push(`<div class="muts">${this.mutations.map((k) => MUTATIONS[k].name).join(' · ')}</div>`);
     return parts.join('');
+  }
+}
+
+// A pet from the reactor: 'rock' = the slick rock with eyes, anything else the dirt golem.
+// (Alchemy.addFollower calls it; the Asset Row shows both without a game.)
+export function makeFollowerModel(kind) {
+  let root;
+  if (kind === 'rock') {
+    root = new THREE.Group();
+    const body = new THREE.Mesh(new THREE.DodecahedronGeometry(1, 0), toon(0x8d8898));
+    ink(body, 0.08);
+    body.position.y = 1;
+    root.add(body);
+    for (const s of [-1, 1]) { const eye = new THREE.Mesh(new THREE.SphereGeometry(0.18, 6, 4), glow(0x2ee6ff)); eye.position.set(s * 0.35, 1.3, 0.85); root.add(eye); }
+  } else {
+    const f = makeFigure({ suit: 0x8a6a4a, helmet: 0x6b5a3a, visor: 0xffd23f, scale: 0.7 });
+    root = f.root;
+  }
+  return root;
+}
+
+// The look of the mutations: builds each owned mutation's meshes on the runner model M through add(parent, mesh).
+// (Alchemy.applyMutations calls it; the Asset Row shows each one without a game.)
+export function buildMutationMeshes(M, has, add) {
+  if (has('wheels')) for (const leg of [M.legL, M.legR]) {
+    const w = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.32, 0.22, 12).rotateZ(Math.PI / 2), toon(0x221d33));
+    ink(w, 0.03);
+    w.position.set(0, -0.98, 0.05);
+    add(leg, w);
+  }
+  if (has('wings')) for (const s of [-1, 1]) {
+    const wing = new THREE.Mesh(new THREE.PlaneGeometry(1.6, 0.9), new THREE.MeshBasicMaterial({ color: 0xb8e986, transparent: true, opacity: 0.55, side: THREE.DoubleSide }));
+    wing.position.set(s * 0.95, 0.85, -0.45);
+    wing.rotation.y = s * 0.5;
+    wing.userData.flap = s;
+    add(M.torso, wing);
+  }
+  if (has('arms')) for (const s of [-1, 1]) {
+    const arm = new THREE.Mesh(new THREE.CapsuleGeometry(0.09, 0.42, 3, 6), toon(0xff4f2e));
+    ink(arm, 0.03);
+    arm.position.set(s * 0.48, 0.28, 0.1);
+    arm.rotation.z = s * 0.9;
+    add(M.torso, arm);
+  }
+  if (has('void')) {
+    const aura = new THREE.Mesh(new THREE.SphereGeometry(1.4, 16, 12), new THREE.MeshBasicMaterial({ color: 0x7b2ff7, transparent: true, opacity: 0.16, depthWrite: false, blending: THREE.AdditiveBlending }));
+    aura.position.y = 0.6;
+    add(M.torso, aura);
+  }
+  if (has('stone')) for (let i = 0; i < 4; i++) {
+    const sp = new THREE.Mesh(new THREE.OctahedronGeometry(0.18, 0), glow(0x2ee6ff));
+    sp.scale.set(0.6, 1.8, 0.6);
+    // along the flanks of the backpack, clear of the scarf, crate and jar
+    sp.position.set((i < 2 ? -1 : 1) * 0.36, 0.8 - (i % 2) * 0.26, -0.28);
+    sp.rotation.z = (i < 2 ? 1 : -1) * 1.0;
+    add(M.torso, sp);
+  }
+  if (has('claws')) for (const arm of [M.armL, M.armR]) for (let k = 0; k < 3; k++) {
+    const c = new THREE.Mesh(new THREE.ConeGeometry(0.04, 0.22, 4), toon(0xfff4e0));
+    c.position.set((k - 1) * 0.06, -0.78, 0.06);
+    c.rotation.x = Math.PI;
+    add(arm, c);
+  }
+  if (has('roots')) for (const leg of [M.legL, M.legR]) for (let k = 0; k < 3; k++) {
+    const r = new THREE.Mesh(new THREE.ConeGeometry(0.035, 0.5, 4), toon(0x6b4a2a));
+    r.position.set((k - 1) * 0.09, -0.7, -0.1);
+    r.rotation.set(-0.5, 0, (k - 1) * 0.6);
+    add(leg, r);
+    const leaf = new THREE.Mesh(new THREE.ConeGeometry(0.08, 0.22, 4), toon(0x5fbf4a));
+    leaf.position.set((k - 1) * 0.12, -0.35, 0.12);
+    leaf.rotation.z = (k - 1) * 0.8;
+    add(leg, leaf);
+  }
+  if (has('psi')) for (const s of [-1, 1]) {
+    const ant = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.02, 0.4, 5), toon(0x7dd87a));
+    ant.position.set(s * 0.12, 0.52, -0.02);
+    ant.rotation.z = -s * 0.35;
+    add(M.head, ant);
+    const tip = new THREE.Mesh(new THREE.SphereGeometry(0.05, 8, 6), glow(0xfff27a));
+    tip.position.set(s * 0.19, 0.7, -0.02);
+    add(M.head, tip);
+  }
+  if (has('hawk')) {
+    const lens = new THREE.Mesh(new THREE.TorusGeometry(0.11, 0.025, 6, 14), toon(0xffd23f));
+    lens.position.set(0.17, 0.25, 0.38);
+    add(M.head, lens);
+    const glass = new THREE.Mesh(new THREE.CircleGeometry(0.1, 14), glow(0xfff6a8));
+    glass.position.set(0.17, 0.25, 0.39);
+    add(M.head, glass);
+  }
+  if (has('blood')) {
+    const band = new THREE.Mesh(new THREE.TorusGeometry(0.36, 0.06, 6, 16), toon(0xd7263d));
+    band.rotation.x = Math.PI / 2;
+    band.position.y = 0.12;
+    add(M.head, band);
   }
 }
 

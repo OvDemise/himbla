@@ -100,7 +100,7 @@ export function monolithTeleport(g, kmh = null) {
 
 // ---------- echo followers ----------
 
-function holoMaterial() {
+export function holoMaterial() {
   // (ordinary alpha blending: added on top of the pale ground a cyan hologram just burns out to white)
   return new THREE.MeshBasicMaterial({ color: 0x3fd8ff, transparent: true, opacity: 0.5, depthWrite: false });
 }
