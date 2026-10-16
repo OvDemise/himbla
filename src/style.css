@@ -407,8 +407,8 @@ body:has(#title:not(.hidden)) #hud { visibility: hidden; }
 #racepanel .race-row span { margin-left: auto; color: var(--ui-muted); font-size: 13px; }
 #racepanel .race-row.mine { background: rgba(125, 255, 58, 0.18); font-weight: bold; }
 @media (max-width: 600px) { #racepanel { width: calc(100% - 32px); top: 110px; } }
-#scanchip.chip { position: absolute; top: 16px; left: 50%; transform: translateX(-50%); color: #fff; background: #b8001a; border-color: #ff4a5e; font-size: 9px; white-space: nowrap; width: max-content; animation: blink 0.8s steps(2) infinite; }
-@keyframes scanpulse { from { opacity: 1; } to { opacity: 0.6; } }
+#scanchip.chip { position: absolute; top: 16px; left: 50%; transform: translateX(-50%); color: #fff; background: #b8001a; border-color: #ff4a5e; font-size: 9px; white-space: nowrap; width: max-content; animation: scanpulse 1.3s ease-in-out infinite alternate; }
+@keyframes scanpulse { from { opacity: 1; } to { opacity: 0.45; } }
 .swatch { display: inline-block; width: 12px; height: 12px; border: 2px solid #05030c; margin-right: 4px; vertical-align: -2px; }
 
 /* ---- settings ---- */
