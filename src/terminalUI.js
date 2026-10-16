@@ -60,26 +60,28 @@ export const ICONS = {
     '..########..',
   ],
   turret: [
-    '.......###..',
-    '......####..',
-    '...#####o...',
-    '..#oooooo#..',
-    '..#o++++o#..',
-    '.#oooooooo#.',
-    '.##########.',
-    '.#o#o#o#o#o.',
+    '..#####.....',
+    '.#ooooo#####',
+    '.#o+++o#....',
+    '.#ooooo#####',
+    '..#####.....',
+    '...#oo#.....',
+    '...#oo#.....',
+    '...#oo#.....',
+    '..#oooo#....',
+    '.########...',
   ],
   turret2: [
-    '....###.....',
-    '...####.....',
-    '.#####o.....',
-    '#oooooo#....',
-    '#o++++o#....',
-    '########.+++',
-    '..#oo#.....+',
-    '..#oo#...+++',
-    '..#oo#...+..',
-    '.######..+++',
+    '..#####.....',
+    '.#ooooo#####',
+    '.#o+++o#....',
+    '.#ooooo#####',
+    '..#####.....',
+    '...#oo#..+++',
+    '...#oo#....+',
+    '...#oo#..+++',
+    '..#oooo#.+..',
+    '.########+++',
   ],
   market: [
     '############',
@@ -148,7 +150,7 @@ export function terminalPage(s) {
       <div class="otm-d-main">
         <div class="otm-d-top"><span class="otm-d-name">${esc(d.name)}</span><span class="otm-pill ${d.state}">${esc(d.stateText)}</span></div>
         <p class="otm-d-desc">${esc(d.desc)}</p>
-        <div class="otm-rows">${d.rows.map(([k, v, tone]) => `<div class="otm-row"><span>${esc(k)}</span><b${tone ? ` class="${tone}"` : ''}>${esc(v)}</b></div>`).join('')}</div>
+        <div class="otm-rows">${d.rows.map(([k, v, tone]) => { const cls = [tone, /[₵5]/.test(v) ? 'cr' : ''].filter(Boolean).join(' '); return `<div class="otm-row"><span>${esc(k)}</span><b${cls ? ` class="${cls}"` : ''}>${esc(v)}</b></div>`; }).join('')}</div>
         ${d.meter ? `<div class="otm-meter"><div class="otm-bar"><i style="width:${Math.round(Math.max(0, Math.min(1, d.meter.v)) * 100)}%"></i></div><span>${esc(d.meter.text)}</span></div>` : ''}
         ${a ? `<button type="button" class="otm-act ${a.tone || ''}" data-act="${esc(a.id)}">${a.key ? `<span class="otm-key">${a.key}</span>` : ''}<span>${esc(a.label)}</span></button>` : (d.note ? `<div class="otm-note">${esc(d.note)}</div>` : '')}
         <div class="otm-msg ${d.msg ? d.msgTone || '' : 'empty'}" role="status">${d.msg ? esc(d.msg) : ''}</div>
@@ -180,7 +182,11 @@ export function wireTerminal(root, { onSelect, onAct }) {
     const t = e.target.closest('[data-sel], [data-act]');
     if (!t || !root.contains(t)) return;
     e.stopPropagation();
+    const act = root.querySelector('.otm-act');
     if (t.dataset.act) onAct(t.dataset.act);
+    // A on a controller is a click with no mouse behind it (detail 0), and the highlight has already selected the tile it is on:
+    // D-pad Down from a top-row tile lands on the tile below, never on the button, so A on the selected tile presses its button
+    else if (e.detail === 0 && document.body.classList.contains('pad-on') && t.classList.contains('sel') && act) onAct(act.dataset.act);
     else onSelect(t.dataset.sel);
   });
   // a controller's highlight fires a synthetic mouseover on what it lands on (gamepad.js setFocus): the detail follows it
@@ -214,5 +220,10 @@ export function stepSel(root, sel, code) {
   const step = { ArrowRight: 1, KeyD: 1, ArrowLeft: -1, KeyA: -1, ArrowDown: cols, KeyS: cols, ArrowUp: -cols, KeyW: -cols }[code];
   if (step === undefined) return null;
   const i = Math.max(0, ids.indexOf(sel));
-  return ids[Math.max(0, Math.min(ids.length - 1, i + step))];
+  let j = i + step;
+  if (Math.abs(step) > 1 && (j < 0 || j >= ids.length)) { // a vertical move off the grid: a short last row takes you to its last tile, the edge rows stay put
+    const lastRow = Math.floor((ids.length - 1) / cols);
+    j = j >= ids.length && Math.floor(i / cols) < lastRow ? ids.length - 1 : i;
+  }
+  return ids[Math.max(0, Math.min(ids.length - 1, j))];
 }

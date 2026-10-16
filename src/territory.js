@@ -322,7 +322,7 @@ export class Territory {
     o.model.traverse((m) => {
       if (!m.userData.outpostGun) return;
       m.rotation.order = 'YXZ'; // clone() does not copy the Euler order: pitch about the head's own x, then yaw
-      o.guns.push({ head: m, root: m.parent, cd: 0.5 + 0.45 * o.guns.length, scanT: 0, target: null, skipT: null, skipCd: 0, side: 1 });
+      o.guns.push({ head: m, root: m.parent, cd: 0.5 + 0.45 * o.guns.length, scanT: 0, target: null, skips: new WeakMap(), side: 1 });
     });
   }
 
@@ -338,12 +338,12 @@ export class Territory {
       head.getWorldPosition(_gp);
       let tg = gun.target;
       if (tg && (tg.dead || tg.center.distanceTo(_gp) > GUN.range * 1.05)) tg = gun.target = null;
-      gun.scanT -= dt; gun.skipCd -= dt; gun.cd = Math.max(-1, gun.cd - dt);
+      gun.scanT -= dt; gun.cd = Math.max(-1, gun.cd - dt);
       if (!tg && gun.scanT <= 0) {
         gun.scanT = 0.4;
         let bd = GUN.range;
         for (const e of E.list) {
-          if (!E.gunTarget(e) || (e === gun.skipT && gun.skipCd > 0)) continue;
+          if (!E.gunTarget(e) || gun.skips.get(e) > g.time) continue; // (no line of fire to it a moment ago)
           let d = e.center.distanceTo(_gp);
           if (o.guns.some((x) => x !== gun && x.target === e)) d += 80; // a second gun prefers another raider
           if (d < bd) { bd = d; tg = e; }
@@ -355,6 +355,8 @@ export class Territory {
         _gl.copy(tg.center).addScaledVector(tg.body.vel, _gp.distanceTo(tg.center) / GUN.speed);
         gun.root.worldToLocal(_gl).sub(head.position); // (never read root.rotation.y: clone() re-decomposes it)
         yawErr = wrapPi(Math.atan2(_gl.x, _gl.z) - head.rotation.y);
+        // (the pitch is clamped to the mount's limits, -0.5..0.6 rad: the lower stop keeps the barrel clear of the deck rail. A raider inside ~10 m of
+        // the stand, or well above it, is still engaged: its shell leaves the tip along the aim-lead line rather than exactly along the barrel)
         pitchErr = THREE.MathUtils.clamp(Math.atan2(-_gl.y, Math.hypot(_gl.x, _gl.z)), -0.5, 0.6) - head.rotation.x; // (+rotation.x = barrel down)
         head.rotation.y += THREE.MathUtils.clamp(yawErr, -GUN.turn * dt, GUN.turn * dt);
         head.rotation.x += THREE.MathUtils.clamp(pitchErr, -GUN.pitchTurn * dt, GUN.pitchTurn * dt);
@@ -367,7 +369,7 @@ export class Territory {
       gun.side = -gun.side;
       head.localToWorld(_gt.set(gun.side * GUN.tip[0], GUN.tip[1], GUN.tip[2]));
       gun.cd = GUN.interval;
-      if (!E.clearShot(_gt, tg.center)) { gun.cd = 0.3; gun.skipT = tg; gun.skipCd = 3; gun.target = null; continue; }
+      if (!E.clearShot(_gt, tg.center)) { gun.cd = 0.3; gun.skips.set(tg, g.time + 3); gun.target = null; continue; }
       const dir = E.aimLead(_gt, GUN.speed, 0.01, tg.center, tg.body.vel);
       g.projectiles.fire('mil', _gt, dir.multiplyScalar(GUN.speed), { damage: GUN.damage, splash: GUN.splash, color: 0xffb02e, size: 0.5, knock: 0.6, spare: true });
       g.fx.spawn(_gt, _gf.set(0, 0, 1).transformDirection(head.matrixWorld).multiplyScalar(5), { color: 0xffe08a, size: 0.9, life: 0.12, count: 3, spread: 1.5, drag: 3 });

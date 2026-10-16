@@ -463,10 +463,13 @@ class Game {
     if (!(opts.stay && this.state === 'dialog')) this.openModal('dialog');
     this.dialogButtons = buttons;
     this.dialogKey = opts.onKey || null;
+    this.dialogQuiet = opts.quiet ? performance.now() + opts.quiet : 0; // ms during which only the last choice (CLOSE) and Escape act
     this.hud.dialog(title, text, buttons, (i) => this.pickDialog(i), opts);
   }
 
   pickDialog(i, esc = false) {
+    // the page just answered a press in place: the second press of a double-click or double-tap isn't meant for what now sits under it
+    if (!esc && this.dialogQuiet > performance.now() && i < this.dialogButtons.length - 1) return;
     const b = this.dialogButtons && this.dialogButtons[i];
     if (b && b.keep) { if (b.fn) b.fn(); return; } // (keep: the choice repaints its page itself instead of closing the dialog)
     this.closeModal(esc);

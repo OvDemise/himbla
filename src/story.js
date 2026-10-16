@@ -38,7 +38,7 @@ export const TECH = {
 export const MODULES = {
   greenhouse: { name: 'Greenhouse', cost: 600, icon: 'greenhouse', tint: '#7dff6a', feature: 'Heals you within 60 m', desc: 'Heals you while you are nearby.' },
   clinic: { name: 'Clinic', cost: 800, icon: 'clinic', tint: '#ff2a4a', feature: 'K.O. respawn point', desc: 'You redeploy here after a K.O. (nearest clinic wins).' },
-  beacon: { name: 'Beacon Tower', cost: 700, icon: 'beacon', tint: '#2ee6ff', feature: 'Charts 1.5 km · fast travel', desc: 'Charts 1.5 km of map around it and links to your other beacons for fast travel.' },
+  beacon: { name: 'Beacon Tower', cost: 700, icon: 'beacon', tint: '#2ee6ff', feature: 'Charts the map · fast travel', desc: 'Charts a wide circle of map around it and links to your other beacons for fast travel.' },
   turret: { name: 'Militia Turret', cost: 900, icon: 'turret', tint: '#ff9f1c', feature: 'Shoots pirates within 300 m', desc: 'A manned gun on a tall stand. Shoots pirates within 300 m.' },
   turret2: { name: 'Second Militia Turret', cost: 900, needs: 'turret', icon: 'turret2', tint: '#ff9f1c', feature: 'A second gun by the gate', desc: 'A second gun on a stand of its own beside the gate. Shoots pirates within 300 m.' },
   market: { name: 'Market Stall', cost: 1200, icon: 'market', tint: '#ff2e88', feature: '₵40 a minute, up to ₵800', desc: 'Earns ₵40 a minute (up to ₵800) to collect at the terminal.' },
@@ -1793,11 +1793,11 @@ export class Story {
       stats: [{ k: 'CREDITS', v: `₵${credits}`, tone: 'gold' }, { k: 'PLOTS BUILT', v: `${plots} / ${PLOTS}` }, { k: 'MARKET BANK', v: has('market') ? `₵${bank} / ₵${BANK_CAP}` : '—' }],
       tiles, sel, detail,
       closeKey: acts.length + 1,
-      foot: { kb: `Click a building · 1-${acts.length || 1} do it · Arrows pick · Enter acts · Esc closes`, pad: `${glyphHtml(['A'])} pick a building, then its button · ${glyphHtml(['B'])} close` },
+      foot: { kb: `Click a building · 1-${acts.length || 1} do it · Arrows pick · Enter acts · Esc closes`, pad: `${glyphHtml(['A'])} do what the highlighted building offers · ${glyphHtml(['B'])} close` },
     };
     const settle = keepScroll();
     g.dialog(spec.title, terminalPage(spec), buttons, {
-      raw: true, cls: 'otm-dlg', stay: true,
+      raw: true, cls: 'otm-dlg', stay: true, quiet: msg ? 400 : 0, // (quiet: the second click of a double-click on BUILD must not press whatever the repaint put under it)
       onKey: (code) => {
         const root = document.querySelector('#dialog .otm');
         if (!root) return false;
@@ -1819,7 +1819,7 @@ export class Story {
     const T = g.territory;
     const others = this.myOutposts().filter((o) => o !== from && o.modules.includes('beacon'));
     if (!others.length) { g.hud.toast('Build a beacon at another outpost to link them.', 2.5); return; }
-    g.dialog('BEACON TRAVEL', 'Where to?', others.map((o, i) => ({ label: `${i + 1} · ${T.name(o)}`, fn: () => this.teleportTo(o.dir) })).concat([{ label: `${others.length + 1} · CANCEL` }]));
+    g.dialog('BEACON TRAVEL', 'Where to?', others.map((o, i) => ({ label: `${i + 1} · ${T.name(o)}`, fn: () => this.teleportTo(o.dir) })).concat([{ label: `${others.length + 1} · CANCEL` }]), { stay: true }); // (stay: it replaces the terminal page that is already open, no second unlock)
   }
 
   revealAround(o) {
