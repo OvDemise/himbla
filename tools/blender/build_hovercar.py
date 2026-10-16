@@ -8,7 +8,7 @@
 #                 a dark splitter. SPACECOM's car alone has a roof light bar (the `livery_spacecom` pivot, extra `faction`: the
 #                 game keeps only the matching one); the other factions' cars have none. No emblems yet (the logos aren't made).
 #   car_civilian  the CIVILIAN car: the same hull, rounder and a hand taller: a big glass bubble, chrome
-#                 side bumpers, a single oval headlamp on the nose cone, a lengthened trunk with a two-tone lid carrying a side-on rack and luggage pod, a soft swoosh instead of a stripe, stubby tail fins.
+#                 side bumpers, a single oval headlamp on the nose cone, a lengthened trunk carrying a side-on rack and luggage pod, a soft swoosh instead of a stripe, stubby tail fins.
 #
 # The faction car is about 6.7 m long, the civilian one 6.9 m (its trunk is 0.4 m longer), both 3.9 m over the pods (the old car: 5.5 x 3.3 m), authored in three.js axes
 # (x right, y up, +z nose), centred on the hull's middle like the old car.
@@ -231,8 +231,7 @@ def build_civilian(R):
         {"z": 2.0, "w": 0.5, "t": 0.43, "b": 0.0, "yc": 0.45, "eT": 2.2},
     ]
     mesh("canopy", loft(cano, 28), "glass", R, 0.04)
-    # the trunk: a two-tone lid over the lengthened rear deck, and the rack and luggage on it, turned side-on (long across the car)
-    mesh("trunkLid", keep(loft(grow(H, 0.02), 40, False, False), lambda c: c[2] < -2.0 and c[1] > 0.3 and abs(c[0]) < 0.9), "roof", R, 0.02)
+    # the trunk (the body colour all over): the rack and luggage on the lengthened rear deck, turned side-on (long across the car)
     zr = -2.6                       # the rack's middle
     RXh, RZh = 0.62, 0.36           # half its length (across the car) and half its depth
     RY = top_y(H, 0, zr) + 0.36
@@ -291,12 +290,12 @@ def build_civilian(R):
     oy = top_y(H, 0, 2.4)
     mesh("ornamentStem", B((0, oy - 0.03, 2.4), (0, oy + 0.1, 2.4), 0.03, 6, True), "trim", R, 0)
     mesh("ornament", xf(superquad(0.06, 0.08, 0.06, 0.8, 0.8, 8, 5), (0, oy + 0.15, 2.4)), "trim", R, 0.01)
-    # a whip antenna rooted in the trunk deck's rear corner, on a little base, with a lamp at its tip
-    ax, az = -0.95, -3.0
+    # a whip antenna rooted in the deck just behind the glass, on a little base, with a lamp at its tip
+    ax, az = -0.72, -1.88
     ay = top_y(H, ax, az)
     mesh("whipBase", xf(lathe([(0.0, -0.05), (0.07, -0.05), (0.07, 0.04), (0.03, 0.07), (0, 0.07)], 10), (ax, ay, az)), "trim", R, 0)
-    mesh("whip", B((ax, ay, az), (ax - 0.08, ay + 1.1, az - 0.28), 0.018, 5, True), "dark", R, 0)
-    mesh("whipTip", xf(superquad(0.05, 0.05, 0.05, 1, 1, 8, 5), (ax - 0.08, ay + 1.1, az - 0.28)), "tail", R, 0)
+    mesh("whip", B((ax, ay, az), (ax - 0.08, ay + 1.1, az - 0.1), 0.018, 5, True), "dark", R, 0)
+    mesh("whipTip", xf(superquad(0.05, 0.05, 0.05, 1, 1, 8, 5), (ax - 0.08, ay + 1.1, az - 0.1)), "tail", R, 0)
 
 
 RF = pivot("car_faction", (0, 0, 0))
