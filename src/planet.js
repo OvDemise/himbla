@@ -19,7 +19,6 @@ const AHEAD_LOD = 1; // build-ahead: chunks round where you'll be soon, up to th
 // the ink line along crater crests: how many rims the terrain shader takes, and how far out
 const RIM_INK_MAX = 64, RIM_INK_REACH = 1500, RIM_INK_BIG = 120; // (no ink on rims bigger than that)
 const _rv = new THREE.Vector3();
-const _d = new THREE.Vector3();
 const _a = new THREE.Vector3(), _b = new THREE.Vector3(), _c = new THREE.Vector3(), _e = new THREE.Vector3();
 const _p00 = new THREE.Vector3(), _p10 = new THREE.Vector3(), _p01 = new THREE.Vector3(), _p11 = new THREE.Vector3();
 
@@ -126,24 +125,6 @@ export class Planet extends TerrainField {
   }
 
   tellWorkers(msg) { for (const wk of this.workers) wk.postMessage(msg); }
-
-  // The mineral tints on or off (config.js PLANET.painted; kept for testing): every chunk rebuilds.
-  setPainted(on) {
-    on = !!on;
-    if (on === this.painted) return;
-    this.painted = on;
-    this.tellWorkers({ type: 'style', painted: on });
-    this.ready.length = 0;
-    for (const ch of this.chunks) {
-      for (let l = 0; l < ch.meshes.length; l++) if (ch.meshes[l]) { this.scene.remove(ch.meshes[l]); ch.meshes[l].geometry.dispose(); ch.meshes[l] = null; }
-      ch.shown = -1;
-      if (ch.boulders) { this.scene.remove(ch.boulders); ch.boulders = null; ch.boulderSpec = null; }
-      if (ch.boulderCols && this.colliders) { for (const col of ch.boulderCols) this.colliders.remove(col); ch.boulderCols = null; }
-      ch.ver++;
-      ch.pending = 0;
-    }
-    this.rebuildNow = true; // (the next update builds what's in view straight away, then the workers carry on)
-  }
 
   // ask a worker for a chunk at a level (the least busy one)
   request(ch, lod) {
@@ -681,7 +662,6 @@ diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.93, 0.9, 0.86), rimChip * rimCor
     const horizon = Math.sqrt(Math.max(0, camLen * camLen - rMin * rMin)) + Math.sqrt(rMax * rMax - rMin * rMin);
     const limit = Math.min(maxDist, horizon);
     const now = performance.now();
-    if (this.rebuildNow) { this.rebuildNow = false; budgetMs = 1e9; }
     const sync = budgetMs >= 1e8 || !this.workers.length;
     const t0 = performance.now();
     // finished chunks from the workers become meshes (a millisecond or two each): the ones filling a

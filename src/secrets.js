@@ -33,7 +33,6 @@ const N_ORBIT = 1440;
 
 const _v = new THREE.Vector3();
 const _w = new THREE.Vector3();
-const _q = new THREE.Quaternion();
 
 export class Secrets {
   constructor(game) {
@@ -636,9 +635,6 @@ export class Secrets {
     g.fx.pop('ALIEN ARTIFACT ACQUIRED!', null, { color: '#7dffd4', size: 64, life: 2 });
     g.hud.toast('It sealed itself into a compartment of your jar. It hums louder when you face the twilight side…', 5);
   }
-
-  // is the satellite pin worth drawing on the globe map
-  mapInfo() { return { pos: this.sat.pos, orbit: this.orbit, radius: this.radius, theta: this.satTheta() }; }
 }
 
 // The Xenoglide skates on the shrine's pedestal: the same build as a runner's skates (shell boot,

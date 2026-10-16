@@ -140,8 +140,6 @@ export class Missions {
     return this.offers[loc.id];
   }
 
-  refreshAll() { this.offers = {}; }
-
   // Kepler Twin Cradle: one more contract can ride on top of the first (its own pickup, drop-off,
   // clock and condition). Pirates go for the bottom crate; when the first job ends either way, the
   // second one moves down and carries on as the main contract.

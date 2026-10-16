@@ -97,8 +97,5 @@ export const market = createMarket();
 
 // Number formats shared by the board and the ticker.
 export const fmtPrice = (p) => p.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-export const fmtChange = (c) => (c >= 0 ? '+' : '-') + Math.abs(c).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-export const fmtPct = (p) => (p >= 0 ? '+' : '-') + Math.abs(p).toFixed(2) + '%';
-export const fmtVol = (v) => (v >= 1e6 ? (v / 1e6).toFixed(2) + 'M' : v >= 1e3 ? (v / 1e3).toFixed(1) + 'K' : String(v));
 // the scrolling ticker's line: one entry per stock, an arrow for the session move
 export const tickerText = (m = market) => m.stocks.map((s) => `${s.name} ${s.change >= 0 ? '▲' : '▼'} ${fmtPrice(s.price)}`).join(' | ');

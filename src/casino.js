@@ -113,7 +113,7 @@ const LINES = {
   win: ['Huh. Beginner\'s luck.', 'Don\'t get used to it.', 'Nice. Now give it back.', 'The odds are just warming up.', 'See? Winning is easy. Do it again.', 'A winner! Somebody take a photo for the wall.'],
   big: ['WHOA! Somebody check that machine!', 'Security! …No wait, that\'s legit. Ugh.', 'That\'s coming out of MY bonus!', 'Now THAT\'s a moonshot!', 'I need to sit down. I AM sitting down. I need to sit down more.'],
   lose: ['The house thanks you for your donation.', 'Close! …Not really, but close.', 'Gravity\'s low. So are your odds.', 'Have you tried winning?', 'Keep going, you\'re due! (You are not due.)', 'That one\'s going toward the new chandelier.', 'Ooh. Unlucky. Again?'],
-  broke: ['Outta credits? Rusty the loan shark has a… flexible rate. Press 7.', 'No credits, no service. Those are the rules. I made them.', 'Go deliver some packages and come back rich. Or come back poor. I\'m easy.'],
+  broke: ['Outta credits? Rusty the loan shark has a… flexible rate. Press 6.', 'No credits, no service. Those are the rules. I made them.', 'Go deliver some packages and come back rich. Or come back poor. I\'m easy.'],
   jackpot: ['JACKPOT?! I\'m calling my mom. I\'m calling YOUR mom!', 'THE MACHINE IS SCREAMING! THE MACHINE IS SCREAMING!'],
   nothing: ['NOTHING! Ha! That\'s my favourite slice.', 'It says "lol" right on it, kid.', 'The wheel giveth. Mostly the wheel taketh.'],
   vip: ['VIP upgrade! I\'ll have them warm up the velvet rope.', 'A high roller! I knew it the moment you skated in.'],

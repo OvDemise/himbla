@@ -34,7 +34,6 @@ export const ACTIONS = [
 // keys the game hard-wires for menus and weapon slots
 const RESERVED = ['Escape', 'Enter', 'Digit1', 'Digit2', 'Digit3', 'Digit4', 'Digit5', 'Digit6', 'Digit7', 'Digit8', 'Digit9', 'Digit0'];
 
-const LEVELS = [['off', 'OFF'], ['rare', 'RARE'], ['normal', 'NORMAL'], ['often', 'OFTEN']];
 
 // Quality presets: picking one sets these; changing any of them by hand makes it CUSTOM.
 const PRESETS = {

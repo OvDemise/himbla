@@ -1,6 +1,5 @@
 import * as THREE from 'three';
 import { upAt } from './geo.js';
-import { toon } from './toon.js';
 
 const MAX_P = 1200;
 // skate trail ribbons: a point every 1/60 s, the usual tail 40 points (2/3 s) long, up to 2 s while grinding

@@ -545,15 +545,6 @@ export class World {
     return g;
   }
 
-  // block() baked into a Batch (perimeter walls: dozens of identical segments).
-  blockB(B, loc, dx, dz, w, h, d, color, yaw = 0, roof = 0x3a3550) {
-    B.at(dx, dz, yaw);
-    B.add(new THREE.BoxGeometry(w, h, d), toon(color), 0, h / 2, 0, { outline: 0.2 });
-    B.add(new THREE.BoxGeometry(w * 1.06, 0.6, d * 1.06), toon(roof), 0, h + 0.3, 0, { outline: 0.1 });
-    B.add(new THREE.BoxGeometry(w * 1.01, h * 0.12, d * 1.01), this.glowM(0xfff6a8), 0, h * 0.65, 0, { outline: 0 });
-    this.col(loc, { type: 'box', x: dx, y: h / 2 + 0.3, z: dz, hx: w / 2 + 0.2, hy: h / 2 + 0.3, hz: d / 2 + 0.2, yaw });
-  }
-
   // Fortress wall segment (local x along the wall, +z = outside): a battered plinth, buttresses and
   // crenellations on the outer face, a capped walkway, panel seams, an inner light strip and wall
   // lamps outside. Same collider as the old block wall.
@@ -1540,24 +1531,6 @@ export class World {
     this.pad(loc, -100, -20, 13, 0x7dff6a, true);
     this.solarField(loc, 0, 120, 3, 8, 0);
     this.addFigures(loc, 8, { kind: 'worker', look: () => ({ suit: 0xffffff, visor: 0x2b8f4a }) });
-  }
-
-  buildBioLab(loc) {
-    const greens = [0x6aff9e, 0xb8ffb0, 0x2edfa0];
-    for (let i = 0; i < 4; i++) {
-      const a = (i / 4) * Math.PI * 2 + 0.3;
-      const g = this.dome(loc, Math.cos(a) * 50, Math.sin(a) * 50, 18, greens[i % 3]);
-      for (let k = 0; k < 4; k++) {
-        const c = mesh(new THREE.ConeGeometry(2, 7, 6), toon(0x1f8a3a), 0.05);
-        c.position.set((this.r() - 0.5) * 18, 3.5, (this.r() - 0.5) * 18);
-        c.updateMatrix(); c.matrixAutoUpdate = false;
-        g.add(c);
-      }
-    }
-    this.block(loc, 0, 0, 22, 12, 22, 0xfff4e0, 0.785, 0x2edfa0);
-    this.tower(loc, 0, 0, 30, 1.6, 0xe0e0e0, 0x6aff9e);
-    this.pad(loc, 80, -40, 12, 0x6aff9e, true);
-    this.addFigures(loc, 6, { kind: 'worker', look: () => ({ suit: 0xffffff, visor: 0x2b8f4a }) });
   }
 
   // Helium-3 Exchange (settlements.js): excavator, conveyor, derrick, tank farm, ticker hall.

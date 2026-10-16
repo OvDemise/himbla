@@ -104,7 +104,6 @@ function ovalStrip(r0, r1, y, perCurve = 48) {
   return g;
 }
 
-function distCat(d) { return d < 900 ? 'SPRINT' : d < 1900 ? 'MILE' : d < 2900 ? 'STAKES' : 'MARATHON'; }
 
 export class Race {
   constructor(game) {

@@ -62,7 +62,6 @@ for (const [key, label, parts] of STAGES) {
   for (const [k, l] of parts || []) { g.kids.push(LAPS.length); LAPS.push({ key: k, label: l, parent: LAPS.indexOf(g), kids: [] }); }
 }
 const LAP_IX = Object.fromEntries(LAPS.map((L, i) => [L.key, i]));
-export const LAP_KEYS = Object.keys(LAP_IX); // (every name lap() takes: the stage-timing call sites in main.js and player.js are checked against it)
 const GROUPS = LAPS.filter((L) => L.kids.length);
 const DETAIL_AVG = 0.1, DETAIL_MAX = 0.5; // ms: a part shows under its group when it averages this much, or spiked to this
 
