@@ -43,6 +43,7 @@ import { Powers } from './powers.js';
 import { Tutorial } from './tutorial.js';
 import { Recall } from './recall.js';
 import { Respawn } from './respawn.js';
+import { Chamber } from './chamber.js';
 import { Secrets } from './secrets.js';
 import { Settings } from './settings.js'; // settings
 import { Casino } from './casino.js'; // casino
@@ -269,6 +270,7 @@ class Game {
     this.powers = new Powers(this); // Z: the selected power; the mouse wheel picks
     this.tutorial = new Tutorial(this);
     this.recall = new Recall(this);
+    this.chamber = new Chamber(this); // the Moon Council vote cutscene (builds its set on first use)
     this.secrets = new Secrets(this);
     // pirates live at Rustmoon Hold
     if (this.rep.aligned()) { const h = this.home(); this.player.respawn(h.point, h.facing); this.cam.fwd.copy(h.facing); }
@@ -1051,6 +1053,7 @@ class Game {
       this.updateCamera(0.016, true);
       this.story.save();
       this.save();
+      this.chamber.reveal(0); // (a council vote's black was holding the picture; the card covers it now)
     }, 1400);
     setTimeout(() => {
       el.classList.add('out');
@@ -1201,6 +1204,7 @@ class Game {
     }
 
     this.recall.update(dt);
+    this.chamber.update(dt, rdt); // (real time too: its fade to black keeps easing under a dialog)
     this.spindle.updateRecovery(dt);
     if (this.state === 'title') this.updateTitleTour(rdt);
     else if (this.state !== 'cutscene' && this.state !== 'derby') this.updateCamera(dt);
@@ -1232,12 +1236,15 @@ class Game {
     this.damageFlash = Math.max(0, this.damageFlash - dt * 1.5);
     u.damage.value = (this.damageFlash * 0.8 + (P.health / P.maxHealth < 0.25 && !P.dead ? 0.25 : 0)) * (this.settings ? this.settings.v.damageFlash : 1); // settings
     u.alert.value = this.enemies.bases.some((b) => b.inside && ((b.restricted && !b.authorized) || b.hostile)) ? 1 : 0;
+    u.fade.value = this.chamber.fade;
+    if (this.chamber.on) u.speed.value = u.boost.value = u.damage.value = u.alert.value = 0; // (the chamber's picture is clean: none of the Moon's flashes)
 
     if (this.trailer) this.trailer.post(u);
     this.renderer.setViewport(0, 0, window.innerWidth, window.innerHeight);
     this.syncLocalLights();
     dbg.renderStart();
     if (this.cheats.debugView) this.cheats.renderDebug(); // (dev menu: polygons / draw calls laid bare)
+    else if (this.chamber.on) this.post.render(this.chamber.scene, this.chamber.camera); // (the council's cutscene draws its own set instead of the Moon)
     else this.post.render(this.scene, this.camera);
     dbg.renderEnd();
     this.input.endFrame();
