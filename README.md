@@ -43,6 +43,10 @@ Grab the latest build from the repo's **Releases** page:
 
 `F11` toggles fullscreen. Saves live in the app's own storage.
 
+Release builds (`dist:*` and the workflow) are made with `vite build --mode release`, which leaves the dev tools (the F8 dev
+menu, the cheat menus, the F3 debug overlay, the git menu, the Asset Row, `?trailer` and `window.game`) out of the bundle;
+`npm run build:release` makes one and `npm run check:dev-strip` proves none of it is in there.
+
 Building it yourself: `npm run app` runs the desktop version; `npm run dist:win`, `dist:linux` or `dist:mac`
 package it into `release/`. Pushing a `v*` tag, or a commit whose message contains `[release]` (the usual way: bump
 `package.json`'s version, commit `Release x.y.z [release]`, push), runs `.github/workflows/release.yml`, which
@@ -524,6 +528,19 @@ Hold `=` and `` ` `` (backtick) together during play (deliberately awkward so pl
 god mode · unlock all gear, weapons and cosmetics · lab kit (big jar, items, 3 chimeras) · and under MORE: join
 Rustmoon, spawn a pirate squad or the Mega Mite, spawn an event for any faction (and teleport to it), max out
 the unlock counters, toggle any splice-pod mutation (with a reset), or reset all progress. Number keys pick, Esc closes.
+
+### The Asset Row (dev builds only)
+
+Dev menu (`F8`) → **Full cheat menu** → **Teleport** → option 1, **ASSET ROW**: a flat showroom with every asset in the game
+lined up side by side, 203 of them in 25 sections (the runner and its gear, people, creatures, props and markers,
+weapons and effects, rocks and nature, the secrets and the Spindle's props, ground vehicles and ships, outposts intact and
+wrecked, the building parts the settlements are made of, the hometown, and all the places). The small ones stand in the
+yellow lane (z = 0), the places over 100 m across in the cyan lane 460 m over; the whole row is about 9 km, so the dev
+speed multiplier helps. Each item has a name board and is built when you come near and let go of when you walk off, so the
+row costs nothing to keep. You cannot be hurt there, the Moon (its story, missions and events) waits frozen, and nothing you
+do there is saved. Leave through the same menu entry (it reads LEAVE ASSET ROW), any teleport, or quit to the menu: you land
+back where you were. It is not a place on the Moon, is in no save, and a release build has none of it. The catalogue is in
+`src/assetRowItems/` (the item format is at the top of its `index.js`); to add an asset, add an item to the matching file.
 
 ## Enemy outlines & Threat Scanner
 
