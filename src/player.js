@@ -85,6 +85,32 @@ export class Player {
     this.params.handling += gw * 0.3;
   }
 
+  // Ride the deck you stand on: called once the world has moved it this frame (main.js), so that you, your model and the camera move with the
+  // deck's move of THIS frame. (Carried before the physics step with the move of the last frame, as this was, you and the camera lagged the ship's
+  // mesh by one frame's move, the more so the faster it flew, and as frame times vary that is a wobble in every frame.) The deck's turn since the
+  // last frame is applied too: a ship following its route (it yaws and pitches with the curve of the Moon) would otherwise swing everything
+  // round its middle from under your feet, the further out you stand (the wings, the cargo bays) the more.
+  rideCarry() {
+    const b = this.body, plat = b.platform;
+    if (!plat) { this.platOn = null; return;  }
+    const d = _v.subVectors(plat.pos, plat.prevPos);
+    const pq = this.platQ || (this.platQ = new THREE.Quaternion());
+    let rot = false;
+    if (plat.quat) {
+      if (this.platOn === plat) {
+        _q.copy(pq).invert().premultiply(plat.quat);
+        rot = _q.w < 0.99999999 && _q.w > 0.9;
+      }
+      pq.copy(plat.quat);
+      this.platOn = plat;
+    } else this.platOn = null;
+    const g = this.game, m = this.model.root;
+    const move = (p) => { p.add(d); if (rot) p.sub(plat.pos).applyQuaternion(_q).add(plat.pos); };
+    move(b.pos); move(m.position); move(this.center);
+    if (rot) b.vel.applyQuaternion(_q);
+    move(g.cam.position); move(g.camera.position);
+  }
+
   respawn(pos, facing) {
     this.body.pos.copy(pos);
     this.body.vel.set(0, 0, 0);
@@ -315,23 +341,7 @@ export class Player {
     b.jumped = false;
     // ride moving vehicles: carry along with the deck you're standing on
     const plat = b.platform;
-    if (plat) {
-      b.pos.add(_v.subVectors(plat.pos, plat.prevPos));
-      // ...and turn with it: a deck that yaws or pitches (a freighter following its route over the curve of the Moon) swings everything on it
-      // round its middle, and the further out you stand (the wings, the cargo bays) the further it would slide you out from under your feet
-      const pq = this.platQ || (this.platQ = new THREE.Quaternion());
-      if (plat.quat) {
-        if (this.platOn === plat) {
-          _q.copy(pq).invert().premultiply(plat.quat);
-          if (_q.w < 0.99999999 && _q.w > 0.9) {
-            b.pos.sub(plat.pos).applyQuaternion(_q).add(plat.pos);
-            b.vel.applyQuaternion(_q);
-          }
-        }
-        pq.copy(plat.quat);
-        this.platOn = plat;
-      } else this.platOn = null;
-    } else this.platOn = null;
+    // (carried along with the deck you stand on, and turned with it, once the world has moved it: rideCarry)
     this.prevVel = (this.prevVel || new THREE.Vector3()).copy(b.vel);
     if (plat) this.prevVel.add(plat.vel);
     // Quantum Slipstream Vanes (a power: on for a few seconds when used): a share of your ground handling in the air
