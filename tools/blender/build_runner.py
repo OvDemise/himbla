@@ -395,8 +395,8 @@ for s in (-1, 1):
 # (head_rim, at y 0.985), so the two never cross: a rib pattern here cut through the helmet and the rim at
 # the same height and the outline shells of the three read as splotches all the way round
 mesh("torso_collar", xf(torus(0.215, 0.062, 24, 6, 1.1), (0, 0.9, 0)), "collar", T, 0.03)
-# the knot where the scarf tails leave the collar at the back of the neck (ScarfSim roots them here)
-mesh("torso_scarfKnot", xf(superquad(0.085, 0.055, 0.05, 0.6, 0.6, 12, 6), (0.03, 0.925, -0.246), (0.1, 0.0, 0.0)), "collar", T, 0.03)
+# the knot where the scarf tails leave the collar, on its left-back (50 degrees round from straight back; ScarfSim roots them here)
+mesh("torso_scarfKnot", xf(superquad(0.085, 0.055, 0.05, 0.6, 0.6, 12, 6), (0.222, 0.93, -0.186), (0.1, -0.873, 0.0)), "collar", T, 0.03)
 
 # ---- head ----
 H = pivot("head", (0, 1.18, 0), T)
@@ -481,27 +481,25 @@ for side, name in ((-1, "armL"), (1, "armR")):
 # apart from the always-worn parts. Colour slots: the pad's plates are `accent`, its trim `helmet`, its hardware
 # `metal`; the headband is `accent` (the outfit paints it red) with `dark` stitching.
 
-# shoulder pads: three lames stepping down and out over the pauldron, each edged in trim, a ridge down the
-# crown and studs. Bigger than the pauldron under them (0.15 x 0.125 x 0.145), turned with the arm.
-def lame(w, h, d, t, roll, side, name, P, trim=True):
-    """One curved plate: a half dome (flat underneath) rolled out and down, a trim bead round its lower edge."""
-    def clip(v):
-        return (v[0], max(v[1], -h * 0.28), v[2])
-    mesh(name, xf(superquad(w, h, d, 0.5, 0.62, 14, 6), t, (0, 0, side * roll), fn=clip), "accent", P, 0.03)
-    if trim:
-        ring = xf(torus(w * 0.98, 0.02, 16, 4), (0, 0, 0), s=(1.0, 1.0, d / w))
-        mesh(name + "Trim", xf(ring, (t[0], t[1] - h * 0.28 - 0.002, t[2]), (0, 0, side * roll)), "helmet", P, 0.01)
-
+# shoulder pads: one terraced dome over the pauldron (it is one surface of revolution, so nothing intersects and the outline
+# is one clean line), three tiers stepping down and out, a trim ring on each tier's lip and a stud and ring on the crown. It
+# is a little bigger than the pauldron under it (0.15 x 0.125 x 0.145) and tipped outward and down with the shoulder.
+PAD = [(0, 0.150), (0.07, 0.148), (0.115, 0.136), (0.143, 0.108), (0.15, 0.082), (0.148, 0.066),     # top tier
+       (0.166, 0.062), (0.186, 0.04), (0.192, 0.014), (0.19, 0.0),                                    # middle tier
+       (0.204, -0.004), (0.218, -0.026), (0.218, -0.05), (0.213, -0.058),                            # lowest tier
+       (0.195, -0.064), (0, -0.064)]
+PAD_LIPS = [(0.151, 0.064), (0.193, 0.002), (0.22, -0.05)]   # (r, y) of each tier's lower edge: where a trim ring goes
 for side, tag in ((-1, "L"), (1, "R")):
     A = bpy.data.objects["arm" + tag]
     P = pivot("pad" + tag, (0, 0, 0), A)
-    lame(0.215, 0.15, 0.2, (side * 0.045, 0.06, 0), 0.26, side, "pad" + tag + "_lame0", P)
-    lame(0.19, 0.11, 0.18, (side * 0.115, -0.005, 0), 0.5, side, "pad" + tag + "_lame1", P)
-    lame(0.16, 0.085, 0.15, (side * 0.18, -0.065, 0), 0.72, side, "pad" + tag + "_lame2", P)
-    ridge = extrude([(-0.15, 0.0), (-0.12, 0.05), (0.0, 0.075), (0.12, 0.05), (0.15, 0.0)], 0.022, "x")
-    mesh("pad" + tag + "_ridge", xf(ridge, (side * 0.055, 0.205, 0), (0, 0, side * 0.26)), "metal", P, 0.012)
-    for k, z in enumerate((-0.09, 0.0, 0.09)):
-        mesh(f"pad{tag}_stud{k}", xf(superquad(0.016, 0.012, 0.016, 0.8, 0.8, 8, 4), (side * (0.095 + 0.02 * (k == 1)), 0.115 - 0.01 * (k == 1), z), (0, 0, side * 0.3)), "metal", P, 0)
+    tilt = (0, 0, -side * 0.22)  # outer side down
+    at = (side * 0.035, 0.036, 0)
+    k = 1.0                      # overall size (about two thirds the reach of the first cut, which stuck out 0.34 from the shoulder)
+    mesh("pad" + tag + "_dome", xf(lathe([(r * k, y * k) for r, y in PAD], 28, 1.0, 0.92), at, tilt), "accent", P, 0.03)
+    for i, (r, y) in enumerate(PAD_LIPS):
+        mesh(f"pad{tag}_trim{i}", xf(xf(torus(r * k, 0.007, 28, 4), (0, y * k, 0), s=(1, 1, 0.92)), at, tilt), "helmet", P, 0)
+    mesh("pad" + tag + "_crownRing", xf(xf(torus(0.05 * k, 0.006, 20, 3), (0, 0.146 * k, 0), s=(1, 1, 0.92)), at, tilt), "metal", P, 0)
+    mesh("pad" + tag + "_stud", xf(xf(superquad(0.018, 0.013, 0.018, 0.8, 0.8, 10, 5), (0, 0.15 * k, 0)), at, tilt), "metal", P, 0)
 
 # headband: a strip that hugs the helmet (radius 0.34 at its height), thicker at the front, a knot behind the
 # left ear with two tails and a loose end, and a stitched line along the lower edge
