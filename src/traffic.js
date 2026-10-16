@@ -565,9 +565,16 @@ export class Traffic {
   // the town's single ring-side stop, then keeps going round the ring to whichever road it wants
   // next (so nothing ever needs a U-turn - a dead-end town is simply a lap of its ring).
 
-  buildRoads() {
-    // (the casino joins in like a town: a ring road round its grounds and traffic dropping punters off)
-    const safe = this.w.locations.filter((l) => l.safe && !l.restricted && (!l.poi || l.type === 'casino') && l.type !== 'pirate');
+  // The towns that get roads. The casino joins in like a town (a ring road round its grounds and traffic
+  // dropping punters off); your own town only once it has built Roads (or is the one being given them).
+  townsOnRoads(extra = null) {
+    return this.w.locations.filter((l) => l.safe && !l.restricted && (!l.poi || l.type === 'casino') && l.type !== 'pirate'
+      && (l.type !== 'hometown' || l === extra || (l.slots || []).includes('roads')));
+  }
+
+  // Which of those towns are joined by a road (a set of 'idA|idB' keys): everything within SAFE_ROAD, each town's
+  // nearest neighbour, a few second links, then the hand-made cuts and extras.
+  linkPairs(safe) {
     const key = (a, b) => (a.id < b.id ? `${a.id}|${b.id}` : `${b.id}|${a.id}`);
     const pairs = new Set();
     const has = (a, b) => pairs.has(key(a, b));
@@ -587,6 +594,11 @@ export class Traffic {
     }
     for (const [a, b] of CUT_ROADS) if (this.L[a] && this.L[b]) pairs.delete(key(this.L[a], this.L[b]));
     for (const [a, b] of EXTRA_ROADS) if (this.L[a] && this.L[b]) pairs.add(key(this.L[a], this.L[b]));
+    return pairs;
+  }
+
+  buildRoads() {
+    const pairs = this.linkPairs(this.townsOnRoads());
     this.roadGeo = { pos: [], uv: [], fade: [], mark: [], berm: [], soft: [], wid: [], idx: [] };
     this.posts = [];
     this.pieces = [];

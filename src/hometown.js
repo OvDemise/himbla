@@ -1,7 +1,7 @@
 // Your town (Kepler story finale): a real settlement on the map, founded at the site you surveyed,
 // with eight building plots round the Moon Council hall. You fill the plots from the hall's terminal;
 // each building does something (income, healing, militia guns, a clinic to redeploy at, a motor pool,
-// a shuttle pad, a school, a radio tower). The hall is also where you call Moon Council votes: each
+// a shuttle pad, roads, a radio tower). The hall is also where you call Moon Council votes: each
 // member faction votes with you more readily the better it thinks of you, and a motion that passes
 // changes the Moon (worldstate.js applies it on the next load, after a "one week later" cut).
 import * as THREE from 'three';
@@ -16,16 +16,20 @@ export const SLOT_R = 64, SLOTS = 8;
 // plot i: round the hall, the entrance (local +z) left clear
 export const slotAt = (i) => { const a = Math.PI / 8 + (i * Math.PI * 2) / SLOTS; return { x: Math.sin(a) * SLOT_R, z: Math.cos(a) * SLOT_R, face: a + Math.PI }; };
 
+export const BANK_CAP = 1500; // what the town bank holds (₵); a full bank stops earning until you collect
+
+// Key order is the order of the hall's tiles and number keys. icon / tint / feature are what a building's
+// tile shows (icon names are terminalUI.js's); income is ₵ a minute into the town bank.
 export const BUILDINGS = {
-  housing: { name: 'Housing Domes', cost: 1500, desc: 'Families move in: +₵20 a minute to the town bank.' },
-  market: { name: 'Market Hall', cost: 2000, desc: 'Traders set up shop: +₵60 a minute to the town bank (it holds up to ₵1500).' },
-  clinic: { name: 'Clinic', cost: 1200, desc: 'You redeploy here after a K.O. (the nearest clinic wins).' },
-  farm: { name: 'Greenhouse Farm', cost: 1000, desc: 'Heals you anywhere in town, and +₵15 a minute.' },
-  motorpool: { name: 'Motor Pool', cost: 1800, desc: 'A Homestead Mule of your own, and your vehicles are patched up whenever you\'re in town.' },
-  barracks: { name: 'Militia Barracks', cost: 2200, desc: 'Two militia guns that shoot any pirate within 400 m of town.' },
-  school: { name: 'School & Playground', cost: 1200, desc: 'The town\'s good name: every council member leans 10% further your way.' },
-  radio: { name: 'Radio Tower', cost: 1600, desc: 'Charts 3 km of map round town, and you can call a council vote twice as often.' },
-  pad: { name: 'Shuttle Pad', cost: 2500, desc: 'The town is your home base: you start, recall and redeploy here.' },
+  housing: { name: 'Housing Domes', cost: 1500, icon: 'housing', tint: '#ffd23f', feature: '+₵20 a minute', income: 20, desc: 'Families move in: +₵20 a minute to the town bank.' },
+  market: { name: 'Market Hall', cost: 2000, icon: 'market', tint: '#ff2e88', feature: '+₵60 a minute', income: 60, desc: `Traders set up shop: +₵60 a minute to the town bank (it holds up to ₵${BANK_CAP}).` },
+  clinic: { name: 'Clinic', cost: 1200, icon: 'clinic', tint: '#ff2a4a', feature: 'K.O. respawn point', desc: 'You redeploy here after a K.O. unless you have set a charted headquarters as your respawn point (set it here).' },
+  farm: { name: 'Greenhouse Farm', cost: 1000, icon: 'greenhouse', tint: '#7dff6a', feature: 'Heals · +₵15/min · saplings', income: 15, desc: 'Heals you anywhere in town, +₵15 a minute, and a free sapling for your jar from the nursery bench every 5 minutes.' },
+  motorpool: { name: 'Motor Pool', cost: 1800, icon: 'garage', tint: '#ffd23f', feature: 'Your vehicles · militia', desc: 'A Homestead Mule of your own; roll any vehicle out of its door (F), and your vehicles are patched up whenever you\'re in town. When raiders reach the town, two militia rovers roll out (every 10 minutes).' },
+  barracks: { name: 'Militia Barracks', cost: 2200, icon: 'turret2', tint: '#ff9f1c', feature: '2 guns, 400 m', desc: 'Two militia guns that shoot any pirate within 400 m of town.' },
+  roads: { name: 'Roads', cost: 1800, icon: 'roads', tint: '#c9c3d9', feature: 'Ring road + links', desc: 'Road crews lay a ring road round the town and link it to the settlements around it. Land-trains and hover-cars start calling.' },
+  radio: { name: 'Radio Tower', cost: 1600, icon: 'beacon', tint: '#2ee6ff', feature: 'Charts 3 km · sweeps', desc: 'Charts 3 km of map round town and lets you sweep the rest of the Moon from the tower; you can call a council vote twice as often.' },
+  pad: { name: 'Shuttle Pad', cost: 2500, icon: 'pad', tint: '#c77dff', feature: 'Shuttle · home base', desc: 'A landing pad and a shuttle service to the nearest settlement; the town is also your home base.' },
 };
 
 // ---------------------------------------------------------------------------------------------
@@ -158,16 +162,24 @@ function buildingKit(type) {
         sandbags(k, 0, -6, 6, -1.4, 1.4, 2);
         k.flag(-8, -6, 12, KEP);
         break;
-      case 'school':
-        cabin(k, -2, 2, 12, 8, 4.6, 0xffd23f, 0, { trim: 0x2ec4ff });
-        k.at();
-        for (const sx of [-1, 1]) k.beam([7 + sx * 1.6, 0.3, -5], [7 + sx * 1.2, 3.6, -5], 0.08, T(0xff2e88));
-        k.beam([5.8, 3.6, -5], [8.2, 3.6, -5], 0.08, T(0xff2e88));
-        k.add(new THREE.BoxGeometry(1.2, 0.12, 5), T(0x7dff6a), -6, 1.5, -6, { rx: 0.5, outline: 0.02 });
-        k.box(1.4, 2.6, 1.4, T(0x2ec4ff), -6, 0.3, -8.6, { outline: 0.03 });
-        k.solid(0.7, 1.3, 0.7, -6, -8.6, 0, 0.3);
-        k.solid(0.6, 0.8, 2.3, -6, -6, 0, 0.6); // (the slide)
-        for (const sx of [-1, 1]) k.column(0.2, 3.9, 7 + sx * 1.4, -5);
+      case 'roads': // the road crew's depot: fresh blacktop with lane dashes, a bitumen silo, a road roller, cones and a barrier across the front
+        k.box(18, 0.12, 11, T(0x2f2d3d), 0, 0.3, -0.5, { outline: 0 });
+        for (let i = -2; i <= 2; i++) k.box(0.4, 0.05, 2.2, T(CREAM), i * 3.2, 0.42, 3.6, { outline: 0 });
+        k.cyl(2.4, 2.4, 7.5, 14, T(LT), 6.5, 2.0, -4, { outline: 0.08 });
+        k.add(new THREE.ConeGeometry(2.4, 1.8, 14), T(CONC), 6.5, 10.4, -4, { outline: 0.05 });
+        for (const [sx, sz] of [[-1.7, -1.7], [1.7, -1.7], [-1.7, 1.7], [1.7, 1.7]]) k.cyl(0.18, 0.22, 2.0, 6, T(DK), 6.5 + sx, 0.3, -4 + sz, { outline: 0.03 });
+        k.cyl(0.4, 0.4, 3.2, 8, T(KEP), 6.5, 0.3, -1.2, { outline: 0.04 }); // (the silo's spout)
+        k.column(2.5, 11, 6.5, -4);
+        k.box(3.2, 1.3, 5.2, T(0xffd23f), -5.2, 1.5, -3.4, { outline: 0.06 }); // (the road roller)
+        k.box(2.6, 1.9, 2.0, T(0x2ec4ff), -5.2, 2.8, -4.2, { outline: 0.05 });
+        for (const dz of [-1.4, -5.4]) k.add(new THREE.CylinderGeometry(1.2, 1.2, 3.0, 14).rotateZ(Math.PI / 2), T(0x7a7790), -5.2, 1.5, dz, { outline: 0.05 });
+        k.solid(1.7, 1.6, 3.0, -5.2, -3.4, 0, 0.3);
+        for (let i = 0; i < 7; i++) k.add(new THREE.ConeGeometry(0.34, 0.95, 6), T(0xff7a1a), -9 + i * 3, 0.8, 7.2, { outline: 0.03 });
+        k.box(5, 0.5, 0.18, T(CREAM), 3.5, 0.9, 7.2, { outline: 0.02 });
+        k.box(5, 0.16, 0.2, T(0xff3b5c), 3.5, 1.15, 7.2, { outline: 0 });
+        k.solid(2.5, 0.5, 0.3, 3.5, 7.2, 0, 0);
+        k.sign('ROAD CREW', 0, -9, { ry: 0, w: 7, y: 3.6 });
+        k.lamp(-8.5, 4.8, 6);
         break;
       case 'radio':
         k.box(5, 0.5, 5, T(CONC), 0, 0.3, 0, { outline: 0.03 });
@@ -319,8 +331,7 @@ export class HomeTown {
   chance(f, motion) {
     if (f === 'kepler') return 1; // your own seat
     const rep = this.game.rep.get(f);
-    const school = this.has('school') ? 0.1 : 0;
-    return Math.min(0.97, Math.max(0.03, 0.15 + rep / 50 + (motion.stance[f] || 0) + school));
+    return Math.min(0.97, Math.max(0.03, 0.15 + rep / 50 + (motion.stance[f] || 0)));
   }
 
   cooldown() { const c = this.ws.council; return Math.max(0, (c.next || 0) - Date.now()); }
@@ -377,7 +388,7 @@ export class HomeTown {
     if (this.has('market')) rate += 60;
     if (this.has('housing')) rate += 20;
     if (this.has('farm')) rate += 15;
-    st.bank = Math.min(1500, (st.bank || 0) + (rate / 60) * dt);
+    st.bank = Math.min(BANK_CAP, (st.bank || 0) + (rate / 60) * dt);
     this.saveT -= dt;
     if (this.saveT <= 0) { this.saveT = 30; saveWorldState(this.ws); }
     const d = P.pos.distanceTo(this.loc.pos);
