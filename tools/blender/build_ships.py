@@ -892,7 +892,7 @@ for side in (-1, 1):
     zmin, zmax = max(FRAME_Z[0] + 1.9, WING_STOP), FRAME_Z[-1] - 1.9
     inn = -side                      # (inboard, over the bays)
     reach = RX - UX                  # the boom's reach: out to the crate column
-    DROP = RAIL_TOP + 0.7 - 0.75 - (UY + 0.9)
+    DROP = RAIL_TOP + 0.7 - 0.98 - (UY + 0.9)
     T = pivot(f"f_crane{side}", (side * RX, RAIL_TOP, TZ), FH, role="trolley", side=side, travelMin=round(zmin - TZ, 3), travelMax=round(zmax - TZ, 3), dropMax=round(DROP, 3))
     for sx in (-1, 1):               # four flanged wheels astride the rail, on axles
         for sz in (-1, 1):
@@ -923,13 +923,72 @@ for side in (-1, 1):
         C_ = pivot(f"f_craneCable{side}{sz}", (inn * reach, 0.7, sz * 1.2), T, role="cable", side=side)
         FM(f"craneFall{side}{sz}", beam((0, 0, 0), (0, -1, 0), 0.05, 5), "dark", C_, 0)
     H_ = pivot(f"f_craneHoist{side}", (inn * reach, 0.7, 0), T, role="hoist", side=side)
-    FM(f"spreader{side}", xf(rbox(1.5, 0.14, 2.7, 0.3, 8, 4), (0, -0.4, 0)), "steel", H_, 0.05)
-    FM(f"spreaderBar{side}", xf(rbox(0.16, 0.1, 2.5, 0.3, 6, 3), (0, -0.2, 0)), "metal", H_, 0.02)
+    # An ISO spreader frame as long and wide as the crates' corner castings (x +-1.65, z +-3.9): two side beams, two end beams, a spine the cables
+    # come down to, a locking head and pin at each corner, and a flipper plate beside each head that hangs down round the crate's top edge.
+    for sx in (-1, 1):
+        FM(f"spreaderSide{side}{sx}", xf(rbox(0.17, 0.14, 4.0, 0.3, 8, 4), (sx * 1.65, -0.42, 0)), "steel", H_, 0.05)
     for sz in (-1, 1):
-        FM(f"spreaderHead{side}{sz}", xf(rbox(0.34, 0.2, 0.3, 0.3, 6, 3), (0, -0.46, sz * 2.62)), "dark", H_, 0.03)
-        FM(f"spreaderSocket{side}{sz}", xf(rbox(0.22, 0.1, 0.22, 0.3, 6, 3), (0, -0.2, sz * 1.2)), "hazard", H_, 0.01)
-        for sx in (-1, 1):           # twist-lock cones at the corners
-            FM(f"spreaderLock{side}{sz}{sx}", xf(lathe([(0, 0), (0.14, 0), (0.1, -0.2), (0, -0.2)], 8), (sx * 1.3, -0.56, sz * 2.45)), "hazard", H_, 0.01)
+        FM(f"spreaderEnd{side}{sz}", xf(rbox(1.82, 0.14, 0.2, 0.3, 8, 4), (0, -0.42, sz * 3.9)), "steel", H_, 0.05)
+        FM(f"spreaderCross{side}{sz}", xf(rbox(1.65, 0.1, 0.14, 0.3, 6, 3), (0, -0.3, sz * 1.2)), "metal", H_, 0.02)
+        FM(f"spreaderSocket{side}{sz}", xf(rbox(0.22, 0.1, 0.22, 0.3, 6, 3), (0, -0.14, sz * 1.2)), "hazard", H_, 0.01)
+    FM(f"spreaderSpine{side}", xf(rbox(0.22, 0.12, 3.7, 0.3, 8, 4), (0, -0.3, 0)), "metal", H_, 0.03)
+    for sx in (-1, 1):
+        for sz in (-1, 1):
+            FM(f"spreaderHead{side}{sx}{sz}", xf(rbox(0.3, 0.2, 0.32, 0.3, 6, 3), (sx * 1.65, -0.5, sz * 3.9)), "dark", H_, 0.03)
+            FM(f"spreaderPin{side}{sx}{sz}", xf(lathe([(0, 0), (0.15, 0), (0.1, -0.3), (0, -0.34)], 8), (sx * 1.65, -0.64, sz * 3.9)), "hazard", H_, 0.01)
+            FM(f"spreaderFlipper{side}{sx}{sz}", xf(rbox(0.05, 0.42, 0.42, 0.3, 4, 3), (sx * 2.0, -0.78, sz * 3.9)), "hazard", H_, 0.02)
+            FM(f"spreaderHinge{side}{sx}{sz}", xf(rbox(0.2, 0.06, 0.3, 0.3, 4, 3), (sx * 1.85, -0.38, sz * 3.9)), "steel", H_, 0.01)
+
+# ---- the collision: solid boxes in the ship's own frame (hx, hy, hz, x, y, z) that the game keeps in the world while the ship is near, so the
+# hull, tower, nose, bells, wings, the cages and the crates are solid and their tops can be stood on (the belly's middle stays open for the ramp) ----
+_solid = []
+
+
+def solid(hx, hy, hz, x, y, z, k=1.0):
+    _solid.append([round(v * k, 3) for v in (hx, hy, hz, x, y, z)])
+
+
+_c = lambda lo, hi: ((lo + hi) / 2, (hi - lo) / 2)      # (centre, half) of a span
+zc_, zh_ = _c(-27.2, zf(18.0))
+solid(7.9, 2.62, zh_, 0, 2.52, zc_, K)                   # the deck slab and the upper hull: top = the deck plate (5.14)
+for sx in (-1, 1):
+    solid(2.65, 2.45, zh_, sx * 5.25, -2.55, zc_, K)     # the lower hull either side of the belly's open middle
+for lo, hi, hx_, y0_, y1_ in ((18.0, 27.5, 7.0, -4.7, 3.7), (27.5, 31.0, 4.8, -3.8, 2.3), (31.0, 33.8, 2.6, -2.8, 1.2)):
+    z_, h_ = _c(zf(lo), zf(hi))
+    y_, hy_ = _c(y0_, y1_)
+    solid(hx_, hy_, h_, 0, y_, z_, K)                    # the bow, in steps down its taper
+z_, h_ = _c(zf(12.0), zf(26.5))
+solid(5.4, 2.23, h_, 0, 7.37, z_, K)                     # the bridge tower
+for lo, hi, hx_, y0_, y1_ in ((26.5, 28.5, 4.8, 3.7, 7.0), (28.5, 31.0, 3.8, 2.4, 4.2)):
+    z_, h_ = _c(zf(lo), zf(hi))
+    y_, hy_ = _c(y0_, y1_)
+    solid(hx_, hy_, h_, 0, y_, z_, K)                    # its raked face
+z_, h_ = _c(zf(15.6), zf(25.6))
+solid(3.95, 1.75, h_, 0, 11.35, z_, K)                   # the pilot house
+solid(8.8, 5.8, 2.8, 0, 0, -29.0, K)                     # the stern block
+for bx, by in ((-4.2, 2.6), (4.2, 2.6), (-4.2, -2.6), (4.2, -2.6)):
+    solid(2.3, 2.3, 2.55, bx, by, -35.9, K)              # the four engine bells
+for sx in (-1, 1):                                       # the radiator wings, in steps up their dihedral
+    for s0, s1 in ((0.0, 3.5), (3.5, 7.0), (7.0, 10.0), (10.0, 13.0)):
+        lead = lambda sp: 0.0 if sp < 6.0 else 3.0 * (sp - 6.0) / 7.0
+        trail = lambda sp: 9.2 if sp < 5.5 else 9.2 - 2.0 * (sp - 5.5) / 7.5
+        lo_, hi_ = max(lead(s0), lead(s1)), min(trail(s0), trail(s1))
+        sp_ = (s0 + s1) / 2
+        solid((s1 - s0) / 2 * math.cos(RAD_DIH) + 0.05, 0.42, (hi_ - lo_) / 2, sx * (7.6 + sp_ * math.cos(RAD_DIH)), WY + sp_ * math.sin(RAD_DIH), -6.0 - (lo_ + hi_) / 2, K)
+# the cargo cages (absolute sizes): posts, the two long rails, each bay's floor, and a block for every stack of crates
+for side in (-1, 1):
+    ph_ = (BAY_TOP + 0.2 - FOOT_Y) / 2
+    for z in FRAME_Z:
+        solid(0.3, ph_, 0.3, side * RX, FOOT_Y + ph_, z)
+    solid(0.42, 0.3, ZLH, side * RX, BAY_TOP, ZLC)
+    solid(0.36, 0.3, ZLH, side * RX, FOOT_Y + 0.12, ZLC)
+    for k, z in enumerate(SLOT_Z):
+        solid((RX - HW) / 2, 0.18, 4.1, side * (HW + RX) / 2, UY - 0.2, z)
+        n_ = len(CARGO[(side, k)])
+        if n_:
+            solid(1.95, n_ * UNIT_H / 2, 4.2, side * UX, UY + n_ * UNIT_H / 2, z)
+FR["collide"] = [v for b_ in _solid for v in b_]
+print("freighter collision boxes:", len(_solid))
 
 FR["gearH"] = GEAR_F * K
 FR["deck"] = [6.9 * K, 2.6 * K, DZH * K]

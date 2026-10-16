@@ -370,7 +370,8 @@ export class Winch {
       offer(null, c, looked, _nv);
     }
     for (const b of best) {
-      if (!g.enemies.clearShot(eye, b.point)) continue;
+      // (the line is clear of everything but the thing itself: its own solid boxes round the hull must not hide it from its own hook)
+      if (!g.enemies.clearShot(eye, b.point, b.T ? b.T.obj.plat || b.T.obj : null)) continue;
       return this.handle(b.T || this.structure(b.col), b.point, b.nrm, b.looked, b.dP);
     }
     return null;

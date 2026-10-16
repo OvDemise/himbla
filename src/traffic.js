@@ -2612,7 +2612,7 @@ export class Traffic {
 
   // Keep a vehicle's deck colliders in the spatial hash while it is near the camera: one box for a
   // flyer or hover-car (deck / deckY / deckZ), or the list of boxes in the model's own frame for a
-  // land-train unit (decks: hx, hy, hz, y, z each).
+  // land-train unit or the freighter (decks: hx, hy, hz, y, z each, and x for a box off the middle line).
   syncDeck(s, camPos) {
     const near = s.pos.distanceToSquared(camPos) < 350 * 350;
     this.dropDeck(s);
@@ -2624,7 +2624,7 @@ export class Traffic {
     boxes.forEach((d, i) => {
       const c = s.deckCols[i];
       c.ax.copy(_a); c.ay.copy(_b); c.az.copy(_c);
-      c.c.copy(s.pos).addScaledVector(_b, d.y).addScaledVector(_c, d.z);
+      c.c.copy(s.pos).addScaledVector(_a, d.x || 0).addScaledVector(_b, d.y).addScaledVector(_c, d.z);
       c.hx = d.hx; c.hy = d.hy; c.hz = d.hz;
       this.C.add(c);
     });

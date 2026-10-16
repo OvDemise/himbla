@@ -1426,6 +1426,12 @@ function makeShip(kind, { color, stripe, faction = 'kepler' }) {
   const ship = {
     root, kind, size: kind === 'freighter' ? 30 : 10,
     gearH: d.gearH, deck: [...d.deck], deckY: d.deckY, deckZ: d.deckZ, radius: d.radius, padR: d.padR,
+    // the solid boxes the world keeps round it (traffic.js syncDeck): (hx, hy, hz, x, y, z) groups in the ship's frame, when the model has them
+    // (the freighter: hull, tower, bells, wings, cages and crates); otherwise the one deck box above
+    decks: d.collide && d.collide.length ? Array.from({ length: Math.floor(d.collide.length / 6) }, (_, i) => {
+      const b = d.collide.slice(i * 6, i * 6 + 6);
+      return { hx: b[0], hy: b[1], hz: b[2], x: b[3], y: b[4], z: b[5] };
+    }) : undefined,
     inside: v3(d.inside), rampTop: v3(d.rampTop), rampBottom: v3(d.rampBottom),
     gearK: 1, rampK: 0,
     // 0 = stowed in the bays, 1 = down and locked: the doors swing open first, then the legs
