@@ -138,6 +138,20 @@ class Batch {
   }
 }
 
+// The red, striped, flickering wall round a restricted military zone (buildMilitary; also the Asset Row)
+export function zoneWallMaterial() {
+  return new THREE.ShaderMaterial({
+    transparent: true, depthWrite: false, side: THREE.DoubleSide,
+    uniforms: { time: { value: 0 }, color: { value: new THREE.Color(0xff2a4a) }, alert: { value: 0 } },
+    vertexShader: `varying vec2 vUv; varying vec3 vW; void main(){ vUv=uv; vec4 w=modelMatrix*vec4(position,1.0); vW=w.xyz; gl_Position=projectionMatrix*viewMatrix*w; }`,
+    fragmentShader: `uniform float time; uniform vec3 color; uniform float alert; varying vec2 vUv; varying vec3 vW;
+      void main(){ float s = step(0.5, fract((vW.x+vW.z)*0.04 + vW.y*0.04 - time*0.3));
+        float fade = (1.0 - vUv.y);
+        float a = (0.12 + 0.25*s + alert*0.25) * fade;
+        gl_FragColor = vec4(color, a); }`,
+  });
+}
+
 // Builds everything that sits on the moon. Each settlement lives in its own local frame
 // (Y = local up, XZ = its flat plateau) and is only attached to the scene while the
 // camera is close enough to see it.
@@ -1595,16 +1609,7 @@ export class World {
     this.addFigures(loc, small ? 4 : 8, { kind: 'soldier', look: () => ({ suit: 0x55607a, helmet: fc, visor: 0x111111 }) });
 
     if (!loc.restricted) return; // (the Moon Council's ceasefire stood the zone down: no wall)
-    const mat = new THREE.ShaderMaterial({
-      transparent: true, depthWrite: false, side: THREE.DoubleSide,
-      uniforms: { time: { value: 0 }, color: { value: new THREE.Color(0xff2a4a) }, alert: { value: 0 } },
-      vertexShader: `varying vec2 vUv; varying vec3 vW; void main(){ vUv=uv; vec4 w=modelMatrix*vec4(position,1.0); vW=w.xyz; gl_Position=projectionMatrix*viewMatrix*w; }`,
-      fragmentShader: `uniform float time; uniform vec3 color; uniform float alert; varying vec2 vUv; varying vec3 vW;
-        void main(){ float s = step(0.5, fract((vW.x+vW.z)*0.04 + vW.y*0.04 - time*0.3));
-          float fade = (1.0 - vUv.y);
-          float a = (0.12 + 0.25*s + alert*0.25) * fade;
-          gl_FragColor = vec4(color, a); }`,
-    });
+    const mat = zoneWallMaterial();
     const wall = new THREE.Mesh(new THREE.CylinderGeometry(loc.zoneR, loc.zoneR, 170, 96, 1, true), mat);
     this.put(wall, loc, 0, 0, 15);
     this.zoneWalls.push({ loc, mat });
