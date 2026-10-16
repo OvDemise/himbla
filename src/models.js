@@ -2078,8 +2078,8 @@ export class LightTrail {
 
 // ---- The hover-cars (built in Blender, see build_hovercar.py) ----
 // The smallest road vehicle, in two sets from one body style, about 6.5 m long and 3.9 m over the pods: the FACTION car (a low, sharp
-// hull in a faction's colours; SPACECOM's alone carries the roof light bar) and the CIVILIAN car (a rounder two-tone with a roof rack,
-// in one of CAR_PAINTS: none black, none a faction colour). Slots: body, roof (civilian), stripe (faction trim / civilian accent), trim,
+// hull in a faction's colours; SPACECOM's alone carries the roof light bar) and the CIVILIAN car (a rounder two-tone with a side-on rack and luggage on its lengthened trunk,
+// in one of CAR_PAINTS: none black, none a faction colour). Slots: body, roof (the civilian trunk lid and number plate), stripe (faction trim / civilian accent), trim,
 // dark, and the glowing glass, lamp, tail, lift (the four hover pads) and beaconA / beaconB (the light bar's two lamps).
 export const CAR_FACTIONS = {
   spacecom: { body: 0xf2ecdc, stripe: 0xffd23f }, // white and yellow
