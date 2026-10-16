@@ -953,21 +953,32 @@ zc_, zh_ = _c(-27.2, zf(18.0))
 solid(7.9, 2.62, zh_, 0, 2.52, zc_, K)                   # the deck slab and the upper hull: top = the deck plate (5.14)
 for sx in (-1, 1):
     solid(2.65, 2.45, zh_, sx * 5.25, -2.55, zc_, K)     # the lower hull either side of the belly's open middle
-for lo, hi, hx_, y0_, y1_ in ((18.0, 27.5, 7.0, -4.7, 3.7), (27.5, 31.0, 4.8, -3.8, 2.3), (31.0, 33.8, 2.6, -2.8, 1.2)):
-    z_, h_ = _c(zf(lo), zf(hi))
-    y_, hy_ = _c(y0_, y1_)
-    solid(hx_, hy_, h_, 0, y_, z_, K)                    # the bow, in steps down its taper
-z_, h_ = _c(zf(12.0), zf(26.5))
-solid(5.4, 2.23, h_, 0, 7.37, z_, K)                     # the bridge tower
-for lo, hi, hx_, y0_, y1_ in ((26.5, 28.5, 4.8, 3.7, 7.0), (28.5, 31.0, 3.8, 2.4, 4.2)):
-    z_, h_ = _c(zf(lo), zf(hi))
-    y_, hy_ = _c(y0_, y1_)
-    solid(hx_, hy_, h_, 0, y_, z_, K)                    # its raked face
-z_, h_ = _c(zf(15.6), zf(25.6))
-solid(3.95, 1.75, h_, 0, 11.35, z_, K)                   # the pilot house
+
+
+def slabs(secs, z0, z1, step, y_lo=None):
+    """Boxes cut from a lofted part's own cross-sections, one per `step` m of its length, each as wide and tall as the section at its middle (the
+    section's rounded corners are why the width is a hair under it), so a tapering nose or a raked tower is followed instead of stepped round."""
+    n = max(1, int(round((z1 - z0) / step)))
+    for i in range(n):
+        za, zb = z0 + (z1 - z0) * i / n, z0 + (z1 - z0) * (i + 1) / n
+        sec = lerp_sec(secs, (za + zb) / 2)
+        yc = sec.get("yc", 0.0)
+        lo, hi = yc - sec["b"], yc + sec["t"]
+        if y_lo is not None:
+            lo = max(lo, y_lo)
+        if hi - lo < 0.2:
+            continue
+        zc, zh = _c(za, zb)
+        yc_, yh = _c(lo, hi)
+        solid(sec["w"] * 0.98, yh, zh, 0, yc_, zc, K)
+
+
+slabs(FSECS, zf(18.0), zf(33.8), 1.6)                    # the bow, down its taper (the nose rounds off, it is not a stack of steps)
+slabs(BRIDGE, zf(12.0), zf(31.0), 1.6, y_lo=4.5)         # the bridge tower and its raked face
+slabs(PH, zf(15.6), zf(25.6), 1.7)                       # the pilot house
 solid(8.8, 5.8, 2.8, 0, 0, -29.0, K)                     # the stern block
 for bx, by in ((-4.2, 2.6), (4.2, 2.6), (-4.2, -2.6), (4.2, -2.6)):
-    solid(2.3, 2.3, 2.55, bx, by, -35.9, K)              # the four engine bells
+    solid(2.1, 2.1, 2.55, bx, by, -35.9, K)              # the four engine bells
 for sx in (-1, 1):                                       # the radiator wings, in steps up their dihedral
     for s0, s1 in ((0.0, 3.5), (3.5, 7.0), (7.0, 10.0), (10.0, 13.0)):
         lead = lambda sp: 0.0 if sp < 6.0 else 3.0 * (sp - 6.0) / 7.0
