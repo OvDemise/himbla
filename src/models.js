@@ -292,14 +292,14 @@ const SCARF_PTS = 12;
 // lets go as the airflow rises, so a skater's scarf streams out behind, over the pack if need be.
 const ease01 = (t) => { t = Math.min(1, Math.max(0, t)); return t * t * (3 - 2 * t); };
 const SCARF_GUIDES = [0, 1].map((k) => {
-  const rho = 0.29 + 0.03 * k, th0 = (12 + 3 * k) * Math.PI / 180, th1 = (68 + 18 * k) * Math.PI / 180, n = 7;
+  const rho = 0.29, th0 = 12 * Math.PI / 180, th1 = (68 - 3 * k) * Math.PI / 180, n = 7; // (the second lies on the first, a ribbon's thickness above it, and ends a little earlier)
   const g = [];
   for (let i = 0; i <= n; i++) { // the arc round the collar: angle from straight back, round toward the left
     const t = i / n, th = th0 + (th1 - th0) * t;
-    g.push([rho * Math.sin(th), 0.945 - 0.03 * t, -rho * Math.cos(th)]);
+    g.push([rho * Math.sin(th), 0.945 - 0.03 * t + 0.042 * k, -rho * Math.cos(th)]);
   }
   const e = g[n];
-  g.push([e[0] + 0.05, 0.875, e[2] - 0.09 - 0.02 * k], [0.36 + 0.025 * k, 0.76, -0.235 - 0.03 * k], [0.37 + 0.025 * k, 0.55, -0.27 - 0.03 * k]); // ...and down behind the shoulder
+  g.push([e[0] + 0.05 + 0.01 * k, 0.875, e[2] - 0.08 - 0.03 * k], [0.36 + 0.01 * k, 0.76, -0.235 - 0.045 * k], [0.37 + 0.01 * k, 0.55, -0.27 - 0.045 * k]); // ...and down behind the shoulder, the second a layer further back // ...and down behind the shoulder
   const cum = g.reduce((a, q, i) => { a.push(i ? a[i - 1] + Math.hypot(q[0] - g[i - 1][0], q[1] - g[i - 1][1], q[2] - g[i - 1][2]) : 0); return a; }, []);
   return { g, cum };
 });
@@ -334,6 +334,28 @@ function scarfStrip(n) {
     return g;
   };
   return { geo: mk(), ink: mk() };
+}
+
+// Keep point q out of the gear boxes (rounded boxes, see PACK_BOX): out through the top, the back or a side, never through the front (that
+// is your back) or the bottom, so a tail can't end up squeezed between the pack and you or under it. `po` (where q was) decides, if it can be told.
+function gearPush(q, po, boxes) {
+  for (const B of boxes) {
+    const hx = B[0], yl = B[1], yh = B[2], zb = B[3], zf = B[4], br = Math.min(B[5], hx, (yh - yl) / 2, (zf - zb) / 2);
+    const cy = (yl + yh) / 2, cz = (zb + zf) / 2;
+    const dx = Math.abs(q.x) - (hx - br), dy = Math.abs(q.y - cy) - ((yh - yl) / 2 - br), dz = Math.abs(q.z - cz) - ((zf - zb) / 2 - br);
+    const out = Math.hypot(Math.max(dx, 0), Math.max(dy, 0), Math.max(dz, 0));
+    if (out + Math.min(Math.max(dx, dy, dz), 0) - br >= 0) continue; // (outside the rounded box)
+    if (po.y >= yh) q.y = yh;
+    else if (po.z <= zb) q.z = zb;
+    else if (Math.abs(po.x) >= hx) q.x = Math.sign(po.x) * hx;
+    else {
+      const dTop = yh - q.y, dRear = q.z - zb, dSide = hx - Math.abs(q.x);
+      if (dTop <= dRear && dTop <= dSide) q.y = yh;
+      else if (dSide <= dRear) q.x = Math.sign(q.x || 1) * hx;
+      else q.z = zb;
+    }
+    po.lerp(q, 0.05); // (a little friction: it settles on the pack rather than skating off it)
+  }
 }
 
 export class ScarfSim {
@@ -429,7 +451,7 @@ export class ScarfSim {
           const ay = fy + Math.cos(this.t * 8.3 - i * 0.6 + T.phase) * flut * 16 * u;
           const q = p[i];
           // the channel as a spring (firm near the neck, loose further down so the ends still sway), damped so it settles
-          const kk = rest * (i < 5 ? 55 : 12), dmp = 0.96 - rest * (i < 5 ? 0.07 : 0.03), g = T.tgt[i];
+          const kk = rest * (i < 5 ? 90 : 14), dmp = 0.96 - rest * (i < 5 ? 0.1 : 0.03), g = T.tgt[i];
           const vx = (q.x - o[i].x) * dmp, vy = (q.y - o[i].y) * dmp, vz = (q.z - o[i].z) * dmp;
           o[i].copy(q);
           q.x += vx + (ax + (g.x - q.x) * kk) * h2; q.y += vy + (ay + (g.y - q.y) * kk) * h2; q.z += vz + (fz + (g.z - q.z) * kk) * h2;
@@ -455,22 +477,7 @@ export class ScarfSim {
             // stay behind your back, and out of the gear on it: rounded boxes (the pack's own shape, the crates') that the tail
             // slides over: out through the nearest face
             if (q.z > -0.18) q.z = -0.18;
-            for (const B of boxes) {
-              const hx = B[0], yl = B[1], yh = B[2], zb = B[3], zf = B[4], br = Math.min(B[5], hx, (yh - yl) / 2, (zf - zb) / 2);
-              const cy = (yl + yh) / 2, cz = (zb + zf) / 2;
-              const dx = Math.abs(q.x) - (hx - br), dy = Math.abs(q.y - cy) - ((yh - yl) / 2 - br), dz = Math.abs(q.z - cz) - ((zf - zb) / 2 - br);
-              const ox = Math.max(dx, 0), oy = Math.max(dy, 0), oz = Math.max(dz, 0);
-              const out = Math.hypot(ox, oy, oz);
-              const d = out + Math.min(Math.max(dx, dy, dz), 0) - br; // (signed distance to the box: negative inside)
-              if (d >= 0) continue;
-              let nx, ny, nz;
-              if (out > 1e-6) { nx = (ox / out) * Math.sign(q.x || 1); ny = (oy / out) * Math.sign(q.y - cy || 1); nz = (oz / out) * Math.sign(q.z - cz || 1); }
-              else if (dx >= dy && dx >= dz) { nx = Math.sign(q.x || 1); ny = nz = 0; }
-              else if (dy >= dz) { ny = Math.sign(q.y - cy || 1); nx = nz = 0; }
-              else { nz = Math.sign(q.z - cz || 1); nx = ny = 0; }
-              q.x -= nx * d; q.y -= ny * d; q.z -= nz * d;
-              o[i].lerp(q, 0.05); // (a little friction: it settles on the pack rather than skating off it)
-            }
+            gearPush(q, o[i], boxes);
           }
         }
       }
@@ -481,10 +488,10 @@ export class ScarfSim {
       for (let i = 1; i < SCARF_PTS; i++) {
         _st.subVectors(B[i], A[i]);
         const d = _st.length();
-        if (d < 0.045) { if (d < 1e-5) _st.set(0, 0, -1); else _st.divideScalar(d); B[i].addScaledVector(_st, (0.045 - d) * 0.6); A[i].addScaledVector(_st, -(0.045 - d) * 0.4); }
+        if (d < 0.04) { if (d < 1e-5) _st.set(0, 0, -1); else _st.divideScalar(d); B[i].addScaledVector(_st, (0.04 - d) * 0.6); A[i].addScaledVector(_st, -(0.04 - d) * 0.4); }
       }
     }
-    for (const T of this.tails) this.draw(T);
+    for (const T of this.tails) { for (let i = 1; i < SCARF_PTS; i++) gearPush(T.p[i], T.o[i], boxes); this.draw(T); } // (the pair's push can't drive a tail into the pack)
   }
 
   draw(T) {
