@@ -4,6 +4,9 @@ import runner from './characters-runner.js';
 import people from './characters-people.js';
 import creatures from './characters-creatures.js';
 
+// (lines of figures and creatures are not for walking into: no colliders, except the leaders' podiums)
+for (const g of [runner, people, creatures]) for (const it of g.items) if (it.id !== 'people.leaders') it.solid = false;
+
 export default [runner, people, creatures];
 
 /*
