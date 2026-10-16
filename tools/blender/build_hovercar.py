@@ -7,10 +7,10 @@
 #   car_faction   the FACTION car: a low, sharp hull in the faction's livery: a racing stripe down the spine, swept tail fins and
 #                 a dark splitter. SPACECOM's car alone has a roof light bar (the `livery_spacecom` pivot, extra `faction`: the
 #                 game keeps only the matching one); the other factions' cars have none. No emblems yet (the logos aren't made).
-#   car_civilian  the CIVILIAN car: the same hull, rounder and a hand taller: a big glass bubble under a two-tone roof, chrome
-#                 side bumpers, a single oval headlamp on the nose cone, a roof rack with a luggage pod, a soft swoosh instead of a stripe, stubby tail fins.
+#   car_civilian  the CIVILIAN car: the same hull, rounder and a hand taller: a big glass bubble, chrome
+#                 side bumpers, a single oval headlamp on the nose cone, a lengthened trunk with a two-tone lid carrying a side-on rack and luggage pod, a soft swoosh instead of a stripe, stubby tail fins.
 #
-# Both are about 6.5 m long and 3.9 m over the pods (1.18 x the old car's footprint of 5.5 x 3.3 m), authored in three.js axes
+# The faction car is about 6.7 m long, the civilian one 6.9 m (its trunk is 0.4 m longer), both 3.9 m over the pods (the old car: 5.5 x 3.3 m), authored in three.js axes
 # (x right, y up, +z nose), centred on the hull's middle like the old car.
 # - Pivot roles: lift (a hover-pad glow under each corner, breathes), beacon (the faction car's roof lamps, blink; extra `phase`),
 #   livery (see above). Everything else is static.
@@ -108,13 +108,12 @@ HULL_F, HULL_C = None, None
 
 
 def hull_sections(civ):
-    """The one hull both cars share: a flattened capsule. The civilian's is a little taller and blunter at the nose."""
+    """The one hull both cars share: a flattened capsule. The civilian's is a little taller and blunter at the nose, and 0.4 m longer
+    behind the cabin: a proper trunk deck for the rack."""
     k = 1.12 if civ else 1.0
     nose = 3.1 if civ else 3.25
-    return [
-        {"z": -3.25, "w": 0.5, "t": 0.26 * k, "b": 0.24, "eT": 2.4, "eB": 2.6},
-        {"z": -2.85, "w": 1.05, "t": 0.52 * k, "b": 0.4, "eT": 2.4, "eB": 2.6},
-        {"z": -1.8, "w": 1.4, "t": 0.64 * k, "b": 0.5, "eT": 2.4, "eB": 2.6},
+    rear = [(-3.65, 0.5, 0.26, 0.24), (-3.25, 1.05, 0.52, 0.4), (-2.2, 1.4, 0.64, 0.5)] if civ else [(-3.25, 0.5, 0.26, 0.24), (-2.85, 1.05, 0.52, 0.4), (-1.8, 1.4, 0.64, 0.5)]
+    return [{"z": z, "w": w, "t": t * k, "b": b, "eT": 2.4, "eB": 2.6} for z, w, t, b in rear] + [
         {"z": 0.0, "w": 1.5, "t": 0.68 * k, "b": 0.52, "eT": 2.4, "eB": 2.6},
         {"z": 1.6, "w": 1.36, "t": 0.58 * k, "b": 0.47, "eT": 2.4, "eB": 2.6},
         {"z": nose - 0.5, "w": 0.95 if civ else 0.88, "t": 0.42 * k, "b": 0.34, "eT": 2.4, "eB": 2.6},
@@ -172,7 +171,6 @@ def build_faction(R):
         {"z": 1.75, "w": 0.4, "t": 0.22, "b": 0.0, "yc": 0.5, "eT": 2.6},
     ]
     mesh("canopy", loft(cano, 28), "glass", R, 0.04)
-    mesh("canopyFrame", keep(loft(grow(cano, 0.02), 28, False, False), lambda c: abs(c[0]) < 0.16 and c[1] > 1.0), "stripe", R, 0)
     # hood vents laid on the hood's slope
     for sx in (-1, 1):
         x, z = sx * 0.4, 2.15
@@ -224,7 +222,7 @@ def build_civilian(R):
     mesh("hull", loft(H, 40), "body", R, 0.07)
     # a soft swoosh down each flank, in place of the faction car's racing stripe
     mesh("swoosh", keep(loft(grow(H, 0.022), 40, False, False), lambda c: abs(c[1] - 0.06) < 0.07 and abs(c[0]) > 0.7), "stripe", R, 0)
-    # a big glass bubble, set well down into the hull so its rim is buried, under a two-tone roof cap
+    # a big glass bubble, set well down into the hull so its rim is buried
     cano = [
         {"z": -1.65, "w": 0.7, "t": 0.41, "b": 0.0, "yc": 0.45, "eT": 2.2},
         {"z": -1.1, "w": 1.15, "t": 0.99, "b": 0.0, "yc": 0.45, "eT": 2.2},
@@ -233,23 +231,27 @@ def build_civilian(R):
         {"z": 2.0, "w": 0.5, "t": 0.43, "b": 0.0, "yc": 0.45, "eT": 2.2},
     ]
     mesh("canopy", loft(cano, 28), "glass", R, 0.04)
-    mesh("roof", keep(loft(grow(cano, 0.03), 28, False, False), lambda c: c[1] > 1.34), "roof", R, 0.02)
-    # a roof rack: four posts each standing on the roof (their feet buried in it), two rails and two cross bars, and the pod strapped on top
-    RY = 1.66
+    # the trunk: a two-tone lid over the lengthened rear deck, and the rack and luggage on it, turned side-on (long across the car)
+    mesh("trunkLid", keep(loft(grow(H, 0.02), 40, False, False), lambda c: c[2] < -2.0 and c[1] > 0.3 and abs(c[0]) < 0.9), "roof", R, 0.02)
+    zr = -2.6                       # the rack's middle
+    RXh, RZh = 0.62, 0.36           # half its length (across the car) and half its depth
+    RY = top_y(H, 0, zr) + 0.36
     for sx in (-1, 1):
-        for z in (-0.9, 0.9):
-            yr = top_y(cano, 0.55, z) - 0.05
-            mesh(f"post{sx}{z}", B((sx * 0.55, yr, z), (sx * 0.55, RY, z), 0.03, 6, True), "trim", R, 0.01)
-            mesh(f"foot{sx}{z}", xf(rbox(0.07, 0.03, 0.07, 0.4, 6, 4), (sx * 0.55, yr + 0.04, z)), "trim", R, 0)
-        mesh(f"rail{sx}", B((sx * 0.55, RY, -0.95), (sx * 0.55, RY, 0.95), 0.03, 6, True), "trim", R, 0.01)
-    for z in (-0.5, 0.5):
-        mesh(f"cross{z}", B((-0.55, RY, z), (0.55, RY, z), 0.025, 6, True), "trim", R, 0)
-    mesh("luggage", xf(rbox(0.46, 0.17, 0.62, 0.35, 12, 6), (0, RY + 0.12, -0.05)), "stripe", R, 0.03)
-    for z in (-0.3, 0.3):
-        mesh(f"strap{z}", xf(rbox(0.475, 0.19, 0.025, 0.2, 10, 4), (0, RY + 0.12, z - 0.05)), "trim", R, 0)
+        for sz in (-1, 1):
+            x, z = sx * RXh, zr + sz * RZh
+            yr = top_y(H, abs(x), z) - 0.05      # a post's foot is buried in the deck
+            mesh(f"post{sx}{sz}", B((x, yr, z), (x, RY, z), 0.03, 6, True), "trim", R, 0.01)
+            mesh(f"foot{sx}{sz}", xf(rbox(0.07, 0.03, 0.07, 0.4, 6, 4), (x, yr + 0.04, z)), "trim", R, 0)
+    for sz in (-1, 1):
+        mesh(f"rail{sz}", B((-RXh, RY, zr + sz * RZh), (RXh, RY, zr + sz * RZh), 0.03, 6, True), "trim", R, 0.01)
+    for x in (-0.3, 0.3):
+        mesh(f"cross{x}", B((x, RY, zr - RZh), (x, RY, zr + RZh), 0.025, 6, True), "trim", R, 0)
+    mesh("luggage", xf(rbox(0.5, 0.15, 0.27, 0.35, 12, 6), (0, RY + 0.13, zr)), "stripe", R, 0.03)
+    for x in (-0.22, 0.22):
+        mesh(f"strap{x}", xf(rbox(0.025, 0.17, 0.285, 0.2, 10, 4), (x, RY + 0.13, zr)), "trim", R, 0)
     # round tail lamps in chrome bezels, set into the tail flanks and turned to the surface
     for sx in (-1, 1):
-        p, yaw = flank(H, sx, 0.12, -3.0)
+        p, yaw = flank(H, sx, 0.12, -3.42)
         q = mount(p, yaw, 0.03)
         mesh(f"tail{sx}", xf(lathe([(0, 0), (0.13, 0), (0.13, 0.06), (0, 0.06)], 12), q, (PI / 2, yaw, 0)), "tail", R, 0)
         mesh(f"tailBezel{sx}", xf(torus(0.145, 0.03, 12, 5), (q[0] + math.sin(yaw) * 0.05, q[1], q[2] + math.cos(yaw) * 0.05), (PI / 2, yaw, 0)), "trim", R, 0)
@@ -273,12 +275,12 @@ def build_civilian(R):
             pts = L + [(0.0, y, tip_z)] + Rr
             mesh(name, tube(pts, [0.04] * len(pts), 8, True), "trim", R, 0.02)
     bumper("bumperF", [1.9, 2.3, 2.7, 2.95], -0.1)
-    bumper("bumperR", [-2.2, -2.6, -2.95, -3.15], -0.1, -3.3)
-    yp = (top_y(H, 0, -3.22) + bot_y(H, 0, -3.22)) / 2 + 0.05
-    mesh("plate", xf(rbox(0.22, 0.07, 0.03, 0.3, 6, 4), (0, yp, -3.22)), "roof", R, 0.012)
-    # stubby tail fins with their feet in the deck, door handles on the flanks, mirrors on stalks
+    bumper("bumperR", [-2.5, -2.9, -3.3, -3.55], -0.1, -3.74)
+    yp = (top_y(H, 0, -3.62) + bot_y(H, 0, -3.62)) / 2 + 0.05
+    mesh("plate", xf(rbox(0.22, 0.07, 0.03, 0.3, 6, 4), (0, yp, -3.62)), "roof", R, 0.012)
+    # stubby tail fins with their feet in the deck at the tail's corners, door handles on the flanks, mirrors on stalks
     for sx in (-1, 1):
-        x, z = sx * 0.9, -2.6
+        x, z = sx * 0.7, -3.35
         mesh(f"fin{sx}", xf(rbox(0.07, 0.17, 0.34, 0.5, 10, 6), (x, top_y(H, abs(x), z) + 0.07, z), (-0.3, 0, sx * -0.2)), "body", R, 0.03)
         p, yaw = flank(H, sx, 0.3, 0.0)
         mesh(f"handle{sx}", xf(rbox(0.03, 0.035, 0.2, 0.4, 6, 4), (p[0] - sx * 0.01, p[1], p[2])), "trim", R, 0.01)
@@ -289,8 +291,8 @@ def build_civilian(R):
     oy = top_y(H, 0, 2.4)
     mesh("ornamentStem", B((0, oy - 0.03, 2.4), (0, oy + 0.1, 2.4), 0.03, 6, True), "trim", R, 0)
     mesh("ornament", xf(superquad(0.06, 0.08, 0.06, 0.8, 0.8, 8, 5), (0, oy + 0.15, 2.4)), "trim", R, 0.01)
-    # a whip antenna rooted in the rear deck, on a little base, with a lamp at its tip
-    ax, az = -0.6, -2.1
+    # a whip antenna rooted in the trunk deck's rear corner, on a little base, with a lamp at its tip
+    ax, az = -0.95, -3.0
     ay = top_y(H, ax, az)
     mesh("whipBase", xf(lathe([(0.0, -0.05), (0.07, -0.05), (0.07, 0.04), (0.03, 0.07), (0, 0.07)], 10), (ax, ay, az)), "trim", R, 0)
     mesh("whip", B((ax, ay, az), (ax - 0.08, ay + 1.1, az - 0.28), 0.018, 5, True), "dark", R, 0)
@@ -305,7 +307,7 @@ build_pods(RC, True, HULL_C)
 build_civilian(RC)
 for r in (RF, RC):
     r["radius"] = 3.4
-    r["length"] = 6.5
+    r["length"] = 6.7 if r is RF else 6.9
     r["width"] = 3.9
 print("built", len(C.objects), "objects")
 
