@@ -694,6 +694,23 @@ export class Winch {
     return null;
   }
 
+  // The bend nearest you, checked every frame and with no hold: once you are up at it and the line past it is clear, it is let go at
+  // once. (At 20 Hz with a hold of 0.2 s the cable ran on past a bend you had already passed, stretching by a metre or more and
+  // drawing you back, until it let go and drew you forward again: a visible jerk round every corner.)
+  releaseFirst(o) {
+    if (!o.wraps.length || this.pathN < 3) return;
+    const P = this.path;
+    if (P[0].distanceTo(P[1]) >= 2.5) return;
+    _ignore = o.ignore;
+    try {
+      if (clearFat(this.game.colliders, P[0], P[2], 0.1, o.wraps.length === 1 ? 3 : 0.35)) {
+        o.wraps.splice(0, 1); o.free.splice(0, 1); o.grp.splice(0, 1);
+        this.ropeDirty = true;
+        this.buildPath(o, _hA.copy(P[0]), _hB.copy(P[this.pathN - 1]));
+      }
+    } finally { _ignore = null; }
+  }
+
   // every frame (after the player has moved): the drum reels you in and the cable pulls when it's taut
   update(dt, held) {
     const g = this.game;
@@ -723,6 +740,7 @@ export class Winch {
       const r = this.tendWraps(o);
       o.snagged = r === 'snag'; // (kept for the strain rule below; tendWraps gives up on a structure now, and the cable passes through it)
     }
+    this.releaseFirst(o);
     const nP = this.pathN;
     let len = this.pathLen();
     if (len > RANGE * 1.6) { this.release(); g.hud.toast('The line snapped!', 1.5); return; }
@@ -730,6 +748,15 @@ export class Winch {
     const P0 = this.path[0], P1 = this.path[1], Pn = this.path[nP - 1], Pm = this.path[nP - 2];
     _up.subVectors(P1, P0); if (_up.lengthSq() > 1e-8) _up.normalize();
     _ut.subVectors(Pm, Pn); if (_ut.lengthSq() > 1e-8) _ut.normalize();
+    // (the directions you and the hook are pulled along change in one step when a bend is added or let go: eased over about 80 ms, so the
+    // pull swings round the corner and doesn't flip, and the player isn't thrown by it)
+    if (!o.dirP) { o.dirP = _up.clone(); o.dirT = _ut.clone(); }
+    else {
+      const sm = 1 - Math.exp(-dt * 12);
+      o.dirP.lerp(_up, sm); if (o.dirP.lengthSq() < 1e-6) o.dirP.copy(_up); else o.dirP.normalize();
+      o.dirT.lerp(_ut, sm); if (o.dirT.lengthSq() < 1e-6) o.dirT.copy(_ut); else o.dirT.normalize();
+      _up.copy(o.dirP); _ut.copy(o.dirT);
+    }
 
     o.len = Math.min(o.len, Math.max(REST, len + 0.1)); // (the cable is only ever as long as the path: a ratchet takes up any slack)
     const closeNow = P.vel.dot(_up) + T.vel().dot(_ut); // (how fast the two ends are closing, along the cable)
@@ -781,12 +808,13 @@ export class Winch {
       const share = mT / (mP + mT); // (you take almost all of the correction; it takes a little)
       // positions: back to the cable's length
       const over = len - o.len;
-      P.body.pos.addScaledVector(_up, over * share);
-      T.shift(_d.copy(_ut).multiplyScalar(over * (1 - share)));
+      const ease = 1 - Math.exp(-dt * 20); // (the correction is taken up over a few frames: a snap of up to LEAD in one frame was a visible jump)
+      P.body.pos.addScaledVector(_up, over * share * ease);
+      T.shift(_d.copy(_ut).multiplyScalar(over * (1 - share) * ease));
       // velocities: no moving apart along the cable (the swing, the tow, the drag all come from this)
       const rel = -(P.vel.dot(_up) + T.vel().dot(_ut));
       if (rel > 0) {
-        const j = rel / (1 / mP + 1 / mT);
+        const j = rel / (1 / mP + 1 / mT) * (1 - Math.exp(-dt * 60)); // (most of it each frame, not all at once)
         P.vel.addScaledVector(_up, j / mP);
         T.push(_d.copy(_ut).multiplyScalar(j));
       }
