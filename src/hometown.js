@@ -13,6 +13,7 @@ import { FACTIONS } from './locations.js';
 import { saveWorldState } from './worldstate.js';
 import { terminalPage, wireTerminal, stepSel, keepScroll } from './terminalUI.js';
 import { glyphHtml } from './glyphs.js';
+import { RadioSweep, SWEEP } from './radio.js';
 
 const DK = 0x3a3550, LT = 0xd8d4e8, CONC = 0x8a8698, CREAM = 0xfff4e0, WARM = 0xfff6a8, KEP = 0xff9f1c, GRN = 0x7dff6a;
 export const SLOT_R = 64, SLOTS = 8;
@@ -282,6 +283,8 @@ export function addBuilding(world, loc, i, type) {
 const EXTRAS = {
   // the picker is a screen of its own: the page is left first, and what you chose comes back to it as its message (back(msg, tone, tile))
   clinic: (t) => [{ id: 'respawn', label: 'SET RESPAWN POINT...', short: 'SET RESPAWN...', tone: 'go', fn: () => { t.leave(); t.game.respawnPt.menu((msg, tone) => t.back(msg, tone, 'clinic')); return { takeover: true }; } }],
+  // (the map closes onto the world, not the page: the sweep goes on while you play)
+  radio: (t) => [{ id: 'radio', label: 'OPEN THE WORLD MAP...', short: 'WORLD MAP...', tone: 'go', fn: () => t.openRadio() }],
 };
 // the live rows under a built building's text: type -> (t) => { rows: [[label, value, tone?]], meter?, note? }
 const pays = (k) => () => ({ rows: [['INCOME', `₵${BUILDINGS[k].income} a minute`], ['BANK HOLDS', `₵${BANK_CAP}`]], note: 'Nothing to press: it pays into the town bank.' });
@@ -305,7 +308,11 @@ const LIVE = {
     return ring ? { rows: [['RING', `${Math.round(ring.Rb)} m round the town`], ['LINKS', `${tr.roads.filter((r) => r.A === t.loc || r.B === t.loc).length} settlements`]], note: 'Nothing to press: the traffic uses them.' }
       : { rows: [['RING', 'Not laid yet']], note: 'The road crews lay the ring road and the links when the game next loads.' };
   },
-  radio: () => ({ rows: [['MAP CHARTED', '3 km round town'], ['VOTES', 'Council sits twice as often']], note: 'Nothing to press yet.' }),
+  radio: (t) => {
+    const R = t.radio, s = R.s, pct = Math.round(R.frac * 100);
+    const status = !s ? ['IDLE', 'dim'] : s.on ? [`SWEEPING ${pct}%`, 'gold'] : s.r >= SWEEP.max ? ['MAX RANGE', ''] : [`STOPPED ${pct}%`, 'dim'];
+    return { rows: [['SWEEP', ...status], ['MAP CHARTED', '3 km round town'], ['VOTES', 'Council sits twice as often']], meter: s ? { v: R.frac, text: `${Math.round(s.r)} / ${SWEEP.max} m` } : null };
+  },
   pad: () => ({ rows: [['HOME BASE', 'You start, recall and redeploy here']], note: 'Nothing to press.' }),
 };
 // what a building does the moment it is built, beyond standing on its plot: type -> (t) => a line for the page's "BUILT" message
@@ -323,6 +330,7 @@ const ON_BUILT = {
 // use(t, player) the prompt and what F does (null: nothing here)
 const POINTS = [
   { id: 'hall', at: (t) => t.terminal, r: 4.5, use: (t) => ({ prompt: '<b>F</b> — MOON COUNCIL HALL', act: () => t.menu() }) },
+  { id: 'radio', at: (t) => t.spot('radio'), r: 5, use: (t) => ({ prompt: '<b>F</b> — RADIO TOWER: WORLD MAP', act: () => t.openRadio() }) },
   // (no page behind the picker here: what you chose is a toast, in the world you are back in)
   { id: 'clinic', at: (t) => t.spot('clinic'), r: 5, use: (t) => ({ prompt: '<b>F</b> — CLINIC: SET YOUR RESPAWN POINT', act: () => t.game.respawnPt.menu((msg) => { if (msg) t.game.hud.toast(msg, 3); }) }) },
 ];
@@ -341,10 +349,11 @@ export class HomeTown {
     this.ui = null; // the page as last drawn: { sel, acts }
     this.view = null; // the board tab's next paint: { sel, msg, tone }
     this.quietUntil = 0; // (performance.now) a press just answered in place: the second half of a double-click is not meant for what is under it now
+    this.radio = new RadioSweep(this); // the Radio Tower's sweep of the world map (radio.js)
     if (this.state) this.ws.council ||= { passed: [], next: 0 }; // (a town from before the council was saved has none)
     if (this.loc) {
       this.terminal = game.world.toWorld(this.loc, TERMINAL.x, 0, TERMINAL.z);
-      if (this.has('radio')) this.chart();
+      if (this.has('radio')) { this.chart(); this.radio.restore(); }
     }
   }
 
@@ -353,12 +362,18 @@ export class HomeTown {
   has(type) { return !!this.state && this.state.slots.includes(type); }
   slotWorld(type) { const i = this.state.slots.indexOf(type); if (i < 0) return null; const p = slotAt(i); return this.game.world.toWorld(this.loc, p.x * 0.75, 0, p.z * 0.75); }
 
+  // the tower charts 3 km of map round the town, and finds the places inside it
   chart() {
-    const G2 = this.game.globe;
-    if (!G2 || !G2.cells) return;
-    const cos = Math.cos(3000 / 3600), d = this.loc.dir;
-    for (let k = 0; k < G2.explored.length; k++) if (G2.cells[k * 3] * d.x + G2.cells[k * 3 + 1] * d.y + G2.cells[k * 3 + 2] * d.z > cos) G2.explored[k] = 1;
-    G2.save();
+    const G = this.game.globe;
+    if (G && G.cells) G.revealAround(this.loc.dir, 3000);
+  }
+
+  // the tower's world map: you sweep the rest of the Moon from here. It is a screen of its own (leave() first); closing it puts you back in the world
+  openRadio() {
+    if (!this.has('radio')) return { msg: 'BUILD A RADIO TOWER FIRST', tone: 'bad' };
+    this.leave();
+    this.game.openMap({ radio: true });
+    return { takeover: true };
   }
 
   // a point in a building's plot frame (x across, z toward the hall), in the world; null until it's built

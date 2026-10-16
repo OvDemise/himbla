@@ -404,6 +404,7 @@ class Game {
         }
       } else if (this.state === 'map') {
         if (esc || code === 'KeyM') this.closeModal(esc);
+        else if (this.globe.mode === 'radio' && code === 'KeyX' && !(e && e.repeat)) this.globe.radioToggle(); // (stop / resume the sweep)
       } else if (this.state === 'log') {
         if (esc || code === 'KeyJ') this.closeModal(esc);
       } else if (this.state === 'dialog') {
@@ -444,6 +445,7 @@ class Game {
     document.getElementById('globe-wrap').classList.add('hidden');
     document.getElementById('globe-tip').classList.add('hidden');
     document.getElementById('replog').classList.add('hidden');
+    if (this.globe.mode) this.globe.setMode(null);
     this.state = 'play';
     // swallow the key that closed it so it can't immediately reopen anything
     this.input.justPressed.clear();
@@ -453,11 +455,13 @@ class Game {
     this.input.lock();
   }
 
-  openMap() {
+  // opts.radio: opened from the Radio Tower, where a click in the fog sends a sweep (mapview.js)
+  openMap(opts = {}) {
     this.tutorial.on('map');
     this.openModal('map');
     document.getElementById('globe-wrap').classList.remove('hidden');
     this.globe.center();
+    this.globe.setMode(opts.radio ? 'radio' : null);
     this.globe.draw();
   }
 
@@ -1182,6 +1186,8 @@ class Game {
     const frozen = FROZEN_STATES.has(this.state);
     const dt = frozen ? 0 : rdt;
     this.time += dt;
+    // the Radio Tower's sweep runs on real time while you play or watch the map (the world is frozen there); a pause, a dialog or a K.O. holds it
+    if (this.town && this.town.radio && (this.state === 'play' || this.state === 'map') && !this.away()) this.town.radio.tick(rdt, this.state === 'map');
 
     const playing = this.state === 'play';
     if (!playing) { if (this.garage && this.garage.radial) this.garage.closeRadial(false); this.vHold = 0; } // (the vehicle wheel, or a V / Y tap still in flight, doesn't outlive the play screen: a pause, the map, a dialog, a death)

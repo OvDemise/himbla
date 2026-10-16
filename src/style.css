@@ -1387,6 +1387,25 @@ body.dark-side #powradial .pr-item.cur.on { border-color: #8f7bff; }
 #globe-legend.folded .lg-tab:hover, #globe-legend.folded .lg-tab.pad-focus { background: var(--cyan); color: #05030c; }
 #globe-legend .lg-tab-t { writing-mode: vertical-rl; letter-spacing: 2px; }
 @media (max-width: 1000px) { #globe-legend { width: 168px; } #globe-legend .lg-row { font-size: 12px; } }
+/* the Radio Tower's panel, beside the globe when the map is opened from the tower: the legend's comic look */
+#globe-radio { position: relative; width: 214px; flex: none; background: var(--ui-bg); color: var(--ui-text); border: 2px solid var(--ui-edge); box-shadow: 0 0 0 2px #05030c, var(--ui-shadow); cursor: default; }
+#globe-radio .gr-head { padding: 8px 10px 7px; border-bottom: 2px solid var(--ui-edge); background: var(--ui-bg2, rgba(26, 20, 48, 0.95)); font-family: var(--comic); font-size: 10px; color: var(--yellow); letter-spacing: 1px; }
+#globe-radio .gr-body { padding: 8px 10px 10px; display: flex; flex-direction: column; gap: 6px; }
+#globe-radio .gr-name { font-size: 14px; color: var(--ui-muted); }
+#globe-radio .gr-row { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+#globe-radio .gr-row label { font-family: var(--comic); font-size: 7px; color: var(--ui-violet); }
+#globe-radio .gr-row b { font-weight: normal; font-size: 15px; color: var(--cyan); }
+#globe-radio .gr-row b.cr { font-family: var(--comic); font-size: 9px; line-height: 1.3; white-space: nowrap; } /* (the body face draws a 5 like an S: figures use the display face) */
+#globe-radio .gr-row b.off { color: var(--ui-muted); }
+#globe-radio .gr-row b.done { color: var(--yellow); }
+#globe-radio .gr-bar { background: var(--cyan); }
+#globe-radio .gr-found { font-size: 13px; line-height: 1.2; color: var(--green); }
+#globe-radio .gr-msg { font-size: 13px; line-height: 1.2; color: #ff7a8a; }
+#globe-radio .gr-btn { font-family: var(--comic); font-size: 10px; line-height: 1.2; padding: 9px 8px 7px; cursor: pointer; background: var(--cyan); color: #05030c; border: 2px solid #05030c; box-shadow: 3px 3px 0 #05030c; }
+#globe-radio .gr-btn:disabled { background: var(--ui-bg3); color: var(--ui-muted); cursor: default; box-shadow: none; }
+#globe-radio .gr-help { font-size: 12px; line-height: 1.25; color: var(--ui-muted); }
+/* narrow windows: the legend steps aside and the panel lies over the globe's lower left, without its help text */
+@media (max-width: 1100px) { #globe-wrap.radio #globe-legend { display: none; } .globe-row { position: relative; } #globe-radio { position: absolute; left: 6px; bottom: 6px; width: 188px; z-index: 2; background: rgba(18, 12, 32, 0.92); } #globe-radio .gr-help { display: none; } }
 
 /* save slot tools (load game): export / import / restore / delete, stacked beside the card */
 .sv-tools { flex: none; width: 104px; display: flex; flex-direction: column; gap: 4px; }

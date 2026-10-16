@@ -14,8 +14,10 @@
 //   pirateTowns [location ids]     Lights Out: the towns the clans blew up and took (pirate dens now)
 //   blackSun    true               Daedalus chapter 4: the reactor at the Forward Post stays
 //   town        {dir,name,kind,    Kepler finale: your town (hometown.js), a settlement on the map
-//               slots,bank}        (slots: eight building keys or null; School & Playground became Roads,
-//                                  so an old save's 'school' is read as 'roads' at load)
+//               slots,bank,radio}  (slots: eight building keys or null; School & Playground became Roads,
+//                                  so an old save's 'school' is read as 'roads' at load; radio: the Radio Tower's
+//                                  sweep of the world map, { d: [x,y,z], r metres, on, n cells, f: [location ids] },
+//                                  radio.js)
 //   council     {passed,next}      the Moon Council's carried motions (and when it sits next)
 //   respawnAt   string|null        the headquarters (location id) you set at your town's clinic to redeploy at after a
 //                                  K.O. (respawn.js); null = your nearest clinic, else home
