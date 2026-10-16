@@ -82,9 +82,14 @@ export function dressRunner(M, outfitId) {
   const add = (parent, mesh, outline = 0.03) => { if (outline) ink(mesh, outline); parent.add(mesh); out.push(mesh); return mesh; };
   for (const e of o.extras || []) {
     if (e === 'crest') {
-      // a swept fin over the helmet: a rounded blade instead of a flat slab
-      const c = add(M.head, new THREE.Mesh(EXTRA_GEO().crest, toon(o.accent)));
-      c.position.set(0, 0.26, -0.04);
+      // the Blender-built swept fin, its base sunk into the helmet (its outline is its own thin shell: see build_runner.py). The
+      // code-built slab only if the file has none
+      const g = runnerExtra('crest', { accent: toon(o.accent) });
+      if (g) { M.head.add(g); out.push(g); }
+      else {
+        const c = add(M.head, new THREE.Mesh(EXTRA_GEO().crest, toon(o.accent)));
+        c.position.set(0, 0.26, -0.04);
+      }
     } else if (e === 'pads') {
       // Blender-built shoulder pads (three stepped lames, trim, ridge, studs) that turn with the arm; the
       // plain dome on the torso only if the file has none

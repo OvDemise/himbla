@@ -403,8 +403,25 @@ H = pivot("head", (0, 1.18, 0), T)
 mesh("head_helmet", lathe([(0, -0.36), (0.19, -0.31), (0.29, -0.22), (0.35, -0.09), (0.36, 0.0), (0.35, 0.09), (0.31, 0.2), (0.24, 0.29), (0.13, 0.345), (0, 0.36)], 24), "helmet", H, 0.05)
 # centre stripe over the crown in the accent colour
 # polar angle from the crown: +40 deg sits just above the visor frame, -125 deg is low on the back
-stripe = [(0, 0.367 * math.cos(math.radians(d)), 0.367 * math.sin(math.radians(d))) for d in range(40, -126, -15)]
-mesh("head_stripe", tube(stripe, [0.03] * len(stripe), 6), "accent", H, 0)
+stripe = [(0, 0.367 * math.cos(math.radians(d)), 0.367 * math.sin(math.radians(d))) for d in range(40, -126, -5)]  # (every 5 degrees: a chord that long dips under the helmet's ring creases and punches holes in a flat band)
+def band(path, hw, top, bot):
+    """A flat band laid along a path on the helmet (a sphere about the origin): a rectangular section, the sideways direction always x, the
+    other radial, so it cannot twist (a round tube's frame flips where the path passes straight up, which was invisible on a tube and
+    tears a flattened one in half). `top` and `bot` are the radii of its outer and inner faces."""
+    verts, faces = [], []
+    for p in path:
+        r = Vector(p).normalized()
+        for sx, level in ((-1, top), (1, top), (1, bot), (-1, bot)):
+            verts.append(tuple(r * level + Vector((sx * hw, 0, 0))))
+    n = len(path)
+    for i in range(n - 1):
+        for k in range(4):
+            k2 = (k + 1) % 4
+            faces.append((i * 4 + k, i * 4 + k2, (i + 1) * 4 + k2, (i + 1) * 4 + k))
+    faces.append((3, 2, 1, 0))
+    faces.append(tuple((n - 1) * 4 + k for k in range(4)))
+    return verts, faces
+mesh("head_stripe", band(stripe, 0.03, 0.375, 0.345), "accent", H, 0)
 # visor frame and glass: shells over the face
 def shell(r, phi0, phi1, th0, th1, nu=20, nv=10, thick=0.0):
     verts, faces = [], []
@@ -517,6 +534,20 @@ for side, tag in ((-1, "L"), (1, "R")):
     mesh("pad" + tag + "_crownRing", xf(xf(lathe([(0.052, 0.1488), (0.056, 0.1486), (0.056, 0.1476), (0.052, 0.1472)], 20, 1.0, 0.92)), at, tilt), "metal", P, 0)
     mesh("pad" + tag + "_stud", xf(xf(superquad(0.02, 0.006, 0.02, 0.8, 0.8, 10, 4), (0, 0.1485, 0)), at, tilt), "metal", P, 0)
 
+# helmet crest (SPACECOM admiral, Vostok hero, Daedalus prototype): a swept fin over the crown, the profile and size of the old code-built
+# one (cosmetics.js) but with its base carried down INTO the helmet all along its length. The old one stopped at y 0.20 on the head, which
+# at the back is 8 cm above the helmet's surface, so its outline shell showed under it as a second arc and cut across the crown stripe.
+# Its outline is a 1.2 cm shell (the rest of the courier uses 3 to 5 cm: a fin that thin and that tall needs a finer line), and the game
+# thins every shell of the courier further as the camera comes in (toon.js inkMatNear).
+def quad(p0, c, p1, n):
+    return [((1 - t) ** 2 * p0[0] + 2 * (1 - t) * t * c[0] + t * t * p1[0], (1 - t) ** 2 * p0[1] + 2 * (1 - t) * t * c[1] + t * t * p1[1]) for t in [i / n for i in range(1, n + 1)]]
+CREST_Y, CREST_Z = 0.26, -0.04   # where the old one sat on the head
+crest_pts = [(0.3, -0.2), (0.3, -0.06)] + quad((0.3, -0.06), (0.22, 0.12), (0.02, 0.2), 10) + quad((0.02, 0.2), (-0.2, 0.26), (-0.34, 0.1), 10) + [(-0.3, -0.06), (-0.3, -0.2)]
+Cp = pivot("crest", (0, 0, 0), H)
+cr = mesh("crest_fin", xf(extrude([(p[0] + CREST_Z, p[1] + CREST_Y) for p in crest_pts], 0.07, "x")), "accent", Cp, 0.012, smooth=False)
+bev = cr.modifiers.new("bevel", "BEVEL")
+bev.width = 0.012; bev.segments = 2; bev.limit_method = "ANGLE"; bev.angle_limit = math.radians(40)
+
 # headband: a strip that hugs the helmet (radius 0.34 at its height), thicker at the front, a knot behind the
 # left ear with two tails and a loose end, and a stitched line along the lower edge
 Bp = pivot("band", (0, 0, 0), H)
@@ -571,6 +602,40 @@ for b, z in enumerate((-0.17, -0.24)):
 for i in range(5):
     x = -0.06 + i * 0.03
     mesh(f"scarf3_tassel{i}", tube([(x, -0.01, -SL + 0.01), (x * 1.1, -0.015, -SL - 0.05), (x * 1.15, -0.018, -SL - 0.09)], [0.012, 0.011, 0.008], 5), "scarf", S, 0)
+
+# ---- flush the painted-on stripes: sink what sticks out of the body into its surface ----
+# The stripes and seams (ink 0: they carry no outline of their own) were tubes laid along a body part, standing 1 to 4 cm proud of it. The
+# body part's outline is a black shell 3 to 5 cm thick round it, so wherever a stripe crossed its silhouette (the head stripe over the
+# crown, a seam down the side of the torso) the stripe's colour was drawn across the black band, the "colour through the outline" look.
+# Each vertex of a stripe that is outside its body part by more than MAX_PROUD (and within the shell) is moved to MAX_PROUD above the
+# surface, so the tube's outer half becomes a flat ribbon that lies on the body and stays inside its line. (tools/blender/audit_outline.py
+# lists what is still proud.)
+from mathutils.bvhtree import BVHTree
+MAX_PROUD = 0.006   # (the bodies are low-poly lathes: a 24-sided helmet sags 3 to 4 mm between its vertices, so a ribbon any closer to the
+                    #  nearest vertex-surface dips under the facets and breaks up)
+FLUSH = [("head_stripe", "head_helmet", 0.008), ("torso_seamL", "torso_trunk"), ("torso_seamR", "torso_trunk")]
+for tag in "LR":
+    FLUSH += [(f"leg{tag}_stripe", f"leg{tag}_leg"), (f"arm{tag}_stripe", f"arm{tag}_arm"), (f"arm{tag}_foreStripe", f"arm{tag}_fore")]
+_dg = bpy.context.evaluated_depsgraph_get()
+def flush(pname, bname, proud=MAX_PROUD):
+    P, B = bpy.data.objects[pname], bpy.data.objects[bname]
+    bme = B.evaluated_get(_dg).to_mesh()
+    bw = B.matrix_world
+    tree = BVHTree.FromPolygons([bw @ v.co for v in bme.vertices], [tuple(p.vertices) for p in bme.polygons])
+    reach = float(B["ink"])
+    pw, inv = P.matrix_world, P.matrix_world.inverted()
+    moved = 0
+    for v in P.data.vertices:
+        co = pw @ v.co
+        loc, n, idx, d = tree.find_nearest(co, reach)
+        if loc is None or (co - loc).dot(n) <= 0 or d <= proud:
+            continue
+        v.co = inv @ (loc + n * proud)
+        moved += 1
+    P.data.update()
+    return moved
+for pn, bn, *pr in FLUSH:
+    flush(pn, bn, *pr)
 
 print("built", len(C.objects), "objects")
 

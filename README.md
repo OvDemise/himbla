@@ -758,6 +758,7 @@ src/
   assets/outposts.glb  the Relay Mast and Watchtower outposts, intact and wrecked (a pilot, off unless the URL has `?outpostGlb`; contract in docs/outpost-glb.md)
 tools/
   blender/build_runner.py  builds the runner in Blender and exports src/assets/runner.glb
+  blender/audit_outline.py lists the courier's parts that stick out of another part with no outline of their own (headless: `python3 tools/blender/audit_outline.py`)
   blender/build_idles.py   keys the runner's seven idles on its pivots (elbows included) -> src/assets/idles.json (headless: `pip install bpy`, then `python3 tools/blender/build_idles.py`; `MOONRUNNER_IDLES_BLEND=idles.blend` also saves the keyed scene)
   optimize-glb.mjs         compresses the models in src/assets (quantized and meshopt-coded: about a quarter of the size); `npm run optimize:glb`, run after re-exporting a model from Blender
   blender/build_ships.py   builds both transit ships in Blender and exports src/assets/ships.glb (the freighter's bays use cargo.py: the land-train's cargo units, mirrored from build_landtrain.py; FREIGHTER_VARIANT=atlas|compact builds the one-crate-high and the smaller-hull studies instead of the shipped two-high freighter)
