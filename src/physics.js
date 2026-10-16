@@ -442,7 +442,9 @@ export function stepSkater(b, input, dt, planet, colliders, params = PHYS, impac
       if (pen <= 0) continue;
       b.pos.addScaledVector(_n, pen);
       cp.addScaledVector(_n, pen);
-      const vn = v.dot(_n);
+      // (the velocity of a body riding a deck is the deck's frame, b.velFrame; any other deck is moving under it: it is hit at the speed it closes)
+      const pv = c.platform && c.platform.vel && b.velFrame !== c.platform ? c.platform.vel : null;
+      const vn = pv ? v.dot(_n) - pv.dot(_n) : v.dot(_n);
       if (vn < 0 && c.bouncy) {
         // inflatable: always springs you back out, harder than you came in
         v.addScaledVector(_n, -vn * 2.15 + 4);
