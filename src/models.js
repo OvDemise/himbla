@@ -20,6 +20,7 @@ const GLB = {
   dish: () => import('./assets/dish.glb?inline'),
   engine: () => import('./assets/engine.glb?inline'),
   briefcase: () => import('./assets/briefcase.glb?inline'),
+  hovercar: () => import('./assets/hovercar.glb?inline'),
 };
 
 // A model file can be compressed (tools/optimize-glb.mjs: quantized, then meshopt-coded: about a third of the size).
@@ -1229,7 +1230,7 @@ const SHIP_TOON = { trim: 0xd8d4e8, dark: 0x2a2540, metal: 0x8a87a0, steel: 0x55
 const SHIP_FX = new Set(['plume', 'plumeCore', 'lift', 'engine', 'core']); // per-ship materials (they pulse)
 const FLAMES = new Set(['plume', 'plumeCore', 'lift']);
 export async function loadShipParts() {
-  const [gltf, sk, wr, ap, lt, cr, ga, di, en, bc] = await Promise.all(['ships', 'skimmer', 'warrig', 'apc', 'landtrain', 'crane', 'garage', 'dish', 'engine', 'briefcase'].map(loadGlb));
+  const [gltf, sk, wr, ap, lt, cr, ga, di, en, bc, hc] = await Promise.all(['ships', 'skimmer', 'warrig', 'apc', 'landtrain', 'crane', 'garage', 'dish', 'engine', 'briefcase', 'hovercar'].map(loadGlb));
   SHIP_PARTS = {};
   for (const name of ['shuttle', 'freighter']) {
     const root = gltf.scene.getObjectByName(name);
@@ -1274,6 +1275,12 @@ export async function loadShipParts() {
   // the salvaged engine that drops out of a wreck (tools/blender/build_engine.py)
   ENGINE_MODEL = en.scene.getObjectByName('engine');
   if (!ENGINE_MODEL) throw new Error('engine.glb has no engine');
+  // the hover-cars (tools/blender/build_hovercar.py): the faction car and the civilian car
+  for (const name of ['car_faction', 'car_civilian']) {
+    const car = hc.scene.getObjectByName(name);
+    if (!car) throw new Error('hovercar.glb has no ' + name);
+    SHIP_PARTS[name] = bakeShip(car);
+  }
   CASE_MODEL = bc.scene.getObjectByName('briefcase');
   if (!CASE_MODEL) throw new Error('briefcase.glb has no briefcase');
   for (const m of [ENGINE_MODEL, CASE_MODEL]) m.traverse((o) => { if (o.isMesh) { o.userData.slot = o.material.name; o.castShadow = true; } });
@@ -2069,55 +2076,65 @@ export class LightTrail {
   dispose() { this.mesh.removeFromParent(); this.mesh.geometry.dispose(); this.mesh.material.dispose(); }
 }
 
-// Hover-car: a smooth flattened capsule with a bubble canopy, a rub-strip round the waist, slim
-// side pods, swept fins and lights set into the skin. Built at the old size (4.8 long) and scaled
-// up 1.15 (traffic.js sizes its deck and hit radius to match).
-export const CAR_SCALE = 1.15;
-export function makeHoverCar({ color = 0xff7ad9, trim = 0xfff4e0 } = {}) {
-  const root = new THREE.Group();
-  const body = baked(`car2|${color}|${trim}`, (k) => {
-    const DK = KT(0x1d1a29);
-    // the hull: a capsule squashed a little top to bottom
-    k.add(new THREE.CapsuleGeometry(1.1, 2.6, 8, 16).rotateX(Math.PI / 2).scale(1, 0.82, 1), KT(color), 0, 0, 0, { outline: 0.08 });
-    // the waist: a thin rub-strip that follows the hull round, and a darker belly pan under it
-    k.add(new THREE.CapsuleGeometry(1.14, 2.6, 6, 16).rotateX(Math.PI / 2).scale(1, 0.1, 1), KT(trim), 0, -0.12, 0, { outline: 0 });
-    k.add(new THREE.CapsuleGeometry(0.9, 2.4, 6, 12).rotateX(Math.PI / 2).scale(1, 0.32, 1), DK, 0, -0.62, 0, { outline: 0 });
-    // canopy: a glass bubble on a trim collar, with a roof spine
-    k.add(new THREE.SphereGeometry(0.95, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2).scale(1, 0.9, 1.25), KG(0x9be7ff), 0, 0.42, 0.2, { outline: 0.05 });
-    k.add(new THREE.TorusGeometry(0.95, 0.07, 4, 20).scale(1, 1.25, 1), KT(trim), 0, 0.44, 0.2, { rx: Math.PI / 2, outline: 0 });
-    k.add(new THREE.TorusGeometry(1.0, 0.05, 4, 16, Math.PI).scale(1.22, 0.88, 1), KT(trim), 0, 0.42, 0.2, { ry: Math.PI / 2, outline: 0 }); // (a roof hoop over the bubble)
-    // hood: two vent slots and a little badge
-    for (const sx of [-1, 1]) k.add(new THREE.BoxGeometry(0.1, 0.04, 0.7), DK, sx * 0.32, 0.62, 1.75, { rx: 0.35, outline: 0 });
-    k.add(new THREE.CylinderGeometry(0.12, 0.12, 0.04, 10), KG(trim), 0, 0.55, 2.1, { rx: 0.9, outline: 0 });
-    // lights: lenses sunk into the nose and tail so only their faces show
-    for (const sx of [-1, 1]) {
-      k.add(new THREE.SphereGeometry(0.2, 10, 6).scale(1.5, 0.55, 0.6), KG(0xfff6a8), sx * 0.55, 0.05, 2.2, { outline: 0 });
-      k.add(new THREE.SphereGeometry(0.2, 10, 6).scale(1.4, 0.5, 0.6), KG(0xff2a4a), sx * 0.55, 0.08, -2.2, { outline: 0 });
+// ---- The hover-cars (built in Blender, see build_hovercar.py) ----
+// The smallest road vehicle, in two sets from one body style, about 6.5 m long and 3.9 m over the pods: the FACTION car (a low, sharp
+// hull in a faction's colours; SPACECOM's alone carries the roof light bar) and the CIVILIAN car (a rounder two-tone with a roof rack,
+// in one of CAR_PAINTS: none black, none a faction colour). Slots: body, roof (civilian), stripe (faction trim / civilian accent), trim,
+// dark, and the glowing glass, lamp, tail, lift (the four hover pads) and beaconA / beaconB (the light bar's two lamps).
+export const CAR_FACTIONS = {
+  spacecom: { body: 0xf2ecdc, stripe: 0xffd23f }, // white and yellow
+  vostok: { body: 0x6b6f78, stripe: 0xff3b5c }, // slate and red
+  kepler: { body: 0xff9f1c, stripe: 0x6a8f3a }, // orange and the Mule's green (cream hid the headlamps)
+  meridian: { body: 0x2ec4ff, stripe: 0x16385e }, // cyan and navy
+};
+export const CAR_PAINTS = [
+  { name: 'Bubblegum', body: 0xff7ad9, roof: 0xfff4e0, stripe: 0xffd0ee },
+  { name: 'Turquoise', body: 0x1fc7b0, roof: 0xf0dfb8, stripe: 0xfff4e0 },
+  { name: 'Periwinkle', body: 0x7b8cff, roof: 0xf4f0ff, stripe: 0xffe08a },
+  { name: 'Mocha', body: 0x9a6b4f, roof: 0xf1e2cf, stripe: 0xe8b88a },
+  { name: 'Seafoam', body: 0x8ee6c0, roof: 0xffffff, stripe: 0xffb3a1 },
+];
+const CAR_GLOW = { glass: 0x9be7ff, lamp: 0xfff6a8, tail: 0xff2a4a, beaconA: 0xff2a4a, beaconB: 0x2e7bff };
+// faction: the car's faction (one of CAR_FACTIONS, else it is a civilian car); paint: which of CAR_PAINTS the civilian car wears.
+// Returns { root, size, beacons } (the light bar's lamp groups, each with userData.phase 0 or 1, for traffic to alternate).
+export function makeHoverCar({ faction = null, paint = 0 } = {}) {
+  const fac = CAR_FACTIONS[faction];
+  const B = SHIP_PARTS[fac ? 'car_faction' : 'car_civilian'];
+  const pal = fac ? { ...fac, trim: 0x8a87a0, dark: 0x2a2540, lift: 0x7be0ff } : { ...CAR_PAINTS[((paint % CAR_PAINTS.length) + CAR_PAINTS.length) % CAR_PAINTS.length], trim: 0xd8d4e8, dark: 0x5b5870, lift: 0xffe6a8 };
+  const mats = new Map();
+  const matFor = (slot) => {
+    if (!mats.has(slot)) mats.set(slot, slot === 'lift' || slot in CAR_GLOW ? glow(pal[slot] ?? CAR_GLOW[slot]) : toon(pal[slot] ?? 0xff00ff));
+    return mats.get(slot);
+  };
+  const beacons = [];
+  const build = (node) => {
+    if (node.role === 'livery' && node.data.faction !== faction) return null; // (SPACECOM's light bar is the only livery part)
+    const g = new THREE.Group();
+    g.name = node.name;
+    g.position.copy(node.pos);
+    g.quaternion.copy(node.quat);
+    for (const { slot, geo } of node.parts) {
+      const m = new THREE.Mesh(geo, matFor(slot));
+      m.castShadow = !(slot === 'lift' || slot in CAR_GLOW);
+      g.add(m);
     }
-    k.add(new THREE.BoxGeometry(0.7, 0.05, 0.08), KG(0xff2a4a), 0, 0.3, -2.13, { rx: -0.5, outline: 0 }); // brake bar
-    k.add(new THREE.BoxGeometry(0.5, 0.22, 0.05), KT(0xfff4e0), 0, -0.3, -2.22, { rx: 0.25, outline: 0.02 }); // plate
-    for (const sx of [-1, 1]) {
-      // side pods: slim capsules tucked against the hull, an intake ring up front, a warm vent at the back
-      k.add(new THREE.CapsuleGeometry(0.34, 1.9, 4, 10).rotateX(Math.PI / 2), KT(trim), sx * 1.12, -0.45, -0.25, { outline: 0.04 });
-      k.add(new THREE.TorusGeometry(0.3, 0.07, 4, 12), DK, sx * 1.12, -0.45, 1.0, { outline: 0 });
-      k.add(new THREE.CylinderGeometry(0.22, 0.26, 0.12, 10).rotateX(Math.PI / 2), KG(0xff9f1c), sx * 1.12, -0.45, -1.55, { outline: 0 });
-      // door seam and a handle
-      k.add(new THREE.BoxGeometry(0.03, 0.55, 0.04), DK, sx * 1.07, 0.1, 0.9, { rz: sx * 0.25, outline: 0 });
-      k.add(new THREE.BoxGeometry(0.04, 0.06, 0.28), KT(trim), sx * 1.06, 0.25, 0.4, { rz: sx * 0.3, outline: 0 });
-      // mirrors on stalks
-      k.beam([sx * 0.85, 0.5, 0.95], [sx * 1.15, 0.62, 1.0], 0.03, DK, { outline: 0 });
-      k.add(new THREE.SphereGeometry(0.13, 8, 6).scale(1, 0.7, 0.5), KT(color), sx * 1.2, 0.64, 1.0, { outline: 0.02 });
-      // swept tail fins
-      k.add(new THREE.BoxGeometry(0.08, 0.7, 0.8), KT(color), sx * 0.55, 0.75, -1.9, { rz: sx * -0.45, rx: -0.5, outline: 0.03 });
-      k.add(new THREE.BoxGeometry(0.09, 0.12, 0.5), KT(trim), sx * 0.7, 1.02, -2.05, { rz: sx * -0.45, rx: -0.5, outline: 0 });
+    if (node.ink) {
+      const h = new THREE.Mesh(node.ink, inkMat);
+      h.castShadow = false;
+      h.userData.isInk = true;
+      g.add(h);
     }
-    // a whip antenna with a tip light
-    k.beam([-0.5, 0.6, -1.5], [-0.62, 1.7, -1.75], 0.02, DK, { outline: 0 });
-    k.ball(0.06, KG(0xff2a4a), -0.62, 1.72, -1.75, { outline: 0 });
-  });
-  body.scale.setScalar(CAR_SCALE);
-  root.add(body);
-  return { root, size: 3 * CAR_SCALE };
+    if (node.role === 'beacon') { g.userData.phase = node.data.phase || 0; beacons.push(g); }
+    for (const k of node.kids) {
+      const c = build(k);
+      if (c) g.add(c);
+    }
+    return g;
+  };
+  const root = build(B);
+  root.position.set(0, 0, 0);
+  root.quaternion.identity();
+  return { root, size: 3 * 1.15 * 1.18, beacons };
 }
 
 // Freighter: a deep-haul hammerhead: a long flat deck you can ride, a raked bridge tower at the

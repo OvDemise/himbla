@@ -42,6 +42,7 @@ function segDist2(a, b, c) {
 const FREIGHT = [['tank', 'cargo', 'blast'], ['cargo', 'tank', 'blast'], ['tank', 'tank', 'blast'], ['tank', 'cargo', 'cargo']];
 const TRAIN_HP = 400, BUGGY_HP = 120, CAR_HP = 90;
 const _z = new THREE.Vector3(0, 0, 1);
+const _eu = new THREE.Euler();
 // ring roads round each connected town
 const RING_GAP = 32; // ring centreline this far outside the settlement radius (past buildings / plateau edge)
 const RING_PUSH = 90; // pushed out up to this much more where something is in the way
@@ -1720,11 +1721,13 @@ export class Traffic {
     });
     if (military) return;
     // hover-cars: hop over slower traffic instead of queueing (the jar can scoop these)
+    // (one is a faction car in the livery of the road's faction, the other a civilian car in one of the civilian paints)
+    const carFaction = this.trainSpec(road, k).faction;
     for (let i = 0; i < 2; i++) {
-      const m = makeHoverCar({ color: [0xff7ad9, 0x2ec4ff, 0x7dff6a, 0xffd23f][(k + i) % 4] });
+      const m = makeHoverCar(i === 0 ? { faction: carFaction } : { paint: k });
       m.root.matrixAutoUpdate = true;
       this.w.scene.add(m.root);
-      const v = add({ ...m, kind: 'car', vmax: 22 + this.r() * 6, acc: 4, front: 2, tail: 2, waitT: 4, deck: [1.45, 1.1, 3.1], deckY: 0, quat: m.root.quaternion, view: 800, radius: 2.8, hoverH: 1.8, hp: CAR_HP, maxHp: CAR_HP, hitR: 3.0, credits: 30 });
+      const v = add({ ...m, kind: 'car', vmax: 22 + this.r() * 6, acc: 4, front: 2.4, tail: 2.4, waitT: 4, deck: [1.7, 1.3, 3.6], deckY: 0, quat: m.root.quaternion, view: 800, radius: 3.3, hoverH: 1.9, hp: CAR_HP, maxHp: CAR_HP, hitR: 3.5, credits: 30, bobPh: this.r() * 6.28 });
       this.vehicles.push(v);
     }
     // buggy (old-style crawler): queues behind slower traffic
@@ -2052,6 +2055,13 @@ export class Traffic {
     g.blastHooks.push((pos, radius, damage, owner) => this.blast(pos, radius, damage, owner));
   }
 
+  // How far a hover-car bobs on its lift: slow and shallow (about a 0.05 m swell at 0.15 Hz and a finer ripple), each car on its own
+  // phase. (It used to ride the distance along the road, so at speed it bounced several times a second.)
+  carBob(v) {
+    const ph = v.bobPh || 0;
+    return Math.sin(this.t * 0.9 + ph) * 0.05 + Math.sin(this.t * 1.7 + ph * 1.7) * 0.02;
+  }
+
   centre(v, out) { return out.copy(v.pos).addScaledVector(_u.copy(v.pos).normalize(), v.kind === 'buggy' ? 1.8 : v.kind === 'car' ? 0.4 : 2.6); }
 
   // Does a shot's segment (a -> b) hit any road vehicle, a land-train's trailers included? (A trailer
@@ -2137,6 +2147,7 @@ export class Traffic {
     for (const wk of this.walkers) if (wk.owner === v && !wk.done) this.release(wk);
     this.char(v, true);
     if (v.beacon) v.beacon.visible = false;
+    if (v.beacons) for (const b of v.beacons) b.visible = false;
     if (!g) return;
     const c = this.centre(v, new THREE.Vector3()), up = c.clone().normalize();
     g.fx.explosion(c, v.kind === 'buggy' ? 7 : 11, true);
@@ -2368,7 +2379,7 @@ export class Traffic {
     _f.divideScalar(d);
     v.cur = Math.min(v.vmax * 0.5, v.cur + v.acc * dt);
     v.pos.addScaledVector(_f, Math.min(d, v.cur * dt));
-    P.ground(v.pos, v.pos, v.hoverH + 0.3 + Math.sin(this.t * 2) * 0.12);
+    P.ground(v.pos, v.pos, v.hoverH + 0.3 + this.carBob(v));
     if (dt > 0) v.vel.copy(v.pos).sub(v.prevPos).divideScalar(dt);
     v.fwd.copy(_f);
     v.root.visible = this.seen(v, camPos);
@@ -2462,11 +2473,11 @@ export class Traffic {
     const lt = v.kind === 'landtrain';
     const up = this.roadFrame(v, v.s, lt ? 2.9 : v.front * 0.7, lt ? 2.9 : Math.max(2, v.front * 0.7), v.hintF, v.hintR, v.pos, _f, _fp, _rp);
     if (v.kind === 'car') {
-      v.hover += ((over || 0) - v.hover) * Math.min(1, dt * 2.5);
+      v.hover += ((over || 0) - v.hover) * Math.min(1, dt * 1.4);
       // (a wreck has lost its lift: it sits on the road)
       if (v.state === 'wreck') v.dropH = Math.max(0, (v.dropH ?? v.hoverH) - dt * 6);
       else v.dropH = v.hoverH;
-      v.pos.addScaledVector(up, v.dropH + (v.state === 'wreck' ? 0.3 : v.hover + Math.sin(this.t * 2 + v.s) * 0.12));
+      v.pos.addScaledVector(up, v.dropH + (v.state === 'wreck' ? 0.3 : v.hover + this.carBob(v)));
     }
     this.applyTug(v, dt);
     if (dt > 0) v.vel.copy(v.pos).sub(v.prevPos).divideScalar(dt);
@@ -2486,6 +2497,10 @@ export class Traffic {
     } else {
       v.root.position.copy(v.pos);
       frameQuat(up, _f, v.root.quaternion);
+      if (v.kind === 'car' && v.state !== 'wreck') { // (a hover-car wallows gently on its lift: about a degree of roll and pitch, slow)
+        const ph = v.bobPh || 0;
+        v.root.quaternion.multiply(_q.setFromEuler(_eu.set(Math.sin(this.t * 0.6 + ph * 1.3) * 0.012, 0, Math.sin(this.t * 0.8 + ph) * 0.018)));
+      }
     }
     if (v.roll) { v.root.quaternion.multiply(_q.setFromAxisAngle(_z, v.roll)); v.root.position.addScaledVector(up, -0.4); }
     if (v.wheels) {
@@ -2493,6 +2508,7 @@ export class Traffic {
       for (const w of v.wheels) w.rotation.x += spin;
     }
     if (v.beacon && v.state !== 'wreck') v.beacon.visible = Math.sin(this.t * 6) > -0.2;
+    if (v.beacons && v.state !== 'wreck') for (const b of v.beacons) b.visible = Math.sin(this.t * 7 + b.userData.phase * Math.PI) > 0; // (SPACECOM's light bar: the two lamps take turns)
     if (v.trailers) {
       v.trailers.forEach((t, i) => {
         const p = t.plat;
