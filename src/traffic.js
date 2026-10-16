@@ -64,6 +64,7 @@ const TEES = [{ from: 'ilmb', on: ['meridian', 'tranq'] }];
 const EXTRA_ROADS = [['mine', 'vostok']];
 const T_ARM = 30; // metres from a T's centre where the lanes stop and the turning connectors take over
 const STOP_IN = 50; // the stop is at least this far along its stretch of ring (room for a land-train)
+const pairKey = (a, b) => (a.id < b.id ? `${a.id}|${b.id}` : `${b.id}|${a.id}`); // (the name of the road between two settlements)
 
 function part(geo, mat, x = 0, y = 0, z = 0, outline = 0.05) {
   const m = new THREE.Mesh(geo, mat);
@@ -633,7 +634,7 @@ export class Traffic {
   // Which of those towns are joined by a road (a set of 'idA|idB' keys): everything within SAFE_ROAD, each town's
   // nearest neighbour, a few second links, then the hand-made cuts and extras.
   linkPairs(safe) {
-    const key = (a, b) => (a.id < b.id ? `${a.id}|${b.id}` : `${b.id}|${a.id}`);
+    const key = pairKey;
     const pairs = new Set();
     const has = (a, b) => pairs.has(key(a, b));
     const dist = (a, b) => arcDist(a.dir, b.dir);
@@ -680,6 +681,100 @@ export class Traffic {
     this.pieces.forEach((pc, i) => { pc.id = i; this.finishPiece(pc); });
     for (const R of this.rings.values()) this.ringStop(R);
     for (const R of this.rings.values()) this.garageLink(R);
+    this.flushRoadBatch();
+    this.roadVehicles = [];
+    let civil = 0; // (the Vostok road is numbered -1 so the other roads keep their services)
+    for (const road of this.roads) this.populateRoad(road, road.A.restricted || (road.B && road.B.restricted) ? -1 : civil++);
+    this.populateGarage();
+  }
+
+  // The settlements a road from `loc` joins under the standard rules (the pairs a load would lay for it), in the order a load lays the roads.
+  linkPartners(loc) {
+    const safe = this.townsOnRoads(loc), pairs = this.linkPairs(safe);
+    return safe.filter((b) => b !== loc && pairs.has(pairKey(loc, b))).sort((p, q) => (pairKey(loc, p) < pairKey(loc, q) ? -1 : 1));
+  }
+
+  // Lay your town's ring road and its links the moment it builds Roads (hometown.js layRoads): the ring a load would make (ringProfile) and the
+  // roads a load would lay for it (linkPartners, in a load's order and way round), added to the running network. A settlement that nothing
+  // joined at boot (Hertzsprung, out on its own) gets its ring in the same pass, so the road reaches it like any other. It is not quite what a
+  // load makes. The rings that were laid at boot have no junction for the new road, so at their end each link turns round in a U-turn connector
+  // (and traffic on those rings never turns into it), and a road with a U-turn has no land-trains: they would fold in it. The next load lays the
+  // whole two-way network. Returns { ring, links, roads }, or null when the town already has its ring. It is all or nothing: a failure part-way
+  // puts every piece, mesh and vehicle back and throws.
+  addTownRoads(loc) {
+    if (this.rings.has(loc)) return null;
+    this.registerLocation(loc);
+    const partners = this.linkPartners(loc);
+    if (!partners.length) return { ring: null, links: [], roads: [] };
+    const fresh = partners.filter((b) => !this.rings.has(b));
+    // what to put back if it fails: the network's lengths, and what the new roads add to each settlement they touch (fences, gates, its group)
+    const was = {
+      pieces: this.pieces.length, roads: this.roads.length, gates: this.gates.length, stops: this.stops.length, lines: this.mapLines.length,
+      vehicles: this.vehicles.length, crawlers: this.crawlers.length, drivers: this.roadVehicles.length, decks: this.platforms.length, scene: new Set(this.w.scene.children),
+      ends: [loc, ...partners].map((l) => ({
+        l, towns: this.towns.has(l) ? this.towns.get(l).length : -1, keep: l.stopKeep.length, gates: this.rings.has(l) ? this.rings.get(l).gates.length : -1,
+        kids: l.group.children.length, cols: (l._cols || []).length, ring: l.ring, ringStop: l.ringStop,
+      })),
+    };
+    try {
+      for (const l of [loc, ...fresh]) delete l._bld; // (the colliders that stand now, not those the last passenger saw)
+      this.roadGeo = { pos: [], uv: [], fade: [], mark: [], berm: [], soft: [], wid: [], idx: [] };
+      this.posts = [];
+      const rings = [loc, ...fresh].map((l) => { const R = this.ringProfile(l); this.rings.set(l, R); return R; });
+      for (const k of partners.map((b) => pairKey(loc, b)).sort()) {
+        const [a, b] = k.split('|'), P = this.L[a === loc.id ? b : a], RP = this.rings.get(P), all = RP.gates;
+        // (a load lays this road in its turn, when the partner's ring has only the junctions of the roads named before it and of no T: it puts
+        // this road's end where it now chooses, unless that is crowded by a junction laid since, and so the road is the load's own, to a few metres)
+        if (!fresh.includes(P)) {
+          RP.gates = all.filter((e) => e.gate.road.eB && pairKey(e.gate.road.A, e.gate.road.B) < k);
+          const at = this.ringGate(RP, loc);
+          if (all.some((e) => Math.min(Math.abs(e.i - at.i), RP.M - Math.abs(e.i - at.i)) * RP.step < GATE_SEP * 0.6)) RP.gates = all;
+        }
+        const own = RP.gates, m = own.length;
+        try { this.buildRoad(this.L[a], this.L[b]); } finally { RP.gates = all; }
+        if (own !== all && own.length > m) all.push(own[m]);
+      }
+      for (const R of rings) this.buildRing(R.loc, R);
+      const roads = this.roads.slice(was.roads);
+      for (const road of roads) {
+        const g = road.A === loc ? road.gates[1] : road.gates[0]; // (the partner's end)
+        if (fresh.includes(g.loc)) continue; // (its ring has the junction)
+        road.uturn = true;
+        const u = this.newPiece('j', this.bez(g.inEnd, g.inDir, g.outStart, g.outDir), { town: g.loc, vlim: 6, uturn: true });
+        g.in.next = [u];
+        u.next = [g.out];
+        this.drawJoin(this.rings.get(g.loc), g.e); // (a plain T would do for the cars, not for the eye)
+      }
+      for (let i = was.pieces; i < this.pieces.length; i++) { const pc = this.pieces[i]; pc.id = i; this.finishPiece(pc); }
+      for (const R of rings) this.ringStop(R);
+      this.flushRoadBatch();
+      roads.forEach((road) => this.populateRoad(road, this.roads.indexOf(road), !road.uturn));
+      for (const pc of this.pieces.slice(was.pieces)) for (let i = 0; i < pc.path.pts.length; i += 10) this.P.clearSpot(pc.path.pts[i]); // (rocks keep off the new roads)
+      this._chunks = null; // (the maps' road lines)
+      for (const road of roads) if (road.uturn) { const g = road.A === loc ? road.gates[1] : road.gates[0]; this.openJoin(this.rings.get(g.loc), g.e); }
+      return { ring: rings[0], links: partners, roads };
+    } catch (e) {
+      this.pieces.length = was.pieces; this.roads.length = was.roads; this.gates.length = was.gates; this.stops.length = was.stops; this.mapLines.length = was.lines;
+      this.vehicles.length = was.vehicles; this.crawlers.length = was.crawlers; this.roadVehicles.length = was.drivers; this.platforms.length = was.decks;
+      for (const o of this.w.scene.children.slice()) if (!was.scene.has(o)) o.removeFromParent(); // (the road meshes and posts, the vehicles and their trailers)
+      for (const w of was.ends) {
+        w.l.stopKeep.length = w.keep;
+        if (w.towns < 0) this.towns.delete(w.l); else this.towns.get(w.l).length = w.towns;
+        if (w.gates < 0) this.rings.delete(w.l); else this.rings.get(w.l).gates.length = w.gates;
+        for (const o of w.l.group.children.slice(w.kids)) o.removeFromParent();
+        for (const c of (w.l._cols || []).splice(w.cols)) this.C.remove(c);
+        w.l.ring = w.ring; w.l.ringStop = w.ringStop;
+      }
+      this.roadGeo = null; this.posts = null;
+      throw e;
+    }
+  }
+
+  // Make what the road builders have laid so far (this.roadGeo, this.posts) into drawn meshes: one road mesh, and the delineator posts (a white
+  // post with a dark band, an amber reflector looking up and down the road and a lit cap, set clear of the shoulder, one every ~110 m: three
+  // instanced draw calls for the lot). A load flushes once, for the whole network (this.roadMesh); a road laid live (addTownRoads) flushes a
+  // batch of its own, which shares the first mesh's material.
+  flushRoadBatch() {
     const G = this.roadGeo;
     const geo = new THREE.BufferGeometry();
     geo.setAttribute('position', new THREE.Float32BufferAttribute(G.pos, 3));
@@ -691,15 +786,12 @@ export class Traffic {
     geo.setAttribute('wid', new THREE.Float32BufferAttribute(G.wid, 1));
     geo.setIndex(G.idx);
     geo.computeBoundingSphere();
-    const mesh = new THREE.Mesh(geo, roadMaterial());
+    const mesh = new THREE.Mesh(geo, this.roadMesh ? this.roadMesh.material : roadMaterial());
     mesh.matrixAutoUpdate = false;
     mesh.frustumCulled = false;
     mesh.renderOrder = 1;
     this.w.scene.add(mesh);
-    this.roadMesh = mesh;
-    this.roadGeo = null;
-    // delineator posts every ~110 m: a white post with a dark band, an amber reflector looking up and down the road
-    // (and a lit cap), set clear of the shoulder; three instanced draw calls for every road
+    if (!this.roadMesh) this.roadMesh = mesh;
     const n = this.posts.length;
     if (n) {
       const postM = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.11, 0.15, 1.8, 6).translate(0, 0.9, 0), toon(0xe8e4f4), n);
@@ -714,11 +806,8 @@ export class Traffic {
       for (const m of [postM, bandM, lensM, capM]) { m.frustumCulled = false; m.matrixAutoUpdate = false; this.w.scene.add(m); }
       postM.castShadow = true;
     }
+    this.roadGeo = null;
     this.posts = null;
-    this.roadVehicles = [];
-    let civil = 0; // (the Vostok road is numbered -1 so the other roads keep their services)
-    for (const road of this.roads) this.populateRoad(road, road.A.restricted || (road.B && road.B.restricted) ? -1 : civil++);
-    this.populateGarage();
   }
 
   // Every k-th point of a world-space polyline as a unit direction (the last point always stays).
@@ -1290,6 +1379,37 @@ export class Traffic {
     });
   }
 
+  // The flared join of a road's end `e` (a gate of ring R) with the ring: a curved fillet each side of the road, road centreline -> ring centreline.
+  drawJoin(R, e) {
+    const M = R.M, cl = e.gate.cl, wrap = (i) => ((i % M) + M) % M;
+    let k = 1;
+    while (k < cl.length - 1 && cl[k].distanceTo(cl[0]) < FILLET) k++;
+    const q = cl[k], tIn = cl[k - 1].clone().sub(cl[k]).normalize();
+    const m = Math.max(2, Math.round(FILLET / R.step));
+    for (const d of [1, -1]) {
+      const j = e.i + d * m;
+      this.drawLine(this.bez(q, tIn, R.W[wrap(j)], R.tan[wrap(j)].clone().multiplyScalar(d), 10, 0.5), 0, 1, (t) => smooth(t / 0.3) * smooth((1 - t) / 0.3), true);
+    }
+  }
+
+  // A road that reaches a ring after the ring was drawn (addTownRoads, at the other settlement's end): the ring's outer berm and its ruts make
+  // way for the junction, as buildRing makes them for the junctions it knows of (the same fall-offs, never raising what is there). The ring's
+  // strip is in the first road mesh, a load drew it.
+  openJoin(R, e) {
+    const A = this.roadMesh.geometry.attributes, n = ROAD_LAT.length, M = R.M, outer = R.din > 0 ? -1 : 1;
+    for (let i = 0; i <= M; i++) {
+      const d = Math.abs(e.i - (i % M)), dg = Math.min(d, M - d) * R.step;
+      if (dg >= 38) continue;
+      const b = smooth((dg - 12) / 10), mk = smooth((dg - 24) / 14);
+      for (let k = 0; k < n; k++) {
+        const at = R.stripBase + i * n + k;
+        A.mark.array[at] = Math.min(A.mark.array[at], mk);
+        if (ROAD_LAT[k] === 0 || Math.sign(ROAD_LAT[k]) === outer) A.berm.array[at] = Math.min(A.berm.array[at], b);
+      }
+    }
+    A.mark.needsUpdate = A.berm.needsUpdate = true;
+  }
+
   // The ring itself: one closed strip, a flared join for each road, lanes and junction connectors.
   buildRing(loc, R) {
     const P = this.P, M = R.M, kd = R.kd;
@@ -1308,6 +1428,7 @@ export class Traffic {
     // closed strip (the last row repeats the first)
     {
       const base = this.roadGeo.pos.length / 3;
+      R.stripBase = base; // (openJoin finds the strip's rows by it)
       let s = 0;
       for (let i = 0; i <= M; i++) {
         if (i) s += W[wrap(i)].distanceTo(W[i - 1]);
@@ -1336,18 +1457,8 @@ export class Traffic {
     const gates = R.gates.sort((p, q) => p.i - q.i);
     const n = gates.length;
     loc.ring = { radius: Math.round(R.Rb), max: Math.round(R.maxR), gates: n };
-    // flared joins: a curved fillet each side of the road, road centreline -> ring centreline
-    for (const e of gates) {
-      const gt = e.gate, cl = gt.cl;
-      let k = 1;
-      while (k < cl.length - 1 && cl[k].distanceTo(cl[0]) < FILLET) k++;
-      const q = cl[k], tIn = cl[k - 1].clone().sub(cl[k]).normalize();
-      const m = Math.max(2, Math.round(FILLET / R.step));
-      for (const d of [1, -1]) {
-        const j = e.i + d * m;
-        this.drawLine(this.bez(q, tIn, W[wrap(j)], laneT(d, j), 10, 0.5), 0, 1, (t) => smooth(t / 0.3) * smooth((1 - t) / 0.3), true);
-      }
-    }
+    // flared joins
+    for (const e of gates) this.drawJoin(R, e);
     // delineator posts on the outside of the ring, away from the junctions
     const outSide = -R.din;
     const near = (i, list, dist) => list.some((gi) => { const d = Math.abs(gi - i); return Math.min(d, M - d) * R.step < dist; });
@@ -1426,7 +1537,7 @@ export class Traffic {
   ringStop(R) {
     const loc = R.loc, M = R.M, d = R.din;
     if (!R.arcs) return;
-    const keeps = this.keepouts(loc, false);
+    const keeps = [...this.keepouts(loc, false), ...loc.stopKeep.filter((k) => k.flyPad)]; // (a ring laid late goes round the pads that landed before it)
     const bl = this.buildings(loc);
     const wrap = (i) => ((i % M) + M) % M;
     let best = null;
@@ -1473,12 +1584,13 @@ export class Traffic {
     const yaw = Math.atan2(sL.x - sx, sL.z - sz);
     const names = (this.towns.get(loc) || []).map((g) => g.other.short);
     const text = `ROADS > ${names.slice(0, 3).join(' ')}${names.length > 3 ? ' +' : ''}`;
-    this.shelter(loc, sx, sz, yaw, text, 0xff9f1c);
+    const shelterAt = { x: sx, z: sz, yaw, text, color: 0xff9f1c }; // (redress hangs it up again after the town is rebuilt in place)
+    this.shelter(loc, sx, sz, yaw, text, shelterAt.color);
     loc.stopKeep.push({ x: sx, z: sz, r: 3 });
     const wait = { x: sx + Math.sin(yaw) * 1.8, y: this.groundY(loc, sx, sz), z: sz + Math.cos(yaw) * 1.8, g: true };
     const r = Math.hypot(sx, sz) || 1;
     pc.stop = {
-      loc, kind: 'road', piece: pc, s, world: p, wait, origin: wait,
+      loc, kind: 'road', piece: pc, s, world: p, wait, origin: wait, shelterAt,
       town: this.townPoint(loc, sx - (sx / r) * 4, sz - (sz / r) * 4, 90),
       queue: [], queued: false,
     };
@@ -1554,7 +1666,7 @@ export class Traffic {
   // Put a land-train, two hover-cars and a buggy on each road, each with somewhere to go. The road into a
   // restricted base (Vostok-9) carries only that faction's own pair of trains, a Moonliner and a Prospector
   // running from the Helium-3 exchange to the bastion and back, one on each lane.
-  populateRoad(road, k) {
+  populateRoad(road, k, trains = true) {
     const military = k < 0;
     const add = (v, lane) => {
       const pc = road.lanes[lane === undefined ? Math.floor(this.r() * road.lanes.length) : lane];
@@ -1574,7 +1686,7 @@ export class Traffic {
     const specs = military
       ? [{ faction: base.faction, type: 'moonliner', cars: ['pax', 'pax', 'pax'] }, { faction: base.faction, type: 'prospector', cars: FREIGHT[0] }]
       : [this.trainSpec(road, k)];
-    specs.forEach((spec, n) => {
+    (trains ? specs : []).forEach((spec, n) => {
       const lt = makeLandTrain(spec);
       this.w.scene.add(lt.root);
       for (const t of lt.trailers) this.w.scene.add(t.root);
@@ -2031,7 +2143,7 @@ export class Traffic {
   // Back on the road later, somewhere the camera can't see it appear.
   respawn(v, camPos) {
     // (the Vostok supply trains come back on their own road, and nothing else is put on it)
-    const lanes = this.roads.filter((r) => !!(r.A.restricted || (r.B && r.B.restricted)) === !!v.shuttle).flatMap((r) => r.lanes).filter((pc) => pc.len > 300);
+    const lanes = this.roads.filter((r) => !!(r.A.restricted || (r.B && r.B.restricted)) === !!v.shuttle && !(r.uturn && v.kind === 'landtrain')).flatMap((r) => r.lanes).filter((pc) => pc.len > 300);
     const h = { i: 0, f: 0 };
     for (let tries = 0; tries < 8 && lanes.length; tries++) {
       const pc = lanes[Math.floor(this.r() * lanes.length)];

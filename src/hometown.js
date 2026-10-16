@@ -292,11 +292,10 @@ const LIVE = {
   farm: () => ({ rows: [['EFFECT', 'Heals 4 hull a second in town'], ['INCOME', `₵${BUILDINGS.farm.income} a minute`]], note: 'Nothing to press: it works while you stand in town.' }),
   motorpool: (t) => ({ rows: [['VEHICLE', 'Homestead Mule'], ['SUMMON', 'Press V anywhere'], ['STATUS', t.game.story.vehicles.includes('mule') ? 'UNLOCKED' : 'NOT UNLOCKED'], ['REPAIRS', 'Vehicles patched up in town']], note: 'Nothing to press: call it with V.' }),
   barracks: () => ({ rows: [['GUNS', '2 militia guns'], ['RANGE', '400 m round town'], ['FIRE', '28 dmg + splash, every 0.8 s'], ['TARGETS', 'Pirates']], note: 'Nothing to press: the guns fire by themselves.' }),
-  // (the ring road and its links are laid at load for now: until then the plot only has the road crew's depot)
   roads: (t) => {
-    const tr = t.game.world.traffic, ring = tr.rings.get(t.loc);
-    return ring ? { rows: [['RING', `${Math.round(ring.Rb)} m round the town`], ['LINKS', `${tr.roads.filter((r) => r.A === t.loc || r.B === t.loc).length} settlements`]], note: 'Nothing to press: the traffic uses them.' }
-      : { rows: [['RING', 'Not laid yet']], note: 'The road crews lay the ring road and the links when the game next loads.' };
+    const tr = t.game.world.traffic, ring = tr.rings.get(t.loc), n = tr.roads.filter((r) => r.A === t.loc || r.B === t.loc).length;
+    return ring ? { rows: [['RING', `${Math.round(ring.Rb)} m round the town`], ['LINKS', `${n} ${n === 1 ? 'settlement' : 'settlements'}`]], note: 'Nothing to press: the traffic uses them.' }
+      : { rows: [['RING', 'Not laid yet']], note: 'The road crews finish the ring road and the links when the game next loads.' };
   },
   radio: () => ({ rows: [['MAP CHARTED', '3 km round town'], ['VOTES', 'Council sits twice as often']], note: 'Nothing to press yet.' }),
   pad: (t) => {
@@ -316,6 +315,7 @@ const ON_BUILT = {
   },
   radio: (t) => { t.chart(); return 'MAP CHARTED 3 KM ROUND TOWN'; },
   pad: (t) => t.linkShuttle(),
+  roads: (t) => t.layRoads(),
 };
 // where F does something in town, first match wins (interact()): at(t) is a world position (null: not there), r the reach in metres,
 // use(t, player) the prompt and what F does (null: nothing here)
@@ -385,6 +385,22 @@ export class HomeTown {
     tr.registerLocation(this.loc);
     const v = tr.addTownShuttle(this.loc, { startAtB: true });
     return v ? `SHUTTLE SERVICE TO ${v.stops[1].loc.name.toUpperCase()} OPENS: FIRST SHUTTLE ON ITS WAY` : '';
+  }
+
+  // Roads: the road crews lay the ring road and the links at once (traffic.js addTownRoads), as far as a running game can: where a link meets a
+  // ring that was laid at load its traffic turns round, until the next load lays the whole network. The page's line, or '' when the town had its
+  // ring already. If the crews fail the game goes on (the plot is built and paid for, and a load lays the roads, as it does for any town with Roads)
+  layRoads() {
+    const tr = this.game.world.traffic;
+    try {
+      const r = tr.addTownRoads(this.loc);
+      if (!r) return '';
+      const n = r.links.length;
+      return n ? `ROAD CREWS FINISHED: RING ROAD + ${n} ${n === 1 ? 'LINK' : 'LINKS'}` : 'NO SETTLEMENT IN REACH: THE CREWS HAVE NOTHING TO LINK';
+    } catch (e) {
+      console.error(e);
+      return 'ROAD CREWS WILL FINISH AFTER YOUR NEXT LOAD';
+    }
   }
 
   // F in town: the first point in POINTS you stand at gives the prompt and what F does
