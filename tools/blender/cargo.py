@@ -6,6 +6,8 @@
 #   cargo_unit("box",   name, parent, pos)    the corrugated cargo container (faction plate and number)
 #   cargo_unit("tank",  name, parent, pos)    the cryogenic Helium-3 tanker (H3 branding panels, valve cabinet, gantry walk)
 #   cargo_unit("blast", name, parent, pos)    the smooth red explosives magazine (OSHA / DOT signs, strobes, lightning rod)
+#   (low=True leaves off what stands up from a roof: the tanker's gantry walk, rails, manways and vent, the magazine's vents, strobes and
+#   rod; every unit is then a flat-topped 3.5 m, so one can stand on another in a stack)
 #
 # Each unit is a pivot with role "cargo" (extra `kind`), at `pos` in three.js axes; its origin is the middle of its footprint on the
 # underside of its rack, and its length runs along z. It holds one `livery` pivot per faction (extra `faction`; the game keeps the
@@ -17,7 +19,7 @@ import bpy, math
 from mathutils import Matrix
 
 CARGO_BASE = 1.62   # in the land-train's frame: the underside of the deck plate (centre 1.72, half 0.1); the unit is lowered by this
-_cargo_ctx = {"pfx": ""}
+_cargo_ctx = {"pfx": "", "low": False}
 
 
 def _cM(name, geo, slot, parent, ink=0.04):
@@ -89,16 +91,17 @@ def _cargo_blast(R):
     for y in (3.25, 4.45):
         for sx in (-1, 1):
             _crb(f"hinge{sx}_{y}", 0.14, 0.1, 0.06, (sx * 1.42, y, -3.68), "dark", R, 0.02, 0.2)
-    for k, z in enumerate((-1.4, 1.2)):
-        _crb(f"vent{k}", 0.9, 0.09, 0.55, (0, 4.8, z), "dark", R, 0.03, 0.15)
-        for j in range(5):
-            _crb(f"ventSlat{k}_{j}", 0.8, 0.025, 0.04, (0, 4.9, z - 0.4 + j * 0.2), "metal", R, 0, 0.3, nu=6, nv=4)
-    for sx in (-1, 1):
-        _cM(f"strobe{sx}", xf(lathe([(0.2, 0), (0.2, 0.08), (0.13, 0.22), (0, 0.26)], 10), (sx * 1.3, 4.76, 3.2)), "hot", R, 0.02)
-        _cM(f"strobeBase{sx}", xf(lathe([(0.24, 0), (0.24, 0.07), (0.2, 0.09)], 10), (sx * 1.3, 4.72, 3.2)), "dark", R, 0.02)
-    _cM("rod", tube([(1.3, 4.72, -3.2), (1.3, 6.2, -3.2)], [0.035, 0.012], 5), "metal", R, 0)
-    _cM("rodBase", xf(lathe([(0.12, 0), (0.12, 0.1), (0.05, 0.14)], 8), (1.3, 4.72, -3.2)), "dark", R, 0.02)
-    _cbm("earthStrap", (1.52, 4.7, -3.4), (1.52, 1.95, -3.4), 0.025, "metal", R, 0)
+    if not _cargo_ctx["low"]:
+        for k, z in enumerate((-1.4, 1.2)):
+            _crb(f"vent{k}", 0.9, 0.09, 0.55, (0, 4.8, z), "dark", R, 0.03, 0.15)
+            for j in range(5):
+                _crb(f"ventSlat{k}_{j}", 0.8, 0.025, 0.04, (0, 4.9, z - 0.4 + j * 0.2), "metal", R, 0, 0.3, nu=6, nv=4)
+        for sx in (-1, 1):
+            _cM(f"strobe{sx}", xf(lathe([(0.2, 0), (0.2, 0.08), (0.13, 0.22), (0, 0.26)], 10), (sx * 1.3, 4.76, 3.2)), "hot", R, 0.02)
+            _cM(f"strobeBase{sx}", xf(lathe([(0.24, 0), (0.24, 0.07), (0.2, 0.09)], 10), (sx * 1.3, 4.72, 3.2)), "dark", R, 0.02)
+        _cM("rod", tube([(1.3, 4.72, -3.2), (1.3, 6.2, -3.2)], [0.035, 0.012], 5), "metal", R, 0)
+        _cM("rodBase", xf(lathe([(0.12, 0), (0.12, 0.1), (0.05, 0.14)], 8), (1.3, 4.72, -3.2)), "dark", R, 0.02)
+        _cbm("earthStrap", (1.52, 4.7, -3.4), (1.52, 1.95, -3.4), 0.025, "metal", R, 0)
     # the signs that are the same for every faction (a DANGER sign, a DOT 1.1 placard and two prohibition signs on each flank, the
     # white band across the top, the hazard stripe along the bottom, and the ends)
     for side in (-1, 1):
@@ -150,15 +153,16 @@ def _cargo_tank(R):
         _cM(f"ring{z}", xf(torus(1.52, 0.06, 22, 4), (0, 3.3, z), (math.pi / 2, 0, 0)), "accent", R, 0.02)
     for z in (-1.8, -0.6, 0.6, 1.8):
         _cM(f"band{z}", xf(torus(1.52, 0.06, 22, 4), (0, 3.3, z), (math.pi / 2, 0, 0)), "steel", R, 0.02)
-    _crb("walk", 0.5, 0.05, 3.1, (0, 4.82, 0), "dark", R, 0.03, 0.1)
-    for z in (-3.0, -2.0, -1.0, 0.0, 1.0, 2.0, 3.0):
-        _crb(f"walkBar{z}", 0.46, 0.012, 0.03, (0, 4.875, z), "metal", R, 0, 0.3, nu=6, nv=4)
-    _rail_roof(R, "rail", 0.55, 3.0, 4.87, 0.42, 7)
-    for k, z in enumerate((-1.5, 1.5)):
-        _cM(f"manway{k}", xf(lathe([(0.4, 0), (0.4, 0.1), (0.3, 0.22), (0, 0.26)], 14), (0, 4.9, z)), "metal", R, 0.03)
-        _cM(f"manwayRing{k}", xf(torus(0.42, 0.045, 14, 4), (0, 4.9, z)), "hazard", R, 0)
-    _cM("vent", tube([(0.0, 4.9, 0.0), (0.0, 5.65, 0.0)], [0.1, 0.1], 8), "steel", R, 0.03)
-    _cM("ventCap", xf(lathe([(0.0, 0), (0.3, 0), (0.28, 0.08), (0.0, 0.14)], 10), (0, 5.65, 0)), "dark", R, 0.02)
+    if not _cargo_ctx["low"]:
+        _crb("walk", 0.5, 0.05, 3.1, (0, 4.82, 0), "dark", R, 0.03, 0.1)
+        for z in (-3.0, -2.0, -1.0, 0.0, 1.0, 2.0, 3.0):
+            _crb(f"walkBar{z}", 0.46, 0.012, 0.03, (0, 4.875, z), "metal", R, 0, 0.3, nu=6, nv=4)
+        _rail_roof(R, "rail", 0.55, 3.0, 4.87, 0.42, 7)
+        for k, z in enumerate((-1.5, 1.5)):
+            _cM(f"manway{k}", xf(lathe([(0.4, 0), (0.4, 0.1), (0.3, 0.22), (0, 0.26)], 14), (0, 4.9, z)), "metal", R, 0.03)
+            _cM(f"manwayRing{k}", xf(torus(0.42, 0.045, 14, 4), (0, 4.9, z)), "hazard", R, 0)
+        _cM("vent", tube([(0.0, 4.9, 0.0), (0.0, 5.65, 0.0)], [0.1, 0.1], 8), "steel", R, 0.03)
+        _cM("ventCap", xf(lathe([(0.0, 0), (0.3, 0), (0.28, 0.08), (0.0, 0.14)], 10), (0, 5.65, 0)), "dark", R, 0.02)
     # the H3 branding panels: a dark board standing off each flank on brackets, with the atom and the legend
     for sx in (-1, 1):
         _crb(f"panel{sx}", 0.07, 0.8, 1.4, (sx * 1.64, 3.3, -0.2), "dark", R, 0.04, 0.08)
@@ -204,12 +208,13 @@ def _cargo_tank(R):
     _cliveries(R, "livery", livery)
 
 
-def cargo_unit(kind, name, parent, pos, scale=1.1):
+def cargo_unit(kind, name, parent, pos, scale=1.1, low=False):
     """One land-train cargo unit ('box', 'tank' or 'blast') at `pos` under `parent`, `scale` times the land-train's size, its length
     along z, its origin the middle of the underside of its rack. Returns its pivot (role "cargo")."""
     before = set(C.objects)
     R = pivot(name, pos, parent, role="cargo", kind=kind)
     _cargo_ctx["pfx"] = name + "_"
+    _cargo_ctx["low"] = low
     {"box": _cargo_box, "tank": _cargo_tank, "blast": _cargo_blast}[kind](R)
     T = Matrix.Scale(scale, 4) @ Matrix.Translation((0, 0, -CARGO_BASE))   # (blender's z is up: three.js y)
     for o in C.objects:
