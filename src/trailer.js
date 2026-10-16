@@ -15,9 +15,10 @@ import { tangent, frameQuat, dirFromAngles } from './geo.js';
 import { mulberry32 } from './rng.js';
 import { spliceGenes } from './chimera.js';
 import { clearEchoes } from './monolith.js';
+import { DEV_TOOLS } from './devtools.js';
 
 const Q = new URLSearchParams(location.search);
-export const TRAILER = Q.has('trailer');
+export const TRAILER = DEV_TOOLS && Q.has('trailer'); // (a director mode for making the trailer: a dev tool, so off in a release build)
 
 if (TRAILER) {
   const mem = () => {

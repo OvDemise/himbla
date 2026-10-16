@@ -201,6 +201,7 @@ const _near = [];
 // the speed that curves over the world (all of it on a sphere; only the part round the girth on
 // the Spindle's cylinder: running along its axis is straight)
 function orbitV2(v, up, vh2) {
+  if (GRAV.flat) return 0; // (a flat world: nothing curves away beneath you)
   const a = GRAV.axis;
   if (!a) return vh2;
   const g = _tmp2.crossVectors(a, up);
@@ -251,7 +252,7 @@ export function stepSkater(b, input, dt, planet, colliders, params = PHYS, impac
     const k = Math.min(1, Math.max(0, (b.airTime - (params.airGrace ?? 1)) / (params.airGravRampTime ?? 2)));
     const fast = Math.min(1, Math.max(0, (Math.sqrt(vh2) - 15) / 30));
     const ramp = 1 + (params.airGravRamp ?? 1) * k * k * (3 - 2 * k) * fast;
-    const orbit = (params.orbitComp ?? 1) * orbitV2(v, up, vh2) / radOf(b.pos);
+    const orbit = GRAV.flat ? 0 : (params.orbitComp ?? 1) * orbitV2(v, up, vh2) / radOf(b.pos); // (flat: radOf is the height, 0 on the floor: no orbital term, and no 0/0)
     const dive = input.dive ? (params.diveGrav ?? 3) : 1;
     v.addScaledVector(up, -(G * (params.airGravMult ?? 1) * ramp * dive + orbit) * dt);
     // magnetic catch: a diving skater near the ground gets pulled onto it

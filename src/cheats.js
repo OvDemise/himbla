@@ -8,6 +8,7 @@ import * as THREE from 'three';
 import { greatCircle } from './geo.js';
 import { MUTATIONS } from './alchemy.js';
 import { DevOverlay, SECTIONS } from './devoverlay.js';
+import { AssetRow } from './assetRow.js';
 
 const DEV_KEY = 'mr-dev-unlocked';
 const METEOR_KEY = 'mr-dev-meteor-power';
@@ -45,6 +46,15 @@ export class Cheats {
   showPauseButton() {
     const b = document.getElementById('dev-btn-pause');
     if (b) b.classList.toggle('hidden', !this.unlocked);
+  }
+
+  // In the Asset Row (assetRow.js)? Then the Moon-only entries (spawns, events, the story, vehicles, ...) would run against
+  // the wrong world: they say so instead.
+  inRow() { const a = this.game.assetRow; return !!(a && a.active); }
+  notInRow() {
+    if (!this.inRow()) return true;
+    this.game.hud.toast('Leave the Asset Row first: teleport menu, option 1.', 3);
+    return false;
   }
 
   // Hidden dev menu: F8, or B, B, X, Y on a controller (gamepad.js). Press F8 again to close.
@@ -212,6 +222,7 @@ export class Cheats {
   spawnMeteor(long = true) {
     const g = this.game;
     if (g.spindle && g.spindle.active) { g.hud.toast('No meteors out on the Spindle.', 2); return false; }
+    if (!this.notInRow()) return false;
     g.meteors.spawnOnPlayer();
     if (long) g.hud.toast('Meteor inbound: it lands where you stand in a few seconds. Move, or go and land on it.', 4);
     else g.hud.toast('Meteor inbound!', 1.5);
@@ -334,6 +345,7 @@ export class Cheats {
   // Drops any faction vehicle next to you and puts you in it (owned or not; doesn't unlock it, so V
   // still only calls the ones the story has given you)
   vehicleMenu() {
+    if (!this.notInRow()) return;
     const g = this.game;
     const ids = Object.keys(VEHICLES);
     g.dialog('SPAWN A VEHICLE', '<small>Drops it beside you and hops you in. Replaces any vehicle already out.</small>', ids.map((k, i) => ({
@@ -353,8 +365,8 @@ export class Cheats {
     const g = this.game;
     g.dialog('CHEAT MENU · MORE', `<small>Stats: ${g.stats.events || 0} events, ${g.stats.meridianEvents || 0} Meridian events, ${g.stats.darkDeliveries || 0} dark deliveries, ${g.stats.raceWins || 0} Derby wins.</small>`, [
       { label: '1 · JOIN RUSTMOON (skip the Pirate Wreck)', fn: () => { this.joinRustmoon(); this.moreMenu(); } },
-      { label: '2 · SPAWN PIRATE SQUAD', fn: () => { g.enemies.spawnSquad(3); } },
-      { label: '3 · SPAWN MEGA MITE', fn: () => { g.alchemy.spawnMegaMite(); } },
+      { label: '2 · SPAWN PIRATE SQUAD', fn: () => { if (this.notInRow()) g.enemies.spawnSquad(3); } },
+      { label: '3 · SPAWN MEGA MITE', fn: () => { if (this.notInRow()) g.alchemy.spawnMegaMite(); } },
       { label: '4 · SPAWN AN EVENT… (or a meteor shower)', fn: () => this.eventMenu() },
       { label: '5 · UNLOCK-STAT COUNTERS (events, deliveries, wins)', fn: () => { Object.assign(g.stats, { meridianEvents: Math.max(3, g.stats.meridianEvents || 0), darkDeliveries: Math.max(5, g.stats.darkDeliveries || 0), raceWins: Math.max(1, g.stats.raceWins || 0) }); g.save(); this.moreMenu(); } },
       { label: `6 · SPLICE MUTATIONS… (${g.alchemy.mutations.length} active)`, fn: () => this.spliceMenu(0) },
@@ -393,6 +405,7 @@ export class Cheats {
   }
 
   storyMenu() {
+    if (!this.notInRow()) return;
     const g = this.game;
     const S = g.story;
     const A = S.active;
@@ -455,19 +468,31 @@ export class Cheats {
 
   teleportMenu(page) {
     const g = this.game;
-    const locs = g.locations.filter((l) => !l.camp);
+    // the Asset Row (assetRow.js: a flat showroom of every asset, not a place on the Moon) is always option 1, the settlements follow it
+    const items = [
+      { name: this.inRow() ? 'LEAVE ASSET ROW' : 'ASSET ROW', fn: () => this.assetRow(!this.inRow()) },
+      ...g.locations.filter((l) => !l.camp).map((l) => ({ name: l.name, fn: () => this.teleport(l) })),
+    ];
     const per = 7;
-    const slice = locs.slice(page * per, page * per + per);
-    const pages = Math.ceil(locs.length / per);
-    const buttons = slice.map((l, i) => ({ label: `${i + 1} · ${l.name}`, fn: () => this.teleport(l) }));
+    const slice = items.slice(page * per, page * per + per);
+    const pages = Math.ceil(items.length / per);
+    const buttons = slice.map((it, i) => ({ label: `${i + 1} · ${it.name}`, fn: it.fn }));
     buttons.push({ label: `${buttons.length + 1} · NEXT PAGE (${page + 1}/${pages})`, fn: () => this.teleportMenu((page + 1) % pages) });
     buttons.push({ label: `${buttons.length + 1} · BACK`, fn: () => this.open() });
-    g.dialog('TELEPORT', '<small>Drops you at the edge of the settlement.</small>', buttons);
+    g.dialog('TELEPORT', '<small>Drops you at the edge of the settlement. Option 1 is the Asset Row: every asset in the game, side by side.</small>', buttons);
+  }
+
+  // into the Asset Row, or out of it to where you were
+  assetRow(enter) {
+    const g = this.game;
+    if (enter) (g.assetRow ||= new AssetRow(g)).start();
+    else if (g.assetRow) g.assetRow.exit();
   }
 
   teleport(l) {
     const g = this.game;
     const P = g.player;
+    if (this.inRow()) g.assetRow.exit(); // (back on the Moon first: the Row has its own flat ground)
     const p = g.world.toWorld(l, 0, 0, Math.min(l.r * 0.8, 120));
     const pos = g.planet.ground(p, p.clone(), 1.5);
     g.planet.update(pos, { budgetMs: 1e9 });
@@ -519,7 +544,7 @@ export class Cheats {
   toSpindle() {
     const g = this.game;
     const S = g.story;
-    if (g.spindle.active) return;
+    if (g.spindle.active || !this.notInRow()) return;
     if (S.active) S.fail('Dropped for a test launch.');
     S.start('meridian', 4);
     S.skipStep();
@@ -536,6 +561,7 @@ export class Cheats {
 
   // Spawn a fresh event for a faction and drop you at its start marker.
   eventMenu() {
+    if (!this.notInRow()) return;
     const g = this.game;
     const fs = ['spacecom', 'vostok', 'meridian', 'kepler', 'daedalus', 'rustmoon'];
     g.dialog('SPAWN EVENT', '<small>Creates a new event and teleports you to where it starts.</small>', fs.map((f, i) => ({

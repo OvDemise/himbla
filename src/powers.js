@@ -12,6 +12,7 @@
 // right stick picks one, A equips it (what a notch of the mouse wheel does), and RB / Z then uses it.
 
 import { glyphHtml } from './glyphs.js';
+import { DEV_TOOLS } from './devtools.js';
 
 const KEY = 'mr-power';
 const POWERS = {
@@ -20,7 +21,7 @@ const POWERS = {
   vanes: { name: 'Slipstream Vanes', has: (g) => g.story.tech.includes('vanes'), cd: (g) => (g.story.vanesActive() ? 0 : g.story.techCd.vanes || 0), status: (g) => (g.story.vanesActive() ? `ON ${Math.ceil(g.story.vanesT)} s` : null) },
   winch: { name: 'Hitch-Line Winch', has: (g) => (g.upgrades.winch || 0) > 0, cd: (g) => (g.winch.on ? 0 : g.winch.cd), status: (g) => g.winch.status() },
   pen: { name: 'Pen Link', has: (g) => (g.upgrades.penlink || 0) > 0, cd: () => 0 },
-  meteor: { name: 'Meteor Spawn (dev)', has: (g) => !!(g.cheats && g.cheats.meteorPower), cd: () => 0 },
+  ...(DEV_TOOLS ? { meteor: { name: 'Meteor Spawn (dev)', has: (g) => !!(g.cheats && g.cheats.meteorPower), cd: () => 0 } } : {}),
 };
 
 export class Powers {

@@ -48,6 +48,7 @@
 import { WEAPONS, weaponUnlocked } from './weapons.js';
 import { Glyphs, glyphState, glyphHtml } from './glyphs.js';
 import { GyroPad } from './gyro.js';
+import { DEV_TOOLS } from './devtools.js';
 
 const DEAD = 0.18; // stick deadzone (radial)
 const AIM_SHOW = 10; // seconds the crosshair stays up after the last shot
@@ -146,7 +147,7 @@ export class Gamepad {
     const g = this.game;
     const menu = g.menu && g.menu.open;
     const st = g.state;
-    if (st === 'play' && !menu && !(g.settings && g.settings.open)) this.devCombo(pressed, dt);
+    if (DEV_TOOLS && st === 'play' && !menu && !(g.settings && g.settings.open)) this.devCombo(pressed, dt);
     const setOpen = g.settings && g.settings.open;
     if (this.radial && (st !== 'play' || menu || setOpen)) this.closeRadial(); // (a dialog or screen opened over it)
     if (g.garage && g.garage.radial && (st !== 'play' || menu || setOpen)) { g.garage.closeRadial(false); g.vHold = 0; }

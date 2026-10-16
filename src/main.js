@@ -33,7 +33,7 @@ import { Grinder } from './rails.js';
 import { Gamepad } from './gamepad.js';
 import { DILATE_RATE } from './monolith.js';
 import { Cosmetics } from './cosmetics.js';
-import { Cheats } from './cheats.js';
+import { Cheats, DEV_TOOLS, loadDevTools } from './devtools.js';
 import { Territory, locationAnchors, holderOf } from './territory.js';
 import { Civilians } from './civilians.js';
 import { Story } from './story.js';
@@ -260,6 +260,7 @@ class Game {
     this.story = new Story(this);
     this.town = new HomeTown(this); // your town and the Moon Council (Kepler story)
     this.spindle = new Spindle(this); // Meridian's finale: the asteroid (the Moon is frozen while you're there)
+    this.assetRow = null; // the dev menu's flat showroom, made on first use (cheats.js, assetRow.js; not in a release build)
     this.garage = new Garage(this);
     this.winch = new Winch(this); // Kepler Hitch-Line Winch
     this.powers = new Powers(this); // Z: the selected power; the mouse wheel picks
@@ -346,7 +347,7 @@ class Game {
       this.closeHelp();
     }, true);
     // (the dev menu's pause entry: shown once the menu has been opened by its F8 / controller combo)
-    document.getElementById('dev-btn-pause').addEventListener('click', (e) => {
+    if (DEV_TOOLS) document.getElementById('dev-btn-pause').addEventListener('click', (e) => {
       e.stopPropagation();
       this.hud.show('pause', false);
       this.state = this.resumeState || 'play';
@@ -413,9 +414,9 @@ class Game {
       } else if (this.state === 'play') {
         if (code === 'KeyM') this.openMap();
         if (code === 'KeyJ') this.openLog();
-        if (code === 'F8') this.cheats.dev(); // hidden dev menu (B, B, X, Y on a controller)
+        if (DEV_TOOLS && code === 'F8') this.cheats.dev(); // hidden dev menu (B, B, X, Y on a controller)
         // hidden testing menu: hold = and ` together
-        if ((code === 'Backquote' && this.input.down('Equal')) || (code === 'Equal' && this.input.down('Backquote'))) this.cheats.open();
+        if (DEV_TOOLS && ((code === 'Backquote' && this.input.down('Equal')) || (code === 'Equal' && this.input.down('Backquote')))) this.cheats.open();
       } else if (this.state === 'dead' && code === 'Enter') this.respawn();
     };
   }
@@ -703,9 +704,12 @@ class Game {
     return this._homes[loc.id];
   }
 
-  // The settlement closest to the player that would let them in (null on the Spindle, or with nothing safe)
+  // Off the Moon: out on the Spindle (Meridian's finale) or in the dev-only Asset Row. The Moon is hidden and frozen then.
+  away() { return this.spindle.active || (this.assetRow !== null && this.assetRow.active); }
+
+  // The settlement closest to the player that would let them in (null away from the Moon, or with nothing safe)
   nearestSettlement() {
-    if (!this.player || (this.spindle && this.spindle.active)) return null;
+    if (!this.player || this.away()) return null;
     const d = this.player.pos.clone().normalize();
     let best = null, bd = Infinity;
     for (const l of this.locations) {
@@ -758,6 +762,7 @@ class Game {
   damagePlayer(amount, cause, from = null) {
     const P = this.player;
     if (P.dead || amount <= 0 || this.cheats.god) return;
+    if (this.assetRow !== null && this.assetRow.active) return; // (the Asset Row is harmless)
     if (this.story.absorb(from)) return;
     if (cause === 'ram' && this.grind) this.grind.knockOff(P);
     // the vehicle soaks hits (and can be wrecked); a sniper round goes straight through the glass
@@ -772,6 +777,7 @@ class Game {
 
   die(cause) {
     const P = this.player;
+    if (this.assetRow !== null && this.assetRow.active) { this.assetRow.respawnAt(); return; } // (never a K.O. in the Asset Row)
     P.health = 0;
     P.dead = true;
     P.model.root.visible = false;
@@ -1101,6 +1107,7 @@ class Game {
   }
 
   quitToMenu() {
+    if (this.assetRow !== null && this.assetRow.active) this.assetRow.exit(); // (back on the Moon, where you were, before anything is saved)
     this.save();
     this.saves.toMenu(this.slotMeta());
   }
@@ -1155,11 +1162,11 @@ class Game {
     dbg.lap('other');
     // the Monolith's time dilation: the world crawls, you don't
     const wdt = playing && this.alchemy.buffs.dilate > 0 ? dt * DILATE_RATE : dt;
-    if (!this.spindle.active) this.world.update(wdt, this.time, this.camera.position);
+    if (!this.away()) this.world.update(wdt, this.time, this.camera.position);
     this.fx.update(wdt, rdt); // (popups run on real time: a pause or the Monolith's dilation doesn't freeze or stretch them)
     dbg.lap('world');
     this.hud.update(rdt);
-    if (!this.spindle.active) this.updateLighting(dt);
+    if (!this.away()) this.updateLighting(dt);
     const P = this.player;
     this.audio.setZone(this.musicZone());
     this.audio.update(P.dead ? 0 : P.speed, P.body.skating, P.body.grounded, P.body.thrusting && playing, frozen); // (frozen: a pause, the map, a dialog: no wind, skate hum or thrusters)
@@ -1233,6 +1240,7 @@ class Game {
     if (this.state === 'derby') return 'downs';
     if (this.state === 'casino') return 'casino';
     if (this.spindle && this.spindle.active) return 'dark'; // (Meridian's finale, out on the Spindle)
+    if (this.assetRow !== null && this.assetRow.active) return 'dark'; // (the dev Asset Row)
     const P = this.player;
     // the Monolith shares the lab's clinical-strange track: the same weird, humming vibe
     this._musicLocs ||= ['casino', 'downs', 'antimatter', 'monolith'].map((id) => this.locations.find((l) => l.id === id)).filter(Boolean);
@@ -1288,6 +1296,14 @@ class Game {
 
   // Sun, sky fill and the helmet lamp all depend on where you stand on the sphere.
   // On the Spindle: you, your shots, the story step and the asteroid; the Moon waits.
+  // In the dev Asset Row: you, your shots and the row. No story, powers, missions, events or timers: they wait on the Moon.
+  updateRow(dt, c) {
+    this.cheats.tick();
+    this.player.update(dt, this.input, c);
+    this.assetRow.update(dt);
+    this.projectiles.update(dt, dt);
+  }
+
   updateAway(dt, c) {
     const P = this.player;
     this.cheats.tick();
@@ -1385,6 +1401,7 @@ class Game {
     this.hurtCd -= dt;
     this.boardCooldown -= dt;
 
+    if (this.assetRow !== null && this.assetRow.active) { this.updateRow(dt, c); return; } // (before secrets.preUpdate: the Moon's satellite must not run)
     this.secrets.preUpdate(dt);
     if (this.spindle.active) { this.updateAway(dt, c); return; }
     this.cheats.tick();
@@ -1670,11 +1687,14 @@ class Game {
 
 }
 
-const game = new Game();
-window.game = game;
+// (the dev tools are fetched first: the Game builds game.cheats as soon as it is made. A release build has none to fetch)
 // canvas text (signs, maps) is drawn during init, so the pixel fonts must be loaded first
 // (loadOutpostParts never rejects, and only fetches anything when the outpostGlb pilot is switched on)
-Promise.all([loadFonts(), loadRunnerParts(), loadShipParts(), loadOutpostParts()]).then(() => game.init()).catch((e) => {
+loadDevTools().then(() => {
+  const game = new Game();
+  if (DEV_TOOLS) window.game = game; // (the console, the test harnesses and the trailer's pump mode)
+  return Promise.all([loadFonts(), loadRunnerParts(), loadShipParts(), loadOutpostParts()]).then(() => game.init());
+}).catch((e) => {
   console.error(e);
   document.getElementById('load-status').textContent = 'Failed to start: ' + e.message;
 });

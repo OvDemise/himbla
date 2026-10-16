@@ -1833,6 +1833,7 @@ export class Story {
   teleportTo(dir, quiet = false) {
     const g = this.game;
     const P = g.player;
+    if (g.assetRow && g.assetRow.active) g.assetRow.exit(true); // (the dev Asset Row: back on the Moon first; this moves you on from there)
     if (P.vehicle) g.garage.exit();
     const t = tangent(new THREE.Vector3(1, 0, 0), dir).normalize();
     const d = greatCircle(dir.clone().normalize(), t, 18);

@@ -1,0 +1,25 @@
+// The Asset Row's catalogue (assetRow.js): the game's assets, in the order they stand along the row.
+//
+// A GROUP is { id, title, items: [item, ...] }; an ITEM is
+//
+//   id      'group.name'      unique
+//   label   'NAME BOARD'      what the board says (short, upper case)
+//   w, d    metres            footprint along the row (x) and across it (z); the layout is worked out from these before
+//                             anything is built, so they must be right to within a few metres (the checks compare them
+//                             with what is really built, tools/asset-row-check.mjs)
+//   big     true              a place wider than 100 m: stands in lane B instead of lane A
+//   solid   false             no colliders (the default: the item's own `cols`, or one box round what it built)
+//   make(ctx)                 builds it: ctx = { game, moon } (moon: the Moon's planet, for what needs its look). Returns
+//                               { root,            an Object3D standing on y = 0, with an IDENTITY transform of its own
+//                                 cols?,           colliders in root's frame: [{ type: 'box'|'cyl'|'sphere', ... }] as
+//                                                  outpostTemplate gives them (box: x y z hx hy hz yaw; cyl: x z y0 y1 r;
+//                                                  sphere: x y z r)
+//                                 update?(dt, t),  called every frame while it is built (a spinner, a blinker, a lifted gear)
+//                                 dispose?() }     anything beyond the geometry and materials under root
+//                             and is called each time you come near it (it is let go of when you walk off), so it must be
+//                             repeatable and must not touch the Moon, the player or the game's registries.
+//
+// An item that cannot be built is shown as a red "DID NOT BUILD" board, so one bad factory never stops the row.
+import samples from './samples.js';
+
+export const GROUPS = [samples];

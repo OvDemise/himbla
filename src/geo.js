@@ -17,10 +17,12 @@ export function dirFromAngles(thetaDeg, phiDeg, out = new THREE.Vector3()) {
 }
 
 // Which way is up. On the Moon: away from its centre. On the Spindle (spindle.js): away from the
-// asteroid's long axis, so you can run all the way round it. Physics, the camera, shots and effects
+// asteroid's long axis, so you can run all the way round it. In the Asset Row (assetRow.js, a dev tool): one fixed
+// direction everywhere (GRAV.flat), "height" being the distance along it. Physics, the camera, shots and effects
 // ask here instead of normalising a position.
-export const GRAV = { axis: null };
+export const GRAV = { axis: null, flat: null };
 export function upAt(p, out = new THREE.Vector3()) {
+  if (GRAV.flat) return out.copy(GRAV.flat);
   const a = GRAV.axis;
   if (!a) return out.copy(p).normalize();
   const k = p.dot(a);
@@ -30,6 +32,7 @@ export function upAt(p, out = new THREE.Vector3()) {
 }
 // distance from the centre (or the axis)
 export function radOf(p) {
+  if (GRAV.flat) return p.dot(GRAV.flat);
   const a = GRAV.axis;
   if (!a) return p.length();
   const k = p.dot(a);
@@ -37,6 +40,7 @@ export function radOf(p) {
 }
 // move p straight up or down until it's r from the centre (or the axis)
 export function setRad(p, r) {
+  if (GRAV.flat) return p.addScaledVector(GRAV.flat, r - p.dot(GRAV.flat));
   const a = GRAV.axis;
   if (!a) return p.setLength(r);
   const k = p.dot(a);
