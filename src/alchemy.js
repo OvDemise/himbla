@@ -224,6 +224,15 @@ export class Alchemy {
     const P = g.player;
     if (!this.owned) { g.hud.toast('You need a containment jar. Dr. Zbornak sells them at the Antimatter Lab.', 3); return; }
     if (this.used >= this.slots) { g.hud.toast('Jar is full. Empty it with X (into the reactor, if you\'re brave).', 2.5); return; }
+    // a salvaged engine lying at rest
+    const eng = this.restingEngine();
+    if (eng) {
+      eng.root.removeFromParent();
+      this.loot.splice(this.loot.indexOf(eng), 1);
+      this.add('engine', eng.name);
+      g.fx.pop('SALVAGED ENGINE!', null, { color: ITEMS.engine.color, size: 42 });
+      return;
+    }
     // knocked-out pirates first
     for (const e of g.enemies.list) {
       if (e.dead || e.kind !== 'skater' || e.faction !== 'pirate' || e.hp > e.maxHp * 0.45) continue;
@@ -305,6 +314,16 @@ export class Alchemy {
     const { root, core } = makeLoot(kind, { credits, crate });
     frameQuat(at.clone().normalize(), tangent(SUN.clone(), up).normalize(), root.quaternion);
     g.scene.add(root);
+    if (kind === 'engine' && !to) {
+      // a salvaged engine is a heavy lump: it pops out in a random direction, thuds, skids and settles
+      // (updateEngine), and only then can it be scooped with G. The halo and light pillar wait for it.
+      for (const c of root.children) if (c !== core) c.visible = false;
+      const dir = tangent(new THREE.Vector3(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5), up).normalize();
+      const p0 = pos.clone().addScaledVector(up, 1.5);
+      root.position.copy(p0);
+      this.loot.push({ kind, name, credits, crate, root, core, pos: p0, phys: true, rest: false, vel: dir.multiplyScalar(4 + Math.random() * 3).addScaledVector(up, 5 + Math.random() * 2), spin: new THREE.Vector3(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5).multiplyScalar(9), smokeT: 0, t: 0 });
+      return;
+    }
     const from = pos.clone().addScaledVector(up, 2);
     root.position.copy(to ? from : at);
     this.loot.push({ kind, name, credits, crate, root, core, pos: at, from, fly: to ? 0 : 1, flyT: 0.9 + from.distanceTo(at) / 25, t: 0 });
@@ -316,6 +335,7 @@ export class Alchemy {
     for (let i = this.loot.length - 1; i >= 0; i--) {
       const L = this.loot[i];
       L.t += dt;
+      if (L.phys) { this.updateEngine(L, dt); if (L.t > 240) { L.root.removeFromParent(); this.loot.splice(i, 1); } continue; }
       if (L.fly < 1) {
         // ballistic hop from the wreck to its landing spot
         L.fly = Math.min(1, L.fly + dt / L.flyT);
@@ -340,6 +360,61 @@ export class Alchemy {
       } else if (L.warned && L.pos.distanceTo(P.pos) > 8) L.warned = false;
       if (take || L.t > 240) { L.root.removeFromParent(); this.loot.splice(i, 1); }
     }
+  }
+
+  // Rigid-body step for a dropped engine: heavy gravity, a dull bounce, hard ground friction, so it
+  // lands near the wreck instead of skipping off. Once it stops it smokes and waits for the scoop.
+  updateEngine(L, dt) {
+    const g = this.game;
+    const sub = Math.ceil(dt / 0.02);
+    const h = dt / sub;
+    for (let k = 0; k < sub && !L.rest; k++) {
+      const up = L.pos.clone().normalize();
+      L.vel.addScaledVector(up, -16 * h);
+      L.pos.addScaledVector(L.vel, h);
+      L.root.rotateX(L.spin.x * h); L.root.rotateY(L.spin.y * h); L.root.rotateZ(L.spin.z * h);
+      const floor = g.planet.surface(L.pos) + 0.45;
+      if (L.pos.length() <= floor) {
+        L.pos.setLength(floor);
+        const vr = L.vel.dot(up);
+        if (vr < 0) {
+          const hit = -vr;
+          L.vel.addScaledVector(up, -vr * (1 + (hit > 3 ? 0.12 : 0))); // (barely bounces; a soft landing just stops)
+          L.vel.multiplyScalar(Math.max(0, 1 - 6 * h)); // (grinding along the dirt)
+          L.spin.multiplyScalar(0.45);
+          if (hit > 2) { g.audio.thud(Math.min(14, hit * 2.5)); g.fx.dust(L.pos, L.vel, 4, up); }
+        } else L.vel.multiplyScalar(Math.max(0, 1 - 6 * h));
+        if (L.vel.length() < 0.6 && L.spin.length() < 1.2) {
+          L.rest = true;
+          L.vel.set(0, 0, 0);
+          L.pos.setLength(g.planet.surface(L.pos) + 0.45);
+          // lie flat on the ground, whichever way it ended up facing
+          frameQuat(L.pos.clone().normalize(), tangent(new THREE.Vector3(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5), L.pos.clone().normalize()).normalize(), L.root.quaternion);
+          for (const c of L.root.children) c.visible = true;
+        }
+      }
+    }
+    L.root.position.copy(L.pos);
+    if (!L.rest) return;
+    // resting: a thin wisp of smoke from the casing
+    L.smokeT -= dt;
+    if (L.smokeT <= 0) {
+      L.smokeT = 0.35 + Math.random() * 0.25;
+      const up = L.pos.clone().normalize();
+      g.fx.spawn(L.pos.clone().addScaledVector(up, 0.5), up.multiplyScalar(0.9), { color: 0x8a8594, size: 0.55, life: 1.6, drag: 1.5, count: 1, spread: 0.25 });
+    }
+  }
+
+  // Nearest resting engine within reach (a still-tumbling one can't be scooped yet)
+  restingEngine() {
+    const P = this.game.player;
+    let best = null, bd = 7;
+    for (const L of this.loot) {
+      if (!L.phys || !L.rest) continue;
+      const d = L.pos.distanceTo(P.pos);
+      if (d < bd) { bd = d; best = L; }
+    }
+    return best;
   }
 
   // a Trading Kiosk mystery crate: open it on the spot

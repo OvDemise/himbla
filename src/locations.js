@@ -223,6 +223,7 @@ export const SHOPS = {
   daedalus: [
     { key: 'rail', name: 'Daedalus Rail Lance', desc: 'WEAPON (key 3): instant piercing beam, long range', cost: 1600, max: 1, faction: 'daedalus', req: [10], weapon: true },
     { key: 'overcharge', name: 'Daedalus Overcharger', desc: 'Faster fire rate for every weapon', cost: 800, max: 3, faction: 'daedalus', req: [5, 15, 30] },
+    { key: 'cloak', name: 'Daedalus Dark-Side Cloak', desc: 'Roaming pirates check for you less often on the dark side: +5 s per level (doubled on Daedalus ground). Den guards unaffected', cost: 900, max: 3, faction: 'daedalus', req: [10, 20, 35] },
   ],
   rustmoon: [
     { key: 'mortar', name: 'Rustmoon Junk Mortar', desc: 'WEAPON (key 4): lobbed scrap bomb, huge blast', cost: 1200, max: 1, faction: 'rustmoon', req: [5], weapon: true },
