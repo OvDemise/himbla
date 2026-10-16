@@ -775,6 +775,16 @@ body:has(#title:not(.hidden)) #hud { visibility: hidden; }
 #cinebars .cb-skip { position: absolute; bottom: calc(11vh + 12px); right: 24px; color: var(--ui-muted); font-family: var(--comic); font-size: 8px; opacity: 0.85; }
 #cinebars.cb-out { opacity: 0; transition: opacity 0.4s; }
 body.medevac #hud > *:not(#popups):not(#cinebars) { visibility: hidden; } /* (the Spindle med-evac cutscene: just the picture and its caption) */
+/* ---- the Moon Council vote cutscene (chamber.js) ---- */
+body.council #hud > *:not(#popups):not(#cinebars) { visibility: hidden; } /* (just the picture, its caption and the speech bubble; stays up through the roll call on black) */
+#cinebars .cb-say { position: absolute; left: 50%; bottom: calc(11vh + 16px); transform: translateX(-50%); width: min(720px, calc(100vw - 48px)); background: var(--ui-bg); color: var(--ui-text); font-family: var(--body); font-size: 20px; line-height: 1.3; padding: 10px 14px 9px; border: 2px solid var(--yellow); box-shadow: 0 0 0 2px #05030c, var(--ui-shadow); }
+#cinebars .cb-say b { display: block; font-family: var(--comic); font-size: 10px; color: var(--yellow); margin-bottom: 4px; letter-spacing: 1px; }
+#cinebars .cb-cap small { color: var(--ui-muted); }
+#cinebars .cb-bang { position: absolute; left: 50%; top: 40%; font-family: var(--comic); font-size: clamp(40px, 9vw, 110px); color: var(--yellow); text-shadow: 6px 6px 0 #ff2e88, -3px -3px 0 #05030c, 3px -3px 0 #05030c, -3px 3px 0 #05030c; transform: translate(-50%, -50%) rotate(-6deg); animation: cs-bang 0.25s steps(5) both; }
+@keyframes cs-bang { from { transform: translate(-50%, -50%) scale(0.2) rotate(-14deg); opacity: 0; } to { transform: translate(-50%, -50%) scale(1) rotate(-6deg); opacity: 1; } }
+#dialog .vote-roll .rc { opacity: 0; animation: rc-in 0.01s linear forwards; animation-delay: calc(0.5s + var(--i) * 0.6s); } /* (the roll call: one member at a time) */
+#dialog .vote-roll .dlg-btns { opacity: 0; animation: rc-in 0.01s linear forwards; animation-delay: var(--at, 0s); } /* (the buttons' labels would give the verdict away: they wait for it, announce() sets --at) */
+@keyframes rc-in { to { opacity: 1; } }
 @keyframes cbin { from { transform: scaleY(0); } to { transform: scaleY(1); } }
 #jarchip .artifact-slot { color: #7dffd4; text-shadow: 0 0 8px #7dffd4; }
 /* ---- rail lance scope ---- */

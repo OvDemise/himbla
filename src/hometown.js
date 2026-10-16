@@ -46,29 +46,39 @@ export const BUILDINGS = {
 // ---------------------------------------------------------------------------------------------
 // Moon Council motions. Members are the five non-pirate factions still standing; Kepler (you) always
 // votes yes; a motion needs a majority. hidden(ws): not on the table (already passed, or moot).
-// icon / tint / feature are what a motion's tile shows on the hall's page, like a building's.
+// icon / tint / feature are what a motion's tile shows on the hall's page, like a building's. say (what the councillor tells the chamber,
+// two lines of at most about 100 characters each: they are typed at 34 letters a second) and focus (the delegations the speech is aimed
+// at, whose faces the camera cuts to) are for the vote's cutscene (chamber.js).
 // ---------------------------------------------------------------------------------------------
 export const MOTIONS = {
   ceasefire: {
     name: 'Vostok–Daedalus Ceasefire', icon: 'council', tint: '#ff3b5c', feature: 'Vostok & Daedalus stand down',
     desc: 'Vostok and Daedalus stand down. Their militarised zones open up, and their armour (the BTR-M APC and the Phase Skimmer), their weapons and Daedalus\' Phase Dash go on sale to anyone.',
+    say: ['Vostok. Daedalus. Every shell you trade out there is one I sweep up in here.', 'I move that you both stand down: open your gates and let the Moon use its roads.'],
+    focus: ['vostok', 'daedalus'],
     stance: { vostok: -0.15, daedalus: -0.15 },
     hidden: (ws) => Object.keys(ws.conquered || {}).length > 0,
   },
   openSkies: {
     name: 'Open Skies Accord', icon: 'council', tint: '#ffd23f', feature: 'SPACECOM opens its labs',
     desc: 'SPACECOM opens its motor pool and its labs: the Lunar Interceptor and the Deflector Shield go on sale at the ILMB.',
+    say: ['SPACECOM keeps the best motor pool on the Moon locked up in a hangar.', 'I move the Open Skies Accord: open your labs and your interceptors to every honest runner.'],
+    focus: ['spacecom', 'meridian'],
     stance: { spacecom: -0.05 },
     hidden: (ws) => !!ws.lawless,
   },
   freeTrade: {
     name: 'Free Trade Charter', icon: 'council', tint: '#2ec4ff', feature: '10% off every shop',
     desc: 'Meridian drops its tariffs: 10% off every shop on the Moon, and the Courier Light-Bike and the Personal Teleporter go on sale at the Exchange.',
+    say: ['Every crate on this Moon pays a toll before it pays the people who carried it.', 'I move the Free Trade Charter: drop the tariffs, and let the Moon trade.'],
+    focus: ['meridian', 'kepler'],
     stance: {},
   },
   militiaPact: {
     name: 'Militia Pact', icon: 'council', tint: '#ff9f1c', feature: '2 more militia turrets',
     desc: 'Every Kepler town gets two more militia turrets, and the Homestead Mule goes on sale at Kepler Civic Center.',
+    say: ['Raiders hit our towns, and a settler is lucky to have one turret to her name.', 'I move the Militia Pact: two more guns on every Kepler town, and the Militia Carrier on sale.'],
+    focus: ['kepler', 'spacecom'],
     stance: {},
   },
 };
@@ -492,8 +502,13 @@ export class HomeTown {
   leave() { const g = this.game; if (g.state === 'board' || g.state === 'dialog') g.closeModal(false); }
   back() { if (this.skin === 'board') this.game.openBoard(this.loc, 'town'); else this.menu(this.ui && this.ui.sel); }
 
-  // the chamber's first draw is the slow part of a vote: it is warmed up while the page is read (nothing to warm yet)
-  warm() {}
+  // the chamber's first draw is the slow part of a vote (its shaders, and its text textures): it is built and warmed up while the page is
+  // read, so the scene never hitches. Once is enough, and only while the council could sit
+  warm() {
+    if (this._warm || this.cooldown() > 0) return;
+    this._warm = true;
+    this.game.chamber.prepare().catch(() => {});
+  }
 
   // arrows / WASD and Enter over the page (both skins); false: not a key of the page's
   key(code) {
@@ -596,8 +611,9 @@ export class HomeTown {
 
   cooldown() { const c = this.ws.council; return Math.max(0, (c.next || 0) - Date.now()); }
 
-  // call a vote on a motion. The council's answer is told on screens of its own (the page is left first); back() is where a failed motion
-  // goes next
+  // call a vote on a motion. The result is decided and saved HERE, before the cutscene (chamber.js), so skipping the scene, or closing the
+  // game during it, can't change anything; the scene ends in a fade to black, and only then is the result read out (announce()). The page is
+  // left first, and back() is where a failed motion goes next
   vote(key, back = () => this.back()) {
     const g = this.game;
     const m = MOTIONS[key];
@@ -609,19 +625,36 @@ export class HomeTown {
     const yes = ballots.filter((b) => b.yes).length;
     const pass = yes > members.length / 2;
     c.next = Date.now() + VOTE_CD / (this.has('radio') ? 2 : 1);
-    const roll = ballots.map((b) => `<span style="color:${FACTIONS[b.f].color}">${FACTIONS[b.f].name}</span>: <b style="color:${b.yes ? '#7dff6a' : '#ff3b5c'}">${b.yes ? 'AYE' : 'NAY'}</b>`).join('<br>');
-    g.audio.tone(pass ? 880 : 220, 0.4, 'triangle', 0.25);
-    this.leave();
-    if (!pass) {
-      saveWorldState(this.ws);
-      g.dialog(`THE VOTE: ${m.name.toUpperCase()}`, `${roll}<br><br><b>${yes} to ${members.length - yes}. THE MOTION FAILS.</b><br><small>Raise your standing with the doubters and call it again next session.</small>`, [{ label: 'NEXT TIME', fn: back }]);
-      return { takeover: true };
-    }
-    c.passed.push(key);
+    const news = pass ? `<b>${m.name.toUpperCase()}.</b> ${m.desc}<br><br><small>Carried by the Moon Council, sitting in ${this.state.name}.</small>` : null;
+    if (pass) { c.passed.push(key); this.ws.bulletin = news; } // (the bulletin too: if the game is closed before the new dawn, the next load tells the news, as after a finale)
     saveWorldState(this.ws);
-    g.dialog(`THE VOTE: ${m.name.toUpperCase()}`, `${roll}<br><br><b>${yes} to ${members.length - yes}. THE MOTION CARRIES.</b><br><small>${m.desc}</small>`, [{ label: 'ONE WEEK LATER…' }]);
-    g.story.pendingDawn = () => g.newDawn(`THE COUNCIL HAS SPOKEN: ${m.name.toUpperCase()}`, `<b>${m.name.toUpperCase()}.</b> ${m.desc}<br><br><small>Carried by the Moon Council, sitting in ${this.state.name}.</small>`);
+    this.leave();
+    // (only the odds go to the scene, never the ballots: the faces in the chamber match the forecast on the page, and spoil nothing)
+    g.chamber.play({ motion: key, name: m.name, say: m.say, focus: m.focus, town: this.state.name, members: members.map((f) => ({ f, p: this.chance(f, m) })) },
+      () => this.announce(m, ballots, yes, members.length, pass, news, back));
     return { takeover: true };
+  }
+
+  // The picture is black (the chamber's fade has finished): the roll is read out, one member at a time, on the black (style.css .vote-roll), and
+  // the buttons wait for the verdict (their labels would give it away). A failed motion fades the Moon back up under the page it came from;
+  // a carried one goes on to the new dawn, whose card is already covering the picture
+  announce(m, ballots, yes, n, pass, news, back) {
+    const g = this.game;
+    const STEP = 0.6, FIRST = 0.5; // seconds between the lines, and before the first (the same as the delays in style.css)
+    const roll = ballots.map((b, i) => `<div class="rc" style="--i:${i}"><span style="color:${FACTIONS[b.f].color}">${FACTIONS[b.f].name}</span>: <b style="color:${b.yes ? '#7dff6a' : '#ff3b5c'}">${b.yes ? 'AYE' : 'NAY'}</b></div>`).join('');
+    const verdict = `<div class="rc" style="--i:${ballots.length + 0.4}"><br><b>${yes} to ${n - yes}. THE MOTION ${pass ? 'CARRIES' : 'FAILS'}.</b><br><small>${pass ? m.desc : 'Raise your standing with the doubters and call it again next session.'}</small></div>`;
+    const title = `THE VOTE: ${m.name.toUpperCase()}`;
+    // (a key or a pad button still being mashed to skip the scene can't answer the card the moment it appears: the button, whichever way it
+    // is pressed, does nothing for the first 0.9 s; then it closes the card itself, like the choices that repaint their own page)
+    const born = performance.now();
+    const answer = (label, then) => ({ label, keep: true, fn: () => { if (performance.now() - born < 900) return; g.closeModal(false); if (then) then(); } });
+    if (pass) g.story.pendingDawn = () => g.newDawn(`THE COUNCIL HAS SPOKEN: ${m.name.toUpperCase()}`, news);
+    g.dialog(title, roll + verdict, [pass ? answer('ONE WEEK LATER…') : answer('NEXT TIME', () => { g.chamber.reveal(0.8); back(); })], { cls: 'vote-roll' });
+    const card = document.querySelector('#dialog .vote-roll');
+    if (card) card.style.setProperty('--at', `${FIRST + (ballots.length + 0.4) * STEP}s`);
+    const blip = (at, f, len, wave, vol) => setTimeout(() => { if (g.state === 'dialog') g.audio.tone(f, len, wave, vol); }, (FIRST + at * STEP) * 1000);
+    ballots.forEach((b, i) => blip(i, b.yes ? 740 : 260, 0.12, 'square', 0.12)); // (up for an AYE, down for a NAY)
+    blip(ballots.length + 0.4, pass ? 880 : 220, 0.4, 'triangle', 0.25);
   }
 
   // ---------- per frame ----------

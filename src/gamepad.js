@@ -163,6 +163,7 @@ export class Gamepad {
     else if (roul) this.roulette(btn, pressed, trig, lx, ly, dt);
     else if (st === 'casino' && g.casino.mode) this.seated(g.casino.mode, btn, pressed, trig, lx, ly, dt);
     else if (st === 'dead') { this.releaseAll(); if (pressed(B.A) || pressed(B.START)) document.getElementById('death').click(); }
+    else if (st === 'cutscene') { this.releaseAll(); if (pressed(B.A) || pressed(B.B) || pressed(B.START)) this.tap('Space'); } // (the cutscenes skip on Space: the recall shuttle, the med-evac and the council's vote)
     else this.ui(btn, pressed, lx, ly, ry, dt);
     this.prev = btn;
   }
