@@ -14,14 +14,17 @@
 //   pirateTowns [location ids]     Lights Out: the towns the clans blew up and took (pirate dens now)
 //   blackSun    true               Daedalus chapter 4: the reactor at the Forward Post stays
 //   town        {dir,name,kind,    Kepler finale: your town (hometown.js), a settlement on the map
-//               slots,bank,radio}  (slots: eight building keys or null; School & Playground became Roads,
-//                                  so an old save's 'school' is read as 'roads' at load; radio: the Radio Tower's
+//               slots,bank,radio,  (slots: eight building keys or null; School & Playground became Roads,
+//               sapNext,defNext}   so an old save's 'school' is read as 'roads' at load; radio: the Radio Tower's
 //                                  sweep of the world map, { d: [x,y,z], r metres, on, n cells, f: [location ids] },
-//                                  radio.js)
+//                                  radio.js; sapNext: when the Greenhouse Farm's nursery bench has its next sapling, and
+//                                  defNext: when the Motor Pool can send its militia rovers out again (both ms since 1970,
+//                                  real time, like council.next))
 //   council     {passed,next}      the Moon Council's carried motions (and when it sits next)
 //   respawnAt   string|null        the headquarters (location id) you set at your town's clinic to redeploy at after a
 //                                  K.O. (respawn.js); null = your nearest clinic, else home
-//   bulletin    string|null        news to show once, on the first load after a finale
+//   bulletin    string|null        news to show once, on the first load after a finale (a carried council vote sets it
+//                                  too, until its new dawn has played)
 import * as THREE from 'three';
 import { FACTIONS, SHOPS } from './locations.js';
 import { darkness, arcDist, tangent, greatCircle } from './geo.js';

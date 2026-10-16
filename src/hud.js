@@ -519,7 +519,7 @@ export class HUD {
     else if (this.crT > 0) this.crT -= dt;
     crEl.classList.toggle('cr-show', this.crT > 0 || g.state === 'board');
     const wi = P.weapon || 0;
-    const wtxt = P.vehicle && P.vehicle.def.turret ? `<span class="on">1</span> ${APC_CANNON.name.toUpperCase()}` : WEAPONS.map((w, i) => `<span class="${i === wi ? 'on' : ''} ${(!w.unlock || g.upgrades[w.unlock]) ? '' : 'locked'}">${i + 1}</span>`).join('') + ` ${WEAPONS[wi].name.toUpperCase()}`;
+    const wtxt = P.vehicle && P.vehicle.def.turret ? `<span class="on">1</span> ${(P.vehicle.def.cannon || APC_CANNON.name).toUpperCase()}` : WEAPONS.map((w, i) => `<span class="${i === wi ? 'on' : ''} ${(!w.unlock || g.upgrades[w.unlock]) ? '' : 'locked'}">${i + 1}</span>`).join('') + ` ${WEAPONS[wi].name.toUpperCase()}`;
     if (wtxt !== this.lastW) { $c('weaponchip').innerHTML = wtxt; this.lastW = wtxt; }
     const jt = g.alchemy ? g.alchemy.hudText() : '';
     if (jt !== this.lastJar) { $c('jarchip').innerHTML = jt; $c('jarchip').classList.toggle('hidden', !jt); this.lastJar = jt; }

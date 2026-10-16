@@ -377,7 +377,7 @@ export class Chamber {
       else this.cap(`${FACTIONS[f].name.toUpperCase()}: THE SEAT STANDS EMPTY`);
     } else if (t < TL.ots0) { // the councillor, from the front, low, with the dome behind
       const u = ease((t - TL.close0) / (TL.ots0 - TL.close0));
-      pos = lerp3(V3(-1.5, 1.5, -2.9), V3(-0.9, 1.75, -2.2), u); look = lerp3(V3(0, 3.5, 0.95), V3(0, 3.0, 0.95), u); fov = lerp(48, 42, u);
+      pos = lerp3(V3(-1.5, 1.5, -2.9), V3(-0.9, 1.75, -2.2), u); look = lerp3(V3(0, 3.2, 0.95), V3(0, 2.7, 0.95), u); fov = lerp(48, 42, u);
       this.cap(`COUNCILLOR OF ${S.town.toUpperCase()}`);
     } else if (t < TL.react0) { // over the shoulder: the audience
       const u = ease((t - TL.ots0) / (TL.react0 - TL.ots0));
@@ -398,7 +398,7 @@ export class Chamber {
     } else { // the gavel, in close, from the floor
       pos = V3(0.9, 2.35, -1.6); look = V3(0.32, 1.9, 0.4); fov = 32;
       this.cap('');
-      if (t >= TL.bang && t < TL.bang + 0.3) { const k = 1 - (t - TL.bang) / 0.3; pos.x += (Math.random() - 0.5) * 0.06 * k; pos.y += (Math.random() - 0.5) * 0.06 * k; } // (the hit shakes the camera)
+      if (t >= TL.bang && t < TL.bang + 0.3) { const k = (1 - (t - TL.bang) / 0.3) * 0.06 * (this.game.settings && this.game.settings.v ? this.game.settings.v.shake ?? 1 : 1); pos.x += (Math.random() - 0.5) * k; pos.y += (Math.random() - 0.5) * k; } // (the hit shakes the camera, as far as the Screen shake setting allows)
     }
     cam.position.copy(pos); cam.lookAt(look);
     if (Math.abs(cam.fov - fov) > 0.01) cam.fov = fov;

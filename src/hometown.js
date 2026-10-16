@@ -39,7 +39,7 @@ export const BUILDINGS = {
   housing: { name: 'Housing Domes', cost: 1500, icon: 'housing', tint: '#ffd23f', feature: '+₵20 a minute', income: 20, desc: 'Families move in: +₵20 a minute to the town bank.' },
   market: { name: 'Market Hall', cost: 2000, icon: 'market', tint: '#ff2e88', feature: '+₵60 a minute', income: 60, desc: `Traders set up shop: +₵60 a minute to the town bank (it holds up to ₵${BANK_CAP}).` },
   clinic: { name: 'Clinic', cost: 1200, icon: 'clinic', tint: '#ff2a4a', feature: 'K.O. respawn point', desc: 'You redeploy here after a K.O. unless you have set a charted headquarters as your respawn point (set it here).' },
-  farm: { name: 'Greenhouse Farm', cost: 1000, icon: 'greenhouse', tint: '#7dff6a', feature: 'Heals · +₵15/min · saplings', income: 15, desc: 'Heals you anywhere in town, +₵15 a minute, and a free sapling for your jar from the nursery bench every 5 minutes.' },
+  farm: { name: 'Greenhouse Farm', cost: 1000, icon: 'greenhouse', tint: '#7dff6a', feature: 'Heals · +₵15/min · saplings', income: 15, desc: 'Heals you anywhere in town, +₵15 a minute, and a free sapling for your jar from the nursery bench every five minutes.' },
   motorpool: { name: 'Motor Pool', cost: 1800, icon: 'garage', tint: '#ffd23f', feature: 'Your vehicles · militia', desc: 'A Homestead Mule of your own; roll any vehicle out of its door (F), and your vehicles are patched up whenever you\'re in town. When raiders reach the town, two militia rovers roll out (every 10 minutes).' },
   barracks: { name: 'Militia Barracks', cost: 2200, icon: 'turret2', tint: '#ff9f1c', feature: '2 guns, 400 m', desc: 'Two militia guns that shoot any pirate within 400 m of town.' },
   roads: { name: 'Roads', cost: 1800, icon: 'roads', tint: '#c9c3d9', feature: 'Ring road + links', desc: 'Road crews lay a ring road round the town and link it to the settlements around it. Hover-cars and buggies start calling at once, land-trains by your next load.' },
@@ -862,7 +862,13 @@ export class HomeTown {
     return Math.min(0.97, Math.max(0.03, 0.15 + rep / 50 + (motion.stance[f] || 0)));
   }
 
-  cooldown() { const c = this.ws.council; return Math.max(0, (c.next || 0) - Date.now()); }
+  // (a clock set back since the last vote must not lock the council: no wait is longer than VOTE_CD, and the saved value is corrected
+  // too, as saplingWait() and militiaWait() do)
+  cooldown() {
+    const c = this.ws.council, now = Date.now();
+    if (c.next > now + VOTE_CD) c.next = now + VOTE_CD;
+    return Math.max(0, (c.next || 0) - now);
+  }
 
   // call a vote on a motion. The result is decided and saved HERE, before the cutscene (chamber.js), so skipping the scene, or closing the
   // game during it, can't change anything; the scene ends in a fade to black, and only then is the result read out (announce()). The page is
@@ -896,7 +902,7 @@ export class HomeTown {
     const STEP = 0.6, FIRST = 0.5; // seconds between the lines, and before the first (the same as the delays in style.css)
     const verdictAt = FIRST + (ballots.length + 0.4) * STEP; // (when the verdict line and the button appear)
     const roll = ballots.map((b, i) => `<div class="rc" style="--i:${i}"><span style="color:${FACTIONS[b.f].color}">${FACTIONS[b.f].name}</span>: <b style="color:${b.yes ? '#7dff6a' : '#ff3b5c'}">${b.yes ? 'AYE' : 'NAY'}</b></div>`).join('');
-    const verdict = `<div class="rc" style="--i:${ballots.length + 0.4}"><br><b>${yes} to ${n - yes}. THE MOTION ${pass ? 'CARRIES' : 'FAILS'}.</b><br><small>${pass ? m.desc : 'Raise your standing with the doubters and call it again next session.'}</small></div>`;
+    const verdict = `<div class="rc" style="--i:${ballots.length + 0.4}"><br><b class="vt">${yes} to ${n - yes}. THE MOTION ${pass ? 'CARRIES' : 'FAILS'}.</b><br><small>${pass ? m.desc : 'Raise your standing with the doubters and call it again next session.'}</small></div>`;
     const title = `THE VOTE: ${m.name.toUpperCase()}`;
     // (the button is invisible until the verdict is read out, so it is inert too: a key or pad button still being mashed to skip the scene, or a
     // click where it will be, can't answer the card before the roll has been heard. That also means no tone is left waiting when it closes. Then
