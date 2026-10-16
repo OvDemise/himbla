@@ -37,7 +37,7 @@ export const TECH = {
 // Modules for outposts you found (the base-builder part).
 export const MODULES = {
   greenhouse: { name: 'Greenhouse', cost: 600, icon: 'greenhouse', tint: '#7dff6a', feature: 'Heals you within 60 m', desc: 'Heals you while you are nearby.' },
-  clinic: { name: 'Clinic', cost: 800, icon: 'clinic', tint: '#ff2a4a', feature: 'K.O. respawn point', desc: 'You redeploy here after a K.O. (nearest clinic wins).' },
+  clinic: { name: 'Clinic', cost: 800, icon: 'clinic', tint: '#ff2a4a', feature: 'K.O. respawn point', desc: 'You redeploy here after a K.O. (nearest clinic wins), unless you have set a charted headquarters as your respawn point (at your town\'s clinic).' },
   beacon: { name: 'Beacon Tower', cost: 700, icon: 'beacon', tint: '#2ee6ff', feature: 'Charts the map · fast travel', desc: 'Charts a wide circle of map around it and links to your other beacons for fast travel.' },
   turret: { name: 'Militia Turret', cost: 900, icon: 'turret', tint: '#ff9f1c', feature: 'Shoots pirates within 300 m', desc: 'A manned gun on a tall stand. Shoots pirates within 300 m.' },
   turret2: { name: 'Second Militia Turret', cost: 900, needs: 'turret', icon: 'turret2', tint: '#ff9f1c', feature: 'A second gun by the gate', desc: 'A second gun on a stand of its own beside the gate. Shoots pirates within 300 m.' },
@@ -1740,8 +1740,8 @@ export class Story {
     const has = (m) => o.modules.includes(m);
     if (k === 'greenhouse') return { rows: [['EFFECT', 'Heals 4 hull / s'], ['RANGE', '60 m round the hub'], ['STATUS', 'ACTIVE']], note: 'Nothing to press: it works while you stand near it.' };
     if (k === 'clinic') {
-      const near = this.clinicSpawn(P.pos.clone().normalize());
-      return { rows: [['EFFECT', 'You redeploy here after a K.O.'], ['NEAREST CLINIC', near === o ? 'THIS ONE (to you)' : 'Another is nearer to you', near === o ? '' : 'dim']] };
+      const near = this.clinicSpawn(P.pos.clone().normalize()), plan = this.game.respawnPt.plan(P.pos.clone().normalize());
+      return { rows: [['EFFECT', 'You redeploy here after a K.O.'], ['REDEPLOY AT', plan.name, plan.kind === 'hq' ? 'gold' : ''], ['NEAREST CLINIC', near === o ? 'THIS ONE (to you)' : 'Another is nearer to you', near === o ? '' : 'dim']] };
     }
     if (k === 'beacon') {
       const linked = this.myOutposts().filter((x) => x !== o && x.modules.includes('beacon')).length;
@@ -1902,7 +1902,7 @@ export class Story {
   clinicSpawn(from) {
     let best = null, bd = Infinity;
     const T = this.game.town;
-    if (T && T.has('clinic')) { const p = T.slotWorld('clinic'); if (p) { best = { dir: p.clone().normalize() }; bd = arcDist(from, best.dir); } }
+    if (T && T.has('clinic')) { const p = T.slotWorld('clinic'); if (p) { best = { dir: p.clone().normalize(), name: `${T.state.name} clinic` }; bd = arcDist(from, best.dir); } }
     for (const o of this.myOutposts()) {
       if (!o.modules.includes('clinic')) continue;
       const d = arcDist(from, o.dir);
