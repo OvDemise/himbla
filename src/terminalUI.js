@@ -197,7 +197,7 @@ export function terminalPage(s) {
   const tile = (t) => `<button type="button" class="otm-tile ${t.state}${t.id === s.sel ? ' sel' : ''}" data-sel="${esc(t.id)}" style="--tint:${t.tint}" aria-pressed="${t.id === s.sel}">
       ${t.key ? `<span class="otm-key">${t.key}</span>` : ''}${icon(t.icon)}
       <span class="otm-name">${esc(t.name)}</span>
-      <span class="otm-feat">${esc(t.feature)}</span>
+      <span class="otm-feat">${esc(t.feature).replace(/₵\d+|\d*5\d*/g, '<b class="cr">$&</b>')}</span>
       <span class="otm-chip ${t.chipTone || ''}">${esc(t.chip)}</span>
     </button>`;
   const d = s.detail;

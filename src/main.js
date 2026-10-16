@@ -1031,6 +1031,7 @@ class Game {
     this.audio.boom(true);
     // once the card is fully black: rebuild, go home
     setTimeout(() => {
+      this.chamber.reveal(0); // (a council vote's black was holding the picture; the card covers it now. First, so a throw below cannot leave the Moon black with no HUD)
       try { this.applyWorldLive(); } catch (e) { console.error(e); }
       if (this.player.vehicle) this.garage.exit();
       this.enemies.clearPirates();
@@ -1042,7 +1043,6 @@ class Game {
       this.updateCamera(0.016, true);
       this.story.save();
       this.save();
-      this.chamber.reveal(0); // (a council vote's black was holding the picture; the card covers it now)
     }, 1400);
     setTimeout(() => {
       el.classList.add('out');

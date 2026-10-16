@@ -103,8 +103,8 @@ Vite's hot reload restarts the page.
 | `P` | Holding pen, anywhere (needs the remote pen link from Dr. Zbornak) |
 | `Shift`+`X` (hold) | Dump the jar anywhere: materials are destroyed, creatures pop back out |
 | `G` / `X` (hold) | Scoop into your containment jar / hold to empty it (into the antimatter reactor when you're beside it) |
-| `F` | Job board / upgrades (inside hubs and settlements) |
-| `M` | Globe map: drag to spin, scroll to zoom. Fog of war covers anywhere you haven't been |
+| `F` | Job board / upgrades (inside hubs and settlements; your town's board has a second tab, COUNCIL HALL: `Q` / `E`) |
+| `M` | Globe map: drag to spin, scroll to zoom. Fog of war covers anywhere you haven't been (from your town's Radio Tower it is also where you send sweeps that chart the fog) |
 | `J` | Reputation Log |
 | `R` (hold 1.5 s) | Emergency recall (₵100): a shuttle flies you to your HQ (the ILMB, the HQ of the faction whose story you've committed to, or Rustmoon Hold if you ride with the pirates); fails everything you have running (your contracts, a live event, your story chapter) before the scene plays, with one list of what was failed (the hold bar warns you first) |
 
@@ -132,7 +132,7 @@ highlight, `A` presses, `B` backs out, `LB`/`RB` switch tabs and the right stick
 a Derby race: `A` cheers, `Y` switches camera, the right stick orbits. On the globe map the left
 stick moves a cursor (rest it on a pin to read it), holding `RT` grabs the globe so the cursor drags
 it round, holding `LB` / `RB` turns the map anticlockwise / clockwise, the right stick zooms, and `B` or
-`View` closes it. At the Plinko board the left stick (or d-pad) aims the chute, `A` or `RT` drops a
+`View` closes it (from your town's Radio Tower, `A` sends a sweep from the cursor and `X` stops or resumes it). At the Plinko board the left stick (or d-pad) aims the chute, `A` or `RT` drops a
 ball (hold either to keep them coming), `LB` / `RB` lower and raise the bet, and `B` stands up. At
 the blackjack table `A` deals and hits, `X` stands, `Y` doubles, `R3` zooms in on the cards (`Z` on the keyboard), with the same `LB` / `RB` bet and
 `B` to stand up. At the Duck Derby the left stick (or d-pad) picks a duck and `A` starts the race
@@ -184,7 +184,8 @@ restricted military zones work (their turrets open fire without clearance). Afte
   too: **SKY-HIGH!** once you've climbed 40 m above where the jump began, and **BIG AIR** (with the time)
   if you land after 5 s or more in the air; shorter hops still score their style points, quietly.
 - **Job boards** are terminals: status screens (credits, standing, uplink), then a contracts screen and a gear
-  screen. At the ILMB the board stands in the plaza as a kiosk of screens under a canopy.
+  screen. At the ILMB the board stands in the plaza as a kiosk of screens under a canopy. The board in your own town
+  has a second tab, COUNCIL HALL (`Q` / `E`, `Tab` or `LB` / `RB`): the same page as the hall's terminal.
 - **Skiing physics:** gravity pulls toward the Moon's centre and along the slope you're on. With the skates on, friction
   is almost zero and the cushion turns some extra downhill pull into speed, so diving into
   a crater and climbing out the other side *gains* momentum. Chain craters to go faster.
@@ -311,9 +312,22 @@ run all the way round its girth (gravity points at its axis) on the way to the c
 is the **Quantum Slipstream Vanes**, a power (pick it on the power wheel, then `Z`): for 10 s your skates keep a
 share of their handling in the air, so you can steer mid-flight (30 s from using them until they're ready again).
 
-**The Moon Council** (once you have your town): call votes from the hall. Each member faction votes with you
-more readily the better its standing with you; a carried motion (a Vostok–Daedalus ceasefire, Open Skies, Free
-Trade, a Militia Pact) reshapes the Moon and puts other factions' vehicles, weapons and tech on sale.
+**Your town** (the Kepler finale) has eight plots and nine buildings to put on them, built from the council hall's terminal
+or the COUNCIL HALL tab of the town's job board: Housing Domes and a Market Hall (income into the town bank); a Clinic
+(a K.O. redeploys you there, unless you set a charted headquarters whose faction rates you at least neutral as your
+respawn point); a Greenhouse Farm (heals you, pays, and gives a free sapling for your jar from its nursery bench every
+5 minutes); a Motor Pool (its door lists your vehicles and rolls one out, and when raiders reach the town two Kepler
+militia rovers roll out, at most every 10 minutes); a Militia Barracks (two guns, 400 m); Roads (a ring road round the
+town and roads out to the settlements around it); a Radio Tower (charts 3 km of map, and from its world map you send
+sweeps that chart the fog: a disc growing from the spot you pick at 25 m/s out to 2 km, in the background); and a
+Shuttle Pad (a landing pad with a shuttle to the nearest settlement; the town becomes your home base).
+
+**The Moon Council** (once you have your town): call votes from the hall's terminal or the COUNCIL HALL tab (every 8
+minutes, 4 with the Radio Tower). Each member faction votes with you more readily the better its standing with you,
+and the vote plays as a short cutscene in the council chamber (skip with `Space`, `Enter` or `A`) that fades to black
+before the result is read out. A carried motion (a Vostok–Daedalus ceasefire, Open Skies, Free Trade, a Militia
+Pact) reshapes the Moon and puts vehicles, weapons and tech on sale (the Pact: two more guns in every Kepler town and
+the Kepler Militia Carrier).
 
 - **Military (SPACECOM, Vostok, Daedalus):** clear ambushes, then **capture outposts** with your backup:
   kill the guards and hold the ground; the outpost flips to your faction and the territory border moves.
@@ -326,7 +340,7 @@ Trade, a Militia Pact) reshapes the Moon and puts other factions' vehicles, weap
   votes: the story panel lists each HQ and the tally, and Gran's letter of introduction clears you through the
   Vostok and Daedalus gates (whatever you stand at with them, unless you're already FRIENDLY) until the Charter is signed. Each outpost terminal is an interactive page: a pixel-icon tile for every building (click one, or arrow
   to it, for what it does and a button to collect, patch up, travel or build; the number keys still work). It builds up
-  to 6 modules on the six plots: Greenhouse (heals nearby), Clinic (you redeploy there after a K.O.), Beacon (charts
+  to 6 modules on the six plots: Greenhouse (heals nearby), Clinic (you redeploy there after a K.O., unless you set a headquarters as your respawn point at your town's clinic), Beacon (charts
   1.5 km and links beacons for fast travel), Militia Turret (a manned gun on a tall stand that turns and fires from its
   own barrel at pirates within 300 m), Market (₵40/min to collect) and Garage (hauler vehicle); and a **Second Militia
   Turret** (₵900, needs the first) on a stand of its own by the gate, which is not one of the six plots. The
@@ -343,7 +357,7 @@ Trade, a Militia Pact) reshapes the Moon and puts other factions' vehicles, weap
   ILMB.
 - **Vehicles** (`V` calls the crane drop, boards and leaves; hold `V` for a radial picker if you own more
   than one; W/S drive, A/D steer, Shift hops, you can still shoot): SPACECOM Lunar Interceptor (fast), Vostok BTR-M APC (slow tank: its turret swings to follow your camera and the barrel elevates with it; left mouse / `RT` fires the 30 mm cannon instead of your own weapons), Daedalus Phase Skimmer (hover,
-  drifts), Kepler Homestead Mule, Meridian Courier Light-Bike (a sleek light-bike you ride tucked low, leaving a
+  drifts), Kepler Homestead Mule, Kepler Militia Carrier (the Militia Pact's armoured hauler: the APC's hull and turret cannon in militia paint, with the Mule's padded bay), Meridian Courier Light-Bike (a sleek light-bike you ride tucked low, leaving a
   glowing trail that fades over a second), Rustmoon Scrapjaw War-Rig. They hug the ground at speed: the wheeled
   ones have real downforce and tyres that bite sideways, and only a proper ramp throws one clear. Ramming pirates
   at speed hurts them. Vehicles have hull points (180 Skimmer to 480 APC) and soak most incoming fire; a hull
@@ -452,7 +466,7 @@ or bail out mid-flight through the side hatch (keeping the ship's speed, with a 
 at the shelter walks up and boards, and the doors close before it leaves; arriving passengers walk to real
 building entrances. Safe settlements are joined by a network of 14 pre-driven **roads** (an 18 m track cut into the
 regolith: a scraped, rutted bed between two smooth berms of pushed-up dust, with delineator posts, wide enough for two
-land-trains to pass) that merge into a big **ring road** around each town, with one stop shelter on the ring. Big six-wheeled **land-trains**,
+land-trains to pass) that merge into a big **ring road** around each town (your own gets its ring road, and its roads out, when you build Roads), with one stop shelter on the ring. Big six-wheeled **land-trains**,
 hover-cars and buggies each pick a destination town: some pass straight through towns, others stop to
 swap passengers and then head somewhere new. There are two land-train services, each painted for the faction whose
 towns it joins (SpaceCom white and yellow, Vostok slate and red, Kepler orange and cream, Meridian cyan and cream, each with the
@@ -533,7 +547,7 @@ the unlock counters, toggle any splice-pod mutation (with a reset), or reset all
 ### The Asset Row (dev builds only)
 
 Dev menu (`F8`) → **Full cheat menu** → **Teleport** → option 1, **ASSET ROW**: a flat showroom with every asset in the game
-lined up side by side, 203 of them in 25 sections (the runner and its gear, people, creatures, props and markers,
+lined up side by side, 204 of them in 25 sections (the runner and its gear, people, creatures, props and markers,
 weapons and effects, rocks and nature, the secrets and the Spindle's props, ground vehicles and ships, outposts intact and
 wrecked, the building parts the settlements are made of, the hometown, and all the places). The small ones stand in the
 yellow lane (z = 0), the places over 100 m across in the cyan lane 460 m over; the whole row is about 9 km, so the dev
@@ -672,7 +686,7 @@ crowd-noise bed for now (the cheering is due a rework), and the race countdown b
 - Toon shading with a 3-step ramp and purple hemisphere "shadow ink"
 - Inverted-hull outlines on characters, vehicles and buildings
 - A post pass (`src/post.js`) that draws ink lines from the depth buffer, halftone dots in
-  shadow, radial **speed lines** that scale with velocity, and damage and alert vignettes
+  shadow, radial **speed lines** that scale with velocity, damage and alert vignettes, and a fade to black (the council chamber's cutscene)
 - Shattered crater rims: a band of broken regolith along the peak of every grindable lip (an uneven rocky core breaking up into patches, a scuffed halo, dark pebbles and bright chips of fresh rock that fade out with distance), worked out per pixel from the ~64 nearest craters so it never follows the terrain triangles. The rocky band and the grind rail come from the same measurement (planet.rimOf): only firm lips get either. Overlapping craters share one outline round the whole cluster (a crater on the floor of one at least twice its size keeps its own); the giants (over 120 m) get neither. The terrain's toon ramp has soft steps, so lighting bands don't saw-tooth round steep walls
 - Onomatopoeia pop-ups (WHOOSH!, KRAK!, KA-BOOM!, YOINK!): at most two on screen at once and never on top of each other; any more queue behind them, and each plays its full run time once it starts
 
@@ -686,7 +700,7 @@ src/
   geo.js         sun/dark-side frame, great-circle and local-frame helpers
   reputation.js  faction standing, tiers, unlocks, Rustmoon state
   events.js      per-faction events, fluid sloshing, escorts, the Pirate Wreck
-  mapview.js     draggable fog-of-war globe map
+  mapview.js     draggable fog-of-war globe map (also where the Radio Tower's sweeps are sent from)
   alchemy.js     containment jar, reactor recipes, wild mites, followers, splice-pod mutations, Mega Mite
   chimera.js     gene splicing + procedural chimera models
   cheats.js      testing menu (backtick)
@@ -694,6 +708,10 @@ src/
   story.js       faction leaders, chapters, outposts you found, tech, Captain Kade
   storyAssets.js faction troops, boss war machines, mission props, founded-outpost compounds
   hometown.js    your town (Kepler finale): its plots and buildings, the Moon Council and its votes
+  chamber.js     the Moon Council chamber (a self-contained cutscene set) and the vote cutscene played in it
+  respawn.js     where a K.O. puts you: the headquarters you set at your town's clinic, else your nearest clinic, else home
+  radio.js       the Radio Tower's sweep: a disc of map that grows from the spot you pick (ws.town.radio)
+  terminalUI.js  the tiled terminal page (icon tiles and a detail screen; spec in, HTML out) of the outposts, the town's hall and the job board's COUNCIL HALL tab
   spindle.js     the Spindle (Meridian finale): the asteroid world, its sky, the mothership
   medevac.js     the Spindle's K.O. cutscene: a recovery craft, two medics and a stretcher carry you off the rock
   worldstate.js  what the story finales changed for good, applied before the world is built

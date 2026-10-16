@@ -802,7 +802,7 @@ export class Story {
       this.founded = this.founded.filter((id) => id !== t.outpost);
       this.save();
       title = `${t.name.toUpperCase()} IS FOUNDED`;
-      news = `<b>THE MOON HAS A NEW TOWN, AND A COUNCIL.</b> ${t.name} has its charter, and you are its Councillor. The Moon Council (SPACECOM, Vostok, Daedalus, Meridian and Kepler) now sits in ${t.name}'s hall.<br><br><small>Fill your town's eight plots from the hall's terminal. Call council votes there too: every member votes with you more readily the better its standing with you, and a motion that carries changes the Moon.</small>`;
+      news = `<b>THE MOON HAS A NEW TOWN, AND A COUNCIL.</b> ${t.name} has its charter, and you are its Councillor. The Moon Council (SPACECOM, Vostok, Daedalus, Meridian and Kepler) now sits in ${t.name}'s hall.<br><br><small>Fill your town's eight plots from the hall's terminal or from the COUNCIL HALL tab of the town's job board (F, then E). Call council votes there too: every member votes with you more readily the better its standing with you, and a motion that carries changes the Moon.</small>`;
     } else if (r.world === 'quantum') {
       ws.quantum = true; // (the core is home: it glows in the Spindle up in the sky)
       saveWorldState(ws);
