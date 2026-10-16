@@ -514,7 +514,8 @@ export class Player {
 
   onImpact(it, skates) {
     const g = this.game;
-    const safe = (g.alchemy && g.alchemy.buffs.cushion > 0) ? 1e9 : skates ? this.params.skateSafeImpact * (g.cheats ? g.cheats.speed : 1) : this.params.bootSafeImpact * (g.cheats ? g.cheats.speed : 1);
+    let safe = (g.alchemy && g.alchemy.buffs.cushion > 0) ? 1e9 : skates ? this.params.skateSafeImpact * (g.cheats ? g.cheats.speed : 1) : this.params.bootSafeImpact * (g.cheats ? g.cheats.speed : 1);
+    if (g.winch && g.winch.on) safe += 14; // (the winch's own pull is controlled: fetching up against a wall or a ship's tower at its pace is a bump, not a crash)
     if (it.speed > 6) g.audio.thud(it.speed);
     if (it.speed > 4 && this.model.halo) this.model.halo.kick(Math.min(1, it.speed / 25)); // (a bump rings the halo)
     if (g.alchemy && g.alchemy.buffs.bouncy > 0 && it.kind === 'ground' && it.speed > 5) {
