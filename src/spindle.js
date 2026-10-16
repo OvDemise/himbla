@@ -115,7 +115,7 @@ function groundLine(pts, r, color, closed = false) {
 const kits = new Map();
 function bake(key, fn) { let r = kits.get(key); if (!r) { const k = new Kit(TEAL, 5, false); fn(k); r = k.finish(); kits.set(key, r); } return r.root.clone(); }
 
-const spire = (k) => {
+export const spire = (k) => {
   const rr = mulberry32(17);
   k.cyl(3.4, 4.2, 1.6, 7, T(0x4a4260), 0, 0, 0, { outline: 0.06 });
   for (let i = 0; i < 5; i++) {
@@ -123,8 +123,8 @@ const spire = (k) => {
     k.add(new THREE.OctahedronGeometry(1, 0).scale(0.9, h / 1.6, 0.9), G(i % 2 ? TEAL : VIO), Math.cos(a) * 1.6, h * 0.45, Math.sin(a) * 1.6, { rx: Math.sin(a) * 0.3, rz: Math.cos(a) * 0.3, outline: 0.04 });
   }
 };
-const obelisk = (k) => { k.box(2.2, 11, 0.9, T(0x0d0a14), 0, 0, 0, { outline: 0.08 }); k.box(0.12, 9, 0.92, G(TEAL), 0, 1, 0, { outline: 0 }); };
-const lander = (k) => {
+export const obelisk = (k) => { k.box(2.2, 11, 0.9, T(0x0d0a14), 0, 0, 0, { outline: 0.08 }); k.box(0.12, 9, 0.92, G(TEAL), 0, 1, 0, { outline: 0 }); };
+export const lander = (k) => {
   k.cyl(12, 12.5, 0.6, 28, T(0x5b5870), 0, 0, 0, { outline: 0.05 });
   k.ring(11.6, 0.2, G(0x2ec4ff), 0, 0.62, 0);
   // the Meridian rocket that brought you, standing on its fins
@@ -136,7 +136,7 @@ const lander = (k) => {
   k.cyl(1.6, 2.2, 1.8, 14, T(0x2a2440), 0, 0.6, 0, { outline: 0.04 });
   for (const sx of [-1, 1]) k.flag(sx * 9, 6, 8, 0x2ec4ff);
 };
-const shrine = (k) => {
+export const shrine = (k) => {
   k.cyl(16, 17, 0.6, 32, T(0x2a2440), 0, 0, 0, { outline: 0.06 });
   k.ring(15.6, 0.25, G(TEAL), 0, 0.62, 0);
   for (let i = 0; i < 6; i++) { const a = (i / 6) * Math.PI * 2; k.at(Math.cos(a) * 13, Math.sin(a) * 13, -a); obelisk(k); k.at(); }
@@ -145,7 +145,7 @@ const shrine = (k) => {
 };
 // the extraction pad: a proper launch pad, a 32 m deck on a plinth with four ramps up to it
 const PAD_R = 16, RAMP_L = 12;
-const extract = (k) => {
+export const extract = (k) => {
   const D = PAD_DECK;
   k.cyl(PAD_R + 1.5, PAD_R + 2.2, 1.2, 36, T(0x3a3550), 0, -0.6, 0, { outline: 0.06 }); // footing
   k.cyl(PAD_R, PAD_R + 0.6, D, 36, T(0x5b5870), 0, 0, 0, { outline: 0.06 }); // the plinth
@@ -172,7 +172,7 @@ const extract = (k) => {
 };
 
 // the mothership: a dark, wide, ribbed saucer with a teal rim, a glass dome and three weapon eyes
-function makeMothership() {
+export function makeMothership() {
   const root = new THREE.Group();
   root.add(bake('mother', (k) => {
     k.add(new THREE.SphereGeometry(38, 36, 14).scale(1, 0.26, 1), T(0x241a33), 0, 0, 0, { outline: 0.4 });
@@ -204,7 +204,7 @@ function makeMothership() {
   return { root, eyes };
 }
 
-function makeDrone() {
+export function makeDrone() {
   const g = new THREE.Group();
   const core = new THREE.Mesh(new THREE.IcosahedronGeometry(1.1, 0), glow(PINK));
   core.userData.lit = core.material;

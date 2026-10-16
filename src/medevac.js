@@ -59,7 +59,7 @@ function basisQuat(up, fwd, out = new THREE.Quaternion()) {
 
 // Meridian's stretcher: pale frame, teal mattress, a glowing rail each side, handles at both ends and
 // legs that unfold when it's set down. +z is the feet end.
-function makeStretcher() {
+export function makeStretcher() {
   const root = new THREE.Group();
   const part = (w, h, d, mat, x, y, z, t = 0.02) => {
     const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);

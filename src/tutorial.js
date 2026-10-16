@@ -27,7 +27,7 @@ const STEPS = [
 ];
 
 // BOLT himself: a round courier drone with a big glowing eye, two rotor pods and an antenna
-function makeDrone() {
+export function makeDrone() {
   const root = new THREE.Group();
   const body = new THREE.Mesh(new THREE.SphereGeometry(0.42, 18, 12), toon(0xfff4e0));
   ink(body, 0.04);

@@ -869,7 +869,7 @@ function inkShell() {
 }
 
 // Inflatable bounce dome: alternating coloured gores, a puffy base tube, tethers and a valve.
-function bounceDome(world, loc, k, x, z, r, c1, c2) {
+export function bounceDome(world, loc, k, x, z, r, c1, c2) {
   k.at(x, z);
   const n = 10;
   for (let i = 0; i < n; i++) k.add(new THREE.SphereGeometry(r, 4, 10, (i / n) * TAU, TAU / n, 0, Math.PI / 2), T(i % 2 ? c1 : c2), 0, -0.4, 0, { outline: 0 });
@@ -1419,7 +1419,7 @@ export function dressLabInside(world, loc, { W, D, H, docX, docZ }) {
 
 // The holding pen's terminal: a small kiosk at the gate. A concrete step, a console with a sloped
 // keypad desk and a screen, a card slot, a little canopy with a light strip and a turning holo ring.
-function penTerminal(k, x, z, yaw) {
+export function penTerminal(k, x, z, yaw) {
   const lime = 0x7dff3a;
   k.at(x, z, yaw);
   k.box(3.6, 0.3, 2.8, T(CONC), 0, 0, 0.2, { outline: 0.04 });
@@ -1571,7 +1571,7 @@ function freeSpot(occ, r, rmin, rmax, rr, tries = 60) {
 
 // Playground: a spinning merry-go-round, a swing set with swaying swings, a slide, a climbing
 // dome and a sandpit, on a soft rubber pad (local frame at x, z).
-function playground(world, loc, k, x, z, yaw = 0) {
+export function playground(world, loc, k, x, z, yaw = 0) {
   const pk = 0xff7ad9, cy = 0x2ec4ff;
   k.at(x, z, yaw);
   k.cyl(13, 13.2, 0.15, 28, T(0x3ad1a0), 0, 0, 0, { outline: 0.04 });
@@ -1630,7 +1630,7 @@ function playground(world, loc, k, x, z, yaw = 0) {
 }
 
 // Water tower: a tank on four legs with a ladder and the town's colour band.
-function waterTower(world, loc, k, x, z, color) {
+export function waterTower(world, loc, k, x, z, color) {
   k.at(x, z);
   for (const [sx, sz] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) {
     k.beam([sx * 3, 0, sz * 3], [sx * 2, 10, sz * 2], 0.25, T(STEEL), { outline: 0.04 });
@@ -1647,7 +1647,7 @@ function waterTower(world, loc, k, x, z, color) {
 }
 
 // Greenhouse: a long glass barrel vault over planter rows under violet grow-lights.
-function greenhouse(world, loc, k, x, z, yaw, len = 18) {
+export function greenhouse(world, loc, k, x, z, yaw, len = 18) {
   k.at(x, z, yaw);
   k.box(7.4, 0.5, len + 0.4, T(CONC), 0, 0, 0, { outline: 0.05 });
   k.add(new THREE.CylinderGeometry(3.4, 3.4, len, 16, 1, true, -Math.PI / 2, Math.PI).rotateX(Math.PI / 2), GLASS(0x8dffb0, 0.25), 0, 0.5, 0, { outline: 0 });
@@ -1661,7 +1661,7 @@ function greenhouse(world, loc, k, x, z, yaw, len = 18) {
 }
 
 // Comms mast with a small dish that turns.
-function commsMast(world, loc, k, x, z, h, color) {
+export function commsMast(world, loc, k, x, z, h, color) {
   k.at(x, z);
   k.box(3, 0.5, 3, T(CONC), 0, 0, 0, { outline: 0.03 });
   lattice(k, 0, 0, h, 1, 0.4, Math.round(h / 3.5), T(LIGHT), T(DARK), { r: 0.14 });
@@ -1735,7 +1735,7 @@ export function buildTown(world, loc, { civic = false } = {}) {
 // Kepler town hall: a colonnaded civic block under a pediment, steps, and a clock tower whose
 // hands go round. Its colonnade faces out of town, towards the way you ride in (it used to face the
 // hub dome, so arriving you saw a blank back wall).
-function townHall(world, loc, k) {
+export function townHall(world, loc, k) {
   const x = 0, z = 52, orange = 0xff9f1c;
   k.at(x, z, Math.PI);
   k.box(32, 1.2, 14, T(CONC), 0, 0, 0, { outline: 0.06 });
@@ -1795,7 +1795,7 @@ export function quonset(k, x, z, r, len, color, yaw, trim) {
 }
 
 // A turning radar: a lattice reflector on a yoke, spinning on a pedestal (dynamic).
-function radar(k, x, y, z, w, color, speed = 0.8) {
+export function radar(k, x, y, z, w, color, speed = 0.8) {
   const rd = part(color, (q) => {
     q.cyl(0.5, 0.7, 1.2, 10, T(DARK), 0, 0, 0, { outline: 0.03 });
     q.add(new THREE.CylinderGeometry(w * 0.32, w * 0.32, w, 16, 1, true, -0.7, 1.4).rotateZ(Math.PI / 2), D(LIGHT), 0, 1.8, -w * 0.18, { outline: 0.04 });
@@ -1808,7 +1808,7 @@ function radar(k, x, y, z, w, color, speed = 0.8) {
 }
 
 // Searchlight: pedestal, tilted housing and a soft light cone, sweeping round (dynamic).
-function searchlight(k, x, y, z, reach = 40) {
+export function searchlight(k, x, y, z, reach = 40) {
   const sl = new THREE.Group();
   const ped = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.5, 0.8, 8), T(DARK)); ped.position.y = 0.4; sl.add(ped);
   const head = new THREE.Group(); head.position.y = 1.15; head.rotation.x = 0.35; sl.add(head);
@@ -2079,7 +2079,7 @@ export function dressArray(world, loc, speeds = []) {
 // gutted to their ribs, a lookout tower with a sweeping searchlight and strings of green lights.
 // Rustmoon Hold is ringed by its wrecks.
 // =============================================================================================
-function shanty(k, x, z, w, h, d, color, yaw, rr) {
+export function shanty(k, x, z, w, h, d, color, yaw, rr) {
   k.at(x, z, yaw);
   if (rr() < 0.5) {
     container(k, 0, 0, 0, color, Math.PI / 2);
@@ -2099,7 +2099,7 @@ function shanty(k, x, z, w, h, d, color, yaw, rr) {
   k.solid(1.15, 0.65, 0.55, -2.2, 2.6);
   k.at();
 }
-function wreckHull(k, x, z, yaw, len, color, tilt = 0.12) {
+export function wreckHull(k, x, z, yaw, len, color, tilt = 0.12) {
   k.at(x, z, yaw, 0, 0, tilt);
   const r = 7;
   k.add(new THREE.CapsuleGeometry(r, len * 0.45, 6, 14).rotateZ(Math.PI / 2), T(color), -len * 0.22, r * 0.75, 0, { outline: 0.25 });

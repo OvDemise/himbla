@@ -123,7 +123,7 @@ function cyl(p, q, lx, lz, y0, y1, r) {
 // ---------------- the rocks ----------------
 
 // Build one shaped rock (p = ground point, q = local frame): { mesh, cols, rail? } in world space.
-function build(kind, rr, p, q, planet, dims = null) {
+export function build(kind, rr, p, q, planet, dims = null) {
   const M = mats();
   const seed = rr() * 100;
   let geo, mat, cols = [], rail = null, worldGeo = false;

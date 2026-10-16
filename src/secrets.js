@@ -644,7 +644,7 @@ export class Secrets {
 // The Xenoglide skates on the shrine's pedestal: the same build as a runner's skates (shell boot,
 // cuff, chassis, hover rail) at display size, in dark shaded alien alloy with glowing seams, a swept
 // crystal heel fin, emitter rings round the rail and a ring of shards orbiting the pair.
-function makeXenoSkates() {
+export function makeXenoSkates() {
   const shell = toon(0x2e2652), plate = toon(0x8f86c8), alloy = toon(0x5ef0c8);
   const seam = glow(0x7dffd4), violet = glow(0xc77dff);
   const add = (parent, geo, mat, x, y, z, t = 0.02, rot) => {
