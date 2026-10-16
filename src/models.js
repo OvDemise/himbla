@@ -294,7 +294,9 @@ const ease01 = (t) => { t = Math.min(1, Math.max(0, t)); return t * t * (3 - 2 *
 const SCARF_GUIDES = [0, 1].map((k) => {
   // from the left-back of the collar (50 degrees round from straight back, under the helmet's rim) a short way over the top of the shoulder...
   const rho = 0.29, rad = Math.PI / 180, g = [];
-  for (const [deg, y] of [[50, 0.945], [59, 0.935], [68, 0.915]]) g.push([rho * Math.sin(deg * rad), y + 0.042 * k, -rho * Math.cos(deg * rad)]); // (the second tail lies on the first)
+  // (both start at the same point, inside the knot; the second tail lies on the first by standing a ribbon's thickness further out, not up:
+  // a second root higher than the first stuck out of the knot's top as a diagonal spike)
+  for (const [deg, y, out] of [[50, 0.945, 0], [59, 0.935, 0.5], [68, 0.915, 1]]) g.push([(rho + 0.03 * k * out) * Math.sin(deg * rad), y, -(rho + 0.03 * k * out) * Math.cos(deg * rad)]);
   const e = g[2];
   // ...then off it behind the arm, and down the left side of the back; the second tail a layer further back
   g.push([e[0] + 0.05, 0.875 + 0.02 * k, e[2] - 0.08 - 0.03 * k], [0.36 + 0.01 * k, 0.76, -0.235 - 0.045 * k], [0.37 + 0.01 * k, 0.55, -0.27 - 0.045 * k]);
@@ -528,7 +530,8 @@ export class ScarfSim {
         _ss.lerp(_sn, flat).normalize();
       }
       _sn.crossVectors(_st, _ss);
-      const hw = (w * (1 - 0.3 * u) + (u > 0.95 ? 0.025 : 0)) / 2;
+      // (the first points narrow to the knot's width, so the ribbon gathers into it and its top end is not wider than what it comes out of)
+      const hw = (w * (1 - 0.3 * u) * (i === 0 ? 0.5 : i === 1 ? 0.82 : 1) + (u > 0.95 ? 0.025 : 0)) / 2;
       const c = p[i];
       const endK = i === 0 ? -e : i === SCARF_PTS - 1 ? e : 0;
       for (let v = 0; v < 4; v++) {

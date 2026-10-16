@@ -457,7 +457,7 @@ FORE = [(0, -0.25), (0.072, -0.24), (0.084, -0.18), (0.093, -0.11), (0.088, -0.0
 for side, name in ((-1, "armL"), (1, "armR")):
     A = pivot(name, (side * 0.45, 0.85, 0), T)
     mesh(name + "_arm", lathe(ARM_UP, 14), "suit", A, 0.04)
-    mesh(name + "_elbowBall", xf(superquad(0.094, 0.094, 0.094, 1, 1, 12, 6), (0, -EL, 0)), "suit", A, 0.04)
+    mesh(name + "_elbowBall", xf(superquad(0.094, 0.094, 0.094, 1, 1, 12, 6), (0, -EL, 0)), "suit", A, 0.012)
     path = [(side * 0.118, -0.04, 0), (side * 0.11, -0.17, 0), (side * 0.092, -0.3, 0)]
     mesh(name + "_stripe", tube(path, [0.015] * 3, 6), "accent", A, 0)
     # layered shoulder pauldron in the helmet colour
@@ -467,7 +467,7 @@ for side, name in ((-1, "armL"), (1, "armR")):
     mesh(name + "_fore", lathe(FORE, 14), "suit", F, 0.04)
     fp = [(side * 0.092, 0.0, 0), (side * 0.09, -0.13, 0)]
     mesh(name + "_foreStripe", tube(fp, [0.015] * 2, 6), "accent", F, 0)
-    mesh(name + "_elbowRing", xf(torus(0.088, 0.014, 12, 4), (0, 0.035, 0)), "accent", F, 0.01)
+    mesh(name + "_elbowRing", xf(lathe([(0.0945, 0.046), (0.0955, 0.042), (0.0955, 0.03), (0.0935, 0.024)], 14)), "accent", F, 0)
     mesh(name + "_elbow", xf(superquad(0.06, 0.07, 0.045, 0.6, 0.6, 12, 6), (0, 0.0, -0.08), (0.1, 0, 0)), "metal", F, 0.015)
     mesh(name + "_cuff", xf(lathe([(0.098, -0.04), (0.104, -0.03), (0.104, 0.03), (0.096, 0.04)], 14), (0, -0.2, 0)), "accent", F, 0.02)
     mesh(name + "_cuffLight", xf(superquad(0.025, 0.012, 0.01, 0.5, 0.5, 8, 4), (0, -0.2, 0.104)), "glow", F, 0)
@@ -484,11 +484,24 @@ for side, name in ((-1, "armL"), (1, "armR")):
 # shoulder pads: one terraced dome over the pauldron (it is one surface of revolution, so nothing intersects and the outline
 # is one clean line), three tiers stepping down and out, a trim ring on each tier's lip and a stud and ring on the crown. It
 # is a little bigger than the pauldron under it (0.15 x 0.125 x 0.145) and tipped outward and down with the shoulder.
-PAD = [(0, 0.150), (0.07, 0.148), (0.115, 0.136), (0.143, 0.108), (0.15, 0.082), (0.148, 0.066),     # top tier
-       (0.166, 0.062), (0.186, 0.04), (0.192, 0.014), (0.19, 0.0),                                    # middle tier
-       (0.204, -0.004), (0.218, -0.026), (0.218, -0.05), (0.213, -0.058),                            # lowest tier
+PAD = [(0, 0.150), (0.07, 0.148), (0.115, 0.136), (0.143, 0.108), (0.15, 0.082), (0.148, 0.068),                  # top tier
+       (0.1485, 0.0645), (0.1525, 0.061), (0.159, 0.0595),                                                         # (the inside corner under it is rounded: a sharp one folds the
+       (0.172, 0.055), (0.186, 0.04), (0.192, 0.014), (0.19, 0.0),                                                 #  outline shell over itself in hairline arcs)
+       (0.1905, -0.003), (0.196, -0.0055), (0.205, -0.0075), (0.218, -0.026), (0.218, -0.05), (0.213, -0.058),       # lowest tier
        (0.195, -0.064), (0, -0.064)]
-PAD_LIPS = [(0.151, 0.064), (0.193, 0.002), (0.22, -0.05)]   # (r, y) of each tier's lower edge: where a trim ring goes
+# trim: a thin sleeve over each tier's lip, cut from the dome's own profile and raised 2.5 mm, so it lies flush. (It used to be a ring on the
+# edge, which stuck out 7 mm past the dome: the outline is a shell 3 cm thick round each part, so anything proud of its part by more than a
+# few mm has its colour drawn across the black band.) (first, last) index into PAD of the lip's stretch of wall:
+PAD_BANDS = [(4, 5), (11, 12), (16, 18)]
+def offset_profile(prof, i0, i1, d):
+    """prof[i0..i1] moved d outward along the profile's 2D normal (central differences, so a band follows a curved wall)."""
+    out = []
+    for i in range(i0, i1 + 1):
+        (ra, ya), (rb, yb) = prof[max(i - 1, 0)], prof[min(i + 1, len(prof) - 1)]
+        tr, ty = rb - ra, yb - ya
+        n = math.hypot(tr, ty) or 1.0
+        out.append((prof[i][0] - d * ty / n, prof[i][1] + d * tr / n))   # (the profile runs top to bottom, so outward, +r on a wall, is the tangent turned a quarter to its left)
+    return out
 for side, tag in ((-1, "L"), (1, "R")):
     A = bpy.data.objects["arm" + tag]
     P = pivot("pad" + tag, (0, 0, 0), A)
@@ -496,10 +509,13 @@ for side, tag in ((-1, "L"), (1, "R")):
     at = (side * 0.035, 0.036, 0)
     k = 1.0                      # overall size (about two thirds the reach of the first cut, which stuck out 0.34 from the shoulder)
     mesh("pad" + tag + "_dome", xf(lathe([(r * k, y * k) for r, y in PAD], 28, 1.0, 0.92), at, tilt), "accent", P, 0.03)
-    for i, (r, y) in enumerate(PAD_LIPS):
-        mesh(f"pad{tag}_trim{i}", xf(xf(torus(r * k, 0.007, 28, 4), (0, y * k, 0), s=(1, 1, 0.92)), at, tilt), "helmet", P, 0)
-    mesh("pad" + tag + "_crownRing", xf(xf(torus(0.05 * k, 0.006, 20, 3), (0, 0.146 * k, 0), s=(1, 1, 0.92)), at, tilt), "metal", P, 0)
-    mesh("pad" + tag + "_stud", xf(xf(superquad(0.018, 0.013, 0.018, 0.8, 0.8, 10, 5), (0, 0.15 * k, 0)), at, tilt), "metal", P, 0)
+    for i, (i0, i1) in enumerate(PAD_BANDS):
+        band = offset_profile(PAD, i0, i1, 0.0025)
+        # (a lathe wants its profile bottom to top, and rows with r > 0: these are open sleeves, no caps)
+        mesh(f"pad{tag}_trim{i}", xf(lathe([(r * k, y * k) for r, y in reversed(band)], 28, 1.0, 0.92), at, tilt), "helmet", P, 0)
+    # a low stud on the crown (3 mm proud: it is on the top silhouette) and a ring round it
+    mesh("pad" + tag + "_crownRing", xf(xf(lathe([(0.052, 0.1488), (0.056, 0.1486), (0.056, 0.1476), (0.052, 0.1472)], 20, 1.0, 0.92)), at, tilt), "metal", P, 0)
+    mesh("pad" + tag + "_stud", xf(xf(superquad(0.02, 0.006, 0.02, 0.8, 0.8, 10, 4), (0, 0.1485, 0)), at, tilt), "metal", P, 0)
 
 # headband: a strip that hugs the helmet (radius 0.34 at its height), thicker at the front, a knot behind the
 # left ear with two tails and a loose end, and a stitched line along the lower edge
