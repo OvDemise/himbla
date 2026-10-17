@@ -471,7 +471,7 @@ def chandelier():
 def sign_frame(root, W, H, depth, name):
     """A plum board with a gold frame, a neon line inside it, corner medallions and a row of bulbs along the top and bottom."""
     A = Acc(name + "Board", "plum", root, 0.04)
-    A.boxc(0, 0, 0, W, H, depth)
+    A.boxc(0, 0, 0, W - 0.04, H - 0.04, depth)      # (a hair inside the frame, so no face of the board shares a plane with the frame's)
     A.flush()
     A = Acc(name + "Frame", "gold", root, 0.03)
     t = 0.18

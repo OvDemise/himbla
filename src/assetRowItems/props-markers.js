@@ -4,7 +4,7 @@ import { seat, hexOf } from './props-util.js';
 import { toon, glow, ink, inkMat, textSprite } from '../toon.js';
 import { mulberry32 } from '../rng.js';
 import { FACTIONS, CARGO, MIL_CARGO } from '../locations.js';
-import { makeCrate, makeSeismo, makeTube, makePylon, makeDish, makeTurret, makeRocket, engineModel, caseModel, plinkoConsoleModel, plinkoFrameModel, makeLampPost, makeFountain, makeChandelier, makeCasinoSign, makeChipStack, makeClawMachine, makeClawHead, clawKindParts, clawLit, makeDerbyPart } from '../models.js';
+import { makeCrate, makeSeismo, makeTube, makePylon, makeDish, makeTurret, makeRocket, engineModel, caseModel, plinkoConsoleModel, plinkoFrameModel, makeLampPost, makeFountain, makeChandelier, makeHallPart, makeCasinoSign, makeChipStack, makeClawMachine, makeClawHead, clawKindParts, clawLit, makeDerbyPart } from '../models.js';
 import { makeProp } from '../storyAssets.js';
 import { makeStretcher } from '../medevac.js';
 import { makeLoot } from '../alchemy.js';
@@ -449,6 +449,30 @@ function blackjack() {
   return { root: lineUp([{ root: blackjackTable(), w: 8, d: 7 }, { root: chips, w: 3.4, d: 0.6 }], 3).root };
 }
 
+// ---- the casino's hall kit (hall.glb, tools/blender/build_hall.py; casinoWorld.js tiles it round the plan): the four wall bays (spade, heart, diamond, club) and the filler, a coffer tile
+// (hung 7 m up), the floor medallion, the Chip Bar (its chip turns), the cashier's cage, a lounge banquette with its table, the doors' frame, the four facade panels and the roof's crown ----
+function casinoHall() {
+  const movers = [];
+  const part = (name, w, d, f) => { const o = makeHallPart(name); if (f) f(o); const g = new THREE.Group(); g.add(o); return { root: g, w, d }; };
+  const parts = [];
+  for (let k = 0; k < 4; k++) parts.push(part('hall_bay' + k, 4.5, 0.6));
+  parts.push(part('hall_filler', 2, 0.3, (o) => { o.scale.x = 2; }));
+  parts.push(part('hall_coffer', 4.5, 4.5, (o) => { o.position.y = 7; }));
+  parts.push(part('hall_medallion', 17.2, 17.2));
+  parts.push(part('hall_bar', 9.4, 9.4, (o) => { const spin = o.getObjectByName('bar_spin'); movers.push((dt) => { spin.rotation.y += dt * 0.9; }); }));
+  parts.push(part('hall_cage', 4.2, 1.8));
+  const lounge = new THREE.Group();
+  lounge.add(makeHallPart('hall_sofa'));
+  const table = makeHallPart('hall_table');
+  table.position.z = 2.2;
+  lounge.add(table);
+  parts.push({ root: lounge, w: 4, d: 3 });
+  parts.push(part('hall_gate', 15.4, 1.2));
+  for (let k = 0; k < 4; k++) parts.push(part('facade_panel' + k, 2.8, 0.4));
+  parts.push(part('facade_crown', 33, 33));
+  return { root: lineUp(parts, 3).root, update: (dt) => { for (const f of movers) f(dt); } };
+}
+
 // ---- the casino's zero-g claw (claw.glb, tools/blender/build_claw.py; clawSim.js and clawView.js run it): the machine with its marquee and screen lit and a tank of things drifting
 // about in it while the claw cruises over them (nobody plays: no beam), then every kind of thing in the tank at the size it floats, the six crate tints, and the claw ----
 function clawMachine() {
@@ -554,6 +578,7 @@ export default {
     { id: 'prop.casino-props', label: 'CASINO LAMPS · FOUNTAINS · CHANDELIER · SIGNS', w: 91, d: 21, make: casinoProps },
     { id: 'prop.duck-derby', label: 'DUCK DERBY TRACK · RACERS · KIOSK · BOARD', w: 31, d: 21, make: duckDerby },
     { id: 'prop.blackjack', label: 'BLACKJACK TABLE · CHIPS', w: 14.4, d: 7, make: blackjack },
+    { id: 'prop.casino-hall', label: 'CASINO HALL KIT: BAYS · CEILING TILE · MEDALLION · BAR · CAGE · LOUNGE · GATE · FACADE · CROWN', w: 165, d: 36, big: true, make: casinoHall },
     { id: 'prop.claw-machine', label: 'ZERO-G CLAW MACHINE', w: 17, d: 8, make: clawMachine },
     { id: 'prop.claw-things', label: 'CLAW TANK: THINGS · CLAW', w: 41, d: 3, make: clawThings },
     { id: 'prop.slot-machines', label: 'SLOT MACHINES', w: 7 * 2.5 + 6 * 0.9, d: 1.8, make: slotMachines },

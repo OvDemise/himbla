@@ -44,7 +44,7 @@ const report = await pg.evaluate((EPS) => {
     const nt = idx ? idx.count / 3 : pos.count / 3;
     let used = false;
     const mat = Array.isArray(o.material) ? o.material[0] : o.material;
-    const tag = (o.name || mat.name || '') + '#' + (mat.color ? mat.color.getHexString() : mat.map ? 'map' : '?') + (mat.side === 2 ? ' (double-sided)' : '') + (mat.transparent ? ' (transparent)' : '');
+    const tag = (o.name || mat.name || '') + (o.parent && o.parent.name ? '<' + o.parent.name + '>' : '') + '#' + (mat.color ? mat.color.getHexString() : mat.map ? 'map' : '?') + (mat.side === 2 ? ' (double-sided)' : '') + (mat.transparent ? ' (transparent)' : '');
     for (let t = 0; t < nt; t++) {
       const i0 = idx ? idx.getX(t * 3) : t * 3, i1 = idx ? idx.getX(t * 3 + 1) : t * 3 + 1, i2 = idx ? idx.getX(t * 3 + 2) : t * 3 + 2;
       a.fromBufferAttribute(pos, i0).applyMatrix4(m); c.fromBufferAttribute(pos, i1).applyMatrix4(m); d.fromBufferAttribute(pos, i2).applyMatrix4(m);
@@ -93,7 +93,7 @@ const report = await pg.evaluate((EPS) => {
     const ov = Math.abs(area2(clip(ta, tb)));
     if (ov < 1e-4) return;
     const k = Math.min(A.mesh, B.mesh) + ':' + Math.max(A.mesh, B.mesh) + ':' + Math.round(A.d * 20);
-    const f = found.get(k) || { a: A.tag, b: B.tag, n: A.n.map((x) => +x.toFixed(2)), d: +A.d.toFixed(3), gap: 0, area: 0, at: [(A.p[0] + A.p[3] + A.p[6]) / 3, (A.p[1] + A.p[4] + A.p[7]) / 3, (A.p[2] + A.p[5] + A.p[8]) / 3].map((x) => +x.toFixed(1)), ds: A.ds || B.ds };
+    const f = found.get(k) || { a: A.tag, b: B.tag, n: A.n, d: +A.d.toFixed(3), gap: 0, area: 0, at: [(A.p[0] + A.p[3] + A.p[6]) / 3, (A.p[1] + A.p[4] + A.p[7]) / 3, (A.p[2] + A.p[5] + A.p[8]) / 3], ds: A.ds || B.ds };
     f.area += ov; f.gap = Math.max(f.gap, Math.abs(A.d - B.d));
     found.set(k, f);
   };
@@ -102,12 +102,40 @@ const report = await pg.evaluate((EPS) => {
     const nb = bucket.get(`${n0},${n1},${n2},${db + 1}`) || [];
     for (let x = 0; x < list.length; x++) { for (let y = x + 1; y < list.length; y++) test(list[x], list[y]); for (const y of nb) test(list[x], y); }
   }
-  return { tris: tris.length, meshes, found: [...found.values()].sort((p, q) => q.area - p.area) };
+  // a face buried inside a solid (the back of a panel set into the wall, say) can never show, whatever it overlaps: a ray from 1 cm in front of it, along its normal, crosses an odd number of
+  // surfaces when that point is inside something closed
+  const hits = (o, d) => {
+    let n = 0;
+    for (const T of tris) {
+      const p = T.p;
+      const e1x = p[3] - p[0], e1y = p[4] - p[1], e1z = p[5] - p[2], e2x = p[6] - p[0], e2y = p[7] - p[1], e2z = p[8] - p[2];
+      const hx = d[1] * e2z - d[2] * e2y, hy = d[2] * e2x - d[0] * e2z, hz = d[0] * e2y - d[1] * e2x;
+      const det = e1x * hx + e1y * hy + e1z * hz;
+      if (Math.abs(det) < 1e-9) continue;
+      const f = 1 / det, sx = o[0] - p[0], sy = o[1] - p[1], sz = o[2] - p[2];
+      const u = f * (sx * hx + sy * hy + sz * hz);
+      if (u < 0 || u > 1) continue;
+      const qx = sy * e1z - sz * e1y, qy = sz * e1x - sx * e1z, qz = sx * e1y - sy * e1x;
+      const v = f * (d[0] * qx + d[1] * qy + d[2] * qz);
+      if (v < 0 || u + v > 1) continue;
+      const t = f * (e2x * qx + e2y * qy + e2z * qz);
+      if (t > 1e-4 && t < 4) n++;                   // (only what is within 4 m: a wall, a counter; a lone plane far off would flip the count)
+    }
+    return n;
+  };
+  const list = [...found.values()].sort((p, q) => q.area - p.area);
+  let buried = 0;
+  for (const f of list) {
+    const n = f.n, o = [f.at[0] + n[0] * 0.01, f.at[1] + n[1] * 0.01, f.at[2] + n[2] * 0.01];
+    f.buried = hits(o, n) % 2 === 1;
+    if (f.buried) buried++;
+  }
+  return { tris: tris.length, meshes, found: list.filter((f) => !f.buried), buried };
 }, EPS);
 
-console.log(`${report.tris} triangles in ${report.meshes} meshes near the casino; plane tolerance ${EPS * 100} cm`);
+console.log(`${report.tris} triangles in ${report.meshes} meshes near the casino; plane tolerance ${EPS * 100} cm; ${report.buried} overlapping pairs are buried inside solids and left out`);
 if (!report.found.length) console.log('no coplanar overlaps');
-for (const f of report.found.slice(0, 40)) console.log(`${f.area.toFixed(2).padStart(7)} m2  gap ${(f.gap * 100).toFixed(1)} cm  normal (${f.n}) at (${f.at})  ${f.a}  <>  ${f.b}${f.ds ? '  [double-sided]' : ''}`);
+for (const f of report.found.slice(0, 40)) console.log(`${f.area.toFixed(2).padStart(7)} m2  gap ${(f.gap * 100).toFixed(1)} cm  normal (${f.n.map((x) => x.toFixed(2))}) at (${f.at.map((x) => x.toFixed(1))})  ${f.a}  <>  ${f.b}${f.ds ? '  [double-sided]' : ''}`);
 if (report.found.length > 40) console.log(`... and ${report.found.length - 40} more`);
 console.log(errs.slice(0, 3).join('\n') || 'no page errors');
 await b.close();

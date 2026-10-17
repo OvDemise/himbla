@@ -1,15 +1,19 @@
 # Lucky Crater Casino: two revisions
 
 Two proposals for rebuilding the casino's structure (the hall, its exterior and where everything stands) in the look the
-interior models now have. **Nothing is built yet**: no game code, no model and no Blender file has changed. What exists is
-the data and the checks behind the proposals:
+interior models now have. **Layout B (the Crater Cross) is built**: `src/casinoPlan.js` holds its numbers, `src/casinoWorld.js`
+builds it, `tools/blender/build_hall.py` makes its kit (`src/assets/hall.glb`). **Layout A stays a proposal.** The sections
+on B below describe the plan as drawn; where the build differs the note says so (the crossing's rounded corners are r 16.5,
+not 15; the wings run from x 10 to 55; the cage is 4 m by 1.75 m). What exists is the data and the checks:
 
 - `tools/casino-layouts.mjs`: every footprint, trigger zone and seated-camera corridor of the current hall and of both
-  proposals, with the checks below. `node tools/casino-layouts.mjs` checks them, `node tools/casino-layouts.mjs docs`
+  proposals, with the checks below. Layout B's numbers are read from `src/casinoPlan.js`, the same ones the game builds from,
+  so the check fails if the game drifts from the plan (and it checks that the wall colliders tile the outline and leave the
+  floor and the doors free). `node tools/casino-layouts.mjs` checks them, `node tools/casino-layouts.mjs docs`
   redraws the plans, `node tools/casino-layouts.mjs dump` lists the placements.
 - `docs/casino-layout-current.svg`, `-a.svg`, `-b.svg`: the plans (looking down, +x to the right, the doors at the bottom).
-- `tools/casino-zfight.mjs`: a Z-fighting audit that runs against the live scene (section "Z-fighting"). Dev-only, like
-  `tools/winch-sign-repro.mjs`.
+- `tools/casino-zfight.mjs`: a Z-fighting audit that runs against the live scene (section "Z-fighting"), and
+  `tools/casino-shots.mjs`: screenshots from fixed vantage points. Dev-only, like `tools/winch-sign-repro.mjs`.
 
 All positions are in the casino's own frame, metres: +x right, +z toward the doors, y up (what `casinoWorld.js` calls
 local). The proposals share one kit of Blender pieces; they differ in plan.
@@ -129,8 +133,9 @@ other); beyond it is the rotunda under the dome and the Chip Bar; the north arm 
 the Duck Derby; the west wing is the claw, the card room and the arcade. Rooms have different heights, so the rotunda is
 the tallest and the wings are the most intimate.
 
-Footprint: rotunda r 15 (dome 24 m to the oculus), the foyer and Plinko arms 18 wide, wings **22 wide x 42 long**, 14 m high.
-**About 3,050 m2** inside (39% more than today) and 110 m of frontage.
+Footprint (as built): a crossing with four rounded corners (r 16.5) under a drum and a dome, the foyer and Plinko arms 18 wide,
+wings **22 wide x 45 long** (x 10 to 55 either side), 16 m high throughout (the wings' lower ceilings are not built).
+**3,089 m2** inside (40% more than today) and 110 m of frontage.
 
 | Piece | Position (x, z) | Size / facing | Note |
 |---|---|---|---|
@@ -147,16 +152,19 @@ Footprint: rotunda r 15 (dome 24 m to the oculus), the foyer and Plinko arms 18 
 Gaps the checker measures: Duck basin to the east lounge 2.6 m, kiosk to the basin 3.1 m, blackjack to the west lounge 3.4 m,
 prize counter to the nearest rotunda pier 3.4 m; every pair of different games is at least 6 m apart.
 
-**Built in Blender**: the same shell kit as A (`hall_bay`, `hall_pier`, `hall_coffer`, `hall_bar`, `hall_cage`, `hall_door`,
-`prize_counter`) plus the pieces only a round plan wants: `drum_bay` (a 22.5-degree wedge of the rotunda wall with its pilaster
-pair), `drum_ring` (the oculus and cornice ring of the dome), `wing_roof`, `lounge_set` (a sofa, a rope, a table). The
-rotunda's floor is one mesh with a gold-inlaid roulette star (no overlay).
+**Built in Blender** (`build_hall.py`, 17 models): `hall_bay0..3` (a bay with half a gold pilaster each side, a lacquered wainscot with
+a framed suit panel, a tall arched panel with a cyan line), `hall_filler`, `hall_coffer`, `hall_medallion` (a compass star with the
+four suits), `hall_bar`, `hall_cage`, `hall_sofa`, `hall_table`, `hall_gate`, `facade_panel0..3` and `facade_crown` (the drum, the
+ribbed dome and the lantern). What differs from the study: the long horizontal pieces (skirting, girdle, cornice, the damask
+field, the outside's plinth, belt and cornice) are rings made in the game from the outline, not parts of a bay, so they meet at the
+corners with a mitre and never share a plane; the prize counter stays as it was (code-built, it is the look the rest follows).
 
-**Outside.** A drum with sixteen pilasters carries a ribbed gilded dome and lantern (r 17) with the rotating sign on its
-mast; the wings are low plum-lacquer halls under hipped roofs with a gold ridge; the foyer is a pavilion with a porte-cochere
-(a gilded canopy on eight columns). The two re-entrant corners between foyer and wings become pocket courts, each a
-formal garden with a mirror pool: the die stands in the west court and the roulette wheel in the east, on gilded plinths. The
-slot carousels sit in front of the porte-cochere at (+-19.5, 40). The ring road and the lot are untouched.
+**Outside** (as built). A plum drum (r 16) with 24 gold pilasters and lit windows carries a plum dome (r 13) with 24 gold ribs and a
+lantern, with the rotating sign on its mast; the walls are plum lacquer on a gold plinth with a belt, a cornice and the pink neon
+in its channel, and a framed suit relief every 6.5 m; the doors have a gold frame with a pediment, and a pink marquee canopy stands
+clear of it. The two re-entrant corners between foyer and wings are pocket courts: the die stands in the west court and the
+roulette wheel in the east. (Not built: hipped wing roofs, mirror pools, gilded plinths for the die and the wheel.) The slot
+carousels stand at (+-19.5, 40). The ring road and the lot are untouched; the boulevard starts at the new doors.
 
 **Code touched.** Everything in A except turning the Duck Derby, plus: the hall's shape (`wall()` boxes become `col.*`
 empties from the shell), the "inside the casino" test in `main.js`, the foyer door at z 14 (`DOOR_Z` moves 1 m), the
@@ -204,6 +212,9 @@ dome), sight lines to signs, or crowds; those are looked at in the engine (Asset
 Two surfaces fight when they sit on one plane (to within what the depth buffer can tell apart), face the same way and
 overlap. The game's depth buffer is 24 bits with near 0.5 and far 9000, which separates surfaces 0.1 mm apart at 30 m and about
 1 mm at 100 m. So the rule is **2 mm**, and the working rule is more careful: 2 cm.
+
+**Result** (see the CHANGELOG): the hall as it was had 812 overlapping pairs; the Crater Cross, with the kit, has a handful, none over
+1 m2 in the new work. `audit_coplanar()` in `kit.py` is the build-time half, and `build_hall.py` passes it.
 
 `tools/casino-zfight.mjs` runs against the game (`npx vite --port 5199 --host 127.0.0.1`, then `node tools/casino-zfight.mjs`).
 It walks every mesh near the casino, brings every triangle into the casino's frame, files them by plane and lists each pair

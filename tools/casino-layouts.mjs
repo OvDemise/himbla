@@ -184,13 +184,13 @@ const cross = (() => {
   if (Math.abs(lane0 - DUCK.lanes[0]) > 1e-6 || Math.abs(DUCK.kiosk[1] - (lane0 + 5.4)) > 1e-6) throw new Error('DUCK in casinoPlan.js does not match the checker\'s derby');
   const g = merge(
     prizeAt(PRIZE.wallX, [0, PRIZE.z], 'W'),
-    { items: [prop('Chip cage', R(-HALL.ARM, -5.5, 3, 7), 3.2, 'game', { grp: 'prize' })], stations: [], corridors: [] },
+    { items: [prop('Chip cage', R(-HALL.ARM, -HALL.ARM + 1.75, 3, 7), 3.95, 'game', { grp: 'prize' })], stations: [], corridors: [] },
     plinko(PLK.wallZ, PLK.x),
     claw(WING.z1, CLAW.x),
     classic(CLASSIC.wallZ, [CLASSIC.xs.reduce((a, b) => a + b) / CLASSIC.xs.length, 0], 'N'),
     blackjack(BJ.x, BJ.z, BJ.yaw),
     eDuck,
-    { items: [prop('Chip bar', C_(0, CZ, 4.7), 4.2, 'new', { free: true }), prop('Roped lounge (W)', R(-54.4, -49.2, WING.z0, WING.z0 + 2.5), 1.2, 'new'), prop('Roped lounge (E)', R(49.6, 55, WING.z0, WING.z0 + 5), 1.2, 'new')], stations: [], corridors: [] },
+    { items: [prop('Chip bar', C_(0, CZ, 4.7), 4.2, 'new', { free: true }), prop('Roped lounge (W)', R(-54.4, -49.2, WING.z0, WING.z0 + 3.2), 1.1, 'new'), prop('Roped lounge (E)', R(49.6, 55, WING.z0, WING.z0 + 5.6), 1.1, 'new')], stations: [], corridors: [] },
   );
   const piers = [];
   for (const a of [45, 135, 225, 315]) piers.push(prop('Rotunda pier', C_(Math.cos((a * Math.PI) / 180) * 13, CZ + Math.sin((a * Math.PI) / 180) * 13, 1.0), 14, 'struct', { struct: true }));

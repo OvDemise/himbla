@@ -263,7 +263,7 @@ def trough_A():
     A.boxc(0, 0.34, 0, LEN - 0.6, 0.12, WID - 0.6)
     A.flush()
     A = Acc("tFloor", "tile", o, 0.0)
-    A.boxc(0, 0.41, 0, LEN - 0.6, 0.04, WID - 0.6)
+    A.boxc(0, 0.41, 0, LEN - 0.64, 0.04, WID - 0.64)
     for z in LANES:
         pass
     A.flush()
@@ -275,10 +275,10 @@ def trough_A():
     A.flush()
     A = Acc("tGold", "gold", o, 0.03)
     A.boxc(0, 0.33, 0, LEN + 0.14, 0.1, WID + 0.14)
-    A.boxc(0, 1.07, WID / 2 - 0.21, LEN, 0.1, 0.42)
-    A.boxc(0, 1.07, -(WID / 2 - 0.21), LEN, 0.1, 0.42)
+    A.boxc(0, 1.07, WID / 2 - 0.19, LEN + 0.04, 0.1, 0.46)       # (the coping stands 2 cm proud of the body, so its sides never share a plane with it)
+    A.boxc(0, 1.07, -(WID / 2 - 0.19), LEN + 0.04, 0.1, 0.46)
     for sx in (-1, 1):
-        A.boxc(sx * (H - 0.21), 1.07, 0, 0.42, 0.1, WID - 0.84)
+        A.boxc(sx * (H - 0.19), 1.07, 0, 0.46, 0.1, WID - 0.84)
     A.flush()
     A = Acc("tFrame", "brass", o, 0.0); P = Acc("tPanel", "plum", o, 0.0); R = Acc("tSuitRed", "suitred", o, 0.012); K = Acc("tSuitCream", "suitcream", o, 0.012)
     for sz in (-1, 1):
@@ -387,7 +387,7 @@ def finish_A():
             A.cylc(0, y, s * PZ, 0.36, 0.1, 14)
         A.lath([(0, 5.5), (0.42, 5.5), (0.34, 5.62), (0.24, 5.7), (0, 5.7)], (0, 0, s * PZ), (0, 0, 0), (1, 1, 1), 12)
         A.ball(0, 5.9, s * PZ, 0.2, 10, 8)
-    A.boxc(0, 5.18, 0, 0.7, 0.14, 2 * PZ + 0.6)
+    A.boxc(0, 5.19, 0, 0.7, 0.16, 2 * PZ + 0.6)      # (its top stands 2 cm above the beam's: they used to share a plane)
     A.flush()
     A = Acc("fBeam", "plum", o, 0.04)
     A.boxc(0, 5.0, 0, 0.62, 0.5, 2 * PZ - 0.2)

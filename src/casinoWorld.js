@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { toon, ink, glow, glowShared, textSprite, nameTag } from './toon.js';
-import { makeFigure, makeSlotCabinet, SLOT_LAMP_OFF, plinkoConsoleModel, plinkoFrameModel, makeBouncer, makeChandelier, makeCasinoSign, makeBlackjackTable, makeClawMachine, makeDerbyPart, makeRacer } from './models.js';
+import { makeFigure, makeSlotCabinet, SLOT_LAMP_OFF, plinkoConsoleModel, plinkoFrameModel, makeBouncer, makeChandelier, makeCasinoSign, makeBlackjackTable, makeClawMachine, makeDerbyPart, makeHallPart, makeRacer } from './models.js';
 import { pxCanvas } from './pixelIcons.js';
 import { pixelFont } from './fonts.js';
 import { faceInfo, glyphState } from './glyphs.js';
@@ -443,33 +443,65 @@ export function buildCasino(w, loc) {
     if (s.k === 'c') col({ type: 'cyl', x: s.x, z: s.z, y0: H, y1: H + 1.7, r: s.r + WALL });
     else col({ type: 'box', x: (s.x0 + s.x1) / 2, y: H + 0.85, z: (s.z0 + s.z1) / 2, hx: (s.x1 - s.x0) / 2 + WALL, hy: 0.85, hz: (s.z1 - s.z0) / 2 + WALL });
   }
-  const crown = H + 1.7;      // the drum and the dome over the crossing, and the sign's mast on the dome
-  put(mesh(new THREE.CylinderGeometry(16, 16.4, 3, 40), toon(0x5a1a8f), 0.15), HCX, CZ, crown + 1.5);
-  put(new THREE.Mesh(new THREE.TorusGeometry(16.3, 0.25, 6, 64).rotateX(Math.PI / 2), glowShared(0xff2e88)), HCX, CZ, crown + 3);
-  put(mesh(new THREE.SphereGeometry(13, 32, 12, 0, TAU, 0, Math.PI / 2), toon(0xffd23f), 0.15), HCX, CZ, crown + 3.3);
-  col({ type: 'cyl', x: HCX, z: CZ, y0: crown, y1: crown + 3, r: 16.4 });
-  col({ type: 'sphere', x: HCX, y: crown + 3.3, z: CZ, r: 13 });
-  const domeTop = crown + 3.3 + 13;
-  // neon trim: pink roofline, cyan corners, gold belt, all the way round (each run's bar is a hair thicker or thinner than its neighbour's, so no two share a face at a corner)
-  const neonS = (geo, color, x, z, y, yaw = 0) => put(new THREE.Mesh(geo, glowS(color)), x, z, y, yaw);
-  E.forEach((e, k) => {
-    const th = 0.5 - (k % 2) * 0.04, thB = 0.4 - (k % 2) * 0.04;
-    neonS(new THREE.BoxGeometry(e.olen, th, th), 0xff2e88, e.omx + e.nx * 0.2, e.omz + e.nz * 0.2, H - 0.4, e.yaw);
-    neonS(new THREE.BoxGeometry(e.olen, thB, thB), 0xffd23f, e.omx + e.nx * 0.2, e.omz + e.nz * 0.2, H * 0.62, e.yaw);
-  });
-  neonS(new THREE.BoxGeometry(DOOR * 2 + 0.6, 0.5, 0.5), 0xff2e88, 0, FRONT + WALL + 0.2, H - 0.4);
-  for (let i = 0; i < IN.length; i++) {        // (the cyan posts: every corner that turns sharply, at the wall's outer corner)
-    const a = IN[(i + IN.length - 1) % IN.length], v = IN[i], b = IN[(i + 1) % IN.length];
-    const d1 = [v[0] - a[0], v[1] - a[1]], d2 = [b[0] - v[0], b[1] - v[1]];
-    const turn = Math.acos(Math.max(-1, Math.min(1, (d1[0] * d2[0] + d1[1] * d2[1]) / (Math.hypot(...d1) * Math.hypot(...d2)))));
-    if (turn < 1 || Math.abs(v[0]) === DOOR) continue;
-    const m = [PO[i][0] - v[0], PO[i][1] - v[1]], ml = Math.hypot(...m) || 1;
-    neonS(new THREE.BoxGeometry(0.62, H, 0.62), 0x2ee6ff, PO[i][0] + (m[0] / ml) * 0.2, PO[i][1] + (m[1] / ml) * 0.2, H / 2);
+  const crown = H + 1.7;      // the drum, dome and lantern over the crossing (build_hall.py: facade_crown), and the sign's mast on the lantern
+  put(makeHallPart('facade_crown'), HCX, CZ, crown);
+  col({ type: 'cyl', x: HCX, z: CZ, y0: crown, y1: crown + 3, r: 16.6 });
+  col({ type: 'sphere', x: HCX, y: crown + 3, z: CZ, r: 13 });
+  const domeTop = crown + 20.5;
+  const bandMats = [glow(0xff2e88), glow(0x2ee6ff)];       // (the hall's two neon lines, which pulse)
+  // the rings round the outline: extruded between two offsets of the plan's outline, so they meet at every corner with a mitre and no two of them lie on one plane
+  // (a ring's back is buried in the wall by a different depth each, so nothing shares a face with the wall or another ring). `a` is the buried side, `b` the front: in metres
+  // from the inside face of the wall, positive into the wall and outward, negative into the room.
+  // (built quad by quad between the two mitred chains, not by triangulating a polygon: the outline's tight corners make a thin ring's two edges cross, and a polygon fill then goes wrong)
+  const bandGeo = (a, b, y0, y1) => {
+    const A = offsetPolygon(IN, a), B = offsetPolygon(IN, b), pos = [];
+    for (const V of [A, B]) { V[0] = [V[0][0] + 0.01, V[0][1]]; V[V.length - 1] = [V[V.length - 1][0] - 0.01, V[V.length - 1][1]]; }     // (the chain's two ends stand 1 cm back from the doors' jambs, so an end face never shares the jamb's plane)
+    const quad = (p0, p1, p2, p3, n) => {     // two triangles, wound to face n
+      const u = [p1[0] - p0[0], p1[1] - p0[1], p1[2] - p0[2]], v = [p2[0] - p0[0], p2[1] - p0[1], p2[2] - p0[2]];
+      const c = [u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2], u[0] * v[1] - u[1] * v[0]];
+      const tris = c[0] * n[0] + c[1] * n[1] + c[2] * n[2] >= 0 ? [p0, p1, p2, p0, p2, p3] : [p0, p2, p1, p0, p3, p2];
+      for (const q of tris) pos.push(q[0], q[1], q[2]);
+    };
+    const P = (V, i, y) => [V[i][0], y, V[i][1]];
+    for (let i = 0; i < IN.length - 1; i++) {      // (the chain runs from one jamb to the other: the doors' gap is left open)
+      const dx = (B[i][0] + B[i + 1][0] - A[i][0] - A[i + 1][0]) / 2, dz = (B[i][1] + B[i + 1][1] - A[i][1] - A[i + 1][1]) / 2, dl = Math.hypot(dx, dz) || 1;
+      quad(P(A, i, y1), P(A, i + 1, y1), P(B, i + 1, y1), P(B, i, y1), [0, 1, 0]);
+      quad(P(A, i, y0), P(A, i + 1, y0), P(B, i + 1, y0), P(B, i, y0), [0, -1, 0]);
+      quad(P(B, i, y0), P(B, i + 1, y0), P(B, i + 1, y1), P(B, i, y1), [dx / dl, 0, dz / dl]);
+      quad(P(A, i, y0), P(A, i + 1, y0), P(A, i + 1, y1), P(A, i, y1), [-dx / dl, 0, -dz / dl]);
+    }
+    for (const [i, sgn] of [[0, -1], [IN.length - 1, 1]]) {       // the two ends of the chain
+      const j = sgn < 0 ? 1 : IN.length - 2, ex = (IN[i][0] - IN[j][0]), ez = (IN[i][1] - IN[j][1]), el = Math.hypot(ex, ez) || 1;
+      quad(P(A, i, y0), P(B, i, y0), P(B, i, y1), P(A, i, y1), [ex / el, 0, ez / el]);
+    }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    g.computeVertexNormals();
+    return g;
+  };
+  const band = (a, b, y0, y1, mat, ol = 0) => put(ol ? mesh(bandGeo(a, b, y0, y1), mat, ol) : new THREE.Mesh(bandGeo(a, b, y0, y1), mat), 0, 0);
+  const across = (off0, off1, y0, y1, mat, ol = 0.012) => put(mesh(new THREE.BoxGeometry(DOOR * 2, y1 - y0, off1 - off0), mat, ol), 0, FRONT + off0 + (off1 - off0) / 2, (y0 + y1) / 2);   // (the same ring over the doors)
+  const GOLD = toon(0xffd23f), BRASS = toon(0xc79a1f);
+  // the outside: a plinth, a belt, a cornice with a dentil band and the neon in its channel; a framed suit panel on every long run; the doors' frame
+  band(WALL - 0.02, WALL + 0.35, 0, 1.3, BRASS, 0.02);
+  band(WALL - 0.03, WALL + 0.18, 9.65, 9.95, GOLD, 0.015);
+  band(WALL - 0.04, WALL + 0.55, H - 0.9, H, GOLD, 0.02);
+  band(WALL - 0.05, WALL + 0.4, H - 1.05, H - 0.9, BRASS, 0.012);
+  band(WALL - 0.06, WALL + 0.12, H - 1.4, H - 1.2, glowS(0xff2e88));
+  across(WALL - 0.04, WALL + 0.55, H - 0.9, H, GOLD, 0.02);
+  across(WALL - 0.05, WALL + 0.4, H - 1.05, H - 0.9, BRASS);
+  across(WALL - 0.06, WALL + 0.12, H - 1.4, H - 1.2, glowS(0xff2e88), 0);
+  let facadeN = 0;
+  for (const e of E) {
+    if (e.olen < 6.5) continue;
+    const n = Math.floor(e.olen / 6.5);
+    for (let q = 0; q < n; q++) {
+      const f = (q + 0.5) / n;
+      put(makeHallPart('facade_panel' + (facadeN++ % 4)), e.o[0] + (e.o2[0] - e.o[0]) * f, e.o[1] + (e.o2[1] - e.o[1]) * f, 0, Math.atan2(e.nx, e.nz));
+    }
   }
-  // glowing door frame
-  for (const sx of [-1, 1]) neonS(new THREE.BoxGeometry(0.6, DOOR_H, 0.6), 0xffd23f, sx * DOOR, FRONT_OUT + 0.1, DOOR_H / 2);
-  neonS(new THREE.BoxGeometry(DOOR * 2 + 0.6, 0.6, 0.6), 0xffd23f, 0, FRONT_OUT + 0.1, DOOR_H);
-  // card suits: the four icons run all the way round the outside, in order (a run long enough for one gets one, a long one several)
+  put(makeHallPart('hall_gate'), 0, FRONT_OUT, 0, 0);
+  // card suits as icons (the prize counter's five panels use them: every one is just a place, drawn at the end as four instanced meshes, one per suit)
   const suitMats = ['♠', '♥', '♦', '♣'].map((s, i) => new THREE.MeshBasicMaterial({
     transparent: true,
     map: canvasTex(128, 128, (x) => {
@@ -479,20 +511,10 @@ export function buildCasino(w, loc) {
     }),
   }));
   const suitGeo = new THREE.PlaneGeometry(4, 4);
-  // (every suit icon is just a place: they're drawn at the end as four instanced meshes, one per suit, so the icons cost four draws)
   const suitSpots = [[], [], [], []];
   const suitAt = (i, x, z, yaw, y = H * 0.8, size = 4) => suitSpots[i % 4].push({ x, y, z, yaw, size });
-  let suitN = 0;
-  for (const e of E) {
-    if (e.olen < 7) continue;
-    const n = Math.max(1, Math.floor(e.olen / 9));
-    for (let q = 0; q < n; q++) {
-      const f = (q + 0.5) / n;
-      suitAt(suitN++, e.o[0] + (e.o2[0] - e.o[0]) * f + e.nx * 0.05, e.o[1] + (e.o2[1] - e.o[1]) * f + e.nz * 0.05, Math.atan2(e.nx, e.nz));
-    }
-  }
   // marquee canopy over the open doors
-  const CAN = FRONT_OUT + 3.5, CANY = DOOR_H + 0.8;       // its middle (z) and height
+  const CAN = FRONT_OUT + 1.6 + 3.5, CANY = 9.0;       // its middle (z) and height (it stands 1.6 m clear of the doors' frame)
   put(mesh(new THREE.BoxGeometry(16, 0.8, 7), toon(0xff2e88), 0.1), 0, CAN, CANY);
   for (const sx of [-1, 1]) put(mesh(new THREE.CylinderGeometry(0.3, 0.3, CANY, 8), toon(0xffd23f), 0.06), sx * 7.6, CAN + 2.9, CANY / 2);
   const bulbMats = [glow(0xfff6a8), glow(0xfff6a8), glow(0xfff6a8)];
@@ -659,27 +681,103 @@ export function buildCasino(w, loc) {
   const runner = new THREE.Mesh(new THREE.PlaneGeometry(5, 18), toon(0xd7263d));
   runner.rotation.x = -Math.PI / 2;
   put(runner, 0, FRONT - 9, 0.08);
-  // wallpaper just inside every run of wall + neon bands
-  const paper = toon(0x45207a);
-  const bandMats = [glow(0xff2e88), glow(0x2ee6ff)];
-  for (const e of E) {
-    const panel = new THREE.Mesh(new THREE.PlaneGeometry(e.len, H - 0.2), paper);
-    put(panel, e.mx - e.nx * 0.02, e.mz - e.nz * 0.02, H / 2, Math.atan2(-e.nx, -e.nz));
-    for (const [y, m] of [[H - 0.8, bandMats[0]], [3.2, bandMats[1]]]) put(new THREE.Mesh(new THREE.BoxGeometry(e.len, 0.25, 0.25), m), e.mx - e.nx * 0.1, e.mz - e.nz * 0.1, y, e.yaw);
+  // the wall: its field of damask, a brass skirting, a lacquered wainscot's gold girdle with a cyan line under it, a gold cornice with the pink neon in its channel, a brass crown moulding (rings
+  // round the outline, see `band`) and, at every bay of every long enough run, the hall kit's bay: half a gold pilaster each side, framed suit panels, a tall arched panel
+  band(0.02, -0.04, 0, H - 0.02, toon(0x45207a));
+  band(0.03, -0.16, 0, 0.25, BRASS, 0.01);
+  band(0.04, -0.14, 1.8, 1.95, GOLD, 0.01);
+  band(0.04, -0.10, 1.76, 1.795, bandMats[1]);
+  band(0.05, -0.55, 13.12, 13.55, GOLD, 0.012);
+  band(-0.45, -0.52, 13.06, 13.12, bandMats[0]);
+  band(0.06, -0.28, 15.4, 15.95, BRASS, 0.01);
+  band(-0.02, -0.42, 0.05, 0.09, BRASS);                 // the floor's border, the carpet's inlay
+  // what stands against a wall, as rectangles of the plan: a bay is left out where one overlaps (the machine, the table, the counter and the boards cover the wall behind them)
+  const wallItems = [];
+  {
+    const R = (x0, x1, z0, z1) => wallItems.push({ x0, x1, z0, z1 });
+    R(CLAW.x - 8.4, CLAW.x + 8.4, CLAW.z - 5.4, CLAW.z + 0.2);
+    R(PLK.x - 8.2, PLK.x + 8.2, PLK.wallZ - 0.2, PLK.wallZ + 3);
+    const bc = [[-3.8, -2], [3.8, -2], [-3.8, 4.7], [3.8, 4.7]].map(([a, b]) => bjPt(a, 0, b));
+    R(Math.min(...bc.map((c) => c[0])) - 0.3, Math.max(...bc.map((c) => c[0])) + 0.3, Math.min(...bc.map((c) => c[2])) - 0.3, Math.max(...bc.map((c) => c[2])) + 0.3);
+    R(PRIZE.wallX - 4.8, PRIZE.wallX + 0.2, PRIZE.z - 4.3, PRIZE.z + 4.3);
+    R(-HALL.ARM - 0.2, -HALL.ARM + 2.0, 2.8, 7.2);
+    R((DUCK.x0 + DUCK.x1) / 2 - 8.7, (DUCK.x0 + DUCK.x1) / 2 + 8.7, DUCK.wallZ - 0.2, DUCK.wallZ + 1.0);
+    const cx = CLASSIC.xs.reduce((a, b) => a + b) / CLASSIC.xs.length;
+    R(cx - 6.5, cx + 6.5, CLASSIC.wallZ - 0.5, CLASSIC.wallZ + 0.2);
   }
+  const onItem = (x, z) => wallItems.some((r) => x >= r.x0 && x <= r.x1 && z >= r.z0 && z <= r.z1);
+  const turnAt = (i) => {      // how sharply the outline turns at vertex i (radians)
+    const a = IN[(i + IN.length - 1) % IN.length], v = IN[i], b = IN[(i + 1) % IN.length];
+    const d1 = [v[0] - a[0], v[1] - a[1]], d2 = [b[0] - v[0], b[1] - v[1]];
+    return Math.acos(Math.max(-1, Math.min(1, (d1[0] * d2[0] + d1[1] * d2[1]) / (Math.hypot(...d1) * Math.hypot(...d2)))));
+  };
+  let bayN = 0;
+  for (const e of E) {
+    const jamb = (i) => Math.abs(IN[i][0]) === DOOR && IN[i][1] === FRONT;
+    const m0 = jamb(e.i) || turnAt(e.i) > 0.5 ? 0.35 : 0, m1 = jamb((e.i + 1) % IN.length) || turnAt((e.i + 1) % IN.length) > 0.5 ? 0.35 : 0;     // (clear of a hard corner, so two half pilasters never meet in one)
+    const L = e.len - m0 - m1;
+    const yaw = Math.atan2(-e.nx, -e.nz);
+    const at = (t, d = 0) => [e.p[0] + e.ux * t - e.nx * d, e.p[1] + e.uz * t - e.nz * d];
+    if (L < 3.4) {        // a run too short for a bay: lacquer wainscot only
+      if (L < 0.5) continue;
+      const f = makeHallPart('hall_filler'), [x, z] = at(m0 + L / 2);
+      f.scale.x = L;
+      put(f, x, z, 0, yaw);
+      continue;
+    }
+    const n = Math.max(1, Math.round(L / 4.5)), bw = L / n;
+    for (let q = 0; q < n; q++) {
+      const t0 = m0 + q * bw;
+      let hit = false;
+      for (let t = t0; t <= t0 + bw + 1e-6 && !hit; t += 0.6) hit = onItem(...at(t, 0.2));
+      if (hit) continue;
+      const b = makeHallPart('hall_bay' + (bayN++ % 4)), [x, z] = at(t0 + bw / 2);
+      b.scale.x = bw / 4.5;
+      put(b, x, z, 0, yaw);
+    }
+  }
+  // the ceiling: a plain dish, hung with the coffer tiles (4.5 m, from the crossing's middle out, wherever a tile clears the walls)
   const ceilM = toon(0x1c0f33); ceilM.side = THREE.DoubleSide;
   const ceiling = new THREE.Mesh(new THREE.ShapeGeometry(flat2(IN, false), 24).rotateX(Math.PI / 2), ceilM);
   put(ceiling, 0, 0, H - 0.02);
-  // ceiling strip lights: two along each arm and wing, clear of the chandeliers' chains
-  const strip = (x, z, sx, sz) => put(new THREE.Mesh(new THREE.BoxGeometry(sx, 0.2, sz), glowS(0xfff6a8)), x, z, H - 0.15);
-  for (const sx of [-1, 1]) {
-    strip(sx * 3.5, 7, 0.5, 12);                       // the foyer
-    strip(sx * 3.5, -34, 0.5, 18);                     // the Plinko arm
-    for (const dz of [-5.5, 5.5]) strip(sx * 32.5, CZ + dz, 40, 0.5);       // the wings
+  for (let i = -13; i <= 13; i++) for (let j = -13; j <= 13; j++) {
+    const x = HCX + 4.5 * i, z = CZ + 4.5 * j;
+    if (inHall(x, z, 2.3)) put(makeHallPart('hall_coffer'), x, z, H - 0.03);
   }
+  // the crossing: the floor's medallion, and the Chip Bar on it (its chip turns)
+  put(makeHallPart('hall_medallion'), HCX, CZ, 0.05);
+  const bar = makeHallPart('hall_bar'), barSpin = bar.getObjectByName('bar_spin');
+  bar.remove(barSpin);
+  put(bar, HCX, CZ, 0.05);
+  put(barSpin, HCX, CZ, 0.05 + barSpin.position.y, 0, true);
+  col({ type: 'cyl', x: HCX, z: CZ, y0: -1, y1: 4.4, r: 4.7 });
+  // the cashier's cage on the foyer's west wall: the chips' counter, its sign painted by the game
+  {
+    const cage = makeHallPart('hall_cage'), cf = cage.getObjectByName('cage_face');
+    const sign = new THREE.Mesh(new THREE.PlaneGeometry(cf.userData.w, cf.userData.h), new THREE.MeshBasicMaterial({ map: neonTex('CHIP CAGE', { w: 512, h: 96, color: '#ffd23f', edge: '#2ee6ff' }) }));
+    sign.position.copy(cf.position); sign.position.z += 0.012;
+    cage.add(sign);
+    put(cage, -HALL.ARM + 0.02, 5, 0, Math.PI / 2);
+    col({ type: 'box', x: -HALL.ARM + 0.85, y: 1.9, z: 5, hx: 0.85, hy: 1.9, hz: 2.05 });
+  }
+  // two lounges at the wings' far ends: banquettes against the wall, a small table, a brass rope
+  const lounge = (sofas, table, ropes) => {
+    for (const [x, z, yaw] of sofas) {
+      put(makeHallPart('hall_sofa'), x, z, 0, yaw);
+      col({ type: 'box', x: x + Math.sin(yaw) * 0.45, y: 0.5, z: z + Math.cos(yaw) * 0.45, hx: yaw === 0 ? 1.8 : 0.45, hy: 0.5, hz: yaw === 0 ? 0.45 : 1.8 });
+    }
+    put(makeHallPart('hall_table'), table[0], table[1], 0);
+    col({ type: 'cyl', x: table[0], z: table[1], y0: -1, y1: 0.7, r: 0.5 });
+    for (const [x, z] of ropes) { put(makeDerbyPart('dd_railpost'), x, z, 0); put(makeDerbyPart('dd_rope'), x, z, 0); }
+  };
+  const WZ = DUCK.wallZ;
+  lounge([[-51.8, WZ + 0.02, 0]], [-51.8, WZ + 2.2], [[-54.0, WZ + 3.0]]);
+  put(makeDerbyPart('dd_railpost'), -50.5, WZ + 3.0, 0);
+  lounge([[52.3, WZ + 0.02, 0], [HALL.WING.x1 - 0.02, WZ + 2.7, -Math.PI / 2]], [52.4, WZ + 2.6], [[49.8, WZ + 5.4]]);
+  put(makeDerbyPart('dd_railpost'), 53.3, WZ + 5.4, 0);
   // chandeliers (build_casino.py): the rose and chain are frozen (merged by the world), the crystal tiers turn slowly
   const chandeliers = [];
-  for (const [x, z] of [[0, 6], [HCX, CZ], [-32, CZ], [33, CZ]]) {
+  for (const [x, z] of [[0, 6], [-32, CZ], [33, CZ]]) {
     const ch = makeChandelier();
     ch.root.remove(ch.spin);
     put(ch.root, x, z, H - 3.3);
@@ -1174,6 +1272,7 @@ export function buildCasino(w, loc) {
       const step = Math.floor(chase * 7) % 3;
       bulbMats.forEach((m, i) => m.color.setHex(i === step ? 0xfff6a8 : 0x8a5a2a));
       for (const c of chandeliers) c.rotation.y += dt * 0.3;
+      barSpin.rotation.y += dt * 0.9;
       bouncer.head.rotation.y = Math.sin(time * 0.55) * 0.55 * Math.max(0, Math.sin(time * 0.17) + 0.4); // (glances left and right, now and then)
       bouncer.root.scale.y = 0.94 * (1 + Math.sin(time * 1.6) * 0.006);
       const pulse = 0.75 + 0.25 * Math.sin(time * 3);
