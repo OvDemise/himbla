@@ -1,4 +1,4 @@
-import { FRONT_OUT } from './casinoPlan.js'; // casino: where the hall's doors' wall ends and the forecourt starts
+import { FRONT_OUT, HALL } from './casinoPlan.js'; // casino: where the hall's doors' wall ends and the forecourt starts
 import * as THREE from 'three';
 import { Kit, T, G, D, GLASS, BEAM, prism, sandbags, container, crate, tank, lightString, junkHeap, PALETTE } from './outpostModels.js';
 import { FACTIONS } from './locations.js';
@@ -2485,17 +2485,20 @@ export function dressCasinoLot(world, loc, makeCar) {
   settle(world, loc, 7707, (k) => {
     // ---- the boulevard: asphalt from the doors to the plaza: a funnel from the door's width out to the boulevard's, then the boulevard itself, which runs
     // under the plaza's paving (so no sliver of dust is left between its end and the plaza's curved edge); gold edge lines; Blender-built neon lamp posts both sides ----
-    const b0 = 44, b1 = FZ - PR + 3, DOOR_Z = FRONT_OUT, W_DOOR = 6.5, W_BLV = 7.5;
+    const b0 = 44, b1 = FZ - PR + 3, DOOR_Z = FRONT_OUT, W_DOOR = 8.6, W_BLV = 7.5;   // (W_DOOR: clear of the gate's piers and their plinths, which stand at 6 to 7.35)
     {
+      // the funnel flares out from the boulevard's width to the gate's over its whole length (2 degrees), so the piers stand on asphalt and the gold edge line meets the wall's plinth beyond them
       const funnel = new THREE.Shape([new THREE.Vector2(-W_DOOR, -DOOR_Z), new THREE.Vector2(W_DOOR, -DOOR_Z), new THREE.Vector2(W_BLV, -b0), new THREE.Vector2(-W_BLV, -b0)]);
       k.add(new THREE.ExtrudeGeometry(funnel, { depth: 0.1, bevelEnabled: false }).rotateX(-Math.PI / 2), T(0x4a4060), 0, 0, 0, { outline: 0 }); // (the shape's y is -z)
       for (const s of [-1, 1]) {
-        const dx = W_BLV - W_DOOR, dz = b0 - DOOR_Z;
-        k.box(0.3, 0.13, Math.hypot(dx, dz) + 0.1, T(GOLD), (s * (W_DOOR + W_BLV)) / 2, 0, (DOOR_Z + b0) / 2, { ry: s * Math.atan2(dx, dz), outline: 0 });
+        const dx = W_DOOR - W_BLV, dz = b0 - DOOR_Z;
+        k.box(0.3, 0.13, Math.hypot(dx, dz) + 0.1, T(GOLD), (s * (W_DOOR + W_BLV)) / 2, 0, (DOOR_Z + b0) / 2, { ry: -s * Math.atan2(dx, dz), outline: 0 });
       }
+      // through the doors: the same asphalt over the wall's thickness (a little under the red carpet's strip, which rises from the hall's runner to the outside carpet), so the road runs right up to the hall's floor
+      k.box(2 * HALL.DOOR + 1, 0.06, DOOR_Z - HALL.FRONT + 0.1, T(0x4a4060), 0, 0, (HALL.FRONT + DOOR_Z) / 2, { outline: 0 });
     }
-    k.box(14, 0.1, b1 - b0, T(0x4a4060), 0, 0, (b0 + b1) / 2, { outline: 0 });
-    for (const s of [-1, 1]) k.box(0.3, 0.13, b1 - b0, T(GOLD), s * 7, 0, (b0 + b1) / 2, { outline: 0 });
+    k.box(2 * W_BLV, 0.1, b1 - b0, T(0x4a4060), 0, 0, (b0 + b1) / 2, { outline: 0 });   // (the funnel's width at its end: no step in the edge line where the two meet)
+    for (const s of [-1, 1]) k.box(0.3, 0.13, b1 - b0, T(GOLD), s * W_BLV, 0, (b0 + b1) / 2, { outline: 0 });
     // a lamp post (build_casino.py) at `sc` times its size, its small lamp toward `yaw`'s +z; `accent` colours its rings, lantern and small lamp
     const lamp = casinoNode('lamp_post');
     const lampAt = (x, z, accent, sc, yaw) => {

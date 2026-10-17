@@ -812,6 +812,7 @@ tools/
   blender/build_casino.py  builds the casino's lamp post, fountain, bouncer, chandelier and signs -> src/assets/casino.glb (also runs headless)
   blender/build_claw.py    builds the Zero-G claw machine, the claw and the things in its tank -> src/assets/claw.glb (also runs headless)
   casino-layouts.mjs       dev-only: the casino's plans (current, A, B) with the games' footprints, trigger zones and camera corridors; checks the spacing and that the walls leave the floor and doors free (`node tools/casino-layouts.mjs`, `... docs` redraws docs/casino-layout-*.svg); docs/casino-layouts.md is the study
+  casino-forecourt.mjs     dev-only: the forecourt (boulevard, car parks, plaza) today and as proposed in docs/casino-forecourt.md; draws both plans and checks the proposal's spacing
   casino-zfight.mjs        dev-only: lists the visible pairs of faces on one plane in the running casino (`node tools/casino-zfight.mjs`; needs the dev server)
   casino-shots.mjs         dev-only: screenshots of the casino from fixed vantage points (needs the dev server)
   check-claw.mjs           dev-only: plays the claw sim with four bots (novice to expert) and prints what each takes home against the ₵200 entry (`node tools/check-claw.mjs 300 [novice|average|skilled|expert]`)

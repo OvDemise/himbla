@@ -691,7 +691,7 @@ export function buildCasino(w, loc) {
   band(0.02, -0.04, 0, H - 0.02, toon(0x45207a));
   band(0.03, -0.16, 0, 0.25, BRASS, 0.01);
   band(0.04, -0.14, 1.8, 1.95, GOLD, 0.01);
-  band(0.04, -0.10, 1.76, 1.795, bandMats[1]);
+  band(0.04, -0.10, 1.735, 1.795, bandMats[1]);
   band(0.05, -0.55, 13.12, 13.55, GOLD, 0.012);
   band(-0.45, -0.52, 13.06, 13.12, bandMats[0]);
   band(0.06, -0.28, 15.4, 15.95, BRASS, 0.01);

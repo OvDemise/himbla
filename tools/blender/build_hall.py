@@ -178,7 +178,7 @@ def bay(kind):
     outer = arch_pts(1.3, 3.2, 9.3)
     brass.poly(outer, 0.04, 0.14)
     plum2.poly(arch_pts(1.2, 3.3, 9.3), 0.05, 0.16)
-    cyan.path([(x, 3.55 + y, 0.18) for x, y in arch_line(1.0, 9.3 - 3.55)], 0.015, 5)
+    cyan.path([(x, 3.55 + y, 0.19) for x, y in arch_line(1.0, 9.3 - 3.55)], 0.05, 6)         # (a 10 cm bead: a 3 cm one dropped out in pieces at a distance)
     # a gold cap over the arch, and a lamp-brass boss either side of its spring line
     for s in (-1, 1):
         brass.ball(s * 1.3, 9.3, 0.17, 0.09, 8, 6)
