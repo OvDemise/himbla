@@ -9,3 +9,13 @@
 1:58:22 PM [vite] (client) [console.warn] THREE.WebGLRenderer: KHR_parallel_shader_compile extension not supported.
 2:01:04 PM [vite] (client) [console.warn] [traffic] no open pad spot at twilight for ship
 2:01:06 PM [vite] (client) [console.warn] THREE.WebGLRenderer: KHR_parallel_shader_compile extension not supported.
+2:11:15 PM [vite] (client) page reload src/assets/duck.glb
+2:11:17 PM [vite] (client) page reload src/assets/duck.glb
+2:11:28 PM [vite] (client) page reload src/casinoWorld.js
+2:11:28 PM [vite] (client) page reload src/assetRowItems/props-markers.js
+2:11:43 PM [vite] (client) [console.warn] [traffic] no open pad spot at twilight for ship
+2:11:46 PM [vite] (client) [console.warn] THREE.WebGLRenderer: KHR_parallel_shader_compile extension not supported.
+2:12:00 PM [vite] (client) [console.warn] [traffic] no open pad spot at twilight for ship
+2:12:02 PM [vite] (client) [console.warn] THREE.WebGLRenderer: KHR_parallel_shader_compile extension not supported.
+2:15:40 PM [vite] (client) [console.warn] [traffic] no open pad spot at twilight for ship
+2:15:42 PM [vite] (client) [console.warn] THREE.WebGLRenderer: KHR_parallel_shader_compile extension not supported.

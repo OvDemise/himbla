@@ -525,7 +525,7 @@ function duckDerby() {
   const bn = arch.getObjectByName('banner'), banner = new THREE.Mesh(new THREE.PlaneGeometry(bn.userData.w, bn.userData.h), checker);
   banner.rotation.y = PI / 2; banner.position.set(fx, bn.position.y, 0); root.add(banner);
   lanes.forEach((c, i) => { const d = makeDuck(c, i === 0 ? 0xff5a1f : 0xff9f1c, i + 1); d.root.position.set(DUCK.x0 - (DUCK.x0 + DUCK.x1) / 2 + 1 + i * 0, 0.61, [2.4, 0.8, -0.8, -2.4][i]); root.add(d.root); });
-  for (let k = 0; k <= 8; k++) { const x = -14 + k * 3.5; at(makeDerbyPart('dd_railpost'), x, 0, 3.95); if (k < 8) at(makeDerbyPart('dd_rope'), x, 0, 3.95); }
+  for (const z of [3.9, -3.9]) for (let k = 0; k <= 8; k++) { const x = -14 + k * 3.5; at(makeDerbyPart('dd_railpost'), x, 0, z); if (k < 8) at(makeDerbyPart('dd_rope'), x, 0, z); }
   const board = at(makeDerbyPart('dd_board'), 0, 8.4, -8.8, -PI / 2);
   const face = board.getObjectByName('face');
   const bp = new THREE.Mesh(new THREE.PlaneGeometry(face.userData.w, face.userData.h), new THREE.MeshBasicMaterial({ map: canvasTex(1024, 384, (x, w, h) => {

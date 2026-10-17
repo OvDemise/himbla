@@ -121,28 +121,41 @@ def digit(A, n, cx, cy, cz, h=0.3, th=0.045, depth=0.03, face="z"):
             A.boxc(cx, cy + y, cz + x, depth, sh, sw)
 
 
-# the four card suits as flat reliefs facing +z (the blackjack table's, build_blackjack.py); kind 0 spade, 1 heart, 2 diamond, 3 club
-def _suit(kind, s):
-    t = Acc("tmp", "dark", None, 0.0)
-    cx = cy = cz = 0.0
+# the card suits, the prize counter's way (build_plinko.py): smooth extruded outlines in a recessed plum panel with a thin brass frame; hearts and diamonds red, spades and clubs cream
+def heart_outline(flip=False):
+    pts = []
+    for i in range(40):
+        t = 2 * PI * i / 40
+        x = 16 * math.sin(t) ** 3
+        y = 13 * math.cos(t) - 5 * math.cos(2 * t) - 2 * math.cos(3 * t) - math.cos(4 * t)
+        pts.append((x, -y if flip else y))
+    return pts
+
+
+def suit_geos(kind, s, depth):
+    """kind 0 spade, 1 heart, 2 diamond, 3 club: shapes about s metres tall, centred on the origin, facing +z"""
+    if kind == 1:
+        k = s / 29.0
+        return [extrude([(x * k, (y + 2.5) * k) for x, y in heart_outline()], depth, "z")]
+    if kind == 2:
+        return [extrude([(0, 0.5 * s), (0.32 * s, 0), (0, -0.5 * s), (-0.32 * s, 0)], depth, "z")]
     if kind == 0:
-        t.ball(cx - 0.23 * s, cy - 0.06 * s, cz, 0.28 * s, 8, 6, s=(1, 1, 0.3)); t.ball(cx + 0.23 * s, cy - 0.06 * s, cz, 0.28 * s, 8, 6, s=(1, 1, 0.3))
-        t.add(cylinder(0.0, 0.47 * s, 0.62 * s, 8), (cx, cy + 0.16 * s, cz), (0, 0, 0), (1, 1, 0.3)); t.add(cylinder(0.0, 0.2 * s, 0.34 * s, 6), (cx, cy - 0.42 * s, cz), (0, 0, 0), (1, 1, 0.3))
-    elif kind == 1:
-        t.ball(cx - 0.23 * s, cy + 0.12 * s, cz, 0.28 * s, 8, 6, s=(1, 1, 0.3)); t.ball(cx + 0.23 * s, cy + 0.12 * s, cz, 0.28 * s, 8, 6, s=(1, 1, 0.3))
-        t.add(cylinder(0.47 * s, 0.0, 0.66 * s, 8), (cx, cy - 0.2 * s, cz), (0, 0, 0), (1, 1, 0.3))
-    elif kind == 2:
-        t.add(cuboid(0.62 * s, 0.62 * s, 0.1 * s), (cx, cy, cz), (0, 0, PI / 4), (1, 1.3, 1))
-    else:
-        t.ball(cx, cy + 0.24 * s, cz, 0.24 * s, 8, 6, s=(1, 1, 0.3)); t.ball(cx - 0.25 * s, cy - 0.08 * s, cz, 0.24 * s, 8, 6, s=(1, 1, 0.3)); t.ball(cx + 0.25 * s, cy - 0.08 * s, cz, 0.24 * s, 8, 6, s=(1, 1, 0.3))
-        t.add(cylinder(0.0, 0.14 * s, 0.5 * s, 6), (cx, cy - 0.28 * s, cz), (0, 0, 0), (1, 1, 0.3))
-    Acc.all.remove(t)
-    return join(t.geos)
+        k = s / 35.0
+        return [extrude([(x * k, (y - 2.5) * k) for x, y in heart_outline(True)], depth, "z"),
+                extrude([(-2 * k, -2.5 * k), (2 * k, -2.5 * k), (5 * k, -15.5 * k), (-5 * k, -15.5 * k)], depth * 0.7, "z")]
+    r = 0.2 * s
+    return [xf(rbox(r, r, depth / 2, 1, 14, 8), (x * s, y * s, 0)) for x, y in ((0, 0.22), (-0.22, -0.08), (0.22, -0.08))] + \
+        [extrude([(-0.05 * s, 0.0), (0.05 * s, 0.0), (0.12 * s, -0.46 * s), (-0.12 * s, -0.46 * s)], depth * 0.7, "z")]
 
 
-def suit_on(red, dark, kind, pos, yaw, s):
-    """a suit at pos facing yaw (0 = +z, PI/2 = +x): hearts and diamonds go to `red`, spades and clubs to `dark`"""
-    (red if kind in (1, 2) else dark).add(_suit(kind, s), pos, (0, yaw, 0))
+def suit_panel(frame, fill, red, cream, kind, pos, yaw, w, h, s, fr=0.045):
+    """A recessed panel on a face (pos = the middle of the face, yaw 0 faces +z, PI/2 faces +x) with suit `kind` in it."""
+    d = 0.05
+    bars = [xf(cuboid(w, fr, d)[:2], (0, h / 2 - fr / 2, d / 2)), xf(cuboid(w, fr, d)[:2], (0, -(h / 2 - fr / 2), d / 2)),
+            xf(cuboid(fr, h - 2 * fr, d)[:2], (w / 2 - fr / 2, 0, d / 2)), xf(cuboid(fr, h - 2 * fr, d)[:2], (-(w / 2 - fr / 2), 0, d / 2))]
+    frame.add(join(bars), pos, (0, yaw, 0))
+    fill.add(xf(cuboid(w - 2 * fr, h - 2 * fr, 0.03)[:2], (0, 0, 0.015)), pos, (0, yaw, 0))
+    (red if kind in (1, 2) else cream).add(join([xf(g[:2], (0, 0, 0.03 + 0.0125)) for g in suit_geos(kind, s, 0.025)]), pos, (0, yaw, 0))
 
 
 LANES = (2.4, 0.8, -0.8, -2.4)          # lane centres across the trough (z), lane 1 at +z (the player's side)
@@ -296,37 +309,19 @@ def trough_A():
     A.flush()
     A = Acc("tGold", "gold", o, 0.03)
     A.boxc(0, 0.33, 0, LEN + 0.14, 0.1, WID + 0.14)
-    A.boxc(0, 1.07, WID / 2 - 0.19, LEN + 0.14, 0.1, 0.42)
-    A.boxc(0, 1.07, -(WID / 2 - 0.19), LEN + 0.14, 0.1, 0.42)
+    A.boxc(0, 1.07, WID / 2 - 0.21, LEN, 0.1, 0.42)
+    A.boxc(0, 1.07, -(WID / 2 - 0.21), LEN, 0.1, 0.42)
     for sx in (-1, 1):
-        A.boxc(sx * (H - 0.19), 1.07, 0, 0.42, 0.1, WID - 0.4)
+        A.boxc(sx * (H - 0.21), 1.07, 0, 0.42, 0.1, WID - 0.84)
     A.flush()
-    A = Acc("tCream", "cream", o, 0.0)
-    A2 = Acc("tSuitRed", "red", o, 0.0)
-    A4 = Acc("tSuitDark", "plum", o, 0.0)
-    A3 = Acc("tInset", "plum2", o, 0.0)
+    A = Acc("tFrame", "gold", o, 0.0); P = Acc("tPanel", "plum", o, 0.0); R = Acc("tSuitRed", "red", o, 0.0); K = Acc("tSuitCream", "cream", o, 0.0)
     for sz in (-1, 1):
         for k in range(-6, 7):
-            x = k * 2.1
-            A3.boxc(x, 0.67, sz * (WID / 2 + 0.015), 1.7, 0.56, 0.03)
-            A.boxc(x, 0.67, sz * (WID / 2 + 0.035), 1.56, 0.42, 0.03)
-            suit_on(A2, A4, (k + 6 + (0 if sz > 0 else 2)) % 4, (x, 0.67, sz * (WID / 2 + 0.06)), 0 if sz > 0 else PI, 0.6)
+            suit_panel(A, P, R, K, (k + 6 + (0 if sz > 0 else 2)) % 4, (k * 2.1, 0.67, sz * WID / 2), 0 if sz > 0 else PI, 1.7, 0.56, 0.3)
     for sx in (-1, 1):
-        A3.boxc(sx * (H + 0.015), 0.67, 0, 0.03, 0.56, 5.0)
-        A.boxc(sx * (H + 0.035), 0.67, 0, 0.03, 0.42, 4.8)
-        suit_on(A2, A4, 2 if sx > 0 else 1, (sx * (H + 0.06), 0.67, 0), sx * PI / 2, 0.6)
-    A.flush(); A2.flush(); A3.flush(); A4.flush()
-    # the corner posts: brass turned pillars with ball finials
-    A = Acc("tCorner", "brass", o, 0.03)
-    for sx in (-1, 1):
-        for sz in (-1,):
-            A.lath([(0, 0.95), (0.2, 0.95), (0.2, 1.05), (0.12, 1.12), (0.12, 1.4), (0.18, 1.46), (0.14, 1.52), (0.0, 1.52)], (sx * (H - 0.19), 0, sz * (WID / 2 - 0.19)), (0, 0, 0), (1, 1, 1), 12)
-    A.flush()
-    A = Acc("tCornerBall", "gold", o, 0.0)
-    for sx in (-1, 1):
-        for sz in (-1,):
-            A.ball(sx * (H - 0.19), 1.66, sz * (WID / 2 - 0.19), 0.12, 8, 6)
-    A.flush()
+        for j, z in enumerate((-1.7, 0.0, 1.7)):
+            suit_panel(A, P, R, K, (j + (0 if sx > 0 else 2)) % 4, (sx * H, 0.67, z), sx * PI / 2, 1.5, 0.56, 0.3)
+    A.flush(); P.flush(); R.flush(); K.flush()
     # lane ropes: floats in red and cream along a fine line, brass cleats at each end
     A = Acc("tFloatR", "red", o, 0.0); B2 = Acc("tFloatC", "cream", o, 0.0); L2 = Acc("tLine", "dark", o, 0.0)
     for zi, z in enumerate((-3.2, -1.6, 0.0, 1.6, 3.2)):
@@ -363,24 +358,24 @@ def gate_A():
         A.boxc(0, 0.72, s * PZ, 0.92, 0.08, 0.92)
         A.cylc(0, 0.76, s * PZ, 0.34, 0.12, 12); A.cylc(0, 2.74, s * PZ, 0.34, 0.12, 12); A.cylc(0, 2.84, s * PZ, 0.28, 0.1, 12, rt=0.2)
         A.ball(0, 3.05, s * PZ, 0.16, 8, 6)
-    A.boxc(0, 3.0, 0, 0.5, 0.08, 2 * PZ + 0.6)
+    A.boxc(0, 3.0, 0, 0.36, 0.08, 2 * PZ + 0.6)
     A.flush()
     A = Acc("gHeader", "plum", o, 0.04)
-    A.boxc(0, 2.78, 0, 0.5, 0.42, 2 * PZ + 0.3)
+    A.boxc(0, 2.78, 0, 0.3, 0.4, 2 * PZ + 0.3)
     A.flush()
     A = Acc("gPlaque", "gold", o, 0.0)
     for i, z in enumerate(LANES, 1):
         for sx in (-1, 1):
-            A.cylc(sx * 0.27, 2.78, z, 0.2, 0.04, 16, rot=(0, 0, PI / 2))
+            A.cylc(sx * 0.17, 2.78, z, 0.2, 0.04, 16, rot=(0, 0, PI / 2))
     A.flush()
     for i, z in enumerate(LANES, 1):
         A = Acc(f"gPlaqueRing{i}", f"lane{i}", o, 0.0)
         for sx in (-1, 1):
-            A.tor(0.21, 0.025, (sx * 0.29, 2.78, z), (0, 0, PI / 2), 18, 4)
+            A.tor(0.21, 0.025, (sx * 0.19, 2.78, z), (0, 0, PI / 2), 18, 4)
         A.flush()
     A = Acc("gPlaqueNum", "dark", o, 0.0)
     for i, z in enumerate(LANES, 1):
-        digit(A, i, 0.3, 2.78, z, 0.22, 0.045, 0.02, "x"); digit(A, i, -0.3, 2.78, z, 0.22, 0.045, 0.02, "-x")
+        digit(A, i, 0.2, 2.78, z, 0.22, 0.045, 0.02, "x"); digit(A, i, -0.2, 2.78, z, 0.22, 0.045, 0.02, "-x")
     A.flush()
     # the starting lamps: a brass housing on the header with three lamps
     A = Acc("gLampBox", "brass", o, 0.03)
@@ -393,7 +388,7 @@ def gate_A():
             A.cylc(sx * 0.3, 3.28, z, 0.22, 0.04, 14, rot=(0, 0, PI / 2))
         pivot(f"lamp{k + 1}", (0.33, 3.28, z), o, role="lamp", r=0.2)
     A.flush()
-    pivot("startSign", (0.27, 2.78, 0.0), o, role="sign", w=1.6, h=0.34)    # (a plate on the header between plaques 2 and 3: the game paints START)
+    pivot("startSign", (0.17, 2.78, 0.0), o, role="sign", w=1.6, h=0.34)    # (a plate on the header between plaques 2 and 3: the game paints START)
     # the grille: a brass portcullis the game lifts away (its own object, origin at its middle)
     g = pivot("dd_grille", (0, 0, 0), None)
     A = Acc("grBars", "brass", g, 0.02)
@@ -431,15 +426,10 @@ def finish_A():
     A = Acc("fBeam", "plum", o, 0.04)
     A.boxc(0, 5.0, 0, 0.62, 0.5, 2 * PZ - 0.2)
     A.flush()
-    A = Acc("fBeamInlay", "cream", o, 0.0)
-    for z in (-2.7, -0.9, 0.9, 2.7):
-        A.boxc(0.33, 5.0, z, 0.03, 0.3, 1.5)
-        A.boxc(-0.33, 5.0, z, 0.03, 0.3, 1.5)
-    A.flush()
-    A = Acc("fSuitRed", "red", o, 0.0); A4 = Acc("fSuitDark", "plum", o, 0.0)
-    for k, z in enumerate((-2.7, -0.9, 0.9, 2.7)):
-        suit_on(A, A4, k, (0.36, 5.0, z), PI / 2, 0.45); suit_on(A, A4, (k + 2) % 4, (-0.36, 5.0, z), -PI / 2, 0.45)
-    A.flush(); A4.flush()
+    A = Acc("fFrame", "gold", o, 0.0); P = Acc("fPanel", "plum2", o, 0.0); R = Acc("fSuitRed", "red", o, 0.0); K = Acc("fSuitCream", "cream", o, 0.0)
+    for k, z in enumerate((-3.6, -1.8, 0.0, 1.8, 3.6)):
+        suit_panel(A, P, R, K, k % 4, (0.31, 5.0, z), PI / 2, 1.5, 0.36, 0.2); suit_panel(A, P, R, K, (k + 2) % 4, (-0.31, 5.0, z), -PI / 2, 1.5, 0.36, 0.2)
+    A.flush(); P.flush(); R.flush(); K.flush()
     # the banner: a pole under the beam on brass rings, the cloth (the game's checker) and two tassels
     A = Acc("fPole", "brass", o, 0.02)
     A.tube((0, 4.62, -(PZ - 0.3)), (0, 4.62, PZ - 0.3), 0.04, 8)
@@ -457,19 +447,19 @@ def finish_A():
         A.path([(0, 4.58, s * 3.55), (0, 3.9, s * 3.6), (0, 3.4, s * 3.6)], [0.03, 0.03, 0.05], 5)
         A.ball(0, 3.3, s * 3.6, 0.09, 8, 6, (1, 1.5, 1))
     A.flush()
-    # the photo-finish camera: a brass body with a black lens, hung under the banner's pole on a bracket
+    # the photo-finish camera: a brass body hung on a bracket from the beam, just before the line (clear of the banner), its lens looking straight down at it
     A = Acc("fCam", "brass", o, 0.03)
-    A.boxc(0, 4.42, 0, 0.5, 0.36, 0.6)
-    A.tube((0, 4.6, 0), (0, 4.78, 0), 0.05, 6)
+    A.boxc(-0.55, 4.45, 0, 0.5, 0.34, 0.6)
+    A.tube((-0.3, 4.76, 0), (-0.55, 4.6, 0), 0.05, 6)
     A.flush()
     A = Acc("fLens", "dark", o, 0.02)
-    A.cylc(0.3, 4.38, 0, 0.17, 0.2, 14, rot=(0, 0, PI / 2))
+    A.cylc(-0.55, 4.18, 0, 0.17, 0.2, 14)
     A.flush()
     A = Acc("fLensGlow", "glass", o, 0.0)
-    A.cylc(0.41, 4.38, 0, 0.12, 0.02, 12, rot=(0, 0, PI / 2))
+    A.cylc(-0.55, 4.07, 0, 0.12, 0.02, 12)
     A.flush()
     A = Acc("fCamLamp", "glowred", o, 0.0)
-    A.ball(0.1, 4.55, 0.24, 0.04, 6, 4)
+    A.ball(-0.4, 4.45, 0.31, 0.04, 6, 4)
     A.flush()
     # a pennant on each finial
     A = Acc("fPennant", "red", o, 0.02)
@@ -507,17 +497,17 @@ def board_A():
             A.tor(0.3, 0.04, (0.14, sy * 3.2, sz * 8.35), (0, 0, PI / 2), 16, 4)
     A.flush()
     A = Acc("bPediment", "gold", o, 0.04)
-    A.cylc(0, 3.65, 0, 1.4, 0.2, 24, rot=(0, 0, PI / 2))
-    A.boxc(0, 3.6, 0, 0.16, 0.8, 5.2)
+    A.boxc(0, 3.72, 0, 0.16, 0.54, 4.4)
+    A.cylc(0, 4.5, 0, 1.0, 0.2, 24, rot=(0, 0, PI / 2))
     A.flush()
     A = Acc("bPedPlum", "plum", o, 0.03)
-    A.cylc(0.1, 3.7, 0, 1.15, 0.1, 24, rot=(0, 0, PI / 2))
+    A.cylc(0.1, 4.5, 0, 0.82, 0.1, 24, rot=(0, 0, PI / 2))
     A.flush()
     A = Acc("bDuck", "body", o, 0.03)       # a duck in relief on the medallion
-    A.ball(0.2, 3.55, 0, 0.5, 12, 8, (0.35, 0.6, 0.9)); A.ball(0.2, 4.1, 0.25, 0.28, 10, 8, (0.35, 1, 1)); 
+    A.ball(0.2, 4.35, 0, 0.36, 12, 8, (0.35, 0.6, 0.9)); A.ball(0.2, 4.75, 0.18, 0.2, 10, 8, (0.35, 1, 1))
     A.flush()
     A = Acc("bDuckBill", "bill", o, 0.0)
-    A.rbc(0.2, 4.08, 0.62, 0.12, 0.12, 0.4, 0.6)
+    A.rbc(0.2, 4.73, 0.44, 0.1, 0.09, 0.28, 0.6)
     A.flush()
     A = Acc("bFinial", "brass", o, 0.03)
     for s in (-1, 1):
@@ -537,15 +527,9 @@ def kiosk_A():
     for sx in (-1, 1):
         A.boxc(sx * 1.4, 0.66, 0.0, 0.1, 1.2, 1.4)
     A.flush()
-    A = Acc("kPanel", "cream", o, 0.0)
-    for x in (-0.65, 0.65):
-        A.boxc(x, 0.66, 0.67, 1.0, 0.7, 0.03)
-    A.boxc(-1.41, 0.66, 0, 0.03, 0.7, 0.8); A.boxc(1.41, 0.66, 0, 0.03, 0.7, 0.8)
-    A.flush()
-    A = Acc("kSuitRed", "red", o, 0.0); A4 = Acc("kSuitDark", "plum", o, 0.0)
-    suit_on(A, A4, 0, (-0.65, 0.66, 0.7), 0, 0.8); suit_on(A, A4, 1, (0.65, 0.66, 0.7), 0, 0.8)
-    suit_on(A, A4, 2, (-1.44, 0.66, 0), -PI / 2, 0.8); suit_on(A, A4, 3, (1.44, 0.66, 0), PI / 2, 0.8)
-    A.flush(); A4.flush()
+    A = Acc("kFrame", "gold", o, 0.0); P = Acc("kPanel", "plum2", o, 0.0); R = Acc("kSuitRed", "red", o, 0.0); K = Acc("kSuitCream", "cream", o, 0.0)
+    suit_panel(A, P, R, K, 0, (-0.65, 0.66, 0.65), 0, 1.0, 0.7, 0.4); suit_panel(A, P, R, K, 1, (0.65, 0.66, 0.65), 0, 1.0, 0.7, 0.4)
+    A.flush(); P.flush(); R.flush(); K.flush()
     # the window: brass posts and bars, an arched header, the screen inside
     A = Acc("kWindow", "brass", o, 0.03)
     for sx in (-1, 1):

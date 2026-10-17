@@ -760,11 +760,12 @@ export function buildCasino(w, loc) {
   const checker = new THREE.MeshBasicMaterial({ map: checkerTex(), side: THREE.DoubleSide });
   const fl = trough.getObjectByName('finishLine');
   flat(new THREE.PlaneGeometry(fl.userData.w, fl.userData.h), new THREE.MeshBasicMaterial({ map: finishTex() }), fl.position);
-  // the front rail: a brass post every 3.5 m along the player's side with a velvet rope between
-  const railZ = lz0 + 0.55;
-  for (let x = L0, k = 0; k <= 8; x += 3.5, k++) {
-    put(makeDerbyPart('dd_railpost'), x, railZ, 0);
-    if (k < 8) put(makeDerbyPart('dd_rope'), x, railZ, 0);
+  // the rails: a brass post every 3.5 m along both long sides with a velvet rope between
+  for (const railZ of [lz0 + 0.55, lz1 - 0.55]) {
+    for (let x = L0, k = 0; k <= 8; x += 3.5, k++) {
+      put(makeDerbyPart('dd_railpost'), x, railZ, 0);
+      if (k < 8) put(makeDerbyPart('dd_rope'), x, railZ, 0);
+    }
   }
   // the start gate: the frame stands, the brass grille is what lifts; three lamps count the start down (a lit disc each side of each lens)
   const gate = makeDerbyPart('dd_grille');
