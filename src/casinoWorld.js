@@ -939,7 +939,9 @@ export function buildCasino(w, loc) {
   // the glass display case on the counter: two lit tiers of prizes
   const CX = -0.5;
   pcBox(3.6, 0.12, 0.9, pm.felt, CX, 1.70, 0, 0.02);
-  pcPut(new THREE.Mesh(new THREE.BoxGeometry(3.5, 1.4, 0.8), new THREE.MeshBasicMaterial({ color: 0xbff8ff, transparent: true, opacity: 0.16, depthWrite: false, side: THREE.DoubleSide })), CX, 2.46, 0);
+  // (the glass stands 2 cm clear of the felt floor: its bottom face used to sit exactly on the floor's top, y = 1.76, and the two
+  // surfaces fought for the same pixels, a patchwork of tints across the case floor)
+  pcPut(new THREE.Mesh(new THREE.BoxGeometry(3.5, 1.38, 0.8), new THREE.MeshBasicMaterial({ color: 0xbff8ff, transparent: true, opacity: 0.16, depthWrite: false, side: THREE.DoubleSide })), CX, 2.47, 0);
   for (const sx of [-1, 1]) for (const sz of [-1, 1]) pcBox(0.07, 1.44, 0.07, pm.gold, CX + sx * 1.77, 2.46, sz * 0.42, 0.01);
   pcBox(3.65, 0.07, 0.95, pm.gold, CX, 3.2, 0, 0.02);
   pcBox(3.45, 0.04, 0.7, pm.felt, CX, 2.46, 0, 0);
