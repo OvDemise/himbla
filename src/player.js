@@ -99,7 +99,9 @@ export class Player {
     if (plat.quat) {
       if (this.platOn === plat) {
         _q.copy(pq).invert().premultiply(plat.quat);
-        rot = _q.w < 0.99999999 && _q.w > 0.9;
+        // (however small the turn: w = cos(angle/2) is 1 to the last digit for a turn under a milliradian, so the size of the turn is read from the vector part;
+        // a rotation skipped as too small slid you a millimetre a frame, the further out the more, and a millimetre is the gap you fall across to lose the deck)
+        rot = _q.w > 0.9 && Math.abs(_q.x) + Math.abs(_q.y) + Math.abs(_q.z) > 1e-13;
       }
       pq.copy(plat.quat);
       this.platOn = plat;
