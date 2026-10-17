@@ -16,6 +16,9 @@
 #     hatch   lit doorway, only shown while the ramp is open
 #     plume   main thruster flame along -z (pulses while flying)
 #     lift    belly lift-jet flame along -y (on while climbing off / settling onto a pad)
+#     board   a route board (the shuttle's destination sign): the pivot sits at the middle of the display
+#             face, +z out of the face; "w" / "h" = the face in metres, "faces" = 1 (front) or 2 (back too).
+#             Its meshes are the housing; the game draws the lit text on the face.
 # - Each mesh has ONE material whose name is a slot (body, stripe, trim, dark, ...). The game
 #   swaps in its own toon / glow materials per slot, which is how liveries recolour.
 # - Custom property "ink" = outline thickness in metres (0 = none).
@@ -40,10 +43,17 @@ def find_repo():
 
 
 REPO = find_repo()
-OUT = os.path.join(REPO, "src", "assets", "ships.glb")
+OUT = os.environ.get("SHIPS_OUT") or os.path.join(REPO, "src", "assets", "ships.glb")
 if not os.path.isdir(os.path.dirname(OUT)):
     raise RuntimeError(f"No src/assets in {REPO}; set MOONRUNNER_REPO to the himbla checkout")
-print("Ships export ->", OUT)
+# The shuttle comes in five builds: "current" (what shipped), the first round of proposals "A" and "B"
+# (nose and route board), and the second round "C" and "D" (see docs/shuttle-proposals.md), which also
+# have new tail fins and side engines clear of the passenger windows. SHUTTLE_VARIANT picks one.
+SHUTTLE_VARIANT = os.environ.get("SHUTTLE_VARIANT", "current")
+if SHUTTLE_VARIANT not in ("current", "A", "B", "C", "D"):
+    raise RuntimeError(f"SHUTTLE_VARIANT must be current, A, B, C or D (got {SHUTTLE_VARIANT!r})")
+NEW_SHUTTLE = SHUTTLE_VARIANT in ("C", "D")
+print("Ships export ->", OUT, "| shuttle variant:", SHUTTLE_VARIANT)
 COLL = "MoonShips"
 
 # preview colours only: the game replaces every slot with its own material
@@ -51,7 +61,7 @@ SLOT_COLORS = {
     "body": (0.95, 0.93, 0.86), "stripe": (0.18, 0.77, 1.0), "trim": (0.85, 0.83, 0.91),
     "dark": (0.13, 0.11, 0.2), "metal": (0.54, 0.53, 0.63), "steel": (0.33, 0.38, 0.48),
     "bay": (0.06, 0.05, 0.1), "deck": (0.36, 0.35, 0.44), "hazard": (1.0, 0.82, 0.25),
-    "glass": (0.6, 0.9, 1.0), "window": (1.0, 0.96, 0.66), "cabin": (1.0, 0.95, 0.69),
+    "glass": (0.6, 0.9, 1.0), "glassDeep": (0.38, 0.74, 0.94), "glassHi": (0.93, 0.99, 1.0), "window": (1.0, 0.96, 0.66), "cabin": (1.0, 0.95, 0.69),
     "engine": (1.0, 0.62, 0.11), "core": (1.0, 0.95, 0.75), "red": (1.0, 0.16, 0.29),
     "green": (0.49, 1.0, 0.42), "white": (1.0, 1.0, 1.0), "sign": (1.0, 0.82, 0.25),
     "plume": (1.0, 0.55, 0.15), "plumeCore": (1.0, 0.95, 0.8), "lift": (0.55, 0.85, 1.0),
@@ -255,6 +265,156 @@ def mirror_x(geo):
     return merge(geo, xf(geo, s=(-1, 1, 1)))
 
 
+def clipf(geo, *fields):
+    """Every face cut exactly where each field f(v) crosses zero (kept where f >= 0): edges are split at
+    the crossing, so on a dense mesh the cut follows f's curve with no sawtooth (keep() drops or keeps
+    whole faces). Several fields cut one after another, so corners stay sharp; -f is the complement."""
+    verts, faces = geo
+    polys = [[tuple(verts[i]) for i in f] for f in faces]
+    for fn in fields:
+        out = []
+        for poly in polys:
+            vals = [fn(p) for p in poly]
+            res = []
+            for i, a in enumerate(poly):
+                j = (i + 1) % len(poly)
+                b, fa, fb = poly[j], vals[i], vals[j]
+                if fa >= 0:
+                    res.append(a)
+                if (fa >= 0) != (fb >= 0):
+                    t = fa / (fa - fb)
+                    res.append(tuple(a[k] + (b[k] - a[k]) * t for k in range(3)))
+            if len(res) >= 3:
+                out.append(res)
+        polys = out
+    out_v, out_f = [], []
+    for poly in polys:
+        o = len(out_v)
+        out_v += poly
+        out_f.append(tuple(range(o, o + len(poly))))
+    return out_v, out_f
+
+
+def pl(pts):
+    """A piecewise-linear function through (x, y) points, flat beyond the ends."""
+    def f(x):
+        if x <= pts[0][0]:
+            return pts[0][1]
+        for (x0, y0), (x1, y1) in zip(pts, pts[1:]):
+            if x <= x1:
+                return y0 + (y1 - y0) * (x - x0) / (x1 - x0)
+        return pts[-1][1]
+    return f
+
+
+def smin(vals, k):
+    """Smooth minimum: the intersection of several fields with its corners rounded by about k."""
+    m = min(vals)
+    return m if k <= 0 else m - k * math.log(sum(math.exp(-(v - m) / k) for v in vals))
+
+
+def pchip(xs, ys):
+    """A monotone cubic through the points (no overshoot between them): returns f(x)."""
+    n = len(xs)
+    h = [xs[i + 1] - xs[i] for i in range(n - 1)]
+    d = [(ys[i + 1] - ys[i]) / h[i] for i in range(n - 1)]
+    m = [0.0] * n
+    for i in range(1, n - 1):
+        if d[i - 1] * d[i] > 0:
+            w1, w2 = 2 * h[i] + h[i - 1], h[i] + 2 * h[i - 1]
+            m[i] = (w1 + w2) / (w1 / d[i - 1] + w2 / d[i])
+
+    def end(h0, h1, d0, d1):
+        v = ((2 * h0 + h1) * d0 - h0 * d1) / (h0 + h1)
+        if v * d0 <= 0:
+            return 0.0
+        if d0 * d1 <= 0 and abs(v) > 3 * abs(d0):
+            return 3 * d0
+        return v
+    m[0] = end(h[0], h[1], d[0], d[1])
+    m[-1] = end(h[-1], h[-2], d[-1], d[-2])
+
+    def f(x):
+        i = max(0, min(n - 2, next((k for k in range(n - 1) if x <= xs[k + 1]), n - 2)))
+        t = (x - xs[i]) / h[i]
+        t2, t3 = t * t, t * t * t
+        return ((2 * t3 - 3 * t2 + 1) * ys[i] + (t3 - 2 * t2 + t) * h[i] * m[i]
+                + (-2 * t3 + 3 * t2) * ys[i + 1] + (t3 - t2) * h[i] * m[i + 1])
+    return f
+
+
+def smooth_sections(sections, z_from, step=0.3):
+    """The hull from z_from forward, re-cut every `step` metres along monotone curves through its
+    sections: the same shape, with the facets of a few long panels rounded off."""
+    tail = [s for s in sections if s["z"] >= z_from]
+    zs = [s["z"] for s in tail]
+    curves = {k: pchip(zs, [s.get(k, 2.5 if k[0] == "e" else 0.0) for s in tail]) for k in ("w", "t", "b", "eT", "eB", "yc")}
+    n = int(round((zs[-1] - zs[0]) / step))
+    pts = [zs[0] + (zs[-1] - zs[0]) * i / n for i in range(n + 1)]
+    return [s for s in sections if s["z"] < z_from] + [{"z": z, **{k: c(z) for k, c in curves.items()}} for z in pts]
+
+
+def hull_field(sections, x, y, z):
+    """< 1 inside the lofted hull, 1 on its skin, > 1 outside."""
+    s = lerp_sec(sections, z)
+    top = y >= s["yc"]
+    e = s["eT"] if top else s["eB"]
+    h = s["t"] if top else s["b"]
+    return (abs(x) / s["w"]) ** e + (abs(y - s["yc"]) / h) ** e
+
+
+def hull_pt(sections, x, y, z0=5.0, z1=10.3):
+    """Where the nose skin is at (x, y), and the outward normal there: (point, normal)."""
+    lo, hi = z0, z1
+    for _ in range(40):
+        mid = (lo + hi) / 2
+        if hull_field(sections, x, y, mid) <= 1.0:
+            lo = mid
+        else:
+            hi = mid
+    e = 1e-3
+    g = Vector((hull_field(sections, x + e, y, lo) - hull_field(sections, x - e, y, lo),
+                hull_field(sections, x, y + e, lo) - hull_field(sections, x, y - e, lo),
+                hull_field(sections, x, y, lo + e) - hull_field(sections, x, y, lo - e)))
+    return Vector((x, y, lo)), g.normalized()
+
+
+def stick(geo, sections, x, y, lift=0.0):
+    """geo (authored facing +z, origin at its back) set onto the nose skin at (x, y): +z along the skin's
+    normal, x kept level, lifted `lift` off it."""
+    p, n = hull_pt(sections, x, y)
+    right = Vector((0, 1, 0)).cross(n).normalized()
+    up = n.cross(right)
+    e = Matrix((right, up, n)).transposed().to_euler("XYZ")
+    return xf(geo, tuple(p + n * lift), (e.x, e.y, e.z))
+
+
+def airfoil_fin(span, c_root, c_tip, sweep, t_root, t_tip, tip_round=0.2, inflate=0.0, nsec=4, m=11):
+    """A fin lofted through airfoil sections: span along +y from the root (y = 0), the leading edge at z = 0 on
+    the root and raked back (-z) by `sweep` at the tip, thickness along x. Chord and thickness taper root to tip
+    (t = thickness / chord), the leading edge is round and the trailing edge fine, and the last `tip_round` of
+    the span closes in along an ellipse so the tip is rounded off. `inflate` thickens it a hair (for a livery
+    band laid over a fin of the same shape). Returns (verts, faces)."""
+    xs = [(1 - math.cos(math.pi * i / m)) / 2 for i in range(m + 1)]            # chord stations, leading to trailing edge
+    half = lambda xc, tc: 5 * tc * (0.2969 * math.sqrt(xc) - 0.1260 * xc - 0.3516 * xc ** 2 + 0.2843 * xc ** 3 - 0.1036 * xc ** 4)
+    outline = [(xc, 1) for xc in xs] + [(xc, -1) for xc in reversed(xs[1:-1])]
+    stations = [i / nsec * (1 - tip_round) for i in range(nsec)]
+    stations += [(1 - tip_round) + tip_round * math.sin(j / 4 * math.pi / 2) for j in range(5)]
+    verts, faces = [], []
+    for f in stations:
+        shrink = 1.0 if f <= 1 - tip_round else math.cos((f - (1 - tip_round)) / tip_round * math.pi / 2)
+        c = (c_root + (c_tip - c_root) * f) * shrink
+        tc = t_root + (t_tip - t_root) * f
+        for xc, sgn in outline:
+            verts.append((sgn * (half(xc, tc) * c + inflate * shrink), span * f, -sweep * f - xc * c))
+    n = len(outline)
+    for j in range(len(stations) - 1):
+        for i in range(n):
+            a, b = j * n + i, j * n + (i + 1) % n
+            faces.append((a, b, b + n, a + n))
+    return verts, faces
+
+
 # ---------------- scene plumbing ----------------
 
 def pivot(name, pos, parent=None, **props):
@@ -357,6 +517,176 @@ def ship_root(name, **props):
 
 
 # =============================================================================================
+# The shuttle's reworked nose (proposals A and B): the windscreen, the nose lamps and the route board.
+# =============================================================================================
+
+def route_board(name, pos, w, h, tilt, faces=1, depth=0.0):
+    """The route board's pivot: at the middle of the display face, +z out of it (the game draws the lit
+    destination there), leaning its face down by `tilt` rad. Meshes added to it are the housing."""
+    P = pivot(name, pos, SR, role="board", w=w, h=h, faces=faces, depth=depth)
+    P.rotation_euler = (tilt, 0.0, 0.0)  # (x turns the same way in both axes; +x tips the face down)
+    return P
+
+
+def build_nose(v):
+    A = v == "A"
+    NEW = v in ("C", "D")   # the second round: B's bubble glass and trim, A's blockier board, one central lamp, new fins
+    # ---- the glass: a patch of the hull's skin, cut by smooth fields (clipf), so every edge is a clean curve
+    # (two heights that follow the roof and the chin, and a rear edge, with the corners rounded by k)
+    if A:
+        head = lambda x: 1.75 - 0.07 * x * x
+        yl = pl([(5.4, 0.3), (7.0, 0.05), (8.6, -0.55), (9.6, -0.95), (10.3, -1.0)])
+        zr, k = 5.7, 0.2
+    else:
+        head = lambda x: 2.0 - 0.1 * x * x
+        yl = pl([(5.2, 0.45), (7.0, 0.2), (8.6, -0.5), (9.6, -0.9), (10.3, -1.0)])
+        if NEW:  # (the chin edge lifted, so the central lamp has the nose below the bezel to itself)
+            yl = pl([(5.2, 0.45), (7.0, 0.25), (8.6, -0.3), (9.6, -0.55), (10.3, -0.65)])
+        zr, k = 5.5, 0.55
+    region = lambda g=0.0: (lambda p: smin([head(p[0]) - p[1] + g, p[1] - yl(p[2]) + g, p[2] - zr + g], k))
+    base = [lerp_sec(HS, 4.6)] + [s for s in HS if s["z"] > 4.6]
+    def skin(d, n=130, step=0.11):
+        dense = densify(base, step)
+        return loft([{**t, "z": t["z"] + (d if i == len(dense) - 1 else 0.0)} for i, t in enumerate(grow(dense, d))], n, False, True)
+    def skin_all(d, n=140, step=0.5):
+        return loft(grow(densify(HS, step), d), n, False, False)
+    GD = 0.035
+    glass = clipf(skin(GD), region())
+    # reflections: diagonal streaks across the front, then a horizon splitting the rest into two tints
+    if A:
+        bands = [(0.35, 0.62), (0.78, 0.9)]
+        hor = 0.0
+    else:
+        bands = [(0.15, 0.75), (0.95, 1.1)]
+        hor = 0.15
+    # (each band edge is its own straight cut: one field for several bands would skip a band narrower than a mesh cell)
+    vv = lambda p: p[1] - 0.8 * p[0]
+    hi_parts, rest = [], glass
+    for a, b in bands:
+        hi_parts.append(clipf(rest, lambda p, a=a: vv(p) - a, lambda p, b=b: b - vv(p)))
+        rest = merge(clipf(rest, lambda p, a=a: a - vv(p)), clipf(rest, lambda p, b=b: vv(p) - b))
+    hi = merge(*hi_parts)
+    mesh("s_windHi", hi, "glassHi", SH, 0)
+    mesh("s_windDeep", clipf(rest, lambda p: hor - p[1]), "glassDeep", SH, 0)
+    mesh("s_windscreen", clipf(rest, lambda p: p[1] - hor), "glass", SH, 0)
+    if A:
+        # a thin dark gasket round the glass, and two body-coloured pillars splitting it into three panes
+        mesh("s_windFrame", clipf(skin(0.045), region(0.1), lambda p: -region()(p)), "dark", SH, 0)
+        for side in (-1, 1):
+            lo, hi_ = (1.15, 1.45) if side > 0 else (-1.45, -1.15)
+            mesh(f"s_windPillar{side}", clipf(clip(skin(0.07), 0, lo, hi_), region(0.03)), "body", SH, 0.025)
+    else:
+        # a fat trim bezel round the whole screen, with a slim dark gasket inside it
+        mesh("s_windBezel", clipf(skin(0.08), region(0.2), lambda p: -region(0.0)(p)), "trim", SH, 0.035)
+        mesh("s_windFrame", clipf(skin(0.05), region(0.03), lambda p: -region(0.0)(p)), "dark", SH, 0)
+
+    # ---- the chin: a skid plate along the bottom of the nose, cut to follow the hull (no lumps)
+    belly = lambda z: lerp_sec(HS, z)["yc"] - lerp_sec(HS, z)["b"]
+    if not NEW:
+        mesh("s_chin", clipf(skin(0.05, 64, 0.25), lambda p: p[2] - 7.6, lambda p: 9.3 - p[2], lambda p: belly(p[2]) + 0.3 - p[1]), "dark" if A else "trim", SH, 0.04)
+
+    # ---- nose lamps, set on the skin (so they face out of it, not buried in it)
+    disc = lambda r, hz: xf(lathe([(0, 0), (r, 0), (r, hz), (0, hz)], 24), r=(math.pi / 2, 0, 0))
+    if NEW:
+        # ONE big lamp, centred under the cockpit: a silver rim round a dark well round the lit lens
+        if v == "C":
+            parts = [("s_headRim", disc(0.6, 0.1), "trim", -0.02, 0.025), ("s_headWell", disc(0.5, 0.12), "dark", 0.0, 0),
+                     ("s_head", disc(0.42, 0.14), "window", 0.04, 0)]
+        else:
+            wide = lambda sx, sy, hz: xf(rbox(sx, sy, hz / 2, 0.3, 16, 6), (0, 0, hz / 2))
+            parts = [("s_headRim", wide(1.05, 0.34, 0.1), "trim", -0.02, 0.025), ("s_headWell", wide(0.95, 0.26, 0.12), "dark", 0.0, 0),
+                     ("s_head", wide(0.86, 0.18, 0.14), "window", 0.04, 0)]
+        for name, geo, slot, lift, ink in parts:
+            mesh(name, stick(geo, HS, 0.0, -1.5, lift), slot, SH, ink)
+    elif A:
+        for side in (-1, 1):
+            rim = xf(rbox(0.62, 0.2, 0.08, 0.35, 14, 6), (0, 0, 0.0))
+            lit = xf(rbox(0.5, 0.11, 0.08, 0.4, 14, 6), (0, 0, 0.05))
+            mesh(f"s_headRim{side}", stick(rim, HS, side * 1.2, -1.2, 0.0), "trim", SH, 0.02)
+            mesh(f"s_head{side}", stick(lit, HS, side * 1.2, -1.2, 0.03), "window", SH, 0)
+    else:
+        for side in (-1, 1):
+            mesh(f"s_headRim{side}", stick(disc(0.46, 0.1), HS, side * 1.05, -1.1, -0.02), "trim", SH, 0.025)
+            mesh(f"s_head{side}", stick(disc(0.34, 0.1), HS, side * 1.05, -1.1, 0.05), "window", SH, 0)
+
+    # ---- the route board (destination display) and the roof gear
+    if NEW:
+        def frame(P, sx, sy, mirror=0.0):
+            """a silver frame round a dark panel, just behind the lit face (z = 0 on the pivot; `mirror` = the other face's
+            distance: the slabs are then the first face's reflected about the block's middle). Each sits proud of the one
+            behind it: the body's front at z = -0.06, the frame's at -0.02, the panel's at -0.01."""
+            at = (lambda z: z) if not mirror else (lambda z: -mirror - z)
+            tag = "Back" if mirror else ""
+            mesh(P.name + "_trim" + tag, xf(rbox(sx + 0.13, sy + 0.1, 0.03, 0.2), (0, 0, at(-0.05))), "trim", P, 0.0)
+            mesh(P.name + "_panel" + tag, xf(rbox(sx, sy, 0.03, 0.2), (0, 0, at(-0.04))), "dark", P, 0)
+        if v == "C":
+            # a blocky header board in the roofline just over the screen, face leaning forward-down like the nose
+            P = route_board("s_board", (0, 3.3, 6.1), 3.4, 0.85, 0.16)
+            mesh("s_boardBody", xf(rbox(2.15, 0.62, 0.5, 0.1, 18, 8), (0, 0.0, -0.56)), "body", P, 0.05)
+            mesh("s_boardPlinth", xf(rbox(1.7, 0.5, 1.0, 0.18), (0, -0.62, -1.2), (-0.12, 0, 0)), "body", P, 0.04)
+            frame(P, 1.7, 0.425)
+            mesh("s_boardCap", xf(rbox(2.19, 0.07, 0.48, 0.3), (0, 0.65, -0.56)), "stripe", P, 0)
+            mesh("s_blister", xf(superquad(0.55, 0.32, 0.55, 0.6, 0.6, 12, 6), (0, 2.82, 3.2)), "trim", SH, 0.03)
+        else:
+            # a double-faced block on a low roof spine (a livery-colour rail from the board back to the tail fin), where the old disc sat
+            P = route_board("s_board", (0, 3.55, 5.1), 3.2, 0.8, 0.06, faces=2, depth=1.24)
+            mesh("s_boardBody", xf(rbox(2.0, 0.6, 0.56, 0.1, 18, 8), (0, 0.0, -0.62)), "body", P, 0.05)
+            mesh("s_boardCap", xf(rbox(2.04, 0.07, 0.58, 0.3), (0, 0.63, -0.62)), "stripe", P, 0)
+            frame(P, 1.6, 0.4)
+            frame(P, 1.6, 0.4, mirror=1.24)
+            mesh("s_boardBase", xf(rbox(1.5, 0.45, 0.9, 0.2), (0, -0.7, -0.62)), "body", P, 0.04)
+            sp = pl([(-6.9, 0.0), (-6.3, 0.34), (-4.5, 0.5), (3.6, 0.5), (4.6, 0.4), (5.3, 0.0)])
+            spine = clipf(skin_all(0.09), lambda p: sp(p[2]) - abs(p[0]), lambda p: p[2] + 6.9, lambda p: 5.3 - p[2])
+            mesh("s_spine", spine, "stripe", SH, 0.03)
+            mesh("s_blister", xf(superquad(0.5, 0.3, 0.5, 0.6, 0.6, 12, 6), (0, 2.95, 1.2)), "body", SH, 0.03)
+    elif A:
+        # a header board just over the screen, its face leaning forward-down like the nose, on a body-coloured
+        # plinth that runs back into the roof
+        P = route_board("s_board", (0, 3.3, 6.1), 3.4, 0.85, 0.16)
+        mesh("s_boardBody", xf(rbox(2.1, 0.6, 0.5, 0.2), (0, 0.0, -0.56)), "body", P, 0.05)
+        mesh("s_boardPlinth", xf(rbox(1.5, 0.5, 1.0, 0.3), (0, -0.62, -1.2), (-0.12, 0, 0)), "body", P, 0.04)
+        mesh("s_boardBezel", xf(rbox(1.85, 0.49, 0.05, 0.2), (0, 0, -0.06)), "dark", P, 0)
+        mesh("s_boardCap", xf(rbox(2.14, 0.07, 0.46, 0.35), (0, 0.61, -0.54)), "stripe", P, 0)
+        mesh("s_blister", xf(superquad(0.55, 0.32, 0.55, 0.6, 0.6, 12, 6), (0, 2.82, 3.2)), "trim", SH, 0.03)
+    else:
+        # a double-faced lightbox on a swept roof fin, standing on the sensor puck (where the old blister sat)
+        mesh("s_puck", xf(superquad(0.95, 0.2, 0.95, 0.5, 0.5, 16, 6), (0, 2.8, 4.7)), "trim", SH, 0.03)
+        P = route_board("s_board", (0, 4.3, 4.95), 3.4, 0.85, 0.1, faces=2, depth=0.41)
+        mesh("s_boardBody", xf(rbox(1.9, 0.54, 0.2, 0.2), (0, 0, -0.21)), "dark", P, 0.05)
+        mesh("s_boardCap", xf(rbox(1.96, 0.07, 0.25, 0.35), (0, 0.56, -0.21)), "stripe", P, 0.03)
+        mesh("s_boardBase", xf(rbox(1.96, 0.07, 0.25, 0.35), (0, -0.56, -0.21)), "stripe", P, 0.03)
+        mesh("s_boardFin", xf(extrude([(0.0, -0.5), (-0.45, -0.5), (-2.0, -1.8), (0.3, -1.8)], 0.34, "x"), (0, 0, 0)), "body", P, 0.04)
+        for side in (-1, 1):
+            mesh(f"s_boardPip{side}", xf(superquad(0.1, 0.1, 0.1, 1, 1, 8, 5), (side * 2.04, 0.56, -0.21)), "green" if side > 0 else "red", P, 0)
+
+
+
+def build_tail(v):
+    """The second round's tail fins. C: a refined V-tail (airfoil-section fins, tapered and raked, with rounded tips, a
+    livery band and a nav light on each). D: one tall dorsal fin on the centreline with a pair of
+    stabilisers across its top (a T-tail), its tip banded in the livery."""
+    def band(spec, place, name, lo, tip_light=None, slot_light="white"):
+        # (shaded fully smooth: an airfoil has no creases to keep)
+        mesh(name, place(airfoil_fin(**spec)), "body", SH, 0.04, None)
+        mesh(name + "Cap", place(clip(airfoil_fin(**spec, inflate=0.012), 1, lo, 1e9)), "stripe", SH, 0, None)
+        if tip_light:
+            mesh(name + "Light", place(xf(superquad(0.13, 0.13, 0.13, 1, 1, 8, 5), tip_light)), slot_light, SH, 0)
+    if v == "C":
+        V = dict(span=2.9, c_root=3.2, c_tip=1.45, sweep=1.7, t_root=0.16, t_tip=0.09)
+        for side in (-1, 1):
+            place = lambda geo, side=side: xf(geo, (side * 1.3, 2.35, -5.0), (0, 0, -side * 0.55))
+            band(V, place, f"s_fin{side}", V["span"] * 0.74, (0, V["span"] * 0.95, -V["sweep"] * 0.95 - 0.9), "green" if side > 0 else "red")
+    else:
+        V = dict(span=2.55, c_root=3.3, c_tip=1.6, sweep=2.1, t_root=0.15, t_tip=0.09, tip_round=0.1)
+        place = lambda geo: xf(geo, (0, 1.9, -4.7))
+        band(V, place, "s_fin", V["span"] * 0.8)
+        S_ = dict(span=2.7, c_root=2.0, c_tip=1.05, sweep=1.0, t_root=0.12, t_tip=0.08)
+        for side in (-1, 1):
+            place = lambda geo, side=side: xf(geo, (side * 0.15, 4.1, -6.55), (0, 0, -side * (math.pi / 2 - 0.1)))
+            band(S_, place, f"s_stab{side}", S_["span"] * 0.8, (0, S_["span"] * 0.95, -S_["sweep"] * 0.95 - 0.35), "green" if side > 0 else "red")
+
+
+# =============================================================================================
 # SHUTTLE-BUS: a fat, friendly lifting-body "hopper" ~19 m long. Wraparound windscreen, a row of
 # porthole windows, two ducted lift-fans on pylons at the back, a canted V-tail, a lit route
 # board on the roof, three folding legs and a rear door that drops down into a ramp.
@@ -379,49 +709,61 @@ SHUTTLE_SECS = [
     {"z": 9.7, "w": 1.6, "t": 0.95, "b": 1.45, "eT": 2.1, "eB": 3.0, "yc": -0.5},
     {"z": 10.05, "w": 0.6, "t": 0.35, "b": 0.6, "eT": 2.0, "eB": 2.2, "yc": -0.55},
 ]
-hull_geo = loft(SHUTTLE_SECS, 40)
+# (the reworked builds round the nose off: the same sections, re-cut every 0.4 m along smooth curves)
+HS = SHUTTLE_SECS if SHUTTLE_VARIANT == "current" else smooth_sections(SHUTTLE_SECS, 2.0, 0.4)
+hull_geo = loft(HS, 40 if SHUTTLE_VARIANT == "current" else 56)
 mesh("s_hull", hull_geo, "body", SH, 0.13)
-# wraparound windscreen: the front of the hull, grown a hair, between two heights
-# (the screen sweeps back along the flanks a little, lower edge dipping toward the nose)
-mesh("s_windscreen", band(SHUTTLE_SECS, 0.035, lambda c: c[2] > 5.4 and 0.1 - (c[2] - 5.4) * 0.12 < c[1] < 2.0 and (c[2] > 6.9 or abs(c[0]) > 2.2)), "glass", SH, 0)
-mesh("s_windFrame", band(SHUTTLE_SECS, 0.05, lambda c: c[2] > 5.2 and (1.98 < c[1] < 2.22 or (c[2] < 5.6 and 0.0 < c[1] < 2.2 and abs(c[0]) > 2.0))), "dark", SH, 0)
+if SHUTTLE_VARIANT == "current":
+    # wraparound windscreen: the front of the hull, grown a hair, between two heights
+    # (the screen sweeps back along the flanks a little, lower edge dipping toward the nose)
+    mesh("s_windscreen", band(SHUTTLE_SECS, 0.035, lambda c: c[2] > 5.4 and 0.1 - (c[2] - 5.4) * 0.12 < c[1] < 2.0 and (c[2] > 6.9 or abs(c[0]) > 2.2)), "glass", SH, 0)
+    mesh("s_windFrame", band(SHUTTLE_SECS, 0.05, lambda c: c[2] > 5.2 and (1.98 < c[1] < 2.22 or (c[2] < 5.6 and 0.0 < c[1] < 2.2 and abs(c[0]) > 2.0))), "dark", SH, 0)
 # livery: a broad level belt and a pinstripe, stopping short of the flat tail cap (a belt that swept
 # up toward the tail cut diagonally across the hull's faces and came out as ragged splotches)
-mesh("s_belt", cband(SHUTTLE_SECS, 0.03, -1.35, -0.6, -9.2, 9.0), "stripe", SH, 0)
-mesh("s_pin", cband(SHUTTLE_SECS, 0.032, -0.38, -0.22, -9.2, 8.6), "trim", SH, 0)
+mesh("s_belt", cband(HS, 0.03, -1.35, -0.6, -9.2, 9.0), "stripe", SH, 0)
+mesh("s_pin", cband(HS, 0.032, -0.38, -0.22, -9.2, 8.6), "trim", SH, 0)
 # porthole windows down both flanks
-for i in range(7):
-    z = -5.6 + i * 1.55
-    sec = lerp_sec(SHUTTLE_SECS, z)
+# (the second round starts the row further forward and spaces it a little tighter, to leave the engines the tail)
+WIN_Z = [(-5.0 + i * 1.5 if NEW_SHUTTLE else -5.6 + i * 1.55) for i in range(7)]
+for i, z in enumerate(WIN_Z):
+    sec = lerp_sec(HS, z)
     for side in (-1, 1):
         x = surf_x(sec, 0.75) + 0.02
         mesh(f"s_win{i}{side}", xf(superquad(0.12, 0.55, 0.48, 0.5, 0.5, 12, 6), (side * x, 0.75, z), (0, 0, side * -0.12)), "window", SH, 0)
         mesh(f"s_winRim{i}{side}", xf(superquad(0.1, 0.68, 0.6, 0.5, 0.5, 12, 6), (side * (x - 0.04), 0.75, z), (0, 0, side * -0.12)), "trim", SH, 0.02)
-# nose: headlights and a chin bumper
-for side in (-1, 1):
-    mesh(f"s_head{side}", xf(superquad(0.36, 0.2, 0.12, 0.4, 0.5, 12, 6), (side * 1.0, -1.05, 9.72), (0.15, side * 0.38, 0)), "window", SH, 0)
-mesh("s_chin", xf(rbox(2.0, 0.22, 0.5, 0.25), (0, -1.75, 9.1)), "dark", SH, 0.04)
-# roof: a lit route board on a stand, a sensor blister and a whip antenna
-mesh("s_boardStand", xf(rbox(0.7, 0.35, 1.2, 0.3), (0, 3.0, 0.8)), "dark", SH, 0.04)
-mesh("s_board", xf(rbox(1.6, 0.42, 0.14, 0.15), (0, 3.55, 0.8)), "dark", SH, 0.04)
-mesh("s_boardLit", xf(rbox(1.45, 0.3, 0.17, 0.12), (0, 3.55, 0.8)), "sign", SH, 0)
-mesh("s_blister", xf(superquad(0.55, 0.32, 0.55, 0.6, 0.6, 12, 6), (0, 2.82, 4.6)), "trim", SH, 0.03)
+if SHUTTLE_VARIANT == "current":
+    mesh("s_chin", xf(rbox(2.0, 0.22, 0.5, 0.25), (0, -1.75, 9.1)), "dark", SH, 0.04)
+    # nose: headlights
+    for side in (-1, 1):
+        mesh(f"s_head{side}", xf(superquad(0.36, 0.2, 0.12, 0.4, 0.5, 12, 6), (side * 1.0, -1.05, 9.72), (0.15, side * 0.38, 0)), "window", SH, 0)
+    # roof: a lit route board on a stand, a sensor blister and a whip antenna
+    mesh("s_boardStand", xf(rbox(0.7, 0.35, 1.2, 0.3), (0, 3.0, 0.8)), "dark", SH, 0.04)
+    mesh("s_board", xf(rbox(1.6, 0.42, 0.14, 0.15), (0, 3.55, 0.8)), "dark", SH, 0.04)
+    mesh("s_boardLit", xf(rbox(1.45, 0.3, 0.17, 0.12), (0, 3.55, 0.8)), "sign", SH, 0)
+    mesh("s_blister", xf(superquad(0.55, 0.32, 0.55, 0.6, 0.6, 12, 6), (0, 2.82, 4.6)), "trim", SH, 0.03)
+else:
+    build_nose(SHUTTLE_VARIANT)
 mesh("s_whip", beam((0.9, 2.7, -2.4), (1.05, 4.4, -2.9), 0.04, 5), "dark", SH, 0)
 mesh("s_whipTip", xf(superquad(0.1, 0.1, 0.1, 1, 1, 8, 5), (1.05, 4.45, -2.9)), "red", SH, 0)
-# V-tail: two canted, swept fins at the back (hull-coloured, thin, raked back), each capped in the
-# livery colour with a light on the tip
-fin = [(1.4, 0), (-0.3, 0), (-1.55, 2.35), (-1.0, 2.6), (0.25, 2.6)]          # (z, y): root to swept tip
-cap = [(0.5, 2.05), (-1.39, 2.05), (-1.57, 2.36), (-1.01, 2.62), (0.26, 2.62)]  # the top of the fin, chord-wide
-for side in (-1, 1):
-    fg = xf(extrude(fin, 0.2, "x"), (side * 1.2, 2.15, -6.2), (0, 0, -side * 0.6))
-    mesh(f"s_fin{side}", fg, "body", SH, 0.04)
-    cg = xf(extrude(cap, 0.24, "x"), (side * 1.2, 2.15, -6.2), (0, 0, -side * 0.6))
-    mesh(f"s_finCap{side}", cg, "stripe", SH, 0)
-    tip = Vector((0, 2.62, -1.3))
-    tip.rotate(Euler((0, 0, -side * 0.6)))
-    mesh(f"s_finTip{side}", xf(superquad(0.13, 0.13, 0.13, 1, 1, 8, 5), (side * 1.2 + tip.x, 2.15 + tip.y, -6.2 + tip.z)), "green" if side > 0 else "red", SH, 0)
+if NEW_SHUTTLE:
+    build_tail(SHUTTLE_VARIANT)
+else:
+    # V-tail: two canted, swept fins at the back (hull-coloured, thin, raked back), each capped in the
+    # livery colour with a light on the tip
+    fin = [(1.4, 0), (-0.3, 0), (-1.55, 2.35), (-1.0, 2.6), (0.25, 2.6)]          # (z, y): root to swept tip
+    cap = [(0.5, 2.05), (-1.39, 2.05), (-1.57, 2.36), (-1.01, 2.62), (0.26, 2.62)]  # the top of the fin, chord-wide
+    for side in (-1, 1):
+        fg = xf(extrude(fin, 0.2, "x"), (side * 1.2, 2.15, -6.2), (0, 0, -side * 0.6))
+        mesh(f"s_fin{side}", fg, "body", SH, 0.04)
+        cg = xf(extrude(cap, 0.24, "x"), (side * 1.2, 2.15, -6.2), (0, 0, -side * 0.6))
+        mesh(f"s_finCap{side}", cg, "stripe", SH, 0)
+        tip = Vector((0, 2.62, -1.3))
+        tip.rotate(Euler((0, 0, -side * 0.6)))
+        mesh(f"s_finTip{side}", xf(superquad(0.13, 0.13, 0.13, 1, 1, 8, 5), (side * 1.2 + tip.x, 2.15 + tip.y, -6.2 + tip.z)), "green" if side > 0 else "red", SH, 0)
 # ducted lift-fans on swept pylons
-FAN_X, FAN_Y, FAN_Z, FAN_R = 5.55, 0.15, -5.0, 1.55
+# (the second round's engines sit right aft, their pylons ending behind the last passenger window, so nothing
+# of them crosses the glass: the first round's, at z -5, carried theirs through the two rearmost windows)
+FAN_X, FAN_Y, FAN_Z, FAN_R = 5.55, 0.15, (-7.7 if NEW_SHUTTLE else -5.0), 1.55
 duct = [(FAN_R + 0.15, -1.5), (FAN_R + 0.55, -1.2), (FAN_R + 0.62, 0.3), (FAN_R + 0.35, 1.45), (FAN_R + 0.02, 1.55), (FAN_R - 0.05, 1.3), (FAN_R, -1.3), (FAN_R + 0.08, -1.5)]
 for side in (-1, 1):
     X = side * FAN_X
@@ -436,13 +778,21 @@ for side in (-1, 1):
     mesh(f"s_nozzleCore{side}", xf(lathe([(0, 0), (0.8, 0), (0.8, 0.06), (0, 0.06)], 16), (X, FAN_Y, FAN_Z - 1.4), (math.pi / 2, 0, 0)), "core", SH, 0)
     # pylon: a fat swept wing root from the hull flank to the duct
     pyl = [(1.6, 0.25), (1.3, 0.55), (-1.4, 0.4), (-1.9, 0.05), (-1.5, -0.3), (1.2, -0.25)]
+    if NEW_SHUTTLE:
+        pyl = [(1.15, 0.25), (0.9, 0.5), (-1.0, 0.4), (-1.45, 0.05), (-1.15, -0.3), (0.9, -0.25)]
     verts, faces = extrude(pyl, 1.0, "x")
     x0 = surf_x(lerp_sec(SHUTTLE_SECS, FAN_Z), FAN_Y) - 0.3
     span = FAN_X - FAN_R - 0.3 - x0
     pv = [((v[0] + 0.5) * span + x0, v[1] + FAN_Y + (v[0] + 0.5) * -0.05, v[2] + FAN_Z + 0.2 - (v[0] + 0.5) * 0.4) for v in verts]
     mesh(f"s_pylon{side}", xf((pv, faces), s=(side, 1, 1)), "stripe", SH, 0.05)
+    pyl_front = max(v[2] for v in pv)
     mesh(f"s_navLight{side}", xf(superquad(0.16, 0.16, 0.16, 1, 1, 8, 5), (X + side * (FAN_R + 0.65), FAN_Y, FAN_Z + 0.1)), "green" if side > 0 else "red", SH, 0)
     plume(S["root"], f"s_plume{'LR'[side > 0]}", (X, FAN_Y, FAN_Z - 1.45), FAN_R * 0.82, 6.5)
+if NEW_SHUTTLE:
+    # the engines must not touch the passenger windows: the duct's front and the pylon's, against the rearmost window's rim
+    gap = min(FAN_Z + 1.55, pyl_front) - (min(WIN_Z) - 0.6)
+    print("shuttle engine clearance: %.2f m behind the rearmost window" % -gap)
+    assert gap < -0.3, "the side engines come within 0.3 m of the passenger windows"
 # belly: skid strakes, lift-jet grilles and their flames
 for side in (-1, 1):
     mesh(f"s_strake{side}", xf(rbox(0.12, 0.16, 5.6, 0.3), (side * 2.85, BELLY_S + 0.05, 0.6)), "dark", SH, 0.03)

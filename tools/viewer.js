@@ -15,7 +15,7 @@ import { inkMat } from '../src/toon.js';
 const Q = new URLSearchParams(location.search);
 const num = (k, d) => (Q.has(k) ? parseFloat(Q.get(k)) : d);
 
-await Promise.all([loadFonts(), loadRunnerParts(), loadShipParts(), loadOutpostParts({ force: true })]);
+await Promise.all([loadFonts(), loadRunnerParts(), loadShipParts({ ships: Q.get('ships') || undefined }), loadOutpostParts({ force: true })]);
 
 const renderer = new THREE.WebGLRenderer({ antialias: false });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -96,6 +96,7 @@ if (m === 'shuttle' || m === 'freighter') {
   model = rig.root;
   rig.setGear(num('gear', 1));
   rig.setRamp(num('ramp', 0));
+  if (Q.has('sign')) rig.setSign(Q.get('sign')); // (the shuttle's route board: &sign=TRANQ)
   model.position.y = rig.gearH * num('gear', 1) + (num('gear', 1) < 1 ? 4 : 0);
   height = m === 'shuttle' ? 8 : 20;
   // &cols=1 draws the freighter's collision boxes (the solid the world keeps round it: model.userData-free, straight from rig.decks)

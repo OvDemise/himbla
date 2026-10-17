@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { toon, ink, glow, glowShared, inkMat, inkMatNear } from './toon.js';
+import { pixelFont } from './fonts.js';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
@@ -48,8 +49,8 @@ function toFloat(a) {
   }
   return out;
 }
-const loadGlb = async (name) => {
-  const gltf = await new GLTFLoader().setMeshoptDecoder(MeshoptDecoder).loadAsync((await GLB[name]()).default);
+const loadGlb = async (name, url) => { // (url: a file to load instead of the bundled one; the dev viewer's `?ships=`)
+  const gltf = await new GLTFLoader().setMeshoptDecoder(MeshoptDecoder).loadAsync(url || (await GLB[name]()).default);
   gltf.scene.traverse((o) => { if (o.isMesh) for (const k of Object.keys(o.geometry.attributes)) o.geometry.setAttribute(k, toFloat(o.geometry.attributes[k])); });
   return gltf;
 };
@@ -1384,12 +1385,12 @@ export function makeRover({ color = 0x7b2ff7, trim = 0xffd23f, pirate = true, fl
 // setThrust(main, lift, t) drives the pulsing flames. The ship's numbers (gear height, walkable
 // deck box, ramp path for passengers...) come from the root's custom properties.
 let SHIP_PARTS = null;
-const SHIP_GLOW = { glass: 0x9be7ff, window: 0xfff6a8, cabin: 0xfff1b0, red: 0xff2a4a, green: 0x7dff6a, white: 0xffffff, sign: 0xffd23f, bay: 0x0c0915 };
+const SHIP_GLOW = { glass: 0x9be7ff, glassDeep: 0x62bdf0, glassHi: 0xeafcff, window: 0xfff6a8, cabin: 0xfff1b0, red: 0xff2a4a, green: 0x7dff6a, white: 0xffffff, sign: 0xffd23f, bay: 0x0c0915 };
 const SHIP_TOON = { trim: 0xd8d4e8, dark: 0x2a2540, metal: 0x8a87a0, steel: 0x55607a, deck: 0x5b5870, hazard: 0xffd23f, cargo0: 0xffd23f, cargo1: 0x2ec4ff, cargo2: 0xff3b5c, cargo3: 0x7dff6a };
 const SHIP_FX = new Set(['plume', 'plumeCore', 'lift', 'engine', 'core', 'beacon']); // per-ship materials (they pulse)
 const FLAMES = new Set(['plume', 'plumeCore', 'lift', 'beacon']);
-export async function loadShipParts() {
-  const [gltf, sk, wr, ap, lt, cr, ga, di, en, bc, hc, sl, pk, cs, bj, gy, cl, dd, hl, lo] = await Promise.all(['ships', 'skimmer', 'warrig', 'apc', 'landtrain', 'crane', 'garage', 'dish', 'engine', 'briefcase', 'hovercar', 'slots', 'plinko', 'casino', 'blackjack', 'gantry', 'claw', 'duck', 'hall', 'lot'].map(loadGlb));
+export async function loadShipParts({ ships } = {}) {
+  const [gltf, sk, wr, ap, lt, cr, ga, di, en, bc, hc, sl, pk, cs, bj, gy, cl, dd, hl, lo] = await Promise.all(['ships', 'skimmer', 'warrig', 'apc', 'landtrain', 'crane', 'garage', 'dish', 'engine', 'briefcase', 'hovercar', 'slots', 'plinko', 'casino', 'blackjack', 'gantry', 'claw', 'duck', 'hall', 'lot'].map((n) => loadGlb(n, n === 'ships' ? ships : undefined)));
   SHIP_PARTS = {};
   for (const name of ['shuttle', 'freighter']) {
     const root = gltf.scene.getObjectByName(name);
@@ -1564,6 +1565,29 @@ function bakeShip(root) {
   return bake(root, new THREE.Matrix4().copy(root.matrixWorld).invert());
 }
 
+// A route board's face: amber pixel-font lettering on a dark dot-matrix panel, shrunk to fit.
+function drawBoard(c, text) {
+  const ctx = c.getContext('2d'), W = c.width, H = c.height;
+  ctx.fillStyle = '#0c0816';
+  ctx.fillRect(0, 0, W, H);
+  const label = text ? `> ${text}` : '';
+  const fs = Math.max(10, Math.min(28, Math.floor((W - 24) / Math.max(1, label.length))));
+  ctx.font = pixelFont(fs);
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.shadowColor = '#ff9f1c';
+  ctx.shadowBlur = 8;
+  ctx.fillStyle = '#ffb02e';
+  ctx.fillText(label, W / 2, H / 2 + fs * 0.06);
+  ctx.shadowBlur = 0;
+  ctx.fillStyle = '#fff1b8';
+  ctx.fillText(label, W / 2, H / 2 + fs * 0.06);
+  // the lamp grid: dark lines between the dots
+  ctx.fillStyle = 'rgba(8, 4, 16, 0.55)';
+  for (let x = 0; x < W; x += 4) ctx.fillRect(x, 0, 1, H);
+  for (let y = 0; y < H; y += 4) ctx.fillRect(0, y, W, 1);
+}
+
 const _shipHot = new THREE.Color();
 function makeShip(kind, { color, stripe, faction = 'kepler' }) {
   const B = SHIP_PARTS[kind];
@@ -1592,7 +1616,7 @@ function makeShip(kind, { color, stripe, faction = 'kepler' }) {
     if (!cargoMats.has(slot)) { const c = cargoSlot(slot, fac); cargoMats.set(slot, c.glow ? glow(c.color) : toon(c.color)); }
     return cargoMats.get(slot);
   };
-  const rig = { legs: [], doors: [], ramps: [], hatches: [], plumes: [], lifts: [], blinkers: [], cranes: [] };
+  const rig = { legs: [], doors: [], ramps: [], hatches: [], plumes: [], lifts: [], boards: [], blinkers: [], cranes: [] };
   const build = (node, cargo = false) => {
     if (node.role === 'livery' && node.data.faction !== fac) return null; // (the other factions' marks never exist)
     cargo = cargo || node.role === 'cargo';
@@ -1620,6 +1644,7 @@ function makeShip(kind, { color, stripe, faction = 'kepler' }) {
     else if (node.role === 'door') rig.doors.push({ g, open: d.open });
     else if (node.role === 'ramp') rig.ramps.push({ g, closed: d.closed, opened: d.opened });
     else if (node.role === 'hatch') rig.hatches.push(g);
+    else if (node.role === 'board') rig.boards.push({ g, w: d.w, h: d.h, faces: d.faces || 1, depth: d.depth || 0 });
     else if (node.role === 'plume') rig.plumes.push({ g, phase: rig.plumes.length * 1.7 });
     else if (node.role === 'lift') rig.lifts.push({ g, phase: rig.lifts.length * 2.3 });
     for (const k of node.kids) {
@@ -1635,10 +1660,39 @@ function makeShip(kind, { color, stripe, faction = 'kepler' }) {
   const root = build(B);
   root.position.set(0, 0, 0);
   root.quaternion.identity();
+  // the route board (the shuttle's destination sign): one lit canvas face on the pivot's +z, and another
+  // on the back of a double-faced one. (A model without a board pivot has no sign: setSign does nothing.)
+  let signCanvas = null, signTex = null;
+  if (rig.boards.length) {
+    signCanvas = document.createElement('canvas');
+    signCanvas.width = 256; signCanvas.height = 64;
+    signTex = new THREE.CanvasTexture(signCanvas);
+    signTex.colorSpace = THREE.SRGBColorSpace;
+    signTex.anisotropy = 4;
+    const signMat = new THREE.MeshBasicMaterial({ map: signTex });
+    for (const b of rig.boards) {
+      const front = new THREE.Mesh(new THREE.PlaneGeometry(b.w, b.h), signMat);
+      front.position.z = 0.004;
+      b.g.add(front);
+      if (b.faces > 1) {
+        const back = new THREE.Mesh(new THREE.PlaneGeometry(b.w, b.h), signMat);
+        back.position.z = -b.depth - 0.004;
+        back.rotation.y = Math.PI;
+        b.g.add(back);
+      }
+    }
+  }
   const d = B.data;
   const v3 = (a) => new THREE.Vector3(a[0], a[1], a[2]);
   const ship = {
-    root, kind, size: kind === 'freighter' ? 30 : 10,
+    root, kind, size: kind === 'freighter' ? 30 : 10, sign: null,
+    // the route board's text (a place's short name: "> TRANQ"); a no-op when the text is unchanged
+    setSign(text) {
+      if (!signCanvas || text === this.sign) return;
+      this.sign = text;
+      drawBoard(signCanvas, text);
+      signTex.needsUpdate = true;
+    },
     gearH: d.gearH, deck: [...d.deck], deckY: d.deckY, deckZ: d.deckZ, radius: d.radius, padR: d.padR,
     // the solid boxes the world keeps round it (traffic.js syncDeck): (hx, hy, hz, x, y, z, roll) groups in the ship's frame, when the model has them
     // (the freighter: hull, tower, bells, wings, cages and crates); otherwise the one deck box above
@@ -1712,6 +1766,7 @@ function makeShip(kind, { color, stripe, faction = 'kepler' }) {
   ship.setGear(1);
   ship.setRamp(0);
   ship.setThrust(0, 0, 0);
+  ship.setSign('SHUTTLE');
   ship.setCrane(0, 0, 0);
   return ship;
 }
