@@ -538,6 +538,11 @@ export function buildCasino(w, loc) {
   const carpet = new THREE.Mesh(new THREE.PlaneGeometry(6, 36), toon(0xd7263d));
   carpet.rotation.x = -Math.PI / 2;
   put(carpet, 0, FRONT_OUT + 18, ASPH + 0.03); // (laid on the asphalt that runs from the doors to the plaza: settlements.js dressCasinoLot)
+  // through the doors: the same width, rising from the runner inside (y 0.08) to the carpet outside as one sloped strip over the wall's thickness
+  const sill = new THREE.Mesh(new THREE.PlaneGeometry(6, FRONT_OUT - HALL.FRONT, 1, 1), toon(0xd7263d));
+  { const pos = sill.geometry.attributes.position; for (let i = 0; i < pos.count; i++) pos.setZ(i, pos.getY(i) < 0 ? 0.05 : 0); pos.needsUpdate = true; sill.geometry.computeVertexNormals(); }
+  sill.rotation.x = -Math.PI / 2;
+  put(sill, 0, (HALL.FRONT + FRONT_OUT) / 2, 0.08);
   for (const sx of [-1, 1]) {
     for (let i = 0; i < 6; i++) put(mesh(new THREE.CylinderGeometry(0.15, 0.2, 1.4, 6), toon(0xffd23f), 0.04), sx * 3.6, FRONT_OUT + 3 + i * 5.5, ASPH + 0.7);
     put(new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 27.5, 5).rotateX(Math.PI / 2), toon(0x8a1030)), sx * 3.6, FRONT_OUT + 3 + 13.75, ASPH + 1.1);
@@ -678,7 +683,7 @@ export function buildCasino(w, loc) {
   const floor = new THREE.Mesh(new THREE.ShapeGeometry(flat2(IN, true), 24).rotateX(-Math.PI / 2), floorMat);
   floor.receiveShadow = true;
   put(floor, 0, 0, 0.05);
-  const runner = new THREE.Mesh(new THREE.PlaneGeometry(5, 18), toon(0xd7263d));
+  const runner = new THREE.Mesh(new THREE.PlaneGeometry(6, 18), toon(0xd7263d));   // (as wide as the carpet outside, so the red runs on unbroken)
   runner.rotation.x = -Math.PI / 2;
   put(runner, 0, FRONT - 9, 0.08);
   // the wall: its field of damask, a brass skirting, a lacquered wainscot's gold girdle with a cyan line under it, a gold cornice with the pink neon in its channel, a brass crown moulding (rings
@@ -736,13 +741,13 @@ export function buildCasino(w, loc) {
       put(b, x, z, 0, yaw);
     }
   }
-  // the ceiling: a plain dish, hung with the coffer tiles (4.5 m, from the crossing's middle out, wherever a tile clears the walls)
+  // the ceiling: a plain dish, hung with the coffer tiles (on a 4.5 m grid from the crossing's middle out, every other one, so the rows run on the diagonal, wherever a tile clears the walls)
   const ceilM = toon(0x1c0f33); ceilM.side = THREE.DoubleSide;
   const ceiling = new THREE.Mesh(new THREE.ShapeGeometry(flat2(IN, false), 24).rotateX(Math.PI / 2), ceilM);
   put(ceiling, 0, 0, H - 0.02);
   for (let i = -13; i <= 13; i++) for (let j = -13; j <= 13; j++) {
     const x = HCX + 4.5 * i, z = CZ + 4.5 * j;
-    if (inHall(x, z, 2.3)) put(makeHallPart('hall_coffer'), x, z, H - 0.03);
+    if ((i + j) % 2 === 0 && inHall(x, z, 2.3)) put(makeHallPart('hall_coffer'), x, z, H - 0.03);
   }
   // the crossing: the floor's medallion, and the Chip Bar on it (its chip turns)
   put(makeHallPart('hall_medallion'), HCX, CZ, 0.05);
@@ -760,21 +765,18 @@ export function buildCasino(w, loc) {
     put(cage, -HALL.ARM + 0.02, 5, 0, Math.PI / 2);
     col({ type: 'box', x: -HALL.ARM + 0.85, y: 1.9, z: 5, hx: 0.85, hy: 1.9, hz: 2.05 });
   }
-  // two lounges at the wings' far ends: banquettes against the wall, a small table, a brass rope
-  const lounge = (sofas, table, ropes) => {
+  // two lounges at the wings' far ends: banquettes against the wall and a small table
+  const lounge = (sofas, table) => {
     for (const [x, z, yaw] of sofas) {
       put(makeHallPart('hall_sofa'), x, z, 0, yaw);
       col({ type: 'box', x: x + Math.sin(yaw) * 0.45, y: 0.5, z: z + Math.cos(yaw) * 0.45, hx: yaw === 0 ? 1.8 : 0.45, hy: 0.5, hz: yaw === 0 ? 0.45 : 1.8 });
     }
     put(makeHallPart('hall_table'), table[0], table[1], 0);
     col({ type: 'cyl', x: table[0], z: table[1], y0: -1, y1: 0.7, r: 0.5 });
-    for (const [x, z] of ropes) { put(makeDerbyPart('dd_railpost'), x, z, 0); put(makeDerbyPart('dd_rope'), x, z, 0); }
   };
   const WZ = DUCK.wallZ;
-  lounge([[-51.8, WZ + 0.02, 0]], [-51.8, WZ + 2.2], [[-54.0, WZ + 3.0]]);
-  put(makeDerbyPart('dd_railpost'), -50.5, WZ + 3.0, 0);
-  lounge([[52.3, WZ + 0.02, 0], [HALL.WING.x1 - 0.02, WZ + 2.7, -Math.PI / 2]], [52.4, WZ + 2.6], [[49.8, WZ + 5.4]]);
-  put(makeDerbyPart('dd_railpost'), 53.3, WZ + 5.4, 0);
+  lounge([[-51.8, WZ + 0.02, 0]], [-51.8, WZ + 2.2]);
+  lounge([[52.3, WZ + 0.02, 0], [HALL.WING.x1 - 0.02, WZ + 2.7, -Math.PI / 2]], [52.4, WZ + 2.6]);
   // chandeliers (build_casino.py): the rose and chain are frozen (merged by the world), the crystal tiers turn slowly
   const chandeliers = [];
   for (const [x, z] of [[0, 6], [-32, CZ], [33, CZ]]) {
@@ -899,11 +901,11 @@ export function buildCasino(w, loc) {
   const oddsTex = new THREE.CanvasTexture(oddsCanvas);
   oddsTex.colorSpace = THREE.SRGBColorSpace;
   const board = makeDerbyPart('dd_board');
-  put(board, tcx, DUCK.wallZ, 8.4, -Math.PI / 2);
+  put(board, tcx, DUCK.wallZ, 7.0, -Math.PI / 2);
   const oddsFace = board.getObjectByName('face');
   // (clearly in front of its frame: it used to share the frame's front face and z-fought)
   const oddsBoard = new THREE.Mesh(new THREE.PlaneGeometry(oddsFace.userData.w, oddsFace.userData.h), new THREE.MeshBasicMaterial({ map: oddsTex, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }));
-  put(oddsBoard, tcx, DUCK.wallZ + oddsFace.position.x, 8.4);
+  put(oddsBoard, tcx, DUCK.wallZ + oddsFace.position.x, 7.0);
   // betting kiosk: a bookmaker's window with its screen, a button in each duck's colour on the counter
   const kiosk = makeDerbyPart('dd_kiosk');
   const ksp = kiosk.getObjectByName('screen');

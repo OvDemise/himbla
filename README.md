@@ -424,8 +424,8 @@ holds the claw, the classic slots and the blackjack table:
 - **Plinko:** a real-physics board (12 rows, 13 slots from 0.2× to 50×, ~94-97 % return). Aim with A/D or the
   mouse, Space or click to drop; hold Space for a stream of balls.
 - The **Classic Games** cabinets open the slots / roulette / prize wheel / high-low overlay (blackjack now
-  lives only at the 3D table); the prize
-  counter (Lucky Chips cosmetics) is at the back. VIP tiers still raise max bets.
+  lives only at the 3D table); the **prize counter** (Lucky Chips cosmetics) in the foyer is its own screen, with no
+  game tabs, and the cabinets' overlay has no prize tab. VIP tiers still raise max bets.
 
 ## Territory
 

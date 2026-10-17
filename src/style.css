@@ -852,6 +852,7 @@ body.on-ride #hud > :not(#popups):not(#prompt):not(#splash):not(#dilate) { displ
 .cas-tabs { border-bottom: 2px solid var(--ui-edge); }
 .cas-tabs button { font-size: 9px; background: var(--ui-bg3); color: var(--ui-muted); border: 2px solid var(--ui-edge); border-bottom: none; border-radius: 0; box-shadow: none; }
 .cas-tabs button.on { background: var(--yellow); color: #05030c; transform: none !important; }
+.cas.venue-prizes .cas-tabs, .cas.venue-prizes .cas-bet, .cas.venue-prizes .cas-jp { display: none; }
 .cas-foot { background: #05030c; color: var(--ui-text); border-top: 2px solid var(--ui-edge); }
 .cas-bet { font-size: 11px; }
 .cas-bet b { font-size: 15px; }

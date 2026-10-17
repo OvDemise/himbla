@@ -20,17 +20,17 @@ export const FRONT_OUT = HALL.FRONT + WALL;      // the doors' wall's outer face
 // ---- the games, in the hall's frame ----
 // Blackjack: the table stands against the west wing's north wall facing +z (its dealer's counter on the wall, the players coming from +z): (x, z) is the middle of its flat edge on the floor,
 // `yaw` its turn. The game thinks in the table's own frame (x right, z toward the player); bjPt gives a point of it in the hall's.
-export const BJ = { x: -42, z: -21.96, R: 3.4, top: 1.16, yaw: 0 };
+export const BJ = { x: -42.9833, z: -21.96, R: 3.4, top: 1.16, yaw: 0 };
 export const bjPt = (lx, y, lz) => { const c = Math.cos(BJ.yaw), s = Math.sin(BJ.yaw); return [BJ.x + lx * c + lz * s, y, BJ.z - lx * s + lz * c]; };
 // The zero-g claw's machine stands on the west wing's south wall, turned to face the wing (its back on the wall at z = `z`); the machine's frame (x along the tank, y up,
 // z toward the glass) goes to the hall's through clawPt.
-export const CLAW = { x: -27, z: -2.02, yaw: Math.PI };
+export const CLAW = { x: -26.65, z: -2.02, yaw: Math.PI };
 export const clawPt = (lx, y, lz) => [CLAW.x - lx, y, CLAW.z - lz];
 // The Duck Derby runs along x on the east wing's north wall, its viewers on +z: the lanes' z (lane 0 nearest the viewers), the gate at x0 and the finish arch at x1.
 export const DUCK = { x0: 20.8, x1: 44.8, lanes: [-16.8, -18.4, -20, -21.6], water: 0.86, kiosk: [32.8, -11.4], wallZ: -24 };
 export const PLK = { x: 0, y: 1.2, z: -42, wallZ: -44 };   // the Plinko board's plane (2 m off the arm's end wall)
 // The classic games' four slot cabinets stand in a row along the west wing's south wall facing -z, 3.2 m apart, 1.75 m off the wall.
-export const CLASSIC = { z: -4.6, xs: [-52.4, -49.2, -46, -42.8], yaw: Math.PI, station: [-47.6, -7.8], wallZ: -2 };
+export const CLASSIC = { z: -2.78, xs: [-52.4, -49.2, -46, -42.8], yaw: Math.PI, station: [-47.6, -6.6], wallZ: -2 };
 // The prize counter stands against the foyer's east wall facing -x (the counter's frame: lx along it, lz out from the prize wall's face toward the player).
 export const PRIZE = { x: 6.07, z: 5.1, wallX: 9 };
 

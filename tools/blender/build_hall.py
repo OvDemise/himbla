@@ -241,7 +241,7 @@ for i in range(8):                                                              
 # the Chip Bar
 # =====================================================================================================
 root = pivot("hall_bar", (0, 0, 0))
-spin = pivot("bar_spin", (0, 5.35, 0), root, role="spin")
+spin = pivot("bar_spin", (0, 6.2, 0), root, role="spin")
 plum = Acc("hall_bar_plum", "plum", root, 0.02)
 plum2 = Acc("hall_bar_plum2", "plum2", root, 0.015)
 gold = Acc("hall_bar_gold", "gold", root, 0.02)
@@ -299,6 +299,7 @@ for i in range(8):                                                              
     brass.cylc(x, 0.33, z, 0.05, 0.54, 8)
     gold.cylc(x, 0.03, z, 0.26, 0.06, 12)
     velvet.cylc(x, 0.66, z, 0.23, 0.14, 12)
+gold.cylc(0, 5.08, 0, 0.14, 0.44, 12)                                              # a neck above the capital: the chip stands clear of the pillar and of the halo's spokes
 # the chip that turns on top (axis horizontal: it stands on edge, turned about y by the game)
 chip_gold.lath([(0, -0.1), (0.9, -0.1), (0.96, -0.05), (0.96, 0.05), (0.9, 0.1), (0, 0.1)], rot=(PI / 2, 0, 0), segs=24)
 chip_pink.lath([(0, -0.115), (0.62, -0.115), (0.62, 0.115), (0, 0.115)], rot=(PI / 2, 0, 0), segs=24)
@@ -419,8 +420,8 @@ for k in range(4):
     red = Acc(f"facade_panel{k}_suitred", "suitred", root, 0.0)
     cream = Acc(f"facade_panel{k}_suitcream", "suitcream", root, 0.0)
     W, Hh = 2.6, 3.4
-    brass.box(-W / 2, W / 2, -Hh / 2 + 4.6, Hh / 2 + 4.6, -0.05, 0.12)               # centred at y 6.3 (the game stands it on the wall)
-    plum2.box(-W / 2 + 0.14, W / 2 - 0.14, -Hh / 2 + 4.74, Hh / 2 + 4.46, -0.04, 0.17)
+    brass.box(-W / 2, W / 2, 6.3 - Hh / 2, 6.3 + Hh / 2, -0.05, 0.12)                 # centred at y 6.3, like the suit and the studs (the game stands it on the wall)
+    plum2.box(-W / 2 + 0.14, W / 2 - 0.14, 6.3 - Hh / 2 + 0.14, 6.3 + Hh / 2 - 0.14, -0.04, 0.17)
     for sx in (-1, 1):
         for sy in (-1, 1):
             gold.ball(sx * (W / 2 - 0.05), 6.3 + sy * (Hh / 2 - 0.05), 0.15, 0.11, 8, 6)
