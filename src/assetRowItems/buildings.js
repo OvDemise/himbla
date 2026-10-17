@@ -9,7 +9,7 @@ import { DISH_SIZE } from '../models.js';
 import { buildHomeTown, addBuilding, slotAt } from '../hometown.js';
 import {
   habDome, cabin, warehouse, quonset, lattice, hortonSphere, floodMast, stack, ticker, conveyor, pipe, radar, searchlight, shanty,
-  wreckHull, penTerminal, jobTerminal, playground, waterTower, greenhouse, commsMast, townHall, bounceDome, towerCrane, garage, dishStation,
+  wreckHull, penTerminal, jobTerminal, playground, waterTower, greenhouse, commsMast, townHall, bounceDome, towerCrane, gantryCrane, cargoStack, garage, dishStation,
 } from '../settlements.js';
 import { animate, together, lineUp } from './common.js';
 
@@ -227,6 +227,10 @@ const parts = {
       worldPart((world, loc, k) => bounceDome(world, loc, k, 0, 0, 26, 0x2ec4ff, 0x7dff6a)),
     ], 4)),
     item('part.tower-crane', 'TOWER CRANE', 44, 9, () => kitPart((k) => towerCrane(k, 0, 0, 34, 30, YEL, { speed: 0.12 }))),
+    item('part.gantry-crane', 'GANTRY CRANE', 58, 36, () => kitPart((k) => gantryCrane(k, 0, 0, YEL, { speed: 1 / 40, phase: 0.3, travel: 24 }))),
+    item('part.cargo-stacks', 'CARGO CONTAINER STACKS', 42, 9, () => kitPart((k) => {
+      ['spacecom', 'vostok', 'kepler', 'meridian'].forEach((f, i) => cargoStack(k, -16 + i * 10.5, 0, 1 + (i % 3), [f, f, f], Math.PI / 2));
+    })),
     item('part.garage.main', 'MOTOR POOL GARAGE', 54, 26, () => kitPart((k) => garage(k, 0, 0, 0, [true, false, true], 'main'))),
     item('part.garage.small', 'SMALL GARAGE', 34, 20, () => kitPart((k) => garage(k, 0, 0, 0, [true, true], 'small'))),
     item('part.dish-stations', 'DISH STATIONS (CRYO · GANTRY)', 66, 30, () => row([
