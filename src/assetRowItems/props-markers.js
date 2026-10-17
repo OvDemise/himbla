@@ -8,7 +8,7 @@ import { makeCrate, makeSeismo, makeTube, makePylon, makeDish, makeTurret, makeR
 import { makeProp } from '../storyAssets.js';
 import { makeStretcher } from '../medevac.js';
 import { makeLoot } from '../alchemy.js';
-import { slotCabinet, updateSlot, blackjackTable, PLK, canvasTex, FONT, makeDuck, waterTex, checkerTex, DUCK } from '../casinoWorld.js';
+import { slotCabinet, updateSlot, blackjackTable, PLK, canvasTex, FONT, makeDuck, waterTex, checkerTex, finishTex, DUCK } from '../casinoWorld.js';
 import { ClawSim, KINDS } from '../clawSim.js';
 import { ClawView } from '../clawView.js';
 import { SLOTS, SPACING, DROP_Y } from '../plinko.js';
@@ -503,7 +503,7 @@ function clawThings() {
 }
 
 // ---- the casino's Duck Derby (duck.glb, tools/blender/build_duck.py): the whole track as the hall has it, with the water, lane numbers, banner, odds board and kiosk screen
-// painted on, the four racers at the gate (their number discs on their wings), the front rail along the near side and the winner's cup ----
+// painted on, the four racers at the gate (their number discs on their wings), the front rail along the near side ----
 function duckDerby() {
   const root = new THREE.Group(), PI = Math.PI;
   const at = (o, x, y, z, ry = 0) => { o.position.set(x, y, z); o.rotation.y = ry; root.add(o); return o; };
@@ -517,7 +517,7 @@ function duckDerby() {
     flat(new THREE.PlaneGeometry(0.9, 0.9), new THREE.MeshBasicMaterial({ map: canvasTex(64, 64, (x) => { x.fillStyle = '#' + c.toString(16).padStart(6, '0'); x.beginPath(); x.arc(32, 32, 30, 0, PI * 2); x.fill(); x.fillStyle = '#120a1e'; x.font = FONT(44); x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText(String(i + 1), 32, 35); }) }), np.position);
   });
   const fl = trough.getObjectByName('finishLine');
-  flat(new THREE.PlaneGeometry(fl.userData.w, fl.userData.h), checker, fl.position);
+  flat(new THREE.PlaneGeometry(fl.userData.w, fl.userData.h), new THREE.MeshBasicMaterial({ map: finishTex() }), fl.position);
   const gx = DUCK.x0 - 0.9 - (DUCK.x0 + DUCK.x1) / 2, fx = DUCK.x1 - (DUCK.x0 + DUCK.x1) / 2;   // (the gate and the finish, in the track's own frame)
   at(makeDerbyPart('dd_gate'), gx, 0, 0);
   at(makeDerbyPart('dd_grille'), gx, 3.4, 0);
@@ -525,8 +525,7 @@ function duckDerby() {
   const bn = arch.getObjectByName('banner'), banner = new THREE.Mesh(new THREE.PlaneGeometry(bn.userData.w, bn.userData.h), checker);
   banner.rotation.y = PI / 2; banner.position.set(fx, bn.position.y, 0); root.add(banner);
   lanes.forEach((c, i) => { const d = makeDuck(c, i === 0 ? 0xff5a1f : 0xff9f1c, i + 1); d.root.position.set(DUCK.x0 - (DUCK.x0 + DUCK.x1) / 2 + 1 + i * 0, 0.61, [2.4, 0.8, -0.8, -2.4][i]); root.add(d.root); });
-  for (let k = 0; k <= 8; k++) { const x = -14 + k * 3.5; at(makeDerbyPart('dd_railpost'), x, 0, 3.95); if (k < 8) at(makeDerbyPart('dd_rope'), x, 0, 3.95); }
-  at(makeDerbyPart('dd_trophy'), 14.6, 0, 5.0);
+  for (const z of [3.9, -3.9]) for (let k = 0; k <= 8; k++) { const x = -14 + k * 3.5; at(makeDerbyPart('dd_railpost'), x, 0, z); if (k < 8) at(makeDerbyPart('dd_rope'), x, 0, z); }
   const board = at(makeDerbyPart('dd_board'), 0, 8.4, -8.8, -PI / 2);
   const face = board.getObjectByName('face');
   const bp = new THREE.Mesh(new THREE.PlaneGeometry(face.userData.w, face.userData.h), new THREE.MeshBasicMaterial({ map: canvasTex(1024, 384, (x, w, h) => {

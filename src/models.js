@@ -2402,9 +2402,9 @@ export function makeClawHead() {
 // ---- The casino's Duck Derby (built in Blender, see build_duck.py) ----
 // `dd_duck1..4`: the four racers (QUACKERS, SIR WADDLES, DUCKTOR WHO, MOONBILL), each ~1.3 m long facing +x with `head`, `wingR` and `wingL` pivots; the game tints their
 // `body`, `wing` and `silk` slots. And the track's pieces: `dd_trough` (water1..4, num1..4 and finishLine pivots), `dd_gate` (lamp1..3, startSign), `dd_grille`, `dd_finish`
-// (banner), `dd_board` (face), `dd_kiosk` (screen), `dd_railpost`, `dd_rope` and `dd_trophy`. makeDerbyPart(name) gives a piece as a Group, its pivots as named children (role and
+// (banner), `dd_board` (face), `dd_kiosk` (screen), `dd_railpost` and `dd_rope`. makeDerbyPart(name) gives a piece as a Group, its pivots as named children (role and
 // extras in userData); makeRacer(i, color, bill) a racer as { root, bob, head, wings }.
-export const DUCK_PROPS = ['dd_duck1', 'dd_duck2', 'dd_duck3', 'dd_duck4', 'dd_trough', 'dd_gate', 'dd_grille', 'dd_finish', 'dd_board', 'dd_kiosk', 'dd_railpost', 'dd_rope', 'dd_trophy'];
+export const DUCK_PROPS = ['dd_duck1', 'dd_duck2', 'dd_duck3', 'dd_duck4', 'dd_trough', 'dd_gate', 'dd_grille', 'dd_finish', 'dd_board', 'dd_kiosk', 'dd_railpost', 'dd_rope'];
 const DD_TOON = {
   plum: 0x4a1766, plum2: 0x6a2a8f, gold: 0xffd23f, brass: 0xc79a1f, cream: 0xfff4e0, red: 0xd7263d, dark: 0x1a1030, tile: 0x2aa3c0, velvet: 0xb3123a, steel: 0xc9c3d9, foam: 0xffffff,
   body: 0xffd23f, wing: 0xe0b72f, bill: 0xff9f1c, silk: 0xff2e88,
