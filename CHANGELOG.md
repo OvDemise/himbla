@@ -5,6 +5,7 @@ contains `[release]` (see the README's Download section). Newest first.
 
 ## Unreleased
 
+- **Casino prize counter: the display case floor no longer flickers:** the glass box round the display case had its bottom face at exactly the same height as the top of the purple felt floor (y = 1.76), so the two coplanar surfaces fought for the same pixels and the floor showed a patchwork of tints with a diagonal split. The glass now stands 2 cm clear of the floor (a hair shorter, same top). Checked in the running game with the camera at the counter before and after: the floor is one even tint.
 - **Casino pass:**
   - **Loan shark removed:** Rusty is gone everywhere: the overlay's LOAN SHARK tab (the tabs are now five, so the number keys 1 to 5 still match), his debt and interest code, the booth's "RUSTY'S LOANS" board and figure in the hall (the PRIZES board is centred over the whole counter now), the prize counter's hotspot and sign text, the pit boss's lines about him, the Asset Row entry, the CSS and the README. A saved game that still owed him money simply has the debt forgiven (the old `debt`, `debtAt` and `loans` keys are dropped when the casino state loads); the credits already borrowed stay.
   - **Plinko:** the aim marker (the ball and arrow that float over the chute) is only there while you are seated at the board; standing at it, it used to hang there for nothing.
