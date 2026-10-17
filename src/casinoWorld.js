@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { toon, ink, glow, glowShared, textSprite, nameTag } from './toon.js';
-import { makeFigure, makeSlotCabinet, SLOT_LAMP_OFF } from './models.js';
+import { makeFigure, makeSlotCabinet, SLOT_LAMP_OFF, plinkoConsoleModel, plinkoFrameModel } from './models.js';
 import { pxCanvas } from './pixelIcons.js';
 import { pixelFont } from './fonts.js';
 import { faceInfo, glyphState } from './glyphs.js';
@@ -826,17 +826,13 @@ export function buildCasino(w, loc) {
   const P = PLK;
   const bw = SLOTS * SPACING + 2.4, bh = DROP_Y + 2.4;
   put(mesh(new THREE.BoxGeometry(bw, bh, 0.5), toon(0x1a0f2e), 0.1), P.x, P.z - 0.45, P.y + bh / 2 - 0.9);
-  col({ type: 'box', x: P.x, y: (P.y + bh) / 2, z: P.z - 0.2, hx: bw / 2 + 0.2, hy: (P.y + bh) / 2, hz: 0.9 });
-  // legs + neon frame
-  for (const sx of [-1, 1]) {
-    put(mesh(new THREE.BoxGeometry(0.6, P.y + 0.4, 0.6), toon(0xffd23f), 0.04), P.x + sx * (bw / 2 - 0.5), P.z - 0.4, (P.y + 0.4) / 2 - 0.4);
-    neon(new THREE.BoxGeometry(0.3, bh, 0.3), 0xff2e88, P.x + sx * bw / 2, P.z - 0.15, P.y + bh / 2 - 0.9);
-  }
-  neon(new THREE.BoxGeometry(bw + 0.3, 0.3, 0.3), 0xff2e88, P.x, P.z - 0.15, P.y + bh - 0.9);
-  neon(new THREE.BoxGeometry(bw + 0.3, 0.3, 0.3), 0xff2e88, P.x, P.z - 0.15, P.y - 0.9);
+  // the cabinet that ties the board to the back wall: a plinth, two pillars, a cornice and the sign backing (tools/blender/build_plinko.py)
+  const plkFrame = plinkoFrameModel();
+  if (plkFrame) put(plkFrame, P.x, P.z, 0);
+  col({ type: 'box', x: P.x, y: 6.9, z: P.z - 0.675, hx: bw / 2 + 0.95, hy: 6.9, hz: 1.375 });
   // header
-  const plkSign = new THREE.Mesh(new THREE.PlaneGeometry(9, 2.25), new THREE.MeshBasicMaterial({ map: neonTex('PLINKO', { color: '#2ee6ff', edge: '#ffd23f', sub: 'UP TO 50× · REAL MOON PHYSICS' }) }));
-  put(plkSign, P.x, P.z - 0.1, P.y + bh + 0.3);
+  const plkSign = new THREE.Mesh(new THREE.PlaneGeometry(8, 2), new THREE.MeshBasicMaterial({ map: neonTex('PLINKO', { color: '#2ee6ff', edge: '#ffd23f', sub: 'UP TO 50× · REAL MOON PHYSICS' }) }));
+  put(plkSign, P.x, P.z - 0.1, P.y + bh + 0.4); // sits on the frame's sign backing
   // pegs: one instanced mesh, per-peg colour so hits can flash
   const pegGeo = new THREE.CylinderGeometry(0.13, 0.13, 0.55, 10).rotateX(Math.PI / 2);
   const pegs = new THREE.InstancedMesh(pegGeo, new THREE.MeshBasicMaterial({ color: 0xffffff }), PEGS.length);
@@ -884,22 +880,9 @@ export function buildCasino(w, loc) {
   arrow.position.y = 0.7;
   aim.add(aimBall, arrow);
   put(aim, P.x, P.z + 0.1, P.y + DROP_Y, 0, true);
-  // the console you stand at
-  const con = new THREE.Group();
-  const cb = mesh(new THREE.BoxGeometry(3.4, 1.1, 1.2), toon(0x2a1450), 0.06);
-  cb.position.y = 0.55;
-  const ct = mesh(new THREE.BoxGeometry(3.6, 0.16, 1.4), toon(0xffd23f), 0.04);
-  ct.position.y = 1.18;
-  const btn = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.36, 0.2, 16), glow(0xff2a4a));
-  btn.position.set(0, 1.34, 0);
-  con.add(cb, ct, btn);
-  for (const sx of [-1, 1]) {
-    const ab = new THREE.Mesh(new THREE.ConeGeometry(0.2, 0.4, 3), glow(0x2ee6ff));
-    ab.rotation.z = sx * Math.PI / 2;
-    ab.position.set(sx * 1.1, 1.36, 0);
-    con.add(ab);
-  }
-  put(con, P.x, P.z + 6, 0);
+  // the booth you stand at: the prize counter's gold and plum with card-suit panels (tools/blender/build_plinko.py)
+  const con = plinkoConsoleModel();
+  if (con) put(con, P.x, P.z + 6, 0);
   col({ type: 'box', x: P.x, y: 0.7, z: P.z + 6, hx: 1.8, hy: 0.7, hz: 0.7 });
 
   // ---------- CLASSIC GAMES corner + prize counter ----------
@@ -1026,7 +1009,9 @@ export function buildCasino(w, loc) {
   // the glass display case on the counter: two lit tiers of prizes
   const CX = -0.5;
   pcBox(3.6, 0.12, 0.9, pm.felt, CX, 1.70, 0, 0.02);
-  pcPut(new THREE.Mesh(new THREE.BoxGeometry(3.5, 1.4, 0.8), new THREE.MeshBasicMaterial({ color: 0xbff8ff, transparent: true, opacity: 0.16, depthWrite: false, side: THREE.DoubleSide })), CX, 2.46, 0);
+  // (the glass stands 2 cm clear of the felt floor: its bottom face used to sit exactly on the floor's top, y = 1.76, and the two
+  // surfaces fought for the same pixels, a patchwork of tints across the case floor)
+  pcPut(new THREE.Mesh(new THREE.BoxGeometry(3.5, 1.38, 0.8), new THREE.MeshBasicMaterial({ color: 0xbff8ff, transparent: true, opacity: 0.16, depthWrite: false, side: THREE.DoubleSide })), CX, 2.47, 0);
   for (const sx of [-1, 1]) for (const sz of [-1, 1]) pcBox(0.07, 1.44, 0.07, pm.gold, CX + sx * 1.77, 2.46, sz * 0.42, 0.01);
   pcBox(3.65, 0.07, 0.95, pm.gold, CX, 3.2, 0, 0.02);
   pcBox(3.45, 0.04, 0.7, pm.felt, CX, 2.46, 0, 0);

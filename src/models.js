@@ -21,6 +21,7 @@ const GLB = {
   dish: () => import('./assets/dish.glb?inline'),
   engine: () => import('./assets/engine.glb?inline'),
   briefcase: () => import('./assets/briefcase.glb?inline'),
+  plinko: () => import('./assets/plinko.glb?inline'),
   hovercar: () => import('./assets/hovercar.glb?inline'),
 };
 
@@ -1379,7 +1380,7 @@ const SHIP_TOON = { trim: 0xd8d4e8, dark: 0x2a2540, metal: 0x8a87a0, steel: 0x55
 const SHIP_FX = new Set(['plume', 'plumeCore', 'lift', 'engine', 'core', 'beacon']); // per-ship materials (they pulse)
 const FLAMES = new Set(['plume', 'plumeCore', 'lift', 'beacon']);
 export async function loadShipParts() {
-  const [gltf, sk, wr, ap, lt, cr, ga, di, en, bc, hc, sl] = await Promise.all(['ships', 'skimmer', 'warrig', 'apc', 'landtrain', 'crane', 'garage', 'dish', 'engine', 'briefcase', 'hovercar', 'slots'].map(loadGlb));
+  const [gltf, sk, wr, ap, lt, cr, ga, di, en, bc, hc, sl, pk] = await Promise.all(['ships', 'skimmer', 'warrig', 'apc', 'landtrain', 'crane', 'garage', 'dish', 'engine', 'briefcase', 'hovercar', 'slots', 'plinko'].map(loadGlb));
   SHIP_PARTS = {};
   for (const name of ['shuttle', 'freighter']) {
     const root = gltf.scene.getObjectByName(name);
@@ -1436,16 +1437,22 @@ export async function loadShipParts() {
   }
   CASE_MODEL = bc.scene.getObjectByName('briefcase');
   if (!CASE_MODEL) throw new Error('briefcase.glb has no briefcase');
-  for (const m of [ENGINE_MODEL, CASE_MODEL]) m.traverse((o) => { if (o.isMesh) { o.userData.slot = o.material.name; o.castShadow = true; } });
+  // the Plinko booth and the cabinet frame that joins the board to the back wall (tools/blender/build_plinko.py)
+  PLINKO_CONSOLE = pk.scene.getObjectByName('plinko_console');
+  PLINKO_FRAME = pk.scene.getObjectByName('plinko_frame');
+  if (!PLINKO_CONSOLE || !PLINKO_FRAME) throw new Error('plinko.glb has no plinko_console / plinko_frame');
+  for (const m of [ENGINE_MODEL, CASE_MODEL, PLINKO_CONSOLE, PLINKO_FRAME]) m.traverse((o) => { if (o.isMesh) { o.userData.slot = o.material.name; o.castShadow = true; } });
 }
 
 // ---- Wreck salvage models (built in Blender, see build_engine.py and build_briefcase.py) ----
 // The SALVAGED ENGINE (a scorched engine block, about 1.25 x 1.1 x 1.8 m) and the CREDITS BRIEFCASE (a gold-trimmed case with the credit sign on
 // both faces, about 0.95 x 0.85 x 0.4 m), each centred on its origin. engineModel() / caseModel() return a fresh copy dressed in the game's toon
 // materials (a `hot` slot glows), each part outlined by its `ink` property; null until the models have loaded.
-let ENGINE_MODEL = null, CASE_MODEL = null;
+let ENGINE_MODEL = null, CASE_MODEL = null, PLINKO_CONSOLE = null, PLINKO_FRAME = null;
 const ENGINE_TOON = { body: 0x6b4630, dark: 0x2a2540, metal: 0x8a87a0, steel: 0x55607a };
 const CASE_TOON = { body: 0x4a2f22, dark: 0x1c1830, trim: 0x8a87a0, gold: 0xffd23f };
+// the Plinko booth and frame use the prize counter's palette; slots named glow* are lit
+const PLINKO_TOON = { gold: 0xffd23f, brass: 0xc79a1f, plum: 0x3b0f4f, dark: 0x1a1030, pink: 0xff2e88, white: 0xfff4e0, red: 0xd7263d, glowPink: 0xff2e88, glowCyan: 0x2ee6ff, glowRed: 0xff2a4a };
 function dressLoot(template, palette) {
   if (!template) return null;
   const root = template.clone(true);
@@ -1454,7 +1461,7 @@ function dressLoot(template, palette) {
   root.traverse((o) => { if (o.isMesh) meshes.push(o); }); // (collected first: ink() adds outline shells as it goes)
   for (const o of meshes) {
     const slot = o.userData.slot;
-    if (!mats.has(slot)) mats.set(slot, slot === 'hot' ? glow(0xff6a2a) : toon(palette[slot] || 0x8a87a0));
+    if (!mats.has(slot)) mats.set(slot, slot === 'hot' ? glow(0xff6a2a) : slot.startsWith('glow') ? glow(palette[slot] || 0xffffff) : toon(palette[slot] || 0x8a87a0));
     o.material = mats.get(slot);
     if (o.userData.ink > 0) ink(o, o.userData.ink);
   }
@@ -1462,6 +1469,9 @@ function dressLoot(template, palette) {
 }
 export const engineModel = () => dressLoot(ENGINE_MODEL, ENGINE_TOON);
 export const caseModel = () => dressLoot(CASE_MODEL, CASE_TOON);
+// the Plinko booth (3.4 x 1.1 x 1.2 m, +z toward the player) and the board's frame (origin on the floor at the board's centre; its back is 2 m behind the board plane)
+export const plinkoConsoleModel = () => dressLoot(PLINKO_CONSOLE, PLINKO_TOON);
+export const plinkoFrameModel = () => dressLoot(PLINKO_FRAME, PLINKO_TOON);
 
 function bakeShip(root) {
   root.updateMatrixWorld(true);
