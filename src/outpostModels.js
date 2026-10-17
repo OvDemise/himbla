@@ -42,8 +42,6 @@ function prism(len, width, height) {
   return new THREE.CylinderGeometry(1, 1, len, 3, 1, false, -Math.PI / 2).rotateZ(-Math.PI / 2)
     .scale(1, height / 1.5, width / 1.732).translate(0, height / 3, 0);
 }
-// a shallow dish facing local +z
-const dishGeo = (r) => new THREE.SphereGeometry(r, 14, 6, 0, Math.PI * 2, 0, 0.75).rotateX(-Math.PI / 2).translate(0, 0, r * 0.85);
 
 // ---------- static-geometry kit ----------
 const _m = new THREE.Matrix4(), _h = new THREE.Matrix4(), _t = new THREE.Matrix4(), _r = new THREE.Matrix4();
@@ -743,22 +741,15 @@ function mast(k) {
     }
     k.cyl(0.08, 0.12, 2.6, 5, T(LIGHT), MX, H, MZ, { outline: 0.02 });
     k.blinker(MX, H + 2.9, MZ, 0xff2a4a, 0.45);
-    for (const [h, ry, r] of [[17, 0.5, 1.6], [25, 2.6, 1.9], [28.5, 4.4, 1.4]]) {
+    for (const [h, ry, rim] of [[17, 0.5, 1.1], [25, 2.6, 1.3], [28.5, 4.4, 0.95]]) { // (a dish head on an arm, in the outpost's faction paint: models.js)
       k.at(MX, MZ, ry);
-      k.add(dishGeo(r), D(0xf5f5f5), 0, h, 1.2, { outline: 0.04 });
-      k.beam([0, h, 0.4], [0, h, 1.4], 0.08, T(DARK));
-      k.beam([0, h, 1.4], [0, h, 1.2 + r * 1.2], 0.04, T(DARK), { outline: 0 });
+      k.beam([0, h - 0.7, 0.4], [0, h - 0.7, 1.5], 0.08, T(DARK));
+      k.dishHead(0, h - 0.7, 1.5, rim, c, { az: Math.PI, el: -1.35 });
       k.at();
     }
     for (let i = 0; i < 3; i++) { k.at(MX, MZ, (i * Math.PI * 2) / 3 + 1.2); k.box(0.55, 2.8, 0.2, T(LIGHT), 0, 35.6, 1.15, { outline: 0.03 }); k.at(); }
     // the spinning dish on the top platform
-    const pv = new THREE.Group();
-    const dm = new THREE.Mesh(dishGeo(1.5), D(0xf5f5f5));
-    dm.position.set(0, 1.0, 1.6); dm.rotation.x = -0.4; dm.castShadow = true;
-    const arm = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.2, 1.6), T(DARK)); arm.position.set(0, 1.0, 0.8);
-    pv.add(dm, arm);
-    pv.userData.spin = true;
-    k.dyn(pv, MX, 32.8, MZ);
+    k.dishHead(MX, 32.8, MZ, 1.0, c, { az: Math.PI, el: -0.7, spin: 0.6, arm: 1.6 });
     // guy wires to three anchors
     for (let i = 0; i < 3; i++) {
       const a = 0.5 + (i * Math.PI * 2) / 3;
@@ -797,8 +788,11 @@ function mast(k) {
     };
     lying([MX + 1, MZ - 2], [5, -20]);
     lying([5.5, -19], [17, -12]);
-    k.add(dishGeo(1.9), D(0xb8b4c8), -8, F + 0.6, -14, { rx: -1.3, ry: 0.7, outline: 0.04 });
-    k.add(dishGeo(1.5), D(0xb8b4c8), 9, F + 0.5, -16, { rx: 1.2, ry: 2.1, outline: 0.04 });
+    k.at(-8, -14, 0.7, F + 0.5, -0.9, 0.3); // (two heads thrown off the mast, on their sides)
+    k.dishHead(0, 0, 0, 1.3, 'none', { el: -0.3 });
+    k.at(9, -16, 2.1, F + 0.4, 0.8, -0.4);
+    k.dishHead(0, 0, 0, 1.0, 'none', { el: -0.6 });
+    k.at();
     for (let i = 0; i < 3; i++) {
       const a = 0.5 + (i * Math.PI * 2) / 3, ax = MX + Math.cos(a) * 17, az = MZ + Math.sin(a) * 17;
       k.box(1.8, 1, 1.8, T(CONC), ax, 0, az, { outline: 0.04 });
@@ -833,8 +827,7 @@ function mast(k) {
   k.at(-13, 10, 2.4);
   k.cyl(0.6, 0.9, 2.4, 8, T(LIGHT), 0, 0, 0, { outline: 0.05 });
   k.box(1.4, 0.8, 1.0, T(DARK), 0, 2.2, 0, { outline: 0.03 });
-  k.add(dishGeo(3.2), D(0xf5f5f5), 0, 3.2, -0.4, { rx: -0.8, outline: 0.05 });
-  k.beam([0, 3.2, 0.3], [0, 5.2, 2.2], 0.06, T(DARK), { outline: 0 });
+  k.dishHead(0, 3.0, 0, 2.2, c, { az: Math.PI, el: -0.7 });
   k.column(1.2, 3, 0, 0);
   k.at();
   // name board, flags, perimeter, lights
@@ -1255,5 +1248,5 @@ export function outpostTemplate(kind, color, variant = 0, wreck = false, src = '
 }
 
 // The kit and its shared props also build the bigger settlements (settlements.js).
-export { Kit, T, G, D, GLASS, BEAM, prism, dishGeo, sandbags, crate, container, tank, junkHeap, lightString, scatterDebris };
+export { Kit, T, G, D, GLASS, BEAM, prism, sandbags, crate, container, tank, junkHeap, lightString, scatterDebris };
 export const PALETTE = { STEEL, DARK, LIGHT, CREAM, CONC, YEL, WOOD, RUST, TYRE, CHAR };

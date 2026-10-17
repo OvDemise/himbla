@@ -119,6 +119,24 @@ def capsule(r, length, end, seg=12):
     return xf(lathe(prof, seg), r=(PI / 2, 0, 0))
 
 
+def dishlet(A, rim_acc, strut_acc, pos, R, tilt, yaw):
+    """A small reflector in the dish stations' style (build_dish.py): a thin paraboloid shell opening along +y, a trim-coloured rim ring and three
+    struts to a feed, all tilted `tilt` about x then turned `yaw` about the vertical and set at `pos`. R is the rim's radius; A, rim_acc and
+    strut_acc take the shell, the ring (and the feed's head) and the struts."""
+    foc, t, n = 0.8 * R, 0.05, 5
+    par = lambda r: r * r / (4 * foc)
+    rs = [R * i / n for i in range(n + 1)]
+    prof = [(0.0, -t)] + [(r, par(r) - t) for r in rs[1:]] + [(R, par(R))] + [(r, par(r)) for r in reversed(rs[1:-1])] + [(0.0, 0.0)]
+    put = lambda g: xf(g, pos, (tilt, yaw, 0), order="YXZ")
+    A.geos.append(put(lathe(prof, 16)))
+    rim_acc.geos.append(put(xf(torus(R + 0.02, 0.05, 16, 4), (0, par(R) - 0.06, 0))))
+    for k in range(3):
+        a = 2 * PI * (k + 0.5) / 3
+        strut_acc.geos.append(put(beam((R * 0.97 * math.sin(a), par(R), R * 0.97 * math.cos(a)), (0, foc * 1.05, 0), 0.025, 4)))
+    strut_acc.geos.append(put(beam((0, 0.0, 0), (0, foc * 1.05, 0), 0.04, 5)))
+    rim_acc.geos.append(put(xf(cuboid(0.16, 0.12, 0.16)[:2], (0, foc * 1.05 + 0.04, 0))))
+
+
 def build(NAME, PFX_, kind):
     """One garage: kind "main" (three bays, a service office and a fuel yard) or "small" (two bays, about an old shed's size)."""
     global PFX
@@ -633,9 +651,9 @@ def build(NAME, PFX_, kind):
         for y, w in ((RY + 4.5, 1.8), (RY + 5.6, 1.2)):
             A.tube((-17.0 - w / 2, y, -8.0), (-17.0 + w / 2, y, -8.0), 0.05, 5)
         A.flush()
-        A = Acc("dish", "white", root, 0.03)
-        A.add(sphere(0.6, 12, 4, PI * 0.45)[:2], (-17.0, RY + 3.4, -7.4), (-PI / 2 + 0.25, 0, 0))
-        A.flush()
+        A, R_, S_ = Acc("dish", "white", root, 0.03), Acc("dishRim", "trim", root, 0.02), Acc("dishStruts", "steel", root, 0.0)
+        dishlet(A, R_, S_, (-17.0, RY + 3.4, -7.4), 0.6, PI / 2 - 0.25, 0.0)
+        A.flush(); R_.flush(); S_.flush()
         pivot(PFX + "beacon", (-17.0, RY + 7.4, -8.0), root, role="blinker", radius=0.25)
     # the turbine vents: a fixed neck on the roof, and the head that spins
     for i, (x, z) in enumerate(((14.0, 3.0), (-3.0, -6.0)) if FULL else ((10.0, 2.5),)):
@@ -736,10 +754,10 @@ def build(NAME, PFX_, kind):
         A = Acc("officeFan", "dark", root, 0.03)
         A.cyl(24.5, OH + 1.45, 1.0, 0.7, 0.1, 12)
         A.flush()
-        A = Acc("officeDish", "white", root, 0.03)
-        A.tube((20.8, OH + 0.25, -1.4), (20.8, OH + 1.7, -1.4), 0.06, 5)
-        A.add(sphere(0.7, 12, 4, PI * 0.45)[:2], (20.8, OH + 2.0, -1.1), (-PI / 2 + 0.5, 0.4, 0))
-        A.flush()
+        A, R_, S_ = Acc("officeDish", "white", root, 0.03), Acc("officeDishRim", "trim", root, 0.02), Acc("officeDishStruts", "steel", root, 0.0)
+        S_.tube((20.8, OH + 0.25, -1.4), (20.8, OH + 1.7, -1.4), 0.06, 5)
+        dishlet(A, R_, S_, (20.8, OH + 2.0, -1.1), 0.7, PI / 2 - 0.5, 0.4)
+        A.flush(); R_.flush(); S_.flush()
 
         # ---------------------------------------------------------------------------------------------------------------
         # the fuel and coolant yard on the left: two tanks on cradles, ladders, a manifold into the wall, a pump and drums

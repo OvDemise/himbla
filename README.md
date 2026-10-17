@@ -394,7 +394,7 @@ yours if you swear in with Rustmoon). Lose him by getting 1.5 km away. Not while
 ## Lucky Crater Casino
 
 A walk-in neon hall about 1 km from the ILMB, with a ring road round its grounds like a town's. Out front,
-two slot carousels (six cabinets round a glowing pillar under a bulb-lit canopy) flank the red carpet, and
+two slot carousels (seven cabinets round a glowing pillar under a bulb-lit canopy) flank the red carpet, and
 punters wander from game to game: playing the slots (yanking the handle while the cabinet lights up), gawping
 at the giant die and the roulette wheel, admiring the chip towers, chatting by the doors. Walk through the
 front doors and press `F` at a station
@@ -509,8 +509,7 @@ settlements raise their guns on pylons. Guns hold fire when a building or the te
 
 The central dome is joined by wide glass skywalks, with people walking inside, to six distinct buildings:
 Hydroponics (glass greenhouse dome), Meridian Labs (leaning observation tower), Vostok Hangar (a ribbed quonset
-with a parked shuttle, round to bump into), Daedalus Relay (big rotating dish and mast, roof dishes with their
-receivers), the Power Block (cooling towers) and the Kepler Habitat (a big ring on A-frame legs, high enough to
+with a parked shuttle, round to bump into), Daedalus Relay (big rotating dish and mast, three roof dishes), the Power Block (cooling towers) and the Kepler Habitat (a big ring on A-frame legs, high enough to
 skate under, with a park inside and a hub tower in the middle).
 
 ## Main menu & saves
@@ -649,7 +648,8 @@ crowd-noise bed for now (the cheering is due a rework), and the race countdown b
   fly clean over), a kicker line with a big launch off the plateau edge, a big **half-pipe** (two matching ~7 m walls
   facing each other across a flat bottom, with decks and stairs) and a pyramid funbox, spread out on the east side. The big ferris wheel (twelve open gondolas, ~50 m tall) and the carousel are **rideable**: `F`
   beside one pops you into the nearest gondola or onto the nearest horse, `F` hops you off (from the top of the
-  wheel, too, if you're brave). (The chimera races moved to Chimera Downs.)
+  wheel, too, if you're brave). While you sit in one the HUD steps aside: just the picture and the hop-off prompt.
+  (The chimera races moved to Chimera Downs.)
 
 ## Locations
 
@@ -753,7 +753,8 @@ src/
   assets/landtrain.glb  the Moonliner and Prospector land-trains: two tractors and four trailers, each with a livery for every faction
   assets/crane.glb   the tower crane (lattice mast, ballasted base, slewing head with cab, trolley and hook)
   assets/garage.glb  the Meridian motor-pool garages: the main one (three bays with open and shut doors, workshop fit-outs, service office, fuel yard, roof plant) and a small two-bay one
-  assets/dish.glb    the two stations for the research arrays' big dishes: the cryo receiver (a banded Helium-3 vessel with a stair, valve cabinet and branding panel) and the gantry station (a lattice mast, container control rooms, battery bank, fuel tank), each with the dish, its yaw and tilt pivots and a livery and number for every faction and dish
+  assets/slots.glb   the casino's slot-machine cabinet: a pixel-arcade video slot with a tilted screen under a marquee, speakers, LED chases, arcade buttons, a ticket printer, a coin cup and a lever (the game paints its colour, marquee, side art and reels)
+  assets/dish.glb    the dish stations: the two for the research arrays' big dishes, the cryo receiver (a banded Helium-3 vessel with a stair, valve cabinet and branding panel) and the gantry station (a lattice mast, container control rooms, battery bank, fuel tank), the field dish the smaller bases use (an eight-sided tower with a gallery and caged ladder, an equipment-room container, and the gantry's truss-backed reflector) and a light head (the field dish's reflector and trunnions with no tower) for the small dishes on masts and roofs, each with the dish, its yaw and tilt pivots and a livery for every faction (the stations also a number for every dish)
   assets/winch.glb   the Hitch-Line Winch's grapple (a gold three-fluke claw, collar, shank and eye) and a metre of twisted steel cable with an orange tracer strand, which the game lays along the line, a piece per metre
   assets/towmark.png the winch's tow-line marker for the HUD (brackets, a dashed ring and a hook glyph, white on clear, rendered in Blender and tinted by a CSS mask)
   assets/outposts.glb  the Relay Mast and Watchtower outposts, intact and wrecked (a pilot, off unless the URL has `?outpostGlb`; contract in docs/outpost-glb.md)
@@ -775,12 +776,13 @@ tools/
   blender/build_landtrain.py builds the Moonliner and Prospector tractors and trailers -> src/assets/landtrain.glb (also runs headless, like build_apc.py)
   blender/build_crane.py   builds the tower crane -> src/assets/crane.glb (also runs headless, like build_apc.py)
   blender/build_garage.py  builds the main and small motor-pool garages -> src/assets/garage.glb (also runs headless)
-  blender/build_dish.py    builds the cryo receiver and gantry station dish arrays -> src/assets/dish.glb (also runs headless)
+  blender/build_slots.py   builds the casino's slot-machine cabinet -> src/assets/slots.glb (also runs headless; checks that the side plaques and decals sit inside the cabinet's silhouette)
+  blender/build_dish.py    builds the cryo receiver, the gantry station, the field dish and the light dish head -> src/assets/dish.glb (also runs headless)
   blender/build_winch.py   builds the winch's grapple and cable piece -> src/assets/winch.glb and renders the tow-line marker -> src/assets/towmark.png (also runs headless: `pip install bpy`, then `MOONRUNNER_REPO=. python3 tools/blender/build_winch.py`)
   blender/build_outposts.py builds the Relay Mast and Watchtower -> src/assets/outposts.glb (also runs headless; `npm run check:outposts` checks the file)
   blender/decals.py        flat lettering, emblems, hazard stripes and safety signs (no textures) the land-train builder execs after kit.py
   blender/kit.py           shared geometry/material/export helpers every Blender builder execs (the runner and ships keep their own variants of a few)
-  viewer.html              dev-only model viewer (npm run dev, then /tools/viewer.html?m=shuttle|freighter|apc|landtrain|crane|garage|dish|outpost|mite|lineup…; freighter takes &faction=spacecom|vostok|kepler|meridian (the cargo's livery); dish takes &kind=cryo|gantry&faction=…&no=01..04&size=30&tilt=<rad>&sweep=1; apc takes &turret=<rad>&barrel=<rad>; landtrain takes &type=moonliner|prospector&faction=spacecom|vostok|kepler|meridian&cars=pax,tank,cargo,blast&unit=<n>)
+  viewer.html              dev-only model viewer (npm run dev, then /tools/viewer.html?m=shuttle|freighter|apc|landtrain|crane|garage|slots|dish|outpost|mite|lineup…; slots takes &n=<cabinets in a row>&ring=<cabinets round a pillar>&idx=<first colour and name>&play=1 (works them like a patron); freighter takes &faction=spacecom|vostok|kepler|meridian (the cargo's livery); dish takes &kind=cryo|gantry|field|head&faction=…&no=01..04&size=30&tilt=<rad>&sweep=1; apc takes &turret=<rad>&barrel=<rad>; landtrain takes &type=moonliner|prospector&faction=spacecom|vostok|kepler|meridian&cars=pax,tank,cargo,blast&unit=<n>)
 ```
 
 **Editing the runner:** run `tools/blender/build_runner.py` in Blender (Scripting tab, or

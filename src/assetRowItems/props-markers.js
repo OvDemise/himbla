@@ -114,12 +114,12 @@ function signalPylon() {
 function dishes() {
   const ds = [];
   const parts = [8, 12, 18, 26, 34].map((size, i) => {
-    const d = makeDish(size, i === 1 || i === 2 ? 0xb0b0c0 : 0xf5f5f5);
+    const d = makeDish(size, ['spacecom', 'vostok', 'kepler', 'meridian', 'daedalus'][i]); // (one in each faction's paint)
     ds.push({ ...d, speed: 0.6, ph: i });
     return seat(d.root);
   });
   const root = lineUp(parts, 4).root;
-  return { root, update: (dt, t) => { for (const d of ds) { d.yaw.rotation.y += d.speed * dt; d.tilt.rotation.x = -0.6 + Math.sin(t * d.speed * 2 + d.ph) * 0.25; } } }; // (world.js update)
+  return { root, update: (dt, t) => { for (const d of ds) { d.yaw.rotation.y += d.speed * dt; d.tilt.rotation.x = -0.6 + Math.sin(t * d.speed * 2 + d.ph) * 0.25; for (const l of d.lamps) l.visible = Math.sin(t * 4 + l.userData.seed) > -0.3; } } }; // (world.js update)
 }
 
 function turrets() {

@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { toon, ink, inkMat, glow, textSprite, nameTag, setMask, vcMaterial, vcable, paintVertices, dropFloorFaces } from './toon.js';
-import { makeDish, makeFigure, makeRover, makeRocket, makeShuttle, makePlanets, makeHoverCar } from './models.js';
+import { makeDish, makeDishHead, makeFigure, makeRover, makeRocket, makeShuttle, makePlanets, makeHoverCar } from './models.js';
 import { mulberry32 } from './rng.js';
 import { FACTIONS } from './locations.js';
 import { SUN, frameQuat, arcDist, dirFromAngles, tangent } from './geo.js';
@@ -241,7 +241,7 @@ export class World {
     const skip = new Set();
     const mark = (o) => { if (o && o.traverse) o.traverse((c) => skip.add(c)); };
     for (const s of this.spinners) if (s.loc === loc) mark(s.obj);
-    for (const d of this.dishes) if (d.loc === loc) mark(d.root);
+    for (const d of this.dishes) if (d.loc === loc) mark(d.yaw);
     for (const a of this.anims) if (a.loc === loc) a.list.forEach(mark);
     for (const k of ['figures', 'walkers', 'rides']) for (const f of this[k]) if (f.loc === loc) mark(f.root);
     const flagged = (o) => { const u = o.userData; return u.keep || u.tick || u.spin || u.blink || u.flag || u.noMerge || u.inkGeo; };
@@ -514,6 +514,13 @@ export class World {
       ax: new THREE.Vector3(1, 0, 0).applyQuaternion(_q), ay: new THREE.Vector3(0, 1, 0).applyQuaternion(_q), az: new THREE.Vector3(0, 0, 1).applyQuaternion(_q),
       hx: spec.hx, hy: spec.hy, hz: spec.hz,
     });
+  }
+
+  // A field dish (models.makeDish), put (frozen) at its place, now turning and nodding at `speed`: only its head moves, so the tower, the
+  // pad and the equipment room merge with the rest of the place (mergeLocation) and the shadow cache keeps them.
+  addDish(dish, speed, loc) {
+    dish.yaw.traverse((o) => { o.matrixAutoUpdate = true; });
+    this.dishes.push({ ...dish, speed, loc });
   }
 
   // Place object in a settlement's local frame. Static objects get frozen matrices.
@@ -968,10 +975,10 @@ export class World {
     this.pad(loc, 95, -60, 16);
     this.pad(loc, -120, 40, 16, 0x2ec4ff);
     this.solarField(loc, 150, 60, 4, 6, 0.4);
-    const dish = makeDish(14);
-    this.put(dish.root, loc, -150, -40, 0, 0, true);
-    this.dishes.push({ ...dish, speed: 0.2, loc });
-    this.col(loc, { type: 'cyl', x: -150, z: -40, y0: -2, y1: 12, r: 2.5 });
+    const dish = makeDish(14, 'spacecom');
+    this.put(dish.root, loc, -150, -40);
+    this.addDish(dish, 0.2, loc);
+    for (const c of dish.cols) this.col(loc, { ...c, x: -150 + c.x, z: -40 + c.z });
 
     // Launch complex: where most new arrivals touch down on the Moon
     const lp = { x: 20, z: -185 };
@@ -1345,25 +1352,11 @@ export class World {
     w.add(new THREE.CylinderGeometry(11.95, 12.15, 0.8, 8, 1, true), this.glowM(purple), 0, 4.2, 0, { ry: Math.PI / 8, outline: 0 });
     for (const [x, z, s] of [[-4, -5, 2.6], [-4, 5, 2.6], [4, -1, 3.4]]) {
       w.add(new THREE.CylinderGeometry(0.3, 0.4, 2, 6), toon(0x3a3550), x, deck + 1, z, { outline: 0.04 });
-      const cy = deck + 2 + s;
-      w.add(new THREE.SphereGeometry(s, 14, 6, 0, Math.PI * 2, 0, 1.0), this.matDS(0xd8d4e8), x, cy, z, { rx: Math.PI + 0.5, outline: 0 });
-      // the receiver: a feed spoke from the middle of the bowl out along its axis (tilted 0.5 rad
-      // like the dish) to the glowing bead at the focus, braced by three thin struts from the rim
-      const ay = Math.cos(0.5), az = Math.sin(0.5); // the bowl's axis (it opens this way)
-      const vy = cy - s * ay, vz = z - s * az; // middle of the bowl
-      const fy = cy + s * 0.15 * ay, fz = z + s * 0.15 * az; // the focus, just above the rim plane
-      const len = s * 1.15;
-      w.add(new THREE.CylinderGeometry(0.09, 0.12, len, 6), toon(0x3a3550), x, (vy + fy) / 2, (vz + fz) / 2, { rx: 0.5, outline: 0.02 });
-      w.add(new THREE.SphereGeometry(0.34, 8, 6), this.glowM(purple), x, fy, fz, { outline: 0 });
-      const rimR = s * Math.sin(1.0), rimO = s * Math.cos(1.0); // rim circle radius, and how far it sits along the axis from the sphere's centre
-      for (let k = 0; k < 3; k++) {
-        const t = (k / 3) * Math.PI * 2 + 0.4;
-        // rim point: centre - axis * rimO + perpendicular offsets (x, and the axis-perpendicular in y/z)
-        const px = x + Math.cos(t) * rimR, py = cy - ay * rimO - az * Math.sin(t) * rimR, pz = z - az * rimO + ay * Math.sin(t) * rimR;
-        const dx = x - px, dy = fy - py, dz = fz - pz, sl = Math.hypot(dx, dy, dz);
-        const sg = new THREE.CylinderGeometry(0.04, 0.04, sl, 4).applyQuaternion(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), new THREE.Vector3(dx / sl, dy / sl, dz / sl)));
-        w.add(sg, toon(0x3a3550), (px + x) / 2, (py + fy) / 2, (pz + fz) / 2, { outline: 0 });
-      }
+      // a dish head (the field dish's reflector, trunnions and feed, without its tower) on the post, opening up and towards +z
+      const head = makeDishHead(s * Math.sin(1.0), 'daedalus');
+      head.yaw.rotation.y = Math.PI;
+      head.tilt.rotation.x = -0.5;
+      w.obj(head.root, x, z, deck + 2);
     }
     // lattice mast
     const mh = 30, mx = 5, mz = 6;
@@ -1375,10 +1368,10 @@ export class World {
     this.blinkers.push({ mat: bm, base: new THREE.Color(0xff2a4a), phase: 1.3, loc });
     w.cyl(mx, mz, deck - 1, deck + mh, 1);
     // big tracking dish beside the bunker
-    const dish = makeDish(12, 0xd8d4e8);
-    w.obj(dish.root, 6, -19, 0, 0, true);
-    this.dishes.push({ ...dish, speed: 0.12, loc });
-    w.cyl(6, -19, -2, 11, 2.5);
+    const dish = makeDish(12, 'daedalus');
+    w.obj(dish.root, 6, -19);
+    this.addDish(dish, 0.12, loc);
+    for (const c of dish.cols) { if (c.type === 'cyl') w.cyl(6 + c.x, -19 + c.z, c.y0, c.y1, c.r); else w.box(6 + c.x, c.y, -19 + c.z, c.hx, c.hy, c.hz); }
     this.vestibule(w, -12.5, 6.4, purple, 8.4, 5);
     w.cyl(0, 0, -2, deck, 12.3);
     w.flag(-6, -14, [0xc77dff, 0x111111, 0xc77dff]);
@@ -1574,10 +1567,10 @@ export class World {
       this.mount(loc, Math.cos(a) * r, Math.sin(a) * r, 0, { ground: true });
     }
     dressBase(this, loc); // command bunker, barracks, searchlight tower, traps, fuel
-    const dish = makeDish(small ? 8 : 12, 0xb0b0c0);
-    this.put(dish.root, loc, 30, 30, 0, 0, true);
-    this.dishes.push({ ...dish, speed: 0.6, loc });
-    this.col(loc, { type: 'cyl', x: 30, z: 30, y0: -2, y1: 11, r: 2.5 });
+    const dish = makeDish(small ? 8 : 12, loc.faction);
+    this.put(dish.root, loc, 30, 30);
+    this.addDish(dish, 0.6, loc);
+    for (const c of dish.cols) this.col(loc, { ...c, x: 30 + c.x, z: 30 + c.z });
     this.flag(loc, 0, small ? 40 : 70, loc.faction === 'vostok' ? [0xff3b5c, 0xffd23f, 0xff3b5c] : [0xc77dff, 0x111111, 0xc77dff], 20);
     this.addFigures(loc, small ? 4 : 8, { kind: 'soldier', look: () => ({ suit: 0x55607a, helmet: fc, visor: 0x111111 }) });
 
@@ -1674,6 +1667,7 @@ export class World {
       if (!d.loc.active) continue;
       d.yaw.rotation.y += d.speed * dt;
       d.tilt.rotation.x = -0.6 + Math.sin(time * d.speed * 2) * 0.25;
+      for (const l of d.lamps) l.visible = Math.sin(time * 4 + l.userData.seed) > -0.3; // (the aircraft lamps)
     }
     for (const b of this.blinkers) {
       if (!b.loc.active) continue;

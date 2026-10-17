@@ -142,7 +142,7 @@ export const STATIONS = [
   { id: 'bj', x: BJ.x, z: BJ.z + BJ.R + 1.4, r: 2.8, label: 'SIT AT THE BLACKJACK TABLE' },
   { id: 'duck', x: DUCK.kiosk[0], z: DUCK.kiosk[1] + 2, r: 2.8, label: 'DUCK DERBY — PICK A DUCK &amp; BET' },
   { id: 'plinko', x: PLK.x, z: PLK.z + 7.8, r: 3.2, label: 'PLAY PLINKO' },
-  { id: 'classic', x: CLASSIC.x - 3.2, z: CLASSIC.zs[1], r: 4.2, label: 'CLASSIC GAMES (SLOTS · ROULETTE · WHEEL · HIGH-LOW)' },
+  { id: 'classic', x: CLASSIC.x - 3.2, z: CLASSIC.mid, r: 5.4, label: 'CLASSIC GAMES (SLOTS · ROULETTE · WHEEL · HIGH-LOW)' },
   { id: 'prizes', x: PRIZE.x - 2.8, z: PRIZE.z, r: 3.8, label: 'PRIZE COUNTER' },
 ];
 

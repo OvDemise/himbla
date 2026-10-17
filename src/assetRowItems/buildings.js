@@ -218,8 +218,8 @@ const parts = {
     item('part.water-tower', 'WATER TOWER', 9, 9, () => worldPart((world, loc, k) => waterTower(world, loc, k, 0, 0, 0xff9f1c))),
     item('part.greenhouse', 'GREENHOUSE', 7.5, 18.5, () => worldPart((world, loc, k) => greenhouse(world, loc, k, 0, 0, 0))),
     item('part.comms-mast', 'COMMS MASTS 16 · 30 M', 12, 3, () => row([
-      worldPart((world, loc, k) => commsMast(world, loc, k, 0, 0, 16, 0xff9f1c)),
-      worldPart((world, loc, k) => commsMast(world, loc, k, 0, 0, 30, 0xffd23f)),
+      worldPart((world, loc, k) => commsMast(world, loc, k, 0, 0, 16, 0xff9f1c, 'kepler')),
+      worldPart((world, loc, k) => commsMast(world, loc, k, 0, 0, 30, 0xffd23f, 'spacecom')),
     ], 6)),
     item('part.town-hall', 'KEPLER TOWN HALL', 44, 19, () => worldPart((world, loc, k) => townHall(world, loc, k))),
     item('part.bounce-dome', 'BOUNCE DOMES 12 · 26 M', 89, 57, () => row([

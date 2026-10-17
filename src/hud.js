@@ -218,14 +218,14 @@ export class HUD {
     if (!this.recallEl) {
       this.recallEl = document.createElement('div');
       this.recallEl.id = 'recallhold';
-      this.recallEl.innerHTML = '<div class="rh-label"></div><div class="rh-track"><div class="rh-fill"></div></div>';
-      document.getElementById('hud').appendChild(this.recallEl);
+      this.recallEl.innerHTML = '<div class="hb-label"></div><div class="hb-track"><div class="hb-fill"></div></div>';
+      document.getElementById('holdbars').appendChild(this.recallEl); // (the stack of progress bars in the bottom centre)
     }
     this.recallEl.classList.toggle('show', k > 0);
     if (k <= 0) return;
-    if (label) this.recallEl.querySelector('.rh-label').textContent = label;
-    else if (loc) this.recallEl.querySelector('.rh-label').textContent = `HOLD R · RECALL TO ${loc.short || loc.name.toUpperCase()} · 100 CR`;
-    this.recallEl.querySelector('.rh-fill').style.width = `${Math.min(1, k) * 100}%`;
+    if (label) this.recallEl.querySelector('.hb-label').textContent = label;
+    else if (loc) this.recallEl.querySelector('.hb-label').textContent = `HOLD R · RECALL TO ${loc.short || loc.name.toUpperCase()} · 100 CR`;
+    this.recallEl.querySelector('.hb-fill').style.width = `${Math.min(1, k) * 100}%`;
   }
 
   toast(text, dur = 2.5, html = false) {

@@ -156,6 +156,13 @@ export function dropFloorFaces(g, maxY = 0.05) {
 export function glow(color) {
   return new THREE.MeshBasicMaterial({ color });
 }
+// A glow material shared by colour: pieces that glow the same colour then merge into one draw call (the world's static merge).
+const sharedGlows = new Map();
+export function glowShared(color) {
+  let m = sharedGlows.get(color);
+  if (!m) sharedGlows.set(color, m = glow(color));
+  return m;
+}
 
 // Canvas text texture in the pixel display font, for in-world signs. Press Start 2P is much
 // wider than the old comic face, so it is drawn at ~half the nominal size on the same canvas.

@@ -1660,20 +1660,15 @@ export function greenhouse(world, loc, k, x, z, yaw, len = 18) {
   k.at();
 }
 
-// Comms mast with a small dish that turns.
-export function commsMast(world, loc, k, x, z, h, color) {
+// Comms mast with a small dish that turns (a dish head on a boom, in `faction`'s paint).
+export function commsMast(world, loc, k, x, z, h, color, faction) {
   k.at(x, z);
   k.box(3, 0.5, 3, T(CONC), 0, 0, 0, { outline: 0.03 });
   lattice(k, 0, 0, h, 1, 0.4, Math.round(h / 3.5), T(LIGHT), T(DARK), { r: 0.14 });
   k.blinker(0, h + 0.4, 0, 0xff2a4a, 0.35);
   k.column(1, h, 0, 0);
-  const dish = part(color, (q) => {
-    q.add(new THREE.SphereGeometry(1.6, 14, 6, 0, TAU, 0, 0.8).rotateX(-Math.PI / 2), D(LIGHT), 0, 0, 0.8, { outline: 0.03 });
-    q.beam([0, 0, 0.3], [0, 0, 1.6], 0.05, T(DARK), { outline: 0 });
-    q.box(0.5, 0.5, 0.5, T(color), 0, 0, 0, { outline: 0.02 });
-  });
-  dish.userData.spin = 0.25;
-  k.dyn(dish, 0, h * 0.75, 0);
+  k.box(0.5, 0.5, 0.5, T(color), 0, h * 0.75 - 0.25, 0, { outline: 0.02 });
+  k.dishHead(0, h * 0.75, 0, 1.15, faction, { az: Math.PI, el: -0.7, spin: 0.25, arm: 1.7 });
   k.at();
 }
 
@@ -1721,7 +1716,7 @@ export function buildTown(world, loc, { civic = false } = {}) {
     const wt = freeSpot(occ, 5, 50, 90, rr);
     if (wt) waterTower(world, loc, k, wt[0], wt[1], palette[loc.id.length % 6]);
     const cm = freeSpot(occ, 3, 60, 95, rr);
-    if (cm) commsMast(world, loc, k, cm[0], cm[1], 16, 0xff9f1c);
+    if (cm) commsMast(world, loc, k, cm[0], cm[1], 16, 0xff9f1c, 'kepler');
     for (let i = 0; i < 6; i++) { const sp = freeSpot(occ, 1.5, 30, 95, rr); if (sp) k.lamp(sp[0], sp[1], 7); }
     // the town sign by the hub's door
     k.at(0, -hubR - 9, Math.PI);
@@ -1869,7 +1864,7 @@ export function dressIlmb(world, loc) {
     hortonSphere(k, -20, -197, 6.5, WHITE, 0x2ec4ff);
     habDome(k, 70, 140, 16, 0xff7ad9, { door: Math.PI, trim: YEL });
     habDome(k, -60, 145, 14, 0xffd23f, { door: Math.PI, trim: 0xff7ad9 });
-    commsMast(world, loc, k, 140, -120, 30, 0xffd23f);
+    commsMast(world, loc, k, 140, -120, 30, 0xffd23f, 'spacecom');
     // barracks and the vehicle depot
     quonset(k, 175, 120, 7, 34, 0x5b5870, -0.6 + Math.PI, YEL);
     quonset(k, -175, 125, 7, 34, 0x5b5870, 0.6 + Math.PI, YEL);
@@ -2062,7 +2057,7 @@ export function dressArray(world, loc, speeds = []) {
     }
     k.solid(7.4, 1.25, 9.7, 28, -5);
     k.at();
-    commsMast(world, loc, k, 100, -20, 40, green);
+    commsMast(world, loc, k, 100, -20, 40, green, loc.faction);
     // the dish stations, and the cable runs from each to the control centre
     ARRAY_DISHES.forEach(([x, z, size], i) => {
       const kind = DISH_KINDS[(i + (loc.id === 'farside' ? 1 : 0)) % DISH_KINDS.length];
