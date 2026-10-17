@@ -70,58 +70,14 @@ SLOT_COLORS = {
 exec(open(os.path.join(REPO, "tools", "blender", "kit.py"), encoding="utf-8").read(), globals())
 exec(open(os.path.join(REPO, "tools", "blender", "decals.py"), encoding="utf-8").read(), globals())
 LAYER = 0.02    # decals stand further off their faces than on a vehicle: these are read from 100 m (the game's camera starts at 0.5 m)
+exec(open(os.path.join(REPO, "tools", "blender", "dishkit.py"), encoding="utf-8").read(), globals())   # the reflector, the mount and the head
 
 C = coll()
 for s in SLOT_COLORS:
     material(s)
 
-PI = math.pi
-YP = 28.5                       # the tilt pivot's height
-RIM, DEEP = 14.1, 6.8           # the reflector's rim radius and depth (the old dish's cap)
-FOC = RIM * RIM / (4 * DEEP)    # a paraboloid through the same rim and depth: a focal length of 7.3 m
-SHELL = 0.45                    # thickness of the reflector's body
-APEX = 2.4                      # the reflector's apex above the tilt pivot, along the dish axis
 PFX = ""
 NUMBERS = ("01", "02", "03", "04")
-
-
-def par(r):
-    """Height of the reflector's face above its apex at radius r."""
-    return r * r / (4 * FOC)
-
-
-# ---------------- pieces (geometry returns) ----------------
-def cube(hx, hy, hz, pos=(0, 0, 0), rot=(0, 0, 0)):
-    """A plain box (half extents): 12 triangles, for the small parts."""
-    v = [(-hx, -hy, -hz), (hx, -hy, -hz), (hx, hy, -hz), (-hx, hy, -hz), (-hx, -hy, hz), (hx, -hy, hz), (hx, hy, hz), (-hx, hy, hz)]
-    return xf((v, [(4, 5, 6, 7), (1, 0, 3, 2), (5, 1, 2, 6), (0, 4, 7, 3), (3, 7, 6, 2), (0, 1, 5, 4)]), pos, rot)
-
-
-def turn(geo, a):
-    """Yaw a piece about the y axis."""
-    return xf(geo, r=(0, a, 0))
-
-
-def circ(r, y, n, close=True):
-    return [(r * math.sin(2 * PI * i / n), y, r * math.cos(2 * PI * i / n)) for i in range(n + (1 if close else 0))]
-
-
-def hoop(r, y, tr, n=48, seg=4):
-    """A hoop in the x-z plane round the y axis."""
-    return tube(circ(r, y, n), [tr] * (n + 1), seg, True)
-
-
-def hoops(rs, y, tr, n=48, seg=4):
-    """Rings of the same tube radius at several radii (y: a number, or a function of r)."""
-    return join([hoop(r, y(r) if callable(y) else y, tr, n, seg) for r in rs])
-
-
-def tori(R, ys, tr, n=32, rseg=4):
-    return join([xf(torus(R, tr, n, rseg), (0, y, 0)) for y in ys])
-
-
-def arc_pts(r, y, a0, a1, n):
-    return [(r * math.sin(a0 + (a1 - a0) * i / n), y, r * math.cos(a0 + (a1 - a0) * i / n)) for i in range(n + 1)]
 
 
 # ---------------- scene helpers ----------------
@@ -161,11 +117,6 @@ def unit(name):
     return root, yaw, tilt
 
 
-def Y(geo):
-    """Geometry authored at world heights, hung on the yaw pivot (which sits at y = YP)."""
-    return xf(geo, t=(0, -YP, 0))
-
-
 def liveries(root, factions=FACTIONS):
     """One livery pivot per faction (role livery); the game keeps only the matching one."""
     return {f: PV(f"livery_{f}", (0, 0, 0), root, role="livery", faction=f) for f in factions}
@@ -194,65 +145,6 @@ def warn_sign(d, u, v, w, h, layer=0, head="WARNING", lines=("RF RADIATION", "KE
         d.text(s, u + w / 2, v + (h - hh) * 0.1 + (len(lines) - 1 - i) * 9 * ps2, ps2, "dark", layer + 2, "c")
 
 
-# ---------------- the dish itself (tilt frame; y0 lifts the apex above the pivot) ----------------
-def bowl(y0, thick, lift, N=11, segs=36):
-    """A closed, thick paraboloid: its underside at par(r) + lift - thick, its face at par(r) + lift."""
-    rs = [RIM * i / N for i in range(N + 1)]
-    prof = [(0.0, y0 + lift - thick)] + [(r, y0 + par(r) + lift - thick) for r in rs[1:]]
-    prof.append((RIM, y0 + par(RIM) + lift))
-    prof += [(r, y0 + par(r) + lift) for r in reversed(rs[1:-1])]
-    prof.append((0.0, y0 + lift))
-    return lathe(prof, segs)
-
-
-def face_seams(y0, n_rad=16, rings=(4.7, 9.4), r_in=1.5, tr=0.085):
-    """Panel seams on the face: radial ridges and ring ridges, thin raised tubes."""
-    out = []
-    n = 7
-    for k in range(n_rad):
-        a = 2 * PI * k / n_rad
-        rs = [r_in + (RIM - 0.5 - r_in) * i / (n - 1) for i in range(n)]
-        out.append(tube([(r * math.sin(a), y0 + par(r) + 0.15, r * math.cos(a)) for r in rs], [tr] * n, 4, True))
-    for r in rings:
-        out.append(hoop(r, y0 + par(r) + 0.15, tr, 56))
-    return join(out)
-
-
-def rim_collar(y0, up=0.45, down=1.0, out=0.5):
-    y = y0 + par(RIM)
-    prof = [(RIM - 0.15, y - down), (RIM + out, y - down), (RIM + out, y + up), (RIM - 0.15, y + up), (RIM - 0.15, y - down)]
-    return lathe(prof, 56)
-
-
-def rib_bottom(y0, r, r0=5.0, depth0=1.0, depth1=1.35):
-    """The height of the trusses' bottom chord at radius r."""
-    ya, yb = y0 + par(r0) - SHELL - depth0, y0 + par(RIM - 0.3) - SHELL - depth1
-    return ya + (yb - ya) * (r - r0) / (RIM - 0.3 - r0)
-
-
-def hub_cone(y0, r_bot=2.3, y_bot=0.0, r_top=5.1):
-    """A solid cone from the trunnion drum up to the reflector's underside, capped just under it."""
-    yb = lambda r: y0 + par(r) - SHELL - 0.06
-    prof = [(0.0, y_bot), (r_bot, y_bot), (r_bot + 0.25, y_bot + 0.3), (r_top, yb(r_top))]
-    prof += [(r_top * f, yb(r_top * f)) for f in (0.66, 0.33)] + [(0.0, yb(0.0))]
-    return lathe(prof, 28)
-
-
-def drum(hl=3.0, r=2.2):
-    """The trunnion drum along x, centred on the pivot."""
-    prof = [(0.0, -hl), (r - 0.2, -hl), (r, -hl + 0.2), (r, hl - 0.2), (r - 0.2, hl), (0.0, hl)]
-    return xf(lathe(prof, 18), r=(0, 0, PI / 2))
-
-
-def quadpod(y0, top_y, r_top, n, tr, seg=6):
-    """Struts from the rim up to the feed support."""
-    out = []
-    for k in range(n):
-        a = 2 * PI * (k + 0.5) / n
-        out.append(B((RIM * 0.97 * math.sin(a), y0 + par(RIM) + 0.1, RIM * 0.97 * math.cos(a)), (r_top * math.sin(a), top_y, r_top * math.cos(a)), tr, seg, True))
-    return join(out)
-
-
 def container(root, name, cx, cz, y0, slot, ribbed, L=9.6, W=3.5, H=3.3):
     """A box on corner castings, its length along z; the corrugation is a row of ribs down each flank."""
     hx, hz = W / 2, L / 2
@@ -265,15 +157,9 @@ def container(root, name, cx, cz, y0, slot, ribbed, L=9.6, W=3.5, H=3.3):
 
 
 def mount(root, yaw, tilt, neck_y0, neck_y1, neck_r, neck_slot="steel"):
-    """What every station shares at the top: the turning neck, the head block and its two ears (all on yaw), the trunnion drum (tilt)."""
-    M("neck", Y(tube([(0, neck_y0, 0), (0, neck_y1, 0)], [neck_r, neck_r], 14)), neck_slot, yaw, 0.08)
-    bx("headBlock", 3.5, 0.5, 2.4, (0, 25.1 - YP, 0), "dark", yaw, 0.1)
-    for s in (-1, 1):
-        bx(f"ear{s}", 0.55, 1.9, 1.4, (s * 3.55, 26.8 - YP, 0), "steel", yaw, 0.08)
-        M(f"bearing{s}", xf(torus(1.3, 0.2, 16, 4), (s * 3.2, 0, 0), (0, 0, PI / 2)), "dark", yaw, 0.04)
-        bx(f"earPlate{s}", 0.6, 0.12, 1.5, (s * 3.55, 28.7 - YP, 0), "hazard", yaw)
-    M("drum", drum(), "steel", tilt, 0.1)
-    M("drumRings", join([xf(torus(2.26, 0.14, 18, 4), (s * 2.3, 0, 0), (0, 0, PI / 2)) for s in (-1, 1)]), "hazard", tilt, 0)
+    """What every station shares at the top (dishkit.py mount_pieces): the turning neck, the head block and its ears on yaw, the drum on tilt."""
+    for name, geo, slot, ink, part in mount_pieces(neck_y0, neck_y1, neck_r, neck_slot):
+        M(name, geo, slot, yaw if part == "yaw" else tilt, ink)
 
 
 # =====================================================================================================
@@ -783,33 +669,8 @@ def build_field():
 # =====================================================================================================
 def build_head():
     root, yaw, tilt = unit("dish_head")
-    mount(root, yaw, tilt, 21.2, 25.4, 1.75)
-    M("hub", hub_cone(APEX), "steel", tilt, 0.12)
-    M("bowl", bowl(APEX, SHELL, 0.0, 5, 20), "white", tilt, 0.14)
-    M("face", bowl(APEX, 0.12, 0.12, 5, 20), "dish", tilt, 0)
-    M("collar", rim_collar(APEX, 0.35, 0.7, 0.4), "dark", tilt, 0.1)
-    nb = 16
-    for slot, parity in (("stripe", 0), ("body", 1)):
-        M("rimBlocks_" + slot, join([tube(arc_pts(RIM + 0.46, APEX + par(RIM) - 0.15, 2 * PI * k / nb + 0.01, 2 * PI * (k + 1) / nb - 0.01, 2), [0.55] * 3, 4, True) for k in range(nb) if k % 2 == parity]), slot, tilt, 0)
-    NT, R0, nbay = 6, 5.0, 2
-    ch, dg = [], []
-    for k in range(NT):
-        a = 2 * PI * (k + 0.5) / NT
-        P = lambda r, y: (r * math.sin(a), y, r * math.cos(a))
-        rs = [R0 + (RIM - 0.3 - R0) * i / nbay for i in range(nbay + 1)]
-        tops = [(r, APEX + par(r) - SHELL - 0.05) for r in rs]
-        bots = [(r, rib_bottom(APEX, r)) for r in rs]
-        ch += [tube([P(*t) for t in tops], [0.17] * len(rs), 4, True), tube([P(*b) for b in bots], [0.2] * len(rs), 4, True)]
-        dg += [B(P(*tops[i]), P(*bots[i]), 0.1, 4, True) for i in range(nbay + 1)]
-    M("trussChords", join(ch), "body", tilt, 0.05)
-    M("trussWeb", join(dg), "steel", tilt, 0)
-    FEED_Y = 14.2
-    M("quadpod", join([B((RIM * 0.97 * math.sin(a), APEX + par(RIM) + 0.1, RIM * 0.97 * math.cos(a)), (1.3 * math.sin(a), FEED_Y - 0.6, 1.3 * math.cos(a)), 0.2, 6, True) for a in [2 * PI * (k + 0.5) / 4 for k in range(4)]]), "body", tilt, 0.05)
-    rb("feedCab", 1.4, 0.9, 1.4, (0, FEED_Y + 0.35, 0), "body", tilt, 0.1, 0.1)
-    bx("feedBand", 1.44, 0.13, 1.44, (0, FEED_Y + 0.35, 0), "stripe", tilt)
-    M("subRefl", lathe([(0.0, APEX + FOC + 0.55), (1.0, APEX + FOC + 0.95), (1.0, APEX + FOC + 1.1), (0.0, APEX + FOC + 0.8)], 12), "white", tilt, 0.04)
-    M("feedStem", tube([(0, FEED_Y - 0.6, 0), (0, APEX + FOC + 0.95, 0)], [0.26, 0.26], 6), "steel", tilt, 0)
-    M("feedLens", lathe([(0.0, APEX + FOC + 0.5), (0.4, APEX + FOC + 0.55), (0.0, APEX + FOC + 0.8)], 10), "green", tilt, 0)
+    for name, geo, slot, ink, part in head_pieces():
+        M(name, geo, slot, yaw if part == "yaw" else tilt, ink)
     return root
 
 
