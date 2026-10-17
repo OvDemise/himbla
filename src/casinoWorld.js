@@ -235,6 +235,10 @@ function feltTex(R) {
   });
 }
 
+// the finish line itself: a strip of two columns of squares across the lanes (the plane is 0.5 m along the track by the basin's width)
+export function finishTex() {
+  return canvasTex(32, 256, (x) => { for (let i = 0; i < 2; i++) for (let j = 0; j < 16; j++) { x.fillStyle = (i + j) % 2 ? '#120a1e' : '#fff4e0'; x.fillRect(i * 16, j * 16, 16, 16); } });
+}
 export function checkerTex() {
   return canvasTex(256, 64, (x, w, h) => {
     for (let i = 0; i < 16; i++) for (let j = 0; j < 4; j++) { x.fillStyle = (i + j) % 2 ? '#120a1e' : '#fff4e0'; x.fillRect(i * 16, j * 16, 16, 16); }
@@ -755,7 +759,7 @@ export function buildCasino(w, loc) {
   });
   const checker = new THREE.MeshBasicMaterial({ map: checkerTex(), side: THREE.DoubleSide });
   const fl = trough.getObjectByName('finishLine');
-  flat(new THREE.PlaneGeometry(fl.userData.w, fl.userData.h), checker, fl.position);
+  flat(new THREE.PlaneGeometry(fl.userData.w, fl.userData.h), new THREE.MeshBasicMaterial({ map: finishTex() }), fl.position);
   // the front rail: a brass post every 3.5 m along the player's side with a velvet rope between
   const railZ = lz0 + 0.55;
   for (let x = L0, k = 0; k <= 8; x += 3.5, k++) {
@@ -782,24 +786,19 @@ export function buildCasino(w, loc) {
     const sp = new THREE.Mesh(new THREE.PlaneGeometry(startPlate.userData.w, startPlate.userData.h), new THREE.MeshBasicMaterial({ map: canvasTex(256, 64, (x, pw, ph) => {
       x.fillStyle = '#120a1e'; x.fillRect(0, 0, pw, ph); x.fillStyle = '#ffd23f'; x.font = FONT(40); x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText('START', pw / 2, ph / 2 + 2);
     }) }));
-    sp.rotation.y = sx * Math.PI / 2;
-    put(sp, DUCK.x0 - 0.9 + sx * (startPlate.position.x + 0.01), tcz + startPlate.position.z, startPlate.position.y);
+    put(sp, DUCK.x0 - 0.9 + sx * (startPlate.position.x + 0.012), tcz + startPlate.position.z, startPlate.position.y, sx * Math.PI / 2);   // (faces along the track, like the lane plaques)
   }
   // the finish arch, its banner (the checker both ways) and the finish line
   const arch = makeDerbyPart('dd_finish');
   put(arch, DUCK.x1, tcz, 0);
   const bn = arch.getObjectByName('banner');
   const banner = new THREE.Mesh(new THREE.PlaneGeometry(bn.userData.w, bn.userData.h), checker);
-  banner.rotation.y = Math.PI / 2;
-  put(banner, DUCK.x1, tcz, bn.position.y);
+  put(banner, DUCK.x1, tcz, bn.position.y, Math.PI / 2);   // (across the lanes, like its beam)
   const ducks = laneCols.map((c, i) => {
     const d = makeDuck(c, i === 0 ? 0xff5a1f : 0xff9f1c, i + 1);
     put(d.root, DUCK.x0, DUCK.lanes[i], DUCK.water - 0.25, 0, true);
     return d;
   });
-  // the winner's cup, at the finish end of the rail
-  put(makeDerbyPart('dd_trophy'), DUCK.x1 + 2.6, lz0 + 1.2, 0);
-  col({ type: 'box', x: DUCK.x1 + 2.6, y: 1.2, z: lz0 + 1.2, hx: 0.75, hy: 1.2, hz: 0.75 });
   // odds board on the back wall: its gilded frame (the Blender model faces +x, turned to face the hall) and the plane the game paints
   const oddsCanvas = document.createElement('canvas');
   oddsCanvas.width = 1024; oddsCanvas.height = 384;

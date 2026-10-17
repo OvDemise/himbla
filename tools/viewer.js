@@ -223,12 +223,11 @@ if (m === 'shuttle' || m === 'freighter') {
     [0xfff4e0, 0xff2a4a, 0x2ee6ff, 0x7dff6a, 0x16121f, 0xc77dff, 0xffd23f].forEach((c, i) => { const g = makeChipStack(c, 5); g.position.set(-1.5 + i * 0.5, 1.155, 1.7); model.add(g); });
     height = 5;
   } else if (part === 'duckderby') {
-    // the Duck Derby's pieces in a row (build_duck.py): the four racers, the kiosk, the trophy, a rail post with its rope, the start gate with its grille and the finish arch
+    // the Duck Derby's pieces in a row (build_duck.py): the four racers, the kiosk, a rail post with its rope, the start gate with its grille and the finish arch
     let x = 0;
     const put = (g, w, y = 0) => { g.position.x = x + w / 2; g.position.y = y; x += w + 1; model.add(g); };
     [0xffd23f, 0xff2e88, 0x2ee6ff, 0x7dff6a].forEach((c, i) => { const d = makeRacer(i + 1, c, 0xff9f1c); put(d.root, 1.8, 0.4); });
     put(makeDerbyPart('dd_kiosk'), 3);
-    put(makeDerbyPart('dd_trophy'), 1.6);
     const post = makeDerbyPart('dd_railpost'), rope = makeDerbyPart('dd_rope');
     put(post, 3.5); rope.position.x = post.position.x - 0.0; model.add(rope);
     const gate = makeDerbyPart('dd_gate'), grille = makeDerbyPart('dd_grille');
