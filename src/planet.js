@@ -313,7 +313,10 @@ ${SKIN_COMMON}`)
         // fades out where the rim itself does (worn away, or flattened under a settlement), and
         // with distance
         .replace('#include <color_fragment>', `#include <color_fragment>
-float rimShade = smoothstep(0.55, 1.0, vRim);
+float rimOld = (uSkin > 0.5 && uSkin < 1.5) ? 0.0 : 1.0; // (the regolith look draws its own rims: moonSkins.js skRim)
+// the soft shade over the rim zone stays in the regolith look too, but only from a distance: it fades in as a pixel grows past 3 cm
+// and is full from 30 cm (about 100 m up), where the rim's blocks have faded out. Close to, the rock is the rim
+float rimShade = smoothstep(0.55, 1.0, vRim) * mix(smoothstep(0.03, 0.3, skPx), 1.0, rimOld);
 diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.32, 0.27, 0.42), rimShade * 0.3);
 vec3 rimP = normalize(vHoleW) * ${R.toFixed(1)};
 // The ink runs along the crest of each grindable lip (rimOf): overlapping craters share one
@@ -321,11 +324,12 @@ vec3 rimP = normalize(vHoleW) * ${R.toFixed(1)};
 // floor (negative radius) get their own. It wavers a little, swells and thins, but stays on the
 // crest, where you grind.
 float rimU = 1e6, rimOwn = 1e6;
+vec3 rimCenU = vec3(0.0), rimCenO = vec3(0.0); // (the centre of the crater each distance is to: the regolith rims run their streaks along its radii)
 for (int i = 0; i < ${RIM_INK_MAX}; i++) {
   if (i >= uRimN) break;
   vec4 c = uRimC[i];
   float sd = distance(rimP, c.xyz) - abs(c.w);
-  if (c.w > 0.0) rimU = min(rimU, sd); else if (abs(sd) < abs(rimOwn)) rimOwn = sd;
+  if (c.w > 0.0) { if (sd < rimU) { rimU = sd; rimCenU = c.xyz; } } else if (abs(sd) < abs(rimOwn)) { rimOwn = sd; rimCenO = c.xyz; }
 }
 float rimWob = (rimNoise(rimP * 0.05) - 0.5) * 1.0 + (rimNoise(rimP * 0.17 + 4.0) - 0.5) * 0.4;
 float rimEdge = min(abs(rimU + rimWob), abs(rimOwn + rimWob));
@@ -337,7 +341,7 @@ float rimFar = 1.0 - smoothstep(${(RIM_INK_REACH * 0.7).toFixed(1)}, ${RIM_INK_R
 // the core and the pebbles and chips lie inside that. The test uses only rimEdge and rimPx (a screen-space
 // derivative, worked out above so nothing derivative-dependent sits inside the branch), with a little to
 // spare, and it skips six of the block's eight noise lookups on nearly every pixel: same result, less work.
-if (rimFar > 0.0 && rimEdge < 3.2 * max(3.2, 1.2 * rimPx) + 2.5) {
+if (rimOld > 0.5 && rimFar > 0.0 && rimEdge < 3.2 * max(3.2, 1.2 * rimPx) + 2.5) {
 // Not ink: a band of shattered regolith along the crest. An uneven rocky core whose edges break up
 // into patches, a soft scuffed halo round it, and rubble through it - dark pebbles and bright
 // chips of fresh rock (the grit fades out with distance before it can shimmer)
