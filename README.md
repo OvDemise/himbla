@@ -711,6 +711,8 @@ src/
   main.js        game loop, camera, state, explosions, job board flow
   config.js      world size and physics tuning
   planet.js      spherical moon: cube-sphere heightfield, craters, LOD chunk streaming, exact surface queries
+  boulders.js    the boulders' lumpy shapes (six, shared by every chunk), their ink shell, and the collider constant that fits a sphere to them
+  moonSkins.js   experiment: three candidate ground textures (regolith, etching, survey) as terrain shader chunks, and regolith's matching look for the rocks (`patchRockMaterial`) and the crater rims (`skRim`); off unless `?moonskin=1|2|3` or the Regolith ground texture setting (dev builds); the Ground detail setting sets its quality
   geo.js         sun/dark-side frame, great-circle and local-frame helpers
   reputation.js  faction standing, tiers, unlocks, Rustmoon state
   events.js      per-faction events, fluid sloshing, escorts, the Pirate Wreck

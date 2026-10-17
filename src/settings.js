@@ -4,6 +4,8 @@
 
 import { glyphHtml, glyphState, tokensFor } from './glyphs.js';
 import { gyroSupported } from './gyro.js';
+import { DEV_TOOLS } from './devtools.js';
+import { SKIN_FROM_URL } from './moonSkins.js';
 
 const KEY = 'moonrunner-settings-v1';
 
@@ -36,10 +38,13 @@ const RESERVED = ['Escape', 'Enter', 'Digit1', 'Digit2', 'Digit3', 'Digit4', 'Di
 
 
 // Quality presets: picking one sets these; changing any of them by hand makes it CUSTOM.
+// (Ground detail is for the regolith ground texture, moonSkins.js, which dev builds can switch on with the Regolith ground texture setting or ?moonskin=1: a release
+// build has neither, so its presets leave Ground detail out.)
+const gd = (n) => (DEV_TOOLS ? { groundDetail: n } : {});
 const PRESETS = {
-  low: { renderScale: 0.75, viewDist: 0.7, terrainDetail: 0.75, shadows: true, shadowRes: 1024, particles: 0.6 },
-  medium: { renderScale: 1, viewDist: 1, terrainDetail: 1, shadows: true, shadowRes: 2048, particles: 1 },
-  high: { renderScale: 1, viewDist: 1.3, terrainDetail: 1.3, shadows: true, shadowRes: 4096, particles: 1.3 },
+  low: { renderScale: 0.75, viewDist: 0.7, terrainDetail: 0.75, shadows: true, shadowRes: 1024, particles: 0.6, ...gd(0) },
+  medium: { renderScale: 1, viewDist: 1, terrainDetail: 1, shadows: true, shadowRes: 2048, particles: 1, ...gd(1) },
+  high: { renderScale: 1, viewDist: 1.3, terrainDetail: 1.3, shadows: true, shadowRes: 4096, particles: 1.3, ...gd(2) },
 };
 const PRESET_KEYS = Object.keys(PRESETS.medium);
 const PRESET_NAME = { low: 'LOW', medium: 'MEDIUM', high: 'HIGH' };
@@ -56,6 +61,11 @@ export const SCHEMA = {
     { key: 'terrainDetail', label: 'Terrain detail', type: 'range', min: 0.6, max: 1.6, step: 0.05, def: 1, fmt: pct, hint: 'How far the detailed ground reaches' },
     { key: 'shadows', label: 'Shadows', type: 'toggle', def: true },
     { key: 'shadowRes', label: 'Shadow quality', type: 'choice', def: 2048, options: [[1024, 'LOW'], [2048, 'MEDIUM'], [4096, 'HIGH']] },
+    // (the regolith ground texture, moonSkins.js: dev builds only for now, and off unless chosen)
+    ...(DEV_TOOLS ? [
+      { key: 'regolith', label: 'Regolith ground texture', type: 'toggle', def: false, hint: 'Lunar dust, pebbles and craters on the ground, and grain and dust on the rocks' },
+      { key: 'groundDetail', label: 'Ground detail', type: 'choice', def: 1, options: [[0, 'LOW'], [1, 'MEDIUM'], [2, 'HIGH']], hint: 'How much of the regolith texture is drawn: lower is faster' },
+    ] : []),
     { key: 'halftone', label: 'Comic halftone dots', type: 'toggle', def: true },
     { key: 'speedLines', label: 'Speed lines', type: 'toggle', def: true },
     { key: 'ink', label: 'Ink outline strength', type: 'range', min: 0, max: 2, step: 0.1, def: 1, fmt: pct },
@@ -191,6 +201,8 @@ export class Settings {
       if (d.binds && typeof d.binds === 'object') this.v.binds = { ...d.binds };
       if (typeof d.autoTuned === 'boolean') this.v.autoTuned = d.autoTuned;
       if (d.preset === undefined) this.v.preset = this.matchPreset(); // (settings saved before presets existed)
+      // (saved before Ground detail existed: it follows the preset they were on, so a LOW preset does not get HIGH detail)
+      else if (d.groundDetail === undefined && PRESETS[d.preset] && PRESETS[d.preset].groundDetail !== undefined) this.v.groundDetail = PRESETS[d.preset].groundDetail;
       this.stored = true;
     } catch { /* corrupt or unavailable */ }
   }
@@ -291,7 +303,18 @@ export class Settings {
         if (sh.map) { sh.map.dispose(); sh.map = null; }
       }
     }
-    if (g.planet) g.planet.lodScale = v.terrainDetail;
+    if (g.planet) {
+      g.planet.lodScale = v.terrainDetail;
+      if (DEV_TOOLS && g.planet.holeU.uSkinQ) {
+        g.planet.holeU.uSkinQ.value = v.groundDetail;
+        // the regolith toggle picks look 1 or the classic 0. ?moonskin=N (the other looks, for trying) wins until the toggle is
+        // first changed, so opening the Settings menu does not undo it.
+        const sk = g.planet.holeU.uSkin;
+        if (this.regolithOn === undefined) { if (!SKIN_FROM_URL) sk.value = v.regolith ? 1 : 0; }
+        else if (this.regolithOn !== v.regolith) sk.value = v.regolith ? 1 : 0;
+        this.regolithOn = v.regolith;
+      }
+    }
     if (g.fx) g.fx.density = v.particles;
     for (const post of [g.post]) {
       if (!post) continue;
