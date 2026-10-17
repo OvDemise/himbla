@@ -8,6 +8,7 @@ import { makeChimera, makeMite, LIVING, MODIFIERS, spliceGenes } from '../src/ch
 import { ComicPost } from '../src/post.js';
 import '../src/wardrobe.js'; // (first: wardrobe and cosmetics import each other, and only this order initialises OUTFITS in time)
 import { dressRunner } from '../src/cosmetics.js';
+import { slotCabinet, updateSlot } from '../src/casinoWorld.js';
 
 const Q = new URLSearchParams(location.search);
 const num = (k, d) => (Q.has(k) ? parseFloat(Q.get(k)) : d);
@@ -145,6 +146,37 @@ if (m === 'shuttle' || m === 'freighter') {
   model = gar.root;
   anim = (t) => gar.update(t);
   height = 12;
+} else if (m === 'slots') {
+  // the casino's slot cabinet (build_slots.py). &n=4 in a row, &gap=3.2 apart  &ring=7 a carousel of them round a pillar at &rr=3.6  &idx=0 the first one's colour and name
+  // &pull=rad turns the lever  &play=1 works them like a patron (the lever, the lamp bar, the reels)
+  const COLS = [0xff2e88, 0x2ee6ff, 0x7dff6a, 0xff9f1c, 0xc77dff, 0xffd23f, 0x4d7cff];
+  const cabs = [];
+  model = new THREE.Group();
+  const first = num('idx', 0), ring = num('ring', 0), rr = num('rr', 3.6);
+  const add = (i, x, z, yaw) => {
+    const cab = slotCabinet(COLS[(first + i) % COLS.length], first + i);
+    for (const o of [cab.userData.stat, cab]) { o.position.set(x, 0, z); o.rotation.y = yaw; model.add(o); }
+    if (Q.has('pull')) cab.userData.pull.rotation.x = num('pull', 0);
+    cabs.push(cab);
+  };
+  if (ring) {
+    const base = new THREE.Mesh(new THREE.CylinderGeometry(rr + 3.8, rr + 4, 0.3, 40), new THREE.MeshToonMaterial({ color: 0x2a1450 })); base.position.y = 0.15; model.add(base);
+    const pil = new THREE.Mesh(new THREE.CylinderGeometry(1.4, 1.6, 7.5, 16), new THREE.MeshToonMaterial({ color: 0x5a1a8f })); pil.position.y = 3.75; model.add(pil);
+    for (let k = 0; k < ring; k++) { const a = (k / ring) * Math.PI * 2; add(k, Math.cos(a) * rr, Math.sin(a) * rr, Math.atan2(Math.cos(a), Math.sin(a))); }
+    height = 9;
+  } else {
+    const n = num('n', 4), gap = num('gap', 3.2);
+    for (let i = 0; i < n; i++) add(i, (i - (n - 1) / 2) * gap, 0, 0);
+    height = 5;
+  }
+  let nextPull = 0;
+  anim = (t, sp, dt) => {
+    for (const c of cabs) {
+      if (Q.get('play') === '1' && t > nextPull) { c.userData.pullT = 0.35; c.userData.playing = 1.6; }
+      updateSlot(c.userData, dt, t);
+    }
+    if (t > nextPull) nextPull = t + 3.2;
+  };
 } else if (m === 'dish') {
   // &kind=cryo|gantry  &faction=kepler|meridian|spacecom|vostok  &no=01..04 (the dish's number)  &size=30 (the old dish's size: a 30 m mount scales to it)
   // &tilt=rad (the dish's elevation, as the game sweeps it: -0.35 to -0.85)  &az=rad (its azimuth)  &sweep=1 turns and nods it like the game; the lamps blink

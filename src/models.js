@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { toon, ink, glow, inkMat, inkMatNear } from './toon.js';
+import { toon, ink, glow, glowShared, inkMat, inkMatNear } from './toon.js';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
@@ -17,6 +17,7 @@ const GLB = {
   landtrain: () => import('./assets/landtrain.glb?inline'),
   crane: () => import('./assets/crane.glb?inline'),
   garage: () => import('./assets/garage.glb?inline'),
+  slots: () => import('./assets/slots.glb?inline'),
   dish: () => import('./assets/dish.glb?inline'),
   engine: () => import('./assets/engine.glb?inline'),
   briefcase: () => import('./assets/briefcase.glb?inline'),
@@ -1378,7 +1379,7 @@ const SHIP_TOON = { trim: 0xd8d4e8, dark: 0x2a2540, metal: 0x8a87a0, steel: 0x55
 const SHIP_FX = new Set(['plume', 'plumeCore', 'lift', 'engine', 'core', 'beacon']); // per-ship materials (they pulse)
 const FLAMES = new Set(['plume', 'plumeCore', 'lift', 'beacon']);
 export async function loadShipParts() {
-  const [gltf, sk, wr, ap, lt, cr, ga, di, en, bc, hc] = await Promise.all(['ships', 'skimmer', 'warrig', 'apc', 'landtrain', 'crane', 'garage', 'dish', 'engine', 'briefcase', 'hovercar'].map(loadGlb));
+  const [gltf, sk, wr, ap, lt, cr, ga, di, en, bc, hc, sl] = await Promise.all(['ships', 'skimmer', 'warrig', 'apc', 'landtrain', 'crane', 'garage', 'dish', 'engine', 'briefcase', 'hovercar', 'slots'].map(loadGlb));
   SHIP_PARTS = {};
   for (const name of ['shuttle', 'freighter']) {
     const root = gltf.scene.getObjectByName(name);
@@ -1414,6 +1415,10 @@ export async function loadShipParts() {
   const shed = ga.scene.getObjectByName('garage_small');
   if (!shed) throw new Error('garage.glb has no garage_small');
   SHIP_PARTS.garage_small = bakeShip(shed);
+  // the casino's slot-machine cabinet (tools/blender/build_slots.py)
+  const slot = sl.scene.getObjectByName('slot');
+  if (!slot) throw new Error('slots.glb has no slot');
+  SHIP_PARTS.slot = bakeShip(slot);
   // the radio-dish array stations (tools/blender/build_dish.py)
   for (const kind of DISH_KINDS) {
     const station = di.scene.getObjectByName('dish_' + kind);
@@ -2052,6 +2057,53 @@ export function makeGarage({ open = [true, false, true], kind = 'main', trim = 0
     root.add(lamp);
   }
   return { root, heads, update(t) { for (const h of heads) h.rotation.y = t * h.userData.spin; } };
+}
+
+// ---- The casino's slot-machine cabinet (built in Blender, see build_slots.py) ----
+// A pixel-arcade video slot facing +z, about 2.2 m wide, 1.6 m deep (z from -0.71 to 0.91) and 4.3 m tall, its lever on the right side. The baked tree: the
+// root's own meshes are the cabinet, the `pull` pivot is the lever (turned about x), `lamp` the roof lamp bar, and the `screen` (marquee), `display`
+// (pixel-reel screen) and `decal` (side art) pivots have no meshes: they say where the casino hangs its textured planes.
+const SLOT_TOON = { dark: 0x1f1a30, bezel: 0x15101f, panel: 0x2a2440, chrome: 0xdcdff0, gold: 0xffd23f, cream: 0xf7f0dc, coin: 0xffd94d };
+const SLOT_GLOW = { ledr: 0xff2a4a, ledg: 0x7dff6a, ledb: 0x2ee6ff, bulb: 0xfff6a8, display: 0x120a2e };
+export const SLOT_LAMP_OFF = 0x5a2a1a;
+
+// A cabinet painted `color`. `stat` holds what never moves (the casino freezes it, so the world merges a whole carousel of them into a few draw
+// calls), `dyn` the lever and the lamp bar (put both where the cabinet stands). `lamp` is the bar's mesh, `pull` the lever's pivot, and `spots` says
+// where the planes go: { screen, display, decals: [] }, each { pos, w, h, tilt } (a decal also has `side`, -1 or 1, and `id`).
+export function makeSlotCabinet(color) {
+  const B = SHIP_PARTS.slot;
+  const shade = new THREE.Color(color).multiplyScalar(0.62).getHex(), neon = new THREE.Color(color).lerp(new THREE.Color(0xffffff), 0.4).getHex(); // (the glow is the paint, brighter)
+  const matFor = (slot) => (slot === 'body' ? toon(color) : slot === 'shade' ? toon(shade) : slot === 'neon' ? glowShared(neon) : slot in SLOT_GLOW ? glowShared(SLOT_GLOW[slot]) : toon(SLOT_TOON[slot] ?? 0xff00ff));
+  const dress = (node, g, lamp = false) => {
+    let bar = null;
+    for (const { slot, geo } of node.parts) {
+      const m = new THREE.Mesh(geo, lamp ? glowShared(SLOT_LAMP_OFF) : matFor(slot));
+      m.castShadow = !lamp && !(slot in SLOT_GLOW) && slot !== 'neon';
+      g.add(m);
+      if (lamp) bar = m;
+    }
+    if (node.ink) { const m = new THREE.Mesh(node.ink, inkMat); m.userData.isInk = true; g.add(m); }
+    return bar;
+  };
+  const stat = new THREE.Group(), dyn = new THREE.Group();
+  const spots = { screen: null, display: null, decals: [] };
+  dress(B, stat);
+  let pull = null, lamp = null;
+  for (const k of B.kids) {
+    const spot = { pos: k.pos, w: k.data.w, h: k.data.h, tilt: k.data.tilt || 0, side: k.data.side, id: k.data.id };
+    if (k.role === 'screen') spots.screen = spot;
+    else if (k.role === 'display') spots.display = spot;
+    else if (k.role === 'decal') spots.decals.push(spot);
+    else if (k.role === 'pull' || k.role === 'lamp') {
+      const g = new THREE.Group();
+      g.position.copy(k.pos);
+      g.quaternion.copy(k.quat);
+      const bar = dress(k, g, k.role === 'lamp');
+      dyn.add(g);
+      if (k.role === 'pull') pull = g; else lamp = bar;
+    }
+  }
+  return { stat, dyn, pull, lamp, spots };
 }
 
 // ---- The dish-array stations (built in Blender, see build_dish.py) ----

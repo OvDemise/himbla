@@ -1,6 +1,7 @@
 import * as THREE from 'three';
-import { toon, ink, glow, textSprite, nameTag } from './toon.js';
-import { makeFigure } from './models.js';
+import { toon, ink, glow, glowShared, textSprite, nameTag } from './toon.js';
+import { makeFigure, makeSlotCabinet, SLOT_LAMP_OFF } from './models.js';
+import { pxCanvas } from './pixelIcons.js';
 import { pixelFont } from './fonts.js';
 import { faceInfo, glyphState } from './glyphs.js';
 import { PEGS, SEGS, SLOTS, MULTS, SPACING, DROP_Y, DIVIDER_TOP, slotEdge, slotCentre } from './plinko.js';
@@ -239,44 +240,130 @@ function waterTex() {
   return t;
 }
 
-// A slot-machine cabinet (the carousels outside, and the Classic Games corner inside). Its pull arm
-// and a "playing" light are exposed in userData so a patron can work it.
-function slotCabinet(color, face) {
-  const g = new THREE.Group();
-  const body = mesh(new THREE.BoxGeometry(3, 4.4, 2.2), toon(color), 0.08);
-  body.position.y = 2.2;
-  const top = mesh(new THREE.CylinderGeometry(1.5, 1.5, 2.2, 12, 1, false, 0, Math.PI).rotateZ(Math.PI / 2).rotateY(Math.PI / 2), toon(0xffd23f), 0.06);
-  top.position.y = 4.4;
-  const scr = new THREE.Mesh(new THREE.PlaneGeometry(2.3, 1.15), new THREE.MeshBasicMaterial({ map: screenTex(face, '#5a1a8f') }));
-  scr.position.set(0, 3.1, 1.11);
-  const tray = mesh(new THREE.BoxGeometry(2.4, 0.4, 0.6), toon(0x3a3550), 0.04);
-  tray.position.set(0, 1.4, 1.3);
-  const arm = mesh(new THREE.CylinderGeometry(0.1, 0.1, 2, 6), toon(0xc9c3d9), 0.03);
-  arm.position.set(1.7, 3.4, 0);
-  const knob = new THREE.Mesh(new THREE.SphereGeometry(0.32, 10, 8), glow(0xff2a4a));
-  knob.position.set(0, 1.05, 0);
-  // the pull arm pivots at its base, so it can be yanked down
-  const pull = new THREE.Group();
-  pull.position.set(1.7, 2.35, 0);
-  arm.position.set(0, 1.05, 0);
-  pull.add(arm, knob);
-  // light strips down the cabinet's edges, a glowing coin tray and a lamp on top that flashes
-  // while someone's playing
-  const strip = glow(color);
-  for (const sx of [-1, 1]) {
-    const st = new THREE.Mesh(new THREE.BoxGeometry(0.12, 4.2, 0.12), strip);
-    st.position.set(sx * 1.52, 2.2, 1.12);
-    g.add(st);
+// ---- Slot-machine cabinets (the carousels outside, and the Classic Games corner inside) ----
+// The model is built in Blender (tools/blender/build_slots.py, models.js makeSlotCabinet); here it gets its pictures: the marquee with the
+// cabinet's name, the pixel sprites on its sides and the pixel-reel screen, which scrolls while a patron plays. What never moves is frozen
+// (`userData.stat`, which the world merges: the marquee and each side picture share one material, so a whole carousel is a few draw calls);
+// the cabinet itself is the lever, the lamp bar and the screen, which a patron works through its userData.
+const SLOT_FACES = ['777', 'BAR', '$$$', 'JKP', '7♦7', 'WIN', 'SPIN'];
+const SLOT_REELS = ['moon', 'comet', 'rocket', 'alien', 'ufo', 'diamond', 'wild']; // (the symbols of the overlay's slots)
+const SLOT_ART = { low: ['ufo', 'alien', 'rocket', 'moon', 'comet', 'diamond', 'wild'], up: ['star', 'crown', 'coin', 'chip', 'flame', 'heart', 'spade'] };
+const SLOT_POLY = { polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }; // (planes a few mm off a cabinet's face)
+const slotMats = { marquee: new Map(), art: new Map(), idle: new Map() };
+const slotLampOff = glowShared(SLOT_LAMP_OFF), slotLampOn = glowShared(0xffd23f);
+
+function marqueeMat(face, color) {
+  const key = face + color;
+  let m = slotMats.marquee.get(key);
+  if (!m) {
+    const hex = '#' + color.toString(16).padStart(6, '0');
+    m = new THREE.MeshBasicMaterial({
+      map: canvasTex(256, 92, (x, w, h) => {
+        x.fillStyle = '#120a1e'; x.fillRect(0, 0, w, h);
+        x.fillStyle = '#3d1366'; x.fillRect(5, 5, w - 10, h - 10);
+        for (let i = 0; i < 16; i++) { x.fillStyle = i % 2 ? '#fff6a8' : hex; x.fillRect(10 + i * 15.6, 8, 6, 6); x.fillRect(10 + i * 15.6, h - 14, 6, 6); }
+        fitText(x, face, w - 40, 56);
+        x.textAlign = 'center'; x.textBaseline = 'middle';
+        x.lineWidth = 8; x.lineJoin = 'round'; x.strokeStyle = '#120a1e'; x.strokeText(face, w / 2, h / 2 + 2);
+        x.fillStyle = '#ffd23f'; x.fillText(face, w / 2, h / 2 + 2);
+      }),
+      ...SLOT_POLY,
+    });
+    slotMats.marquee.set(key, m);
   }
-  const trayGlow = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.08, 0.5), glow(0xffd23f));
-  trayGlow.position.set(0, 1.62, 1.3);
-  const lamp = new THREE.Mesh(new THREE.SphereGeometry(0.35, 10, 8), new THREE.MeshBasicMaterial({ color: 0x5a2a1a }));
-  lamp.position.set(0, 6.0, 0);
-  const lampPost = mesh(new THREE.CylinderGeometry(0.08, 0.08, 0.5, 6), toon(0x3a3550), 0);
-  lampPost.position.set(0, 5.65, 0);
-  g.add(body, top, scr, tray, trayGlow, pull, lampPost, lamp);
-  g.userData = { pull, lamp, scr, playing: 0, pullT: 0 };
-  return g;
+  return m;
+}
+
+// a pixel sprite in a gold-framed dark square, for a cabinet's side
+function artMat(name) {
+  let m = slotMats.art.get(name);
+  if (!m) {
+    const t = canvasTex(64, 64, (x, w, h) => {
+      x.fillStyle = '#ffd23f'; x.fillRect(0, 0, w, h);
+      x.fillStyle = '#1b1430'; x.fillRect(3, 3, w - 6, h - 6);
+      const cv = pxCanvas(name);
+      if (cv) {
+        const k = Math.max(1, Math.floor(46 / Math.max(cv.width, cv.height)));
+        x.imageSmoothingEnabled = false;
+        x.drawImage(cv, Math.round((w - cv.width * k) / 2), Math.round((h - cv.height * k) / 2), cv.width * k, cv.height * k);
+      }
+    });
+    t.magFilter = THREE.NearestFilter;
+    m = new THREE.MeshBasicMaterial({ map: t, ...SLOT_POLY });
+    slotMats.art.set(name, m);
+  }
+  return m;
+}
+
+// The pixel-reel screen: three reels of the overlay's sprites, `pos` the position of each in symbols (a fraction scrolls it)
+function drawReels(x, w, h, pos) {
+  x.fillStyle = '#0b0820'; x.fillRect(0, 0, w, h);
+  x.fillStyle = '#1b1040'; x.fillRect(6, 6, w - 12, h - 12);
+  x.save();
+  x.beginPath(); x.rect(8, 8, w - 16, h - 16); x.clip();
+  x.imageSmoothingEnabled = false;
+  const n = SLOT_REELS.length;
+  for (let c = 0; c < 3; c++) {
+    const base = Math.floor(pos[c]), f = pos[c] - base;
+    for (let r = -1; r <= 3; r++) {
+      const cv = pxCanvas(SLOT_REELS[(((base - r + c * 2) % n) + n) % n]);
+      if (cv) x.drawImage(cv, 14 + c * 78, 12 + (r + f) * 56, 52, 52);
+    }
+  }
+  x.restore();
+  x.fillStyle = '#ff2a4a'; x.fillRect(6, h / 2 - 1, w - 12, 3);
+}
+const reelPos = (seed) => [seed, seed + 1, seed + 2];
+function idleMat(seed) { // (the screen of a cabinet nobody has played yet: shared, one picture per seed)
+  let m = slotMats.idle.get(seed);
+  if (!m) slotMats.idle.set(seed, m = new THREE.MeshBasicMaterial({ map: canvasTex(256, 192, (x, w, h) => drawReels(x, w, h, reelPos(seed))), ...SLOT_POLY }));
+  return m;
+}
+
+export function slotCabinet(color, idx) {
+  const M = makeSlotCabinet(color);
+  const sp = M.spots, n = SLOT_FACES.length;
+  const plane = (spot, mat, ry = 0) => {
+    const p = new THREE.Mesh(new THREE.PlaneGeometry(spot.w, spot.h), mat);
+    p.position.copy(spot.pos);
+    p.rotation.set(-spot.tilt, ry, 0);
+    return p;
+  };
+  M.stat.add(plane(sp.screen, marqueeMat(SLOT_FACES[idx % n], color)));
+  for (const d of sp.decals) M.stat.add(plane(d, artMat(SLOT_ART[d.id][(idx + (d.side > 0 ? 0 : 3)) % SLOT_ART[d.id].length]), d.side * Math.PI / 2));
+  const display = plane(sp.display, idleMat(idx % n));
+  M.dyn.add(display);
+  M.dyn.userData = { stat: M.stat, pull: M.pull, lamp: M.lamp, display, seed: idx % n, playing: 0, pullT: 0, lampOn: false, reel: null };
+  return M.dyn;
+}
+
+// One frame of a cabinet being worked: the lever swings back, the lamp bar flashes while it is played, and the reels run, stopping one after
+// another (a cabinet that has been played keeps its last picture on a screen of its own).
+const REEL_STOP = [1.0, 0.65, 0.3];
+export function updateSlot(u, dt, time) {
+  u.playing = Math.max(0, u.playing - dt);
+  const flash = u.playing > 0 && Math.sin(time * 18) > 0;
+  if (flash !== u.lampOn) { u.lampOn = flash; u.lamp.material = flash ? slotLampOn : slotLampOff; }
+  u.pull.rotation.x += ((u.pullT > 0 ? 1.1 : 0) - u.pull.rotation.x) * Math.min(1, dt * 14);
+  u.pullT = Math.max(0, u.pullT - dt);
+  if (u.playing > 0 && !u.reel) {
+    const tex = canvasTex(256, 192, () => {});
+    u.reel = { tex, ctx: tex.image.getContext('2d'), mat: new THREE.MeshBasicMaterial({ map: tex, ...SLOT_POLY }), pos: reelPos(u.seed), acc: 1, live: [true, true, true] };
+    u.display.material = u.reel.mat;
+  }
+  const r = u.reel;
+  if (!r || (!u.playing && !r.live.some(Boolean))) return;
+  let draw = false;
+  r.acc += dt;
+  for (let c = 0; c < 3; c++) {
+    if (u.playing > REEL_STOP[c]) { r.pos[c] += dt * 16; r.live[c] = true; }
+    else if (r.live[c]) { r.pos[c] = Math.ceil(r.pos[c]); r.live[c] = false; draw = true; } // (lands on a symbol)
+  }
+  if (draw || r.acc > 1 / 15) {
+    r.acc = 0;
+    drawReels(r.ctx, 256, 192, r.pos);
+    r.tex.needsUpdate = true;
+  }
 }
 
 // A rubber duck, ~1.3 m long, facing +x.
@@ -322,7 +409,7 @@ export const HALL = { W: 26, FRONT: 12, BACK: -34, H: 16, DOOR: 5, DOOR_H: 9 };
 export const BJ = { x: -14, z: -8, R: 3.4, top: 1.16 };
 export const DUCK = { x0: -22, x1: 2, lanes: [-21.5, -23.1, -24.7, -26.3], water: 0.86, kiosk: [-10, -17.4] };
 export const PLK = { x: 14, y: 1.2, z: -31 };
-export const CLASSIC = { x: 22.4, zs: [-1.5, 2.5, 6.5] };
+export const CLASSIC = { x: 22.4, mid: 2.5, zs: [-2.3, 0.9, 4.1, 7.3] };   // (the corner's slot cabinets: facing -x, 3.2 m apart)
 export const PRIZE = { x: 22, z: -13 };
 
 export function buildCasino(w, loc) {
@@ -333,9 +420,10 @@ export function buildCasino(w, loc) {
   const CZ = (D + BACK) / 2, DEP = D - BACK;
   const put = (o, x, z, y = 0, yaw = 0, dyn = false) => w.put(o, loc, x, z, y, yaw, dyn);
   const col = (spec) => w.col(loc, spec);
+  // a slot cabinet: its frozen body (merged by the world) and the cabinet itself, which is frozen too unless a patron works it
+  const placeSlot = (cab, x, z, yaw, animated) => { put(cab.userData.stat, x, z, 0, yaw); put(cab, x, z, 0, yaw, animated); };
   // glow materials shared by colour, so a run of trim pieces merges into a draw call or two (glow() makes a new one each time)
-  const sharedGlow = new Map();
-  const glowS = (c) => { let m = sharedGlow.get(c); if (!m) sharedGlow.set(c, m = glow(c)); return m; };
+  const glowS = glowShared;
 
   // ---------- the hall: four walls with a wide door gap, a roof, a stepped crown ----------
   const wallM = toon(0x2a1450);
@@ -463,12 +551,11 @@ export function buildCasino(w, loc) {
   put(pointer, 36, 20.9, 22.6);
   col({ type: 'box', x: 36, y: 12.5, z: 20, hx: 9.5, hy: 9.5, hz: 1 });
 
-  // slot carousels either side of the carpet: six cabinets facing out round a glowing pillar with a
+  // slot carousels either side of the carpet: seven cabinets facing out round a glowing pillar with a
   // spinning SLOTS topper, under a canopy ringed with chasing bulbs, a stool at every machine
-  const cols = [0xff2e88, 0x2ee6ff, 0x7dff6a, 0xff9f1c, 0xc77dff, 0xffd23f];
-  const faces = ['777', 'BAR', '$$$', 'JKP', '7♦7', 'WIN'];
+  const cols = [0xff2e88, 0x2ee6ff, 0x7dff6a, 0xff9f1c, 0xc77dff, 0xffd23f, 0x4d7cff];
   const cabinets = [], toppers = [], yardSpots = [];
-  const CAR_R = 4.4, STAND_R = 7.1;
+  const CAR_R = 3.6, STAND_R = 6.2, CAR_N = 7;
   let n = 0;
   for (const sx of [-1, 1]) {
     const cx = sx * 15, cz = D + 19;
@@ -484,15 +571,15 @@ export function buildCasino(w, loc) {
     ink(topper, 0.06);
     put(topper, cx, cz, 9.4, 0, true);
     toppers.push(topper);
-    col({ type: 'cyl', x: cx, z: cz, y0: -1, y1: 8, r: CAR_R + 1.2 });
-    for (let k2 = 0; k2 < 6; k2++) {
-      const a = (k2 / 6) * Math.PI * 2 + (sx < 0 ? 0.3 : 0);
+    col({ type: 'cyl', x: cx, z: cz, y0: -1, y1: 8, r: CAR_R + 1.2 });   // (the cabinets' fronts and corners reach 4.7 m)
+    for (let k2 = 0; k2 < CAR_N; k2++) {
+      const a = (k2 / CAR_N) * Math.PI * 2 + (sx < 0 ? 0.3 : 0);
       const ox = Math.cos(a), oz = Math.sin(a);
       const yaw = Math.atan2(ox, oz); // the cabinet's front (+z) faces out from the pillar
-      const cab = slotCabinet(cols[n % cols.length], faces[n % faces.length]);
-      put(cab, cx + ox * CAR_R, cz + oz * CAR_R, 0, yaw, true);
+      const cab = slotCabinet(cols[n % cols.length], n);
+      placeSlot(cab, cx + ox * CAR_R, cz + oz * CAR_R, yaw, true);
       cabinets.push(cab);
-      put(mesh(new THREE.CylinderGeometry(0.45, 0.3, 0.9, 10), toon(0xd7263d), 0.04), cx + ox * (CAR_R + 1.75), cz + oz * (CAR_R + 1.75), 0.45);
+      put(mesh(new THREE.CylinderGeometry(0.45, 0.3, 0.9, 10), toon(0xd7263d), 0.04), cx + ox * (CAR_R + 1.65), cz + oz * (CAR_R + 1.65), 0.45);
       // where a patron stands to play it, and a clear point further out to walk via
       yardSpots.push({ kind: 'slot', cab, x: cx + ox * STAND_R, z: cz + oz * STAND_R, yaw: yaw + Math.PI, ax: cx + ox * (STAND_R + 2.4), az: cz + oz * (STAND_R + 2.4), busy: false });
       n++;
@@ -817,15 +904,15 @@ export function buildCasino(w, loc) {
 
   // ---------- CLASSIC GAMES corner + prize counter ----------
   CLASSIC.zs.forEach((z, i) => {
-    put(slotCabinet([0xc77dff, 0x2ee6ff, 0xff9f1c][i], ['777', 'JKP', 'BAR'][i]), CLASSIC.x, z, 0, -Math.PI / 2);
-    col({ type: 'box', x: CLASSIC.x, y: 2.5, z, hx: 1.2, hy: 2.5, hz: 1.6 });
+    placeSlot(slotCabinet([0xc77dff, 0x2ee6ff, 0xff9f1c, 0x7dff6a][i], [0, 3, 1, 5][i]), CLASSIC.x, z, -Math.PI / 2, false);
+    col({ type: 'box', x: CLASSIC.x - 0.1, y: 2.2, z: z + 0.2, hx: 0.85, hy: 2.2, hz: 1.3 }); // (the lever side is +z)
   });
   const clSign = new THREE.Mesh(new THREE.PlaneGeometry(10, 2.5), new THREE.MeshBasicMaterial({ map: neonTex('CLASSIC GAMES', { color: '#ff7ad9', edge: '#7dff6a', sub: 'SLOTS · ROULETTE · PRIZE WHEEL · HIGH-LOW' }) }));
-  put(clSign, W - 1.15, CLASSIC.zs[1], 8.2, -Math.PI / 2);
+  put(clSign, W - 1.15, CLASSIC.mid, 8.2, -Math.PI / 2);
   const vinnie = makeFigure({ suit: 0x1f8a4a, helmet: 0x7dff6a, visor: 0xffd23f, scale: 1.1 });
-  put(vinnie.root, CLASSIC.x - 2.5, CLASSIC.zs[0] - 3, 0, -Math.PI / 2 - 0.5);
+  put(vinnie.root, CLASSIC.x - 2.5, CLASSIC.zs[0] - 2.2, 0, -Math.PI / 2 - 0.5);
   const vin = nameTag(textSprite('VINNIE "THE VISOR" · PIT BOSS', { color: '#7dff6a', size: 44, scale: 0.22, bg: '#120a1e' }), 'VINNIE "THE VISOR" · PIT BOSS', '#7dff6a');
-  vin.position.set(CLASSIC.x - 2.5, 3.4, CLASSIC.zs[0] - 3);
+  vin.position.set(CLASSIC.x - 2.5, 3.4, CLASSIC.zs[0] - 2.2);
   loc.group.add(vin);
   // ---------- the prize counter: a gold booth against the right-hand wall, with a glass display case, a till, a header with
   // pennants and a lit prize wall behind the staff. Built in the booth's own frame: pcPut(o, lx, y, lz) takes lx along the
@@ -1036,14 +1123,7 @@ export function buildCasino(w, loc) {
     pt.stay = sp.kind === 'slot' ? 8 + Math.random() * 14 : 4 + Math.random() * 8;
   }
   function updatePatrons(dt, time) {
-    for (const c of cabinets) {
-      const u = c.userData;
-      u.playing = Math.max(0, u.playing - dt);
-      u.lamp.material.color.setHex(u.playing > 0 && Math.sin(time * 18) > 0 ? 0xffd23f : 0x5a2a1a);
-      u.pull.rotation.x += ((u.pullT > 0 ? 1.1 : 0) - u.pull.rotation.x) * Math.min(1, dt * 14);
-      u.pullT = Math.max(0, u.pullT - dt);
-      u.scr.position.y = 3.1 + (u.playing > 0 ? Math.sin(time * 40) * 0.01 : 0);
-    }
+    for (const c of cabinets) updateSlot(c.userData, dt, time);
     for (const pt of patrons) {
       const p = pt.root.position;
       const tgt = pt.path[0];
