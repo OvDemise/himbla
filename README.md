@@ -646,7 +646,7 @@ crowd-noise bed for now (the cheering is due a rework), and the race countdown b
   Void Skin (water/void-touched, see in the dark and harder to hit), Stone Hide (rock, +40 hull, more drag),
   Burrower Claws (dirt/mud, painless boot landings), Pirate Blood (pirate, hunting squads mostly ignore you).
   Each shows on your runner. Dr. Zbornak cures them for ₵200 each.
-- **Chimera Downs** (the racecourse, a short hop from the Funpark): a four-lane dirt oval with a grandstand full of
+- **Chimera Downs** (the racecourse): a four-lane dirt oval with a grandstand full of
   cheering fans, a jumbotron with live standings, a finish gantry, distance poles, a winner's circle and a golden
   chimera statue. The **race office** window (`F`) posts races over time, **up to three on the card**, each with
   its own **distance** (450 m sprints, miles, 2–2.8 km stakes and 3–3.6 km marathons), **class** (C, B, A or S
@@ -664,13 +664,6 @@ crowd-noise bed for now (the cheering is due a rework), and the race countdown b
   cheers** for a short surge that burns stamina (a dim creature may get spooked instead). Chaos as ever: stumbles,
   zooms, wrong-way runs, giant hops, and the occasional explosion and reassembly.
 - **The Monolith:** touch it (90 s cooldown) and it casts one of three spells, never the same twice running: **Time Dilation** (20 s with pirates, their shots, traffic and meteors at 40 % speed while you keep full speed), **Echo Followers** (one or two holograms of you that retrace your every move a moment late, mid-air jumps and all, for up to ten minutes or until one takes a shot for you; anyone shooting at you picks one of you at random) or **Teleport** (a random spot on the Moon, on flat safe ground away from settlements and lakes, where you land at a standstill one time in four and otherwise running at a random 1–300 km/h; you keep your health and fuel, and a launch comes with a few seconds of Soft Landing so the arrival can't wipe you out).
-- **Bounce Dome Funpark:** a turreted bouncy castle and a row of trampolines that throw you back
-  up harder than you landed (the bounce domes, the entrance arch and the stray lamp posts and light strings are gone; `docs/funpark-layouts.md` proposes two layouts that blend the bouncy and skate parts and add grind rails), plus a **skate park**: a volcano bowl (ride up the outside and drop in, or hit it fast and
-  fly clean over), a kicker line with a big launch off the plateau edge, a big **half-pipe** (two matching ~7 m walls
-  facing each other across a flat bottom, with decks and stairs) and a pyramid funbox, spread out on the east side. The big ferris wheel (twelve open gondolas, ~50 m tall) and the carousel are **rideable**: `F`
-  beside one pops you into the nearest gondola or onto the nearest horse, `F` hops you off (from the top of the
-  wheel, too, if you're brave). While you sit in one the HUD steps aside: just the picture and the hop-off prompt.
-  (The chimera races moved to Chimera Downs.)
 
 ## Locations
 
@@ -747,7 +740,7 @@ src/
   pixelIcons.js  the classic-games overlay's pixel-art sprites (slot symbols, the pit boss, chips, cards' suits…) as plain rows of palette letters
   cosmetics.js   outfits, skate finishes, laser colours, wardrobe
   race.js        Chimera Downs: racecourse, race card, betting, locked race camera, chaos racing
-  rides.js       hop-in rides: free transit-ship rides and the Funpark's ferris wheel and carousel
+  rides.js       hop-in rides: free transit-ship rides, and the fairground's ferris wheel and carousel (built by `settlements.js` `ferrisWheel` / `carousel`, kept in the Asset Row but not placed anywhere until Chimera Downs' rework)
   rocks.js       shaped rocks (ramps, arches, hoodoos, snake rails) and their colliders
   rails.js       grinding the snake rocks' crests and crater rims (the Asset Row's flat world has rails too)
   meteors.js     meteor showers: the warning zone, falling rocks (colliders), chunks and scorch marks
@@ -758,7 +751,7 @@ src/
   enemies.js     pirates (skaters/rovers), military bases, turrets, artillery, theft/recovery
   missions.js    contract generation, pickup/delivery, integrity, payouts
   world.js       sky, settlement layout, colliders, ambient life
-  settlements.js detailed settlements, HQs and landmarks built with the outpost kit (moving parts, skate park)
+  settlements.js detailed settlements, HQs and landmarks built with the outpost kit (moving parts)
   market.js      the Meridian Exchange's stocks: a random-walk market refreshed every 15 s, read by the tower's ticker
   traffic.js     landing pads, ship/bus flights and passengers, roads, land-trains, cars, buggies
   landingPad.js  the landing pad itself (deck on its closed base, railing, stairs, colliders and the walkers' waypoints), for every size and slope

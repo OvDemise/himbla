@@ -118,11 +118,6 @@ export const LOCATIONS = [
     theta: 96, phi: -138, r: 150,
     blurb: 'A clean-cut trench sliding into the Moon. It hums. Something down there is waiting for a key.',
   },
-  {
-    id: 'bounce', name: 'Bounce Dome Funpark', short: 'BOUNCE', type: 'funpark', faction: 'none', poi: true,
-    theta: 30, phi: 135, r: 180, safe: true, repair: 6,
-    blurb: 'Inflatable theme park, back in business: bounce domes, a ferris wheel, trampolines and a skate park. The chimera races moved to Chimera Downs, just down the road.',
-  },
   { // casino
     id: 'casino', name: 'Lucky Crater Casino', short: 'CASINO', type: 'casino', faction: 'none', poi: true,
     theta: 50, phi: -22, r: 110, safe: true, repair: 6,

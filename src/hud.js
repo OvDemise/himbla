@@ -252,7 +252,7 @@ export class HUD {
   banner(loc) {
     const el = $('banner');
     const f = FACTIONS[loc.faction];
-    const kind = { trade: 'TRADE HUB', lab: 'STRANGE PLACE — RESEARCH', monolith: 'STRANGE PLACE', tunnel: 'STRANGE PLACE — ???', funpark: 'STRANGE PLACE — FUNPARK', derby: 'STRANGE PLACE — RACECOURSE', casino: 'STRANGE PLACE — CASINO', hub: 'INTERNATIONAL HUB', civilian: 'CIVILIAN HABITAT', research: 'RESEARCH FACILITY', military: 'MILITARY — RESTRICTED', industrial: 'INDUSTRIAL OUTPOST', pirate: 'PIRATE TERRITORY', hometown: 'YOUR TOWN', ruin: 'RUINS' }[loc.type]; // casino: banner kind; hometown + ruin used to print "undefined" in the chip
+    const kind = { trade: 'TRADE HUB', lab: 'STRANGE PLACE — RESEARCH', monolith: 'STRANGE PLACE', tunnel: 'STRANGE PLACE — ???', derby: 'STRANGE PLACE — RACECOURSE', casino: 'STRANGE PLACE — CASINO', hub: 'INTERNATIONAL HUB', civilian: 'CIVILIAN HABITAT', research: 'RESEARCH FACILITY', military: 'MILITARY — RESTRICTED', industrial: 'INDUSTRIAL OUTPOST', pirate: 'PIRATE TERRITORY', hometown: 'YOUR TOWN', ruin: 'RUINS' }[loc.type]; // casino: banner kind; hometown + ruin used to print "undefined" in the chip
     el.innerHTML = `<div class="b-kind" style="background:${f.color}">${kind}</div><div class="b-name">${loc.name}</div><div class="b-blurb">${loc.blurb}</div>`;
     el.classList.remove('hidden');
     el.classList.remove('slam'); void el.offsetWidth; el.classList.add('slam');

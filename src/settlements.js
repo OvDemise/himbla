@@ -960,46 +960,6 @@ export function buildMeridian(world, loc) {
   });
 }
 
-// ---------------------------------------------------------------------------------------------
-// skateable shapes: a visible solid plus tilted box colliders whose top faces are the riding
-// surface (anything under ~55 degrees counts as ground in physics.stepSkater)
-// ---------------------------------------------------------------------------------------------
-
-// Collider slab whose top surface runs from A (x, y, z) to B, w wide (settlement frame).
-function slope(world, loc, A, B, w, thick = 0.5, extra = {}) {
-  const dx = B[0] - A[0], dy = B[1] - A[1], dz = B[2] - A[2];
-  const run = Math.hypot(dx, dz), len = Math.hypot(run, dy);
-  const yaw = Math.atan2(dx, dz), pitch = -Math.atan2(dy, run);
-  const n = [Math.sin(pitch) * Math.sin(yaw), Math.cos(pitch), Math.sin(pitch) * Math.cos(yaw)];
-  const c = world.col(loc, {
-    type: 'box', hx: w / 2, hy: thick, hz: len / 2, yaw, pitch,
-    x: (A[0] + B[0]) / 2 - n[0] * thick, y: (A[1] + B[1]) / 2 - n[1] * thick, z: (A[2] + B[2]) / 2 - n[2] * thick,
-  });
-  Object.assign(c, extra);
-  return c;
-}
-
-// A kicker: a wedge rising towards local +z (len long, h high at the lip, w wide) with deck
-// stripes, glowing side rails and a coping bar.
-function kicker(world, loc, k, x, z, yaw, len, h, w, color) {
-  const sh = new THREE.Shape([new THREE.Vector2(0, 0), new THREE.Vector2(len, 0), new THREE.Vector2(len, h)]);
-  const geo = new THREE.ExtrudeGeometry(sh, { depth: w, bevelEnabled: false }).translate(0, 0, -w / 2).rotateY(-Math.PI / 2);
-  k.at(x, z, yaw);
-  k.add(geo, T(color), 0, 0, 0, { outline: 0.1 });
-  const ang = Math.atan2(h, len);
-  for (let i = 1; i < 4; i++) {
-    const t = i / 4;
-    k.add(new THREE.BoxGeometry(w + 0.04, 0.06, 0.5), T(YEL), 0, h * t + 0.04, len * t, { rx: -ang, outline: 0 });
-  }
-  k.add(new THREE.CylinderGeometry(0.16, 0.16, w + 0.2, 8).rotateZ(Math.PI / 2), T(LIGHT), 0, h + 0.05, len - 0.1, { outline: 0.03 });
-  for (const s of [-1, 1]) k.beam([s * (w / 2 + 0.1), 0.2, 0.4], [s * (w / 2 + 0.1), h + 0.2, len - 0.2], 0.08, G(color === YEL ? 0x2ee6ff : YEL), { outline: 0 });
-  k.at();
-  const c = Math.cos(yaw), s = Math.sin(yaw);
-  const P = (lz, y) => [x + s * lz, y, z + c * lz];
-  slope(world, loc, P(-0.6, 0), P(len, h), w);
-  world.col(loc, { type: 'box', x: x + s * (len - 0.3), y: h / 2, z: z + c * (len - 0.3), hx: w / 2, hy: h / 2, hz: 0.3, yaw });
-}
-
 // the gored shapes are outlined by one shell that draws nothing itself (only its ink hull shows)
 let _inkShell = null;
 function inkShell() {
@@ -1008,243 +968,117 @@ function inkShell() {
 }
 
 // =============================================================================================
-// Bounce Dome Funpark: the inflatables, now joined by a skate park (a volcano bowl you drop into,
-// a kicker line ending in a big launch off the plateau, a big half-pipe and a pyramid funbox), a ferris wheel, a carousel, trampolines and an entrance arch strung with lights.
+// The funpark's two rides, kept for Chimera Downs' rework (the park itself is gone: nothing calls these yet). Each is built into a settlement kit `k` at (x, z) in
+// the place's frame, and registers its rideable seats in world.rides (rides.js: `F` beside it pops you into the nearest gondola or onto the nearest horse).
 // =============================================================================================
-export function buildFunpark(world, loc) {
-  const cols = [0xff2e88, 0xffd23f, 0x2ee6ff, 0x7dff6a, 0xff9f1c, 0xc77dff];
-  settle(world, loc, 5507, (k) => {
-    // ---- the inflatables ----
-    // bouncy castle: puffy walls, four turrets, crenellations and an arched way in
-    k.at(0, 70);
-    k.box(24, 1.2, 24, T(0x2ee6ff), 0, 0, 0, { outline: 0.12 });
-    k.box(22, 5, 22, T(0xff2e88), 0, 1.2, 0, { outline: 0.2 });
-    for (let i = -4; i <= 4; i++) {
-      if (!(i % 2)) continue;
-      for (const [fx, fz, ry] of [[i * 2.4, 11, 0], [i * 2.4, -11, 0], [11, i * 2.4, Math.PI / 2], [-11, i * 2.4, Math.PI / 2]]) k.add(new THREE.CapsuleGeometry(0.7, 1.2, 4, 8), T(YEL), fx, 7.2, fz, { ry, outline: 0.05 });
-    }
-    for (const [tx, tz] of [[-11, -11], [11, -11], [-11, 11], [11, 11]]) {
-      k.cyl(2.4, 2.6, 10, 14, T(YEL), tx, 0, tz, { outline: 0.1 });
-      k.add(new THREE.ConeGeometry(3, 4.5, 14), T(0x2ee6ff), tx, 12.2, tz, { outline: 0.08 });
-      k.ball(0.6, G(0xff2e88), tx, 14.8, tz, { outline: 0 });
-      world.col(loc, { type: 'cyl', x: tx, z: 70 + tz, y0: -2, y1: 10, r: 2.6 }).bouncy = true;
-    }
-    k.add(new THREE.TorusGeometry(4, 1.0, 8, 16, Math.PI), T(YEL), 0, 1.2, -11.4, { outline: 0.08 });
-    k.box(8, 0.8, 5, T(0x7dff6a), 0, 0, -14, { outline: 0.06 });
-    k.at();
-    world.col(loc, { type: 'box', x: 0, y: 3, z: 70, hx: 12, hy: 3.2, hz: 12 }).bouncy = true;
-    // trampolines: a row of springy discs
-    for (let i = 0; i < 4; i++) {
-      const x = -34 + i * 8, z = -73 + (i % 2) * 4;
-      k.at(x, z);
-      k.cyl(3.2, 3.2, 0.9, 20, T(DARK), 0, 0, 0, { outline: 0.06 });
-      k.add(new THREE.TorusGeometry(3.1, 0.35, 6, 20), T(cols[i]), 0, 0.95, 0, { rx: Math.PI / 2, outline: 0.04 });
-      k.cyl(2.7, 2.7, 0.05, 20, T(0x1d1a29), 0, 0.92, 0, { outline: 0 });
-      k.ring(1.2, 0.08, G(cols[i]), 0, 1.0, 0);
-      k.at();
-      world.col(loc, { type: 'cyl', x, z, y0: -2, y1: 0.95, r: 3.2 }).bouncy = true;
-    }
+const FAIR = [0xff2e88, 0xffd23f, 0x2ee6ff, 0x7dff6a, 0xff9f1c, 0xc77dff];
 
-    // ---- skate park ----
-    // volcano bowl: ride up the outside, over the deck and drop in
-    const bx = 148, bz = -4, r0 = 5, r1 = 11, r2 = 14, r3 = 26, H = 4.2;
-    k.at(bx, bz);
-    const lathe = (pts, c, o) => k.add(new THREE.LatheGeometry(pts.map(([a, b]) => new THREE.Vector2(a, b)), 48), D(c), 0, 0, 0, { outline: o });
-    lathe([[r3, 0], [r2, H]], 0x6d78c8, 0.15);
-    lathe([[r2, H], [r1, H]], 0xe8e4f4, 0);
-    lathe([[r1, H], [r0, 0.02]], 0xb8b2cc, 0);
-    k.cyl(r0 + 0.2, r0 + 0.2, 0.06, 32, T(0xb0aac2), 0, 0, 0, { outline: 0 });
-    k.add(new THREE.TorusGeometry(r1, 0.22, 6, 48), T(LIGHT), 0, H + 0.05, 0, { rx: Math.PI / 2, outline: 0.03 });
-    k.add(new THREE.TorusGeometry(r2, 0.12, 4, 48), G(0xff2e88), 0, H + 0.05, 0, { rx: Math.PI / 2, outline: 0 });
-    for (let i = 0; i < 12; i++) {
-      const a = (i / 12) * TAU, rm = (r1 + r0) / 2;
-      k.add(new THREE.BoxGeometry(1.2, 0.05, (r1 - r0) * 1.1), T(cols[i % 6]), Math.sin(a) * rm, H / 2 + 0.06, Math.cos(a) * rm, { q: new THREE.Quaternion().setFromEuler(new THREE.Euler(-Math.atan2(H, r1 - r0), a, 0, 'YXZ')), outline: 0 });
-    }
-    k.at();
-    const N = 24;
-    for (let i = 0; i < N; i++) {
-      const a = (i / N) * TAU, sa = Math.sin(a), ca = Math.cos(a);
-      const at = (r, y) => [bx + sa * r, y, bz + ca * r];
-      slope(world, loc, at(r0 - 0.8, 0), at(r1, H), (TAU * r1) / N + 0.6);
-      slope(world, loc, at(r3 + 0.8, 0), at(r2, H), (TAU * r3) / N + 0.6);
-      slope(world, loc, at(r1 - 0.2, H), at(r2 + 0.2, H), (TAU * r2) / N + 0.6);
-    }
-    // kicker line heading east: small, medium, then a big launch off the plateau edge
-    // (the big one launches you clean over the Derby track)
-    kicker(world, loc, k, 120, -52, Math.PI / 2, 6, 1.4, 5, 0x2ee6ff);
-    kicker(world, loc, k, 134, -52, Math.PI / 2, 9, 2.8, 6, 0xff9f1c);
-    kicker(world, loc, k, 151, -52, Math.PI / 2, 14, 5, 7, 0xff2e88);
-    for (const x of [120, 136, 153]) k.lamp(x, -60, 7, 0xff7ad9);
-    // half-pipe along the north-east: two matching walls facing each other across a flat bottom
-    // (each a big quarter-pipe, ~7 m to the coping), with a deck, coloured tiles and a railing on top
-    const hx0 = 106, hx1 = 152, hw = hx1 - hx0, hm = (hx0 + hx1) / 2, S = 1.35;
-    const prof = [[0, 0], [2.2, 0.3], [4, 1.1], [5.4, 2.3], [6.3, 3.7], [6.8, 5.2]].map(([zz, y]) => [zz * S, y * S]);
-    const topY = prof[prof.length - 1][1], lipZ = prof[prof.length - 1][0], deckZ = 9.5 * S;
-    const flatZ0 = 46, flatZ1 = 60; // the flat bottom between the walls
-    k.at(hm, (flatZ0 + flatZ1) / 2);
-    k.box(hw, 0.06, flatZ1 - flatZ0 + 1, T(0x8a87c8), 0, 0, 0, { outline: 0 });
-    for (let x = -hw / 2 + 4; x < hw / 2; x += 8) k.box(0.4, 0.07, flatZ1 - flatZ0 - 2, T(YEL), x, 0, 0, { outline: 0 });
-    k.at();
-    const wall = (z0, dir, color) => {
-      // dir +1: the wall rises towards +z from z0; -1: towards -z (the local frame is turned round)
-      k.at(hm, z0, dir > 0 ? 0 : Math.PI);
-      const shape = new THREE.Shape([...prof.map(([zz, y]) => new THREE.Vector2(zz, y)), new THREE.Vector2(deckZ, topY), new THREE.Vector2(deckZ, 0)]);
-      k.add(new THREE.ExtrudeGeometry(shape, { depth: hw, bevelEnabled: false }).translate(0, 0, -hw / 2).rotateY(-Math.PI / 2), T(color), 0, 0, 0, { outline: 0.12 });
-      k.add(new THREE.CylinderGeometry(0.24, 0.24, hw, 8).rotateZ(Math.PI / 2), T(LIGHT), 0, topY + 0.05, lipZ + 0.05, { outline: 0.03 });
-      for (let x = -hw / 2 + 3, i = 0; x <= hw / 2 - 3; x += 6, i++) {
-        k.box(0.12, 1.2, 0.12, T(DARK), x, topY, deckZ - 0.2, { outline: 0 });
-        k.box(1.3, 0.06, 3.2, T(cols[(i + (dir > 0 ? 0 : 3)) % 6]), x, topY + 0.01, (lipZ + deckZ) / 2, { outline: 0 });
-      }
-      k.box(hw, 0.12, 0.12, T(YEL), 0, topY + 1.2, deckZ - 0.2, { outline: 0.02 });
-      // a glowing strip along the transition, so the line reads at night
-      k.box(hw, 0.05, 0.25, G(dir > 0 ? 0x2ee6ff : 0xff2e88), 0, 0.32, 2.4, { rx: -0.2, outline: 0 });
-      k.at();
-      for (let i = 0; i < prof.length - 1; i++) {
-        const [za, ya] = prof[i], [zb, yb] = prof[i + 1];
-        slope(world, loc, [hm, ya, z0 + dir * (za - (i ? 0 : 0.8))], [hm, yb, z0 + dir * zb], hw);
-      }
-      slope(world, loc, [hm, topY, z0 + dir * lipZ], [hm, topY, z0 + dir * deckZ], hw);
-      world.col(loc, { type: 'box', x: hm, y: topY / 2, z: z0 + dir * (deckZ - 1.2), hx: hw / 2, hy: topY / 2, hz: 1.2 });
-    };
-    wall(flatZ1, 1, 0x9be7ff);
-    wall(flatZ0, -1, 0xc8b6ff);
-    // stairs up to each deck at the west end
-    for (const [z0, dir] of [[flatZ1, 1], [flatZ0, -1]]) {
-      const zc = z0 + dir * (lipZ + deckZ) / 2;
-      for (let i = 0; i < 6; i++) {
-        const h = ((i + 1) / 6) * topY;
-        k.at(hx0 - 1.2 - (6 - i) * 0.9, zc);
-        k.box(0.9, h, 3, T(CONC), 0, 0, 0, { outline: 0.03 });
-        k.at();
-        world.col(loc, { type: 'box', x: hx0 - 1.2 - (6 - i) * 0.9, y: h / 2, z: zc, hx: 0.45, hy: h / 2, hz: 1.5 });
+// Ferris wheel: an A-frame, a big turning wheel with lit rims, twelve open gondolas that hang level (about 50 m tall, 48 m across the platform and the wheel's plane).
+export function ferrisWheel(world, loc, k, wx, wz) {
+  // ferris wheel: an A-frame, a big turning wheel with lit rims, open gondolas that hang level
+  // (rideable: rides.js seats you in the nearest gondola)
+  const hub = 27, R = 22; // (bottom gondola just clears the platform)
+  k.at(wx, wz);
+  k.box(16, 0.8, 10, T(CONC), 0, 0, 0, { outline: 0.06 });
+  for (const s of [-1, 1]) for (const t of [-1, 1]) k.beam([t * 7, 0.8, s * 3.4], [0, hub, s * 1.4], 0.6, T(WHITE), { outline: 0.06 });
+  for (const s of [-1, 1]) k.beam([-3.5, hub * 0.5, s * 2.4], [3.5, hub * 0.5, s * 2.4], 0.3, T(WHITE), { outline: 0.04 });
+  k.beam([0, hub, -1.9], [0, hub, 1.9], 0.6, T(DARK), { outline: 0.04 });
+  k.box(3, 2.6, 2.4, T(0xff2e88), 6, 0.8, 4.2, { outline: 0.05 });
+  k.at();
+  world.col(loc, { type: 'box', x: wx, y: 0.6, z: wz, hx: 8, hy: 0.6, hz: 5 });
+  for (const t of [-1, 1]) world.col(loc, { type: 'cyl', x: wx + t * 5.5, z: wz, y0: -2, y1: 8, r: 1.1 });
+  const wheel = part(0xff2e88, (q) => {
+    for (const s of [-1, 1]) {
+      q.add(new THREE.TorusGeometry(R, 0.3, 6, 40), T(0xff2e88), 0, 0, s * 1.0, { outline: 0.04 });
+      q.add(new THREE.TorusGeometry(R * 0.55, 0.18, 4, 28), T(YEL), 0, 0, s * 1.0, { outline: 0 });
+      for (let i = 0; i < 24; i++) {
+        const a = (i / 24) * TAU;
+        q.beam([0, 0, s * 1.0], [Math.cos(a) * R, Math.sin(a) * R, s * 1.0], 0.1, T(WHITE), { outline: 0 });
+        q.ball(0.32, G(FAIR[i % 6]), Math.cos(a) * R, Math.sin(a) * R, s * 1.4, { outline: 0 });
       }
     }
-    // pyramid funbox: four ramps up to a flat top
-    const fx = 100, fz = -32, top = 2.6, half = 3.5, run = 7;
-    k.at(fx, fz);
-    k.add(new THREE.CylinderGeometry(half * Math.SQRT2, (half + run) * Math.SQRT2, top, 4, 1).rotateY(Math.PI / 4), T(0xffd23f), 0, top / 2, 0, { outline: 0.12 });
-    k.box(half * 2 + 0.1, 0.08, half * 2 + 0.1, T(0xff2e88), 0, top, 0, { outline: 0 });
-    k.at();
-    for (let i = 0; i < 4; i++) {
-      const a = (i / 4) * TAU, sa = Math.sin(a), ca = Math.cos(a);
-      slope(world, loc, [fx + sa * (half + run + 0.6), 0, fz + ca * (half + run + 0.6)], [fx + sa * half, top, fz + ca * half], half * 2 + 1);
-    }
-    world.col(loc, { type: 'box', x: fx, y: top - 0.5, z: fz, hx: half, hy: 0.5, hz: half });
-    k.at(96, 30, -Math.PI / 2);
-    k.sign('SKATE ZONE', 0, 0, { w: 9, y: 4.4, fg: '#ff2e88' });
-    k.at();
+    q.add(new THREE.CylinderGeometry(1.6, 1.6, 3.2, 14).rotateX(Math.PI / 2), T(YEL), 0, 0, 0, { outline: 0.05 });
+  });
+  const gondolas = [];
+  for (let i = 0; i < 12; i++) {
+    const a = (i / 12) * TAU;
+    const g = part(FAIR[i % 6], (q) => {
+      // an open basket under a little canopy on posts, so you can see who's riding
+      q.beam([0, 0, 0], [0, -1.4, 0], 0.06, T(DARK), { outline: 0 });
+      q.add(new THREE.CylinderGeometry(1.15, 0.95, 0.9, 12, 1, true), D(FAIR[i % 6]), 0, -3.0, 0, { outline: 0.04 });
+      q.cyl(1.0, 0.95, 0.2, 12, T(DARK), 0, -3.55, 0, { outline: 0 });
+      q.add(new THREE.TorusGeometry(1.15, 0.08, 4, 16).rotateX(Math.PI / 2), T(YEL), 0, -2.55, 0, { outline: 0 });
+      for (let p = 0; p < 3; p++) { const b = (p / 3) * TAU; q.beam([Math.cos(b) * 1.05, -2.55, Math.sin(b) * 1.05], [Math.cos(b) * 1.05, -1.5, Math.sin(b) * 1.05], 0.05, T(WHITE), { outline: 0 }); }
+      q.add(new THREE.ConeGeometry(1.35, 0.8, 12), T(WHITE), 0, -1.1, 0, { outline: 0.03 });
+    });
+    g.position.set(Math.cos(a) * R, Math.sin(a) * R, 0);
+    wheel.add(g);
+    gondolas.push(g);
+  }
+  wheel.userData.tick = (o, dt) => {
+    o.rotation.z += dt * 0.12;
+    for (const g of gondolas) g.rotation.z = -o.rotation.z;
+  };
+  k.dyn(wheel, wx, hub, wz);
+  const P0 = new THREE.Vector3(), P1 = new THREE.Vector3();
+  (world.rides ||= []).push({
+    loc, name: 'FERRIS WHEEL', camDist: 16,
+    seats: gondolas.map((g) => ({ obj: g, local: new THREE.Vector3(0, -3.35, 0), face: new THREE.Vector3(0, 0, 1) })),
+    // step off sideways, out of the wheel's plane
+    exitDir: (p, out) => { wheel.updateMatrixWorld(true); wheel.localToWorld(P0.set(0, 0, 0)); wheel.localToWorld(P1.set(0, 0, 1)); return out.subVectors(P1, P0).normalize(); },
+  });
+}
 
-    // ---- rides ----
-    // ferris wheel: an A-frame, a big turning wheel with lit rims, open gondolas that hang level
-    // (rideable: rides.js seats you in the nearest gondola)
-    const wx = -40, wz = 62, hub = 27, R = 22; // (bottom gondola just clears the platform)
-    k.at(wx, wz);
-    k.box(16, 0.8, 10, T(CONC), 0, 0, 0, { outline: 0.06 });
-    for (const s of [-1, 1]) for (const t of [-1, 1]) k.beam([t * 7, 0.8, s * 3.4], [0, hub, s * 1.4], 0.6, T(WHITE), { outline: 0.06 });
-    for (const s of [-1, 1]) k.beam([-3.5, hub * 0.5, s * 2.4], [3.5, hub * 0.5, s * 2.4], 0.3, T(WHITE), { outline: 0.04 });
-    k.beam([0, hub, -1.9], [0, hub, 1.9], 0.6, T(DARK), { outline: 0.04 });
-    k.box(3, 2.6, 2.4, T(0xff2e88), 6, 0.8, 4.2, { outline: 0.05 });
-    k.at();
-    world.col(loc, { type: 'box', x: wx, y: 0.6, z: wz, hx: 8, hy: 0.6, hz: 5 });
-    for (const t of [-1, 1]) world.col(loc, { type: 'cyl', x: wx + t * 5.5, z: wz, y0: -2, y1: 8, r: 1.1 });
-    const wheel = part(0xff2e88, (q) => {
-      for (const s of [-1, 1]) {
-        q.add(new THREE.TorusGeometry(R, 0.3, 6, 40), T(0xff2e88), 0, 0, s * 1.0, { outline: 0.04 });
-        q.add(new THREE.TorusGeometry(R * 0.55, 0.18, 4, 28), T(YEL), 0, 0, s * 1.0, { outline: 0 });
-        for (let i = 0; i < 24; i++) {
-          const a = (i / 24) * TAU;
-          q.beam([0, 0, s * 1.0], [Math.cos(a) * R, Math.sin(a) * R, s * 1.0], 0.1, T(WHITE), { outline: 0 });
-          q.ball(0.32, G(cols[i % 6]), Math.cos(a) * R, Math.sin(a) * R, s * 1.4, { outline: 0 });
-        }
-      }
-      q.add(new THREE.CylinderGeometry(1.6, 1.6, 3.2, 14).rotateX(Math.PI / 2), T(YEL), 0, 0, 0, { outline: 0.05 });
+// Carousel: a striped canopy, a rotating deck, eight horses bobbing on poles (r about 10 m, 11 m tall).
+export function carousel(world, loc, k, cx, cz) {
+  // carousel: striped canopy, rotating deck, horses bobbing on poles
+      k.at(cx, cz);
+  k.cyl(8.6, 9, 0.7, 24, T(DARK), 0, 0, 0, { outline: 0.06 });
+  k.cyl(0.6, 0.6, 7.4, 10, T(YEL), 0, 0.7, 0, { outline: 0.04 });
+  k.at();
+  world.col(loc, { type: 'cyl', x: cx, z: cz, y0: -2, y1: 0.7, r: 9 });
+  world.col(loc, { type: 'cyl', x: cx, z: cz, y0: 0, y1: 8, r: 1.4 });
+  const carousel = part(0xff2e88, (q) => {
+    q.cyl(8, 8, 0.3, 24, T(WHITE), 0, 0, 0, { outline: 0.04 });
+    for (let i = 0; i < 12; i++) q.add(new THREE.ConeGeometry(9.6, 3.2, 2, 1, true, (i / 12) * TAU, TAU / 12), D(i % 2 ? 0xff2e88 : WHITE), 0, 8.9, 0, { outline: 0 });
+    q.add(new THREE.ConeGeometry(9.65, 3.25, 24, 1, true), inkShell(), 0, 8.9, 0, { outline: 0.12 });
+    q.ring(9.4, 0.2, T(YEL), 0, 7.3, 0);
+    for (let i = 0; i < 24; i++) { const a = (i / 24) * TAU; q.ball(0.18, G(FAIR[i % 6]), Math.cos(a) * 9.5, 7.1, Math.sin(a) * 9.5, { outline: 0 }); }
+    q.ball(0.6, G(YEL), 0, 10.8, 0, { outline: 0 });
+  });
+  const horses = [];
+  for (let i = 0; i < 8; i++) {
+    const a = (i / 8) * TAU;
+    const h = part(FAIR[i % 6], (q) => {
+      q.beam([0, -1.6, 0], [0, 5, 0], 0.06, T(YEL), { outline: 0 });
+      q.add(new THREE.CapsuleGeometry(0.45, 1.4, 4, 8).rotateZ(Math.PI / 2), T(WHITE), 0, 0, 0, { outline: 0.04 });
+      q.add(new THREE.CapsuleGeometry(0.25, 0.7, 4, 6), T(WHITE), 0.85, 0.5, 0, { rz: -0.6, outline: 0.03 });
+      q.box(0.5, 0.35, 0.3, T(WHITE), 1.15, 0.85, 0, { outline: 0.02 });
+      q.box(0.8, 0.15, 0.7, T(FAIR[i % 6]), -0.1, 0.45, 0, { outline: 0 });
+      for (const [lx, lz] of [[-0.6, -0.2], [-0.6, 0.2], [0.6, -0.2], [0.6, 0.2]]) q.beam([lx, -0.2, lz], [lx * 1.2, -0.9, lz], 0.1, T(WHITE), { outline: 0 });
     });
-    const gondolas = [];
-    for (let i = 0; i < 12; i++) {
-      const a = (i / 12) * TAU;
-      const g = part(cols[i % 6], (q) => {
-        // an open basket under a little canopy on posts, so you can see who's riding
-        q.beam([0, 0, 0], [0, -1.4, 0], 0.06, T(DARK), { outline: 0 });
-        q.add(new THREE.CylinderGeometry(1.15, 0.95, 0.9, 12, 1, true), D(cols[i % 6]), 0, -3.0, 0, { outline: 0.04 });
-        q.cyl(1.0, 0.95, 0.2, 12, T(DARK), 0, -3.55, 0, { outline: 0 });
-        q.add(new THREE.TorusGeometry(1.15, 0.08, 4, 16).rotateX(Math.PI / 2), T(YEL), 0, -2.55, 0, { outline: 0 });
-        for (let p = 0; p < 3; p++) { const b = (p / 3) * TAU; q.beam([Math.cos(b) * 1.05, -2.55, Math.sin(b) * 1.05], [Math.cos(b) * 1.05, -1.5, Math.sin(b) * 1.05], 0.05, T(WHITE), { outline: 0 }); }
-        q.add(new THREE.ConeGeometry(1.35, 0.8, 12), T(WHITE), 0, -1.1, 0, { outline: 0.03 });
-      });
-      g.position.set(Math.cos(a) * R, Math.sin(a) * R, 0);
-      wheel.add(g);
-      gondolas.push(g);
-    }
-    wheel.userData.tick = (o, dt) => {
-      o.rotation.z += dt * 0.12;
-      for (const g of gondolas) g.rotation.z = -o.rotation.z;
-    };
-    k.dyn(wheel, wx, hub, wz);
-    const P0 = new THREE.Vector3(), P1 = new THREE.Vector3();
-    world.rides.push({
-      loc, name: 'FERRIS WHEEL', camDist: 16,
-      seats: gondolas.map((g) => ({ obj: g, local: new THREE.Vector3(0, -3.35, 0), face: new THREE.Vector3(0, 0, 1) })),
-      // step off sideways, out of the wheel's plane
-      exitDir: (p, out) => { wheel.updateMatrixWorld(true); wheel.localToWorld(P0.set(0, 0, 0)); wheel.localToWorld(P1.set(0, 0, 1)); return out.subVectors(P1, P0).normalize(); },
-    });
-    // carousel: striped canopy, rotating deck, horses bobbing on poles
-    const cx = -58, cz = -22;
-    k.at(cx, cz);
-    k.cyl(8.6, 9, 0.7, 24, T(DARK), 0, 0, 0, { outline: 0.06 });
-    k.cyl(0.6, 0.6, 7.4, 10, T(YEL), 0, 0.7, 0, { outline: 0.04 });
-    k.at();
-    world.col(loc, { type: 'cyl', x: cx, z: cz, y0: -2, y1: 0.7, r: 9 });
-    world.col(loc, { type: 'cyl', x: cx, z: cz, y0: 0, y1: 8, r: 1.4 });
-    const carousel = part(0xff2e88, (q) => {
-      q.cyl(8, 8, 0.3, 24, T(WHITE), 0, 0, 0, { outline: 0.04 });
-      for (let i = 0; i < 12; i++) q.add(new THREE.ConeGeometry(9.6, 3.2, 2, 1, true, (i / 12) * TAU, TAU / 12), D(i % 2 ? 0xff2e88 : WHITE), 0, 8.9, 0, { outline: 0 });
-      q.add(new THREE.ConeGeometry(9.65, 3.25, 24, 1, true), inkShell(), 0, 8.9, 0, { outline: 0.12 });
-      q.ring(9.4, 0.2, T(YEL), 0, 7.3, 0);
-      for (let i = 0; i < 24; i++) { const a = (i / 24) * TAU; q.ball(0.18, G(cols[i % 6]), Math.cos(a) * 9.5, 7.1, Math.sin(a) * 9.5, { outline: 0 }); }
-      q.ball(0.6, G(YEL), 0, 10.8, 0, { outline: 0 });
-    });
-    const horses = [];
-    for (let i = 0; i < 8; i++) {
-      const a = (i / 8) * TAU;
-      const h = part(cols[i % 6], (q) => {
-        q.beam([0, -1.6, 0], [0, 5, 0], 0.06, T(YEL), { outline: 0 });
-        q.add(new THREE.CapsuleGeometry(0.45, 1.4, 4, 8).rotateZ(Math.PI / 2), T(WHITE), 0, 0, 0, { outline: 0.04 });
-        q.add(new THREE.CapsuleGeometry(0.25, 0.7, 4, 6), T(WHITE), 0.85, 0.5, 0, { rz: -0.6, outline: 0.03 });
-        q.box(0.5, 0.35, 0.3, T(WHITE), 1.15, 0.85, 0, { outline: 0.02 });
-        q.box(0.8, 0.15, 0.7, T(cols[i % 6]), -0.1, 0.45, 0, { outline: 0 });
-        for (const [lx, lz] of [[-0.6, -0.2], [-0.6, 0.2], [0.6, -0.2], [0.6, 0.2]]) q.beam([lx, -0.2, lz], [lx * 1.2, -0.9, lz], 0.1, T(WHITE), { outline: 0 });
-      });
-      h.position.set(Math.cos(a) * 6, 1.6, Math.sin(a) * 6);
-      h.rotation.y = -a;
-      carousel.add(h);
-      horses.push(h);
-    }
-    carousel.userData.tick = (o, dt, t) => {
-      o.rotation.y += dt * 0.5;
-      horses.forEach((h, i) => { h.position.y = 1.6 + Math.sin(t * 2 + i * 1.3) * 0.5; });
-    };
-    k.dyn(carousel, cx, 0.7, cz);
-    const C0 = new THREE.Vector3();
-    world.rides.push({
-      loc, name: 'CAROUSEL', camDist: 9,
-      seats: horses.map((h) => ({ obj: h, local: new THREE.Vector3(-0.1, -0.05, 0), face: new THREE.Vector3(1, 0, 0) })),
-      // hop off outward, away from the centre pole
-      exitDir: (p, out) => {
-        carousel.updateMatrixWorld(true);
-        carousel.localToWorld(C0.set(0, 0, 0));
-        const up = p.clone().normalize();
-        out.subVectors(p, C0);
-        return out.addScaledVector(up, -out.dot(up)).normalize();
-      },
-    });
-
-    // ---- the ticket booth (the arch that stood over it, its banner and the strings of lights and lamp posts round the park are gone) ----
-    k.at(Math.cos(Math.PI / 4) * 99, Math.sin(Math.PI / 4) * 99, Math.PI / 4);
-    k.box(3.4, 3, 2.6, T(YEL), -12, 0, -5, { outline: 0.06 });
-    k.box(3.6, 0.4, 2.8, T(0xff2e88), -12, 3, -5, { outline: 0.04 });
-    k.box(2.2, 1, 0.1, G(WARM), -12, 1.6, -6.32, { outline: 0 });
-    k.solid(1.8, 1.7, 1.4, -12, -5);
-    k.at();
+    h.position.set(Math.cos(a) * 6, 1.6, Math.sin(a) * 6);
+    h.rotation.y = -a;
+    carousel.add(h);
+    horses.push(h);
+  }
+  carousel.userData.tick = (o, dt, t) => {
+    o.rotation.y += dt * 0.5;
+    horses.forEach((h, i) => { h.position.y = 1.6 + Math.sin(t * 2 + i * 1.3) * 0.5; });
+  };
+  k.dyn(carousel, cx, 0.7, cz);
+  const C0 = new THREE.Vector3();
+  (world.rides ||= []).push({
+    loc, name: 'CAROUSEL', camDist: 9,
+    seats: horses.map((h) => ({ obj: h, local: new THREE.Vector3(-0.1, -0.05, 0), face: new THREE.Vector3(1, 0, 0) })),
+    // hop off outward, away from the centre pole
+    exitDir: (p, out) => {
+      carousel.updateMatrixWorld(true);
+      carousel.localToWorld(C0.set(0, 0, 0));
+      const up = p.clone().normalize();
+      out.subVectors(p, C0);
+      return out.addScaledVector(up, -out.dot(up)).normalize();
+    },
   });
 }
 

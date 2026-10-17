@@ -51,7 +51,6 @@ const pirates = [
   P('camp.ruin', 'PIRATE CAMP (ABANDONED)', 128, 124, { base: CAMP, over: { type: 'ruin', faction: 'none', small: true, hostile: false } }, { big: false }),
 ];
 const fun = [
-  P('bounce', 'BOUNCE DOME FUNPARK', 308, 224, { loc: 'bounce' }),
   P('casino', 'LUCKY CRATER CASINO', 152, 174, { loc: 'casino' }),
   P('downs', 'CHIMERA DOWNS', 332, 229, { loc: 'downs', race: true, yaw: Math.PI }),
 ];
