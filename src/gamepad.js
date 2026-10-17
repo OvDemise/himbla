@@ -42,6 +42,7 @@
 //                                               left stick / d-pad  pick a duck   A  race · new race
 //                                               LB / RB     lower / raise the bet   B  stand up
 //   (the pad rumbles too, and a PlayStation pad lights up and gets adaptive triggers: see haptics.js, sonyout.js)
+//   (with the dev free cam on: LB / RB are its up / down, LT is fast, d-pad ↑ / ↓ change its speed: freecam.js)
 //   d-pad ↓      the radial menu (tap to open, tap again to close): vehicles, powers, wardrobe, reputation log,
 //                empty the jar (vehicles and powers open their own wheel of the ones you own:
 //                same controls; a power you pick on its wheel is the one RB uses). The right stick picks a wedge (the
@@ -235,8 +236,12 @@ export class Gamepad {
     for (const [i, code] of Object.entries(HOLD)) this.set(code, btn[i] && !((hold || wheelOpen) && (i == B.A || i == B.B)) && !((hold || gwSticky) && i == B.Y));
     I.mouse[0] = trig(B.RT) > 0.35;
     I.mouse[2] = trig(B.LT) > 0.35;
+    // the dev free cam (freecam.js) has the buttons while it is on: LB up, RB down, LT fast, d-pad ↑ / ↓ its speed (so the d-pad is
+    // not the weapon and power switch, nor the radial menu below)
+    const fc = g.cheats.freeCam;
+    if (fc.on) fc.pad = { rise: (btn[B.LB] ? 1 : 0) - (btn[B.RB] ? 1 : 0), fast: trig(B.LT) > 0.35, speed: (btn[B.UP] ? 1 : 0) - (btn[B.DOWN] ? 1 : 0) };
     // (not while the wheel is open or d-pad down is down: a diagonal press on the way to ↓ isn't a weapon swap)
-    if (!this.radial && !gw && !pw && !btn[B.DOWN]) {
+    else if (!this.radial && !gw && !pw && !btn[B.DOWN]) {
       if (pressed(B.LEFT)) this.cycleWeapon(-1);
       if (pressed(B.RIGHT)) this.cycleWeapon(1);
       if (pressed(B.UP)) I.wheelSteps += 1;
@@ -245,7 +250,7 @@ export class Gamepad {
     if (btn[B.VIEW]) { this.viewT = this.viewT < 0 ? 0 : this.viewT + dt; this.set('KeyR', this.viewT > 0.35); }
     else if (this.viewT >= 0) { if (this.viewT <= 0.35) this.tap('KeyM'); this.set('KeyR', false); this.viewT = -1; }
     const wasOpen = !!this.radial || !!gw || !!pw; // (Start cancels a wheel without also pausing)
-    if (!wheelUsed) this.radialMenu(btn, pressed, rx, ry);
+    if (!wheelUsed && !fc.on) this.radialMenu(btn, pressed, rx, ry);
     if (pressed(B.START) && !wasOpen) this.pause();
   }
 

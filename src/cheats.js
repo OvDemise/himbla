@@ -320,7 +320,7 @@ export class Cheats {
   overlayMenu() {
     const g = this.game, o = this.overlay, f = this.freeCam;
     const on = (v) => (v ? 'ON' : 'OFF');
-    g.dialog('DEBUG OVERLAY', '<small>Every on-screen readout in one panel. F3 shows or hides it in play; the sections you pick are remembered. Free cam: the camera flies (WASD, E / Q up / down, Shift, mouse wheel for speed) while the runner stands still; it is off after a reload.</small>', [
+    g.dialog('DEBUG OVERLAY', '<small>Every on-screen readout in one panel. F3 shows or hides it in play; the sections you pick are remembered. Free cam flies the camera while the runner stands still (its controls are shown at the top of the screen); it is off after a reload.</small>', [
       { label: `1 · OVERLAY: ${on(o.on)}`, fn: () => { o.toggle(); this.overlayMenu(); } },
       { label: `2 · FREE CAM: ${on(f.on)}`, fn: () => { f.toggle(); this.overlayMenu(); } },
       ...SECTIONS.map((s, i) => ({ label: `${i + 3} · ${s.name}: ${on(o.sec[s.key])}`, fn: () => { o.setSection(s.key, !o.sec[s.key]); this.overlayMenu(); } })),

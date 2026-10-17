@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { upAt } from './geo.js';
+import { glyphHtml, glyphState } from './glyphs.js';
 
 // Free cam (Dev menu → Debug overlay → FREE CAM): the camera comes off the runner and flies wherever you point it. The game keeps
 // running round it, so the AI paths, the pirate markers and the traffic can be watched from outside. The runner stands still: the keys,
@@ -8,11 +9,14 @@ import { upAt } from './geo.js';
 // (it is off after a reload).
 //
 //   mouse look · W A S D fly along the view · E / Space up · Q / C down · Shift fast · wheel changes the speed
-//   (a controller's sticks work too; the keys are the game's own bindings, so a remapped W is the forward key)
+//   (the keys are the game's own bindings, so a remapped W is the forward key)
+//   controller: right stick look · left stick fly · LB up · RB down · LT fast · d-pad ↑ / ↓ change the speed (held: it keeps going)
+//   (gamepad.js hands the pad's buttons over in `pad` each frame; the keys the pad also sends are not read, so A, B and L3 do nothing)
 
 const SPEED_MIN = 2, SPEED_MAX = 3000, SPEED_START = 40; // m/s (the Moon is 3.6 km in radius)
-const FAST = 5; // Shift: this many times the speed
+const FAST = 5; // Shift, LT: this many times the speed
 const WHEEL_STEP = 1.25; // speed multiplier per wheel notch
+const PAD_NOTCHES = 6; // ...and the notches a second while d-pad ↑ / ↓ is held
 const PITCH = 1.5; // rad: just short of straight up or down
 // the screens that show the Moon itself (a cutscene, the title tour, the Duck Derby... drive the camera on their own)
 const VIEW_STATES = new Set(['play', 'paused', 'dialog', 'dead']);
@@ -32,8 +36,10 @@ export class FreeCam {
     this.speed = SPEED_START;
     this.lent = null; // the real input state, while the game has the blank one (between takeInput and giveBack)
     this.blank = { keys: new Set(), justPressed: new Set(), mouse: [false, false, false], padMove: { x: 0, y: 0, on: false } };
+    this.pad = null; // { rise, fast, speed }: the controller's buttons this frame (gamepad.js play() sets it while this is on and the pad is in use)
     this.hint = null;
     this.hintSpeed = 0;
+    this.hintKind = '';
   }
 
   toggle() {
@@ -71,6 +77,8 @@ export class FreeCam {
   // main.js frame(), once the pad has been read and before the game acts on the input: look, fly, and hand the game a blank input
   takeInput(dt) {
     if (this.lent) this.giveBack(); // (a frame that threw before giveBack(): don't lose the real input)
+    const pd = this.pad;
+    this.pad = null; // (taken whether or not it is used: one frame's buttons never wait for a later frame)
     const g = this.game;
     if (!this.on || g.state !== 'play') return;
     const I = g.input;
@@ -87,14 +95,23 @@ export class FreeCam {
     _look.copy(this.fwd).multiplyScalar(Math.cos(this.pitch)).addScaledVector(this.up, Math.sin(this.pitch));
     _right.crossVectors(this.fwd, this.up);
     const held = (c) => I.keys.has(c);
-    let ahead = (held('KeyW') ? 1 : 0) - (held('KeyS') ? 1 : 0);
-    let side = (held('KeyD') ? 1 : 0) - (held('KeyA') ? 1 : 0);
-    const rise = (held('Space') || held('KeyE') ? 1 : 0) - (held('KeyC') || held('KeyQ') ? 1 : 0);
-    const pm = I.padMove;
-    if (pm && pm.on) { ahead -= pm.y; side += pm.x; }
+    let ahead, side, rise, fast;
+    if (pd) { // the controller: the left stick (analog) and its buttons. The keys it also sends (the stick as WASD past halfway, A as Shift, B as Q, L3 as E) are not read
+      const pm = I.padMove;
+      ahead = pm.on ? -pm.y : 0;
+      side = pm.on ? pm.x : 0;
+      rise = pd.rise;
+      fast = pd.fast;
+      if (pd.speed) this.speed = clamp(this.speed * WHEEL_STEP ** (pd.speed * PAD_NOTCHES * dt), SPEED_MIN, SPEED_MAX);
+    } else {
+      ahead = (held('KeyW') ? 1 : 0) - (held('KeyS') ? 1 : 0);
+      side = (held('KeyD') ? 1 : 0) - (held('KeyA') ? 1 : 0);
+      rise = (held('Space') || held('KeyE') ? 1 : 0) - (held('KeyC') || held('KeyQ') ? 1 : 0);
+      fast = held('ShiftLeft') || held('ShiftRight');
+    }
     _move.set(0, 0, 0).addScaledVector(_look, ahead).addScaledVector(_right, side).addScaledVector(this.up, rise);
     if (_move.lengthSq() > 1) _move.normalize();
-    this.pos.addScaledVector(_move, this.speed * (held('ShiftLeft') || held('ShiftRight') ? FAST : 1) * dt);
+    this.pos.addScaledVector(_move, this.speed * (fast ? FAST : 1) * dt);
     this.level();
 
     // the game reads these fields straight off the Input: lend it empty ones (the real ones come back in giveBack())
@@ -122,7 +139,7 @@ export class FreeCam {
     this.showHint();
   }
 
-  // the keys, and the speed the wheel has set
+  // the keys (or, with a controller in use, its buttons: style.css shows one or the other), and the speed they have set
   showHint() {
     if (!this.hint) {
       this.hint = document.createElement('div');
@@ -130,9 +147,12 @@ export class FreeCam {
       document.body.appendChild(this.hint);
       this.hintSpeed = 0;
     }
-    if (this.hintSpeed === this.speed) return;
+    if (this.hintSpeed === this.speed && this.hintKind === glyphState.kind) return;
     this.hintSpeed = this.speed;
+    this.hintKind = glyphState.kind; // (an Xbox, PlayStation or Switch pad: the buttons are drawn to match)
     const s = this.speed;
-    this.hint.innerHTML = `FREE CAM · <b>WASD</b> fly · <b>E</b>/<b>Space</b> up · <b>Q</b>/<b>C</b> down · <b>Shift</b> fast · <b>wheel</b> speed: ${s < 10 ? s.toFixed(1) : Math.round(s)} m/s`;
+    const kb = '<b>WASD</b> fly · <b>E</b>/<b>Space</b> up · <b>Q</b>/<b>C</b> down · <b>Shift</b> fast · <b>wheel</b> speed';
+    const pad = glyphHtml(['LS', '#fly', 'RS', '#look', 'LB', '#up', 'RB', '#down', 'LT', '#fast', 'DU', 'DD', '#speed']);
+    this.hint.innerHTML = `FREE CAM · <span class="fc-kb">${kb}</span><span class="fc-pad">${pad}</span> · ${s < 10 ? s.toFixed(1) : Math.round(s)} m/s`;
   }
 }
