@@ -403,7 +403,7 @@ front doors and press `F` at a station
   ←/→ bet, Space deal, H hit, S stand, D double.
 - **Duck Derby:** pick one of four ducks at the kiosk (1–4), bet, Space to race. Odds are fair-minus-5%,
   computed from the same race model; surges, stumbles, photo finishes.
-- **Plinko:** a real-physics board (12 rows, 13 slots from 0.2× to 50×, ~94 % return). Aim with A/D or the
+- **Plinko:** a real-physics board (12 rows, 13 slots from 0.2× to 50×, ~94-97 % return). Aim with A/D or the
   mouse, Space or click to drop; hold Space for a stream of balls.
 - The **Classic Games** cabinets open the slots / roulette / prize wheel / high-low overlay (blackjack now
   lives only at the 3D table); the prize
@@ -769,6 +769,7 @@ tools/
   blender/build_engine.py  builds the salvaged engine that drops out of wrecks -> src/assets/engine.glb
   blender/build_briefcase.py builds the credits briefcase that drops out of wrecks -> src/assets/briefcase.glb
   blender/build_hovercar.py builds the faction and civilian hover-cars -> src/assets/hovercar.glb (the road cars, the casino car park, the Asset Row)
+  blender/build_plinko.py builds the Plinko booth and the board's cabinet frame -> src/assets/plinko.glb (casinoWorld.js, the PLINKO section)
   blender/build_warrig.py  builds the pirate war-rig -> src/assets/warrig.glb
   blender/build_apc.py     builds the Vostok APC and its turret -> src/assets/apc.glb (also runs headless: `pip install bpy`, then `MOONRUNNER_REPO=. python3 tools/blender/build_apc.py`)
   blender/build_landtrain.py builds the Moonliner and Prospector tractors and trailers -> src/assets/landtrain.glb (also runs headless, like build_apc.py)
