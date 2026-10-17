@@ -17,9 +17,14 @@ and how to test.
    Crater Casino" sign beside the ring road; he fires at the chip at the middle of the fountain and wraps the cable round the post as he
    moves left. The second user ("Delta") has a 240 Hz monitor and tests the high end.
 
-## The sign
+## The sign (taken out of the game since)
 
-`dressCasinoLot` in `src/settlements.js`: "the pylon sign out by the road". At the casino's local (26, 118), turned -0.35 rad: two posts
+The casino pass removed the pylon sign ("LUCKY CRATER") from the game after this was reported, so the posts the cable was wound round no longer
+exist in play. The fix is not about that sign: any slim box the cable meets is handled the same way. `tools/winch-ride.mjs` stands the sign's
+colliders in again (same place, same half extents) when the game has none, so the rides stay the ones that showed the bugs.
+
+The sign was built by `dressCasinoLot` in `src/settlements.js` ("the pylon sign out by the road"; see commit `e2d4c54` for the code). At the
+casino's local (26, 118), turned -0.35 rad: two posts
 (`k.box(1.2, 23, 1.2 ...)` with colliders `k.solid(0.6, 11.5, 0.6, ...)`: half extents 0.6 x 11.5 x 0.6, at +-6.6 m from the sign's middle)
 and a marquee/board between them (collider half extents 6.2 x 5.6 x 0.7, centre 10.2 + 5.6 = 15.8 m up). Under the board (y < 10 m) the
 gap between the posts is open; people and the cable can pass through it. The chip fountain is at the casino's local (0, 98), the plaza's
@@ -113,7 +118,7 @@ the reticle's line (four rounds of projecting between the line and the shape), n
 
 ## Testing: `tools/winch-ride.mjs`
 
-Dev only. It starts the real game headless, teleports the real player onto the ground in front of the casino, aims the real camera at the
+Dev only. It starts the real game headless, adds the old sign's colliders if the game has none, teleports the real player onto the ground in front of the casino, aims the real camera at the
 fountain, presses Z so that `powers.js` fires the real winch, and steps the whole game at a fixed dt. The winch runs after the player's
 physics as in play (gravity, ground, collision shell, skates); only rendering, terrain streaming and by default traffic are stubbed. The winch
 is limited to structures (no vehicle is hooked: a clean gate says nothing about towing one), and the `@pin` and ring rides replace `pick()`
@@ -159,6 +164,6 @@ Tips:
 
 ## Done when
 
-The user can winch to the chip fountain from the road, run past and round the sign's posts, and the cable bends round the post (never
-through it) wherever it can bend at all, lets go as the line clears, and never throws the player. `node tools/winch-ride.mjs --gate ring`
+The user can winch to the chip fountain from the road, run past and round a post (the harness's stand-in for the old sign's), and the cable
+bends round it (never through it) wherever it can bend at all, lets go as the line clears, and never throws the player. `node tools/winch-ride.mjs --gate ring`
 is clean. The open items above are separate changes, each proposed to the users before it is built.

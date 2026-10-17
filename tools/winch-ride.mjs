@@ -1,4 +1,5 @@
-// winch-ride.mjs  --  the REAL player and the REAL winch, stepped headlessly at a fixed dt, around the Lucky Crater Casino pylon sign.
+// winch-ride.mjs  --  the REAL player and the REAL winch, stepped headlessly at a fixed dt, past the Lucky Crater Casino's pylon sign (its
+// colliders; the sign itself was taken out of the game, so the harness stands them in) toward the chip fountain.
 // Dev-only test harness for the Hitch-Line winch (src/winch.js; see docs/winch-handoff.md). Not part of the build; needs the dev server (window.game).
 //
 // WHAT IT DOES.  Teleports the real Player (Player.update -> stepSkater: gravity, ground, collision shell, restitution, skates) onto the crater
@@ -283,7 +284,22 @@ const installHarness = (o) => {
   g.planet.cache.clear();
   { const tmp = new V(); for (let x = -40; x <= 130; x += 1.5) for (let z = 30; z <= 220; z += 1.5) g.planet.surface(L(x, 0, z), tmp); }
 
-  // the colliders of the sign and the fountain (sign: dressCasinoLot in settlements.js, two posts 1.2 x 23 x 1.2 m and a board; fountain: the casino's fountain in settlements.js)
+  // The casino's pylon sign out by the road (two posts and a board) was taken out of the game in the casino pass. The winch's trouble was winding
+  // the cable round its posts, so when the game has none the harness stands the same colliders in the same place: dressCasinoLot's old numbers,
+  // centre casino (26, 118) turned -0.35 rad, posts 0.6 x 11.5 x 0.6 m half extents at +-6.6 m, the board 6.2 x 5.6 x 0.7 centred 15.8 m up.
+  {
+    const c0 = L(26, 12, 118), have = [];
+    g.colliders.query(c0, 14, have);
+    if (!have.some((c) => c.type === 'box' && c.hy > 11 && c.mid.distanceTo(c0) <= 14)) {
+      const o0 = L(0, 0, 0), ang = -0.35, ca = Math.cos(ang), sa = Math.sin(ang);
+      const dir = (x, y, z) => L(x, y, z).sub(o0).normalize(); // (the sign's own axes: in the casino's frame, then in the world's)
+      const ax = dir(ca, 0, -sa), ay = dir(0, 1, 0), az = dir(sa, 0, ca);
+      const add = (hx, hy, hz, lx, ly) => g.colliders.add({ type: 'box', c: L(26 + lx * ca, ly, 118 - lx * sa), ax: ax.clone(), ay: ay.clone(), az: az.clone(), hx, hy, hz });
+      for (const sd of [-1, 1]) add(0.6, 11.5, 0.6, sd * 6.6, 11.5);
+      add(6.2, 5.6, 0.7, 0, 15.8);
+    }
+  }
+  // the colliders of the sign and the fountain (fountain: the casino's fountain in settlements.js)
   const sc = L(26, 12, 118);
   const near = []; g.colliders.query(sc, 14, near);
   const sign = near.filter((c) => c.mid.distanceTo(sc) <= 14 && c.type === 'box');
