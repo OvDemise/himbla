@@ -1,7 +1,7 @@
 // Dev-only model viewer: renders one model through the game's comic post pass on a turntable.
 import * as THREE from 'three';
 import { loadFonts } from '../src/fonts.js';
-import { loadRunnerParts, loadShipParts, makeRunner, makeCrate, ScarfSim, makeShuttle, makeFreighter, makeHoverCar, makeApc, makeLandTrain, makeTowerCrane, CRANE_TROLLEY_MIN, CRANE_TROLLEY_SPAN, makeGarage, makeDishStation, DISH_SIZE } from '../src/models.js';
+import { loadRunnerParts, loadShipParts, makeRunner, makeCrate, ScarfSim, makeShuttle, makeFreighter, makeHoverCar, makeApc, makeLandTrain, makeTowerCrane, CRANE_TROLLEY_MIN, CRANE_TROLLEY_SPAN, makeGarage, makeDishStation, DISH_SIZE, makeLampPost, makeFountain, makeBouncer, makeChandelier, makeCasinoSign } from '../src/models.js';
 import { outpostTemplate } from '../src/outpostModels.js';
 import { loadOutpostParts, GLB_KINDS } from '../src/outpostGlb.js';
 import { makeChimera, makeMite, LIVING, MODIFIERS, spliceGenes } from '../src/chimera.js';
@@ -177,6 +177,36 @@ if (m === 'shuttle' || m === 'freighter') {
     }
     if (t > nextPull) nextPull = t + 3.2;
   };
+} else if (m === 'casino') {
+  // the casino's props (build_casino.py). &part=lamp|fountain|bouncer|chandelier|welcome|wall  &accent=hex (the lamp post's colour)  &n=3 lamps in a row
+  const part = Q.get('part') || 'lamp';
+  model = new THREE.Group();
+  if (part === 'lamp') {
+    const acc = Q.has('accent') ? parseInt(Q.get('accent'), 16) : 0xff2e88;
+    for (let i = 0; i < num('n', 1); i++) { const l = makeLampPost(i % 2 ? 0x2ee6ff : acc); l.position.x = i * 4; model.add(l); }
+    height = 9;
+  } else if (part === 'fountain') {
+    const f = makeFountain();
+    model.add(f.root);
+    anim = (t, sp, dt) => f.update(t, dt);
+    height = 9;
+  } else if (part === 'bouncer') {
+    const b = makeBouncer();
+    model.add(b.root);
+    anim = (t) => { b.head.rotation.y = Math.sin(t * 0.7) * 0.5; };
+    height = 2.5;
+  } else if (part === 'chandelier') {
+    const c = makeChandelier();
+    c.root.position.y = 3;   // (it hangs from the ceiling 3.3 m above its centre)
+    model.add(c.root);
+    anim = (t, sp, dt) => { c.spin.rotation.y += dt * 0.3; };
+    height = 6;
+  } else {
+    const sg = makeCasinoSign(part === 'welcome' ? 'welcome_sign' : 'wall_sign');
+    sg.root.position.y = part === 'welcome' ? 7 : 3;
+    model.add(sg.root);
+    height = 6;
+  }
 } else if (m === 'dish') {
   // &kind=cryo|gantry|field|head  &faction=kepler|meridian|spacecom|vostok|daedalus  &no=01..04 (the array dish's number)  &size=30 (the old dish's size: a 30 m mount scales to it)
   // (field is makeDish, the small bases' dish, and head the light head alone that sits on masts and roofs; both take any faction, daedalus and the unclaimed 'none' too)

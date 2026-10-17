@@ -4,6 +4,8 @@ import { FACTIONS } from './locations.js';
 import { pixelFont } from './fonts.js';
 import { glow } from './toon.js';
 import { market, tickerText } from './market.js';
+import { casinoNode, casinoSlot } from './models.js';
+import { waterMesh } from './fountainFx.js';
 import { craneModel, craneSlot, CRANE_H, CRANE_LOAD_DROP, CRANE_TROLLEY_MIN, CRANE_TROLLEY_SPAN, garageModel, garageSlot, GARAGE_HALL, dishModel, dishSlot, DISH_KINDS } from './models.js';
 
 // Settlements, HQs and landmarks built with the outpost Kit (outpostModels.js): every static part
@@ -2344,17 +2346,30 @@ export function dressCasinoLot(world, loc, makeCar) {
   const cars = [];
   const FZ = 98, PR = 17; // the plaza: its centre and radius
   settle(world, loc, 7707, (k) => {
-    // ---- the boulevard: paving from the carpet's end to the plaza's edge, neon lamps both sides ----
-    const b0 = 44, b1 = FZ - PR + 0.5;
+    // ---- the boulevard: asphalt from the doors to the plaza: a funnel from the door's width out to the boulevard's, then the boulevard itself, which runs
+    // under the plaza's paving (so no sliver of dust is left between its end and the plaza's curved edge); gold edge lines; Blender-built neon lamp posts both sides ----
+    const b0 = 44, b1 = FZ - PR + 3, DOOR_Z = 13, W_DOOR = 5.5, W_BLV = 7;
+    {
+      const funnel = new THREE.Shape([new THREE.Vector2(-W_DOOR, -DOOR_Z), new THREE.Vector2(W_DOOR, -DOOR_Z), new THREE.Vector2(W_BLV, -b0), new THREE.Vector2(-W_BLV, -b0)]);
+      k.add(new THREE.ExtrudeGeometry(funnel, { depth: 0.1, bevelEnabled: false }).rotateX(-Math.PI / 2), T(0x4a4060), 0, 0, 0, { outline: 0 }); // (the shape's y is -z)
+      for (const s of [-1, 1]) {
+        const dx = W_BLV - W_DOOR, dz = b0 - DOOR_Z;
+        k.box(0.3, 0.13, Math.hypot(dx, dz) + 0.1, T(GOLD), (s * (W_DOOR + W_BLV)) / 2, 0, (DOOR_Z + b0) / 2, { ry: s * Math.atan2(dx, dz), outline: 0 });
+      }
+    }
     k.box(14, 0.1, b1 - b0, T(0x4a4060), 0, 0, (b0 + b1) / 2, { outline: 0 });
     for (const s of [-1, 1]) k.box(0.3, 0.13, b1 - b0, T(GOLD), s * 7, 0, (b0 + b1) / 2, { outline: 0 });
+    // a lamp post (build_casino.py) at `sc` times its size, its small lamp toward `yaw`'s +z; `accent` colours its rings, lantern and small lamp
+    const lamp = casinoNode('lamp_post');
+    const lampAt = (x, z, accent, sc, yaw) => {
+      k.at(x, z, yaw);
+      k.baked(lamp, (slot) => { const c = casinoSlot(slot, accent); return c.glow ? G(c.color) : T(c.color); }, new THREE.Matrix4().makeScale(sc, sc, sc));
+      k.at();
+    };
     for (let i = 0; i < 3; i++) for (const s of [-1, 1]) {
-      const z = 50 + i * 11, x = s * 8.5, c = (i + (s > 0)) % 2 ? PINK : CYAN;
-      k.cyl(0.18, 0.24, 7, 8, T(0x2a1450), x, 0, z, { outline: 0.03 });
-      k.ring(0.5, 0.12, G(c), x, 2.4, z);
-      k.ring(0.5, 0.12, G(c), x, 4.8, z);
-      k.ball(0.75, G(c), x, 7.4, z, { outline: 0.04 });
-      k.column(0.35, 7, x, z);
+      const z = 50 + i * 11, x = s * 8.5;
+      lampAt(x, z, (i + (s > 0)) % 2 ? PINK : CYAN, 0.92, -s * Math.PI / 2); // (the small lamp faces the road)
+      k.column(0.5, 7.5, x, z);
     }
     // ---- the fountain plaza ----
     // paving with a gold edge, and a ring of chip-coloured tiles round the basin
@@ -2365,22 +2380,25 @@ export function dressCasinoLot(world, loc, makeCar) {
       k.add(g, T(i % 2 ? 0x8a1030 : 0x2a1450), 0, 0.16, FZ, { outline: 0 });
     }
     k.ring(12.6, 0.1, G(GOLD), 0, 0.17, FZ);
-    // the basin: a cream wall with a gold lip, lit water just under the lip
-    k.cyl(9, 9.3, 0.95, 40, T(CRM), 0, 0, FZ, { outline: 0.07 });
-    k.ring(9.05, 0.16, T(GOLD), 0, 0.97, FZ);
-    k.cyl(8.5, 8.5, 0.05, 40, G(0x3fb8ff), 0, 0.72, FZ, { outline: 0 });
-    // the tier: a pedestal, an upper bowl spilling a curtain of water, a casino chip on top
-    k.cyl(1.3, 1.7, 3.3, 16, T(CRM), 0, 0.77, FZ, { outline: 0.05 });
-    k.cyl(3.6, 2.4, 0.6, 24, T(CRM), 0, 4.0, FZ, { outline: 0.05 });
-    k.ring(3.6, 0.1, T(GOLD), 0, 4.6, FZ);
-    k.cyl(3.3, 3.3, 0.04, 24, G(0x9be7ff), 0, 4.48, FZ, { outline: 0 });
-    k.add(new THREE.CylinderGeometry(3.45, 3.9, 3.7, 28, 1, true), GLASS(0x9be7ff, 0.32), 0, 2.6, FZ, { outline: 0 });
-    k.cyl(0.55, 0.75, 1.6, 12, T(CRM), 0, 4.6, FZ, { outline: 0.04 });
-    k.add(new THREE.CylinderGeometry(1.5, 1.5, 0.4, 24).rotateX(Math.PI / 2), T(PINK), 0, 7.6, FZ, { outline: 0.05 });
-    k.add(new THREE.CylinderGeometry(1.0, 1.0, 0.42, 24).rotateX(Math.PI / 2), T(0xfff4e0), 0, 7.6, FZ, { outline: 0 });
-    k.column(9.2, 0.95, 0, FZ);
-    k.column(2.2, 4.6, 0, FZ);
-    k.column(1.6, 9.2, 0, FZ, 4.6);
+    // the fountain (build_casino.py): the basin, pedestal, bowl, stem and spigots are baked into the kit; the chip turns, and the two tiers' ripples, the curtain
+    // spilling over the bowl's lip and the jets from the spigots under the chip run on shaders (fountainFx.js)
+    {
+      const F = casinoNode('fountain'), I = new THREE.Matrix4();
+      const mat = (slot) => { const c = casinoSlot(slot); return c.glow ? G(c.color) : T(c.color); };
+      k.at(0, FZ);
+      k.baked(F, mat, I);
+      for (const n of F.kids) {
+        if (n.role === 'spin') {
+          const chip = part(0xffffff, (q) => q.baked(n, mat, I));
+          chip.userData.spin = n.data.speed || 0.7;
+          k.dyn(chip, n.pos.x, n.pos.y, n.pos.z);
+        } else k.dyn(waterMesh(n), n.pos.x, n.pos.y, n.pos.z);
+      }
+      k.at();
+    }
+    k.column(9.8, 1.05, 0, FZ);
+    k.column(2.7, 4.7, 0, FZ);
+    k.column(1.7, 9.2, 0, FZ, 4.7);
     // benches round the outside of the tiles, facing in (none across the way in, at -z)
     for (let i = 0; i < 6; i++) {
       const a = (i / 6) * TAU + TAU / 12;
@@ -2393,20 +2411,13 @@ export function dressCasinoLot(world, loc, makeCar) {
       k.solid(1.7, 0.72, 0.55, 0, 0);
       k.at();
     }
-    // neon palms between the benches (the two either side of the way in frame it)
+    // lamp posts between the benches: the boulevard's design, scaled down (the two either side of the way in frame it), their small lamps facing the fountain
     for (let i = 0; i < 6; i++) {
       const a = (i / 6) * TAU;
-      const x = Math.cos(a) * 15, z = FZ + Math.sin(a) * 15, c = i % 2 ? PINK : 0x7dff6a;
-      k.cyl(0.6, 0.7, 0.5, 10, T(0x2a1450), x, 0, z, { outline: 0.03 });
-      k.cyl(0.16, 0.24, 5.4, 6, T(0x6b4a2a), x, 0.5, z, { outline: 0.03 });
-      for (let j = 0; j < 6; j++) {
-        const la = (j / 6) * TAU + i, droop = 0.6 + (j % 2) * 0.25;
-        const q = new THREE.Quaternion().setFromEuler(new THREE.Euler(droop, -la + Math.PI / 2, 0, 'YXZ')); // (turned out, then drooping)
-        k.add(new THREE.BoxGeometry(0.45, 0.08, 2.8).translate(0, 0, 1.4), G(c), x, 5.9, z, { q, outline: 0 });
-      }
-      k.ball(0.35, G(GOLD), x, 6.0, z, { outline: 0 });
+      const x = Math.cos(a) * 15, z = FZ + Math.sin(a) * 15;
+      lampAt(x, z, i % 2 ? PINK : CYAN, 0.62, Math.atan2(-Math.cos(a), -Math.sin(a)));
       k.column(0.7, 1, x, z);
-      k.column(0.3, 6, x, z);
+      k.column(0.25, 5, x, z);
     }
     keep(0, FZ, PR + 2);
     keep(0, (b0 + b1) / 2, 10);

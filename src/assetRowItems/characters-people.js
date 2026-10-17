@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { makeRunner, makeFigure } from '../models.js';
+import { makeRunner, makeFigure, makeBouncer } from '../models.js';
 import { toon, glow, ink } from '../toon.js';
 import { FACTIONS } from '../locations.js';
 import { LEADERS, Story } from '../story.js';
@@ -60,7 +60,7 @@ function zbornakItem() {
 function casinoItem() {
   const staff = [
     ['PATRON', () => makeFigure({ suit: 0xffc83a, helmet: 0xfff4e0, visor: 0xff2e88, seed: 900 }).root],
-    ['BOUNCER', () => makeFigure({ suit: 0x16121f, helmet: 0x16121f, visor: 0xffd23f, scale: 1.35 }).root],
+    ['BOUNCER', () => { const b = makeBouncer(); b.root.scale.setScalar(0.94); return b.root; }],
     ['DEALER', () => {
       const dealer = makeFigure({ suit: 0x16121f, helmet: 0xfff4e0, visor: 0xffd23f, scale: 1.05 });
       const bow = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.12, 0.06), glow(0xd7263d));
