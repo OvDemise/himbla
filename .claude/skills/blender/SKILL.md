@@ -1,6 +1,6 @@
 ---
 name: blender
-description: Build, change, compress and check the game's Blender-made models (src/assets/*.glb, idles.json) with headless bpy, and the GLB contract the game relies on. Use for any edit under tools/blender or any .glb in src/assets.
+description: Build, change, compress and check the game's Blender-made models (src/assets/*.glb, idles.json) with headless bpy, and the GLB contract the game relies on. Use for any edit under tools/blender or any .glb in src/assets. A commit that adds, renames, removes or visibly changes a model also updates the Asset Row (the dev showroom of every asset): see "Keep the Asset Row in step".
 ---
 
 # Blender models
@@ -33,6 +33,58 @@ outposts. In the Blender app they run with `exec(open(r"<repo>/tools/blender/bui
 3. Check the diff touches only the models you meant to change. `runner.glb` can differ by a few bytes between
    runs; that is not a change.
 4. Update the README source map if a model or builder was added or renamed.
+5. Update the Asset Row (next section), in the same commit as the model.
+
+## Keep the Asset Row in step
+
+The Asset Row (dev menu F8 -> Full cheat menu -> Teleport -> option 1) stands every asset in the game side by side, and it is where
+models get looked at and compared. A model that is not in it cannot be reviewed there. So **a commit that adds, renames, removes or
+visibly changes a model also updates the Row**: a new `tools/blender/build_*.py`, a new or changed `.glb` or texture in `src/assets`, or
+a changed shape, size, variant or part list.
+
+1. **Find how the game builds the model.** The `GLB` map at the top of `src/models.js` and the exported factory that wraps the file
+   (`hovercar.glb` -> `makeHoverCar`, and so on), or the module that loads it (`winch.js` loads `winch.glb`). The Row calls the same
+   factories, so a model the game can draw can be drawn there.
+2. **Add an item beside its siblings.** The catalogue is `src/assetRowItems/`: `characters-*.js` (runner, people, creatures),
+   `props-*.js` (markers, weapons and effects, nature, secrets), `vehicles.js` (ground vehicles, ships), `buildings.js` (the parts
+   settlements are made of), `places.js` (whole places). The item format is documented at the top of `index.js`; copy a neighbour. In short:
+   a unique `id` (`group.name`), a short upper-case `label`, `w` and `d` (the footprint in metres, right to within a few metres: the layout
+   is fixed before anything is built), and `make({ game, moon })`, which returns `{ root }` standing on y = 0 with an identity transform.
+3. **Keep `make` safe.** Build with the pure model factory, never through Garage, Traffic, Enemies or Missions. Show it static (wheels as
+   built, gear down, no physics; cheap cosmetic updates only). Do not touch the Moon, the player or the game's registries, and be repeatable:
+   it is called each time someone walks up and is let go of when they leave. Add `dispose()` for anything beyond the geometry and
+   materials under `root`, and `cols: []` if it should have no colliders.
+4. **Variants** (faction liveries, outfits, sizes) go in one item that shows each, as `lineUp()` (`common.js`) and `brick()`
+   (`vehicles.js`) do, unless the variants are very large. A model that is also part of a bigger item (inside a place, say) still gets its
+   own item if you would want to look at it alone.
+5. **Changed or removed models.** If a model changed size, update its `w` and `d`. If it was renamed or removed, rename or remove its
+   item. Ids stay unique.
+6. **Look at it.** `npm run dev`, open the Row, press `F` at the plaza terminal (or the one at the section's start) to jump to the section.
+   The item should stand on the floor, have its name board, and not show a red `DID NOT BUILD` board; compare it with how the game draws it.
+7. **Keep the text in step.** The README's Asset Row paragraph states how many items and sections there are: update it if that changes.
+   Add the item to the CHANGELOG entry for the model.
+
+A headless check that every item still builds, and that none throws while it is on screen, works in a cloud session (Chromium and
+Playwright are installed there). Start the dev server, open it with a `page.on('pageerror', ...)` listener, wait for
+`window.game.state === 'title'`, call `window.game.startPlay()`, wait a few seconds, then run this and expect `[]` and no page errors.
+The pause per item matters: an item's `update` hook only runs on frames, so an error in it shows up only if frames are allowed to run.
+
+```js
+await page.evaluate(async () => {
+  const { AssetRow } = await import('/src/assetRow.js');
+  const g = window.game, row = (g.assetRow ||= new AssetRow(g));
+  row.start();
+  const V = g.player.pos.constructor, bad = [];
+  for (const e of row.items) {
+    g.player.respawn(new V(e.x, 1.5, e.z + e.d / 2 + 20), new V(0, 0, -1));
+    row.stream(1e9);                                // builds what is near the player
+    await new Promise((r) => setTimeout(r, 30));    // lets a few frames run its update hook
+    if (e.state !== 'on' || e.failed) bad.push(e.it.id);
+  }
+  row.exit();
+  return bad;                                       // [] when every item built
+});
+```
 
 ## The GLB contract (what the game reads)
 
