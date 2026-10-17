@@ -754,6 +754,29 @@ function tradeHall(k, x, z, w, d, trim, name = 'TRADE HALL') {
   k.at();
 }
 
+// The plaza fountain (built in Blender, tools/blender/build_casino.py): the basin, pedestal, bowl, stem and spigots are baked into
+// the kit; the centrepiece turns (`top`: the casino's 'chip', or the 'dollar' sign in `accent`, the Meridian Exchange's), and the
+// two tiers' ripples, the curtain spilling over the bowl's lip and the jets from the spigots under it run on shaders
+// (fountainFx.js). Colliders for the basin, the pedestal and the stem. Drawn in the settlement's frame (k at the origin).
+export function fountain(k, x, z, { top = 'chip', accent = 0xff2e88 } = {}) {
+  const F = casinoNode('fountain'), I = new THREE.Matrix4();
+  const mat = (slot) => { const c = casinoSlot(slot, accent); return c.glow ? G(c.color) : T(c.color); };
+  k.at(x, z);
+  k.baked(F, mat, I);
+  for (const n of F.kids) {
+    if (n.role === 'spin') {
+      if ((n.data.kind || 'chip') !== top) continue;
+      const piece = part(0xffffff, (q) => q.baked(n, mat, I));
+      piece.userData.spin = n.data.speed || 0.7;
+      k.dyn(piece, n.pos.x, n.pos.y, n.pos.z);
+    } else k.dyn(waterMesh(n), n.pos.x, n.pos.y, n.pos.z);
+  }
+  k.at();
+  k.column(9.8, 1.05, x, z);
+  k.column(2.7, 4.7, x, z);
+  k.column(1.7, 9.2, x, z, 4.7);
+}
+
 // =============================================================================================
 // Meridian Exchange: the trade HQ, laid out on one axis (docs/meridian-layouts.md, layout A): a gate
 // arch on the +z side, a 118 m avenue down to the plaza and the portico of the stepped glass trading
@@ -841,8 +864,9 @@ export function buildMeridian(world, loc) {
       k.at();
       k.lamp(-11, TZ + fz + 10.5, 6); k.lamp(11, TZ + fz + 10.5, 6);
     }
-    // the chairwoman (story.buildLeaders) stands at the foot of the portico's steps, off the doors' line, facing the plaza
-    loc.leaderSpot = { x: 8, z: 6, yaw: Math.atan2(-8, 14) };
+    // the chairwoman (story.buildLeaders) stands at the foot of the portico's steps, off the doors' line, facing the plaza's fountain
+    // (her ballot stand, 5.5 m in front of her, stays clear of the basin)
+    loc.leaderSpot = { x: 9.5, z: 6, yaw: Math.atan2(-9.5, 14) };
     const crown = part(blue, (q) => {
       for (let i = 0; i < 4; i++) {
         const a = (i / 4) * TAU;
@@ -888,18 +912,17 @@ export function buildMeridian(world, loc) {
     // the lab dome west of the avenue, its airlock facing it; the trade hall east of it, its doors facing it
     habDome(k, -58, 40, 22, 0x9be7ff, { door: Math.PI / 2, trim: blue });
     tradeHall(k, 64, 24, 24, 56, blue);
-    // the plaza between the portico and the avenue: paving, a lit beacon, benches, lamps
+    // the plaza between the portico and the avenue: paving, the fountain (the casino's, with a dollar sign in Meridian
+    // blue turning on top), benches round the basin, lamps
     k.at(0, 20);
     k.cyl(12, 12.4, 0.25, 32, T(0xd8d4e8), 0, 0, 0, { outline: 0.04 });
     k.ring(12.2, 0.15, T(blue), 0, 0.25, 0);
-    k.cyl(1.6, 2, 3.2, 10, T(blue), 0, 0, 0, { outline: 0.05 });
-    k.ball(1.4, G(0xbfe9ff), 0, 4.2, 0, { outline: 0 });
-    k.column(2, 3.4, 0, 0);
     for (let i = 0; i < 6; i++) {
       const a = (i / 6) * TAU + 0.3;
-      k.box(2.6, 0.5, 0.8, T(0x8a5a3a), Math.cos(a) * 9, 0.5, Math.sin(a) * 9, { ry: -a + Math.PI / 2, outline: 0.03 });
+      k.box(2.6, 0.5, 0.8, T(0x8a5a3a), Math.cos(a) * 11, 0.5, Math.sin(a) * 11, { ry: -a + Math.PI / 2, outline: 0.03 });
     }
     k.at();
+    fountain(k, 0, 20, { top: 'dollar', accent: blue });
     k.lamp(16, 20, 8); k.lamp(-16, 20, 8);
     // the avenue: 28 m of paving from the plaza to the gate, kerbed, a cream band every 20 m and a line of
     // inset lights down the middle; lamps and banners in pairs along it (the flags between them are the world's)
@@ -2496,25 +2519,8 @@ export function dressCasinoLot(world, loc, makeCar) {
       k.add(g, T(i % 2 ? 0x8a1030 : 0x2a1450), 0, 0.16, FZ, { outline: 0 });
     }
     k.ring(12.6, 0.1, G(GOLD), 0, 0.17, FZ);
-    // the fountain (build_casino.py): the basin, pedestal, bowl, stem and spigots are baked into the kit; the chip turns, and the two tiers' ripples, the curtain
-    // spilling over the bowl's lip and the jets from the spigots under the chip run on shaders (fountainFx.js)
-    {
-      const F = casinoNode('fountain'), I = new THREE.Matrix4();
-      const mat = (slot) => { const c = casinoSlot(slot); return c.glow ? G(c.color) : T(c.color); };
-      k.at(0, FZ);
-      k.baked(F, mat, I);
-      for (const n of F.kids) {
-        if (n.role === 'spin') {
-          const chip = part(0xffffff, (q) => q.baked(n, mat, I));
-          chip.userData.spin = n.data.speed || 0.7;
-          k.dyn(chip, n.pos.x, n.pos.y, n.pos.z);
-        } else k.dyn(waterMesh(n), n.pos.x, n.pos.y, n.pos.z);
-      }
-      k.at();
-    }
-    k.column(9.8, 1.05, 0, FZ);
-    k.column(2.7, 4.7, 0, FZ);
-    k.column(1.7, 9.2, 0, FZ, 4.7);
+    // the fountain (build_casino.py), with the casino's chip turning on top
+    fountain(k, 0, FZ);
     // benches round the outside of the tiles, facing in (none across the way in, at -z)
     for (let i = 0; i < 6; i++) {
       const a = (i / 6) * TAU + TAU / 12;

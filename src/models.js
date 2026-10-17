@@ -2198,7 +2198,7 @@ export function makeSlotCabinet(color) {
 // ---- The casino's props (built in Blender, see build_casino.py) ----
 // Six models in one file, each a root of the baked tree: `lamp_post` (the boulevard's lamp, whose `accent` slot is the colour the game picks;
 // the plaza's ring of posts is the same one scaled down), `fountain` (the plaza basin, with the water in `water`, `curtain` and `streams`
-// pivots that fountainFx.js gives their shaders, and a `chip` pivot that spins), `bouncer` (a buff alien in a tux, a `head` pivot), `chandelier`
+// pivots that fountainFx.js gives their shaders, and `spin` pivots `chip` and `dollar`, the centrepieces, of which one is built), `bouncer` (a buff alien in a tux, a `head` pivot), `chandelier`
 // (a `spin` pivot), `welcome_sign` and `wall_sign` (a `face` pivot where the game puts its text plane).
 export const CASINO_PROPS = ['lamp_post', 'fountain', 'bouncer', 'chandelier', 'welcome_sign', 'wall_sign'];
 const CASINO_TOON = {
@@ -2217,8 +2217,8 @@ export function casinoSlot(slot, accent = 0xff2e88) {
 export const casinoNode = (name) => SHIP_PARTS['casino_' + name];
 
 // A baked node as a Group: its meshes dressed by `matFor` with their outline shells, and a child Group for each pivot (at its place, named, its role
-// and extras in userData), except the fountain's water, which the caller dresses (fountainFx.js).
-function casinoGroup(node, matFor, accent) {
+// and extras in userData), except the fountain's water, which the caller dresses (fountainFx.js), and any pivot `keep` refuses.
+function casinoGroup(node, matFor, accent, keep = () => true) {
   const g = new THREE.Group();
   g.name = node.name;
   g.position.copy(node.pos);
@@ -2231,7 +2231,7 @@ function casinoGroup(node, matFor, accent) {
     g.add(m);
   }
   if (node.ink) { const m = new THREE.Mesh(node.ink, inkMat); m.userData.isInk = true; g.add(m); }
-  for (const k of node.kids) if (!CASINO_WATER.has(k.role)) g.add(casinoGroup(k, matFor, accent));
+  for (const k of node.kids) if (!CASINO_WATER.has(k.role) && keep(k)) g.add(casinoGroup(k, matFor, accent, keep));
   return g;
 }
 const casinoMat = (c) => (c.glow ? glowShared(c.color) : toon(c.color));
@@ -2259,14 +2259,15 @@ export function makeCasinoSign(kind) {
   return { root, face: { pos: f.pos, w: f.data.w, h: f.data.h } };
 }
 
-// The plaza fountain as plain meshes (the viewer's and the Asset Row's): { root, update(t, dt) }; the chip spins and the water runs with `t`.
-export function makeFountain() {
+// The plaza fountain as plain meshes (the viewer's and the Asset Row's): { root, spinner, update(t, dt) }; the centrepiece (`top`: the
+// casino's 'chip', or the 'dollar' sign in `accent`, the Meridian Exchange's) spins and the water runs with `t`.
+export function makeFountain({ top = 'chip', accent = 0xff2e88 } = {}) {
   const node = casinoNode('fountain');
-  const root = casinoGroup(node, casinoMat);
+  const root = casinoGroup(node, casinoMat, accent, (k) => k.role !== 'spin' || (k.data.kind || 'chip') === top);
   const water = [];
   for (const k of node.kids) if (CASINO_WATER.has(k.role)) { const m = waterMesh(k); root.add(m); water.push(m); }
-  const chip = root.getObjectByName('chip');
-  return { root, chip, update(t, dt = 0) { if (chip) chip.rotation.y += dt * (chip.userData.speed || 0.7); for (const m of water) m.userData.tick(m, dt, t); } };
+  const spinner = root.getObjectByName(top);
+  return { root, spinner, chip: spinner, update(t, dt = 0) { if (spinner) spinner.rotation.y += dt * (spinner.userData.speed || 0.7); for (const m of water) m.userData.tick(m, dt, t); } };
 }
 
 // ---- The casino's blackjack table (built in Blender, see build_blackjack.py) ----

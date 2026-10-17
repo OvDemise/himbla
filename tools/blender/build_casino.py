@@ -10,7 +10,8 @@
 #                   fluted pole with gold bands, two hovering rings (each over a gold lift coil) and a solid glowing lantern on top. The `accent`
 #                   slot (the rings, the lantern, the small lamp) is the colour the game picks for the post; the fountain's ring of posts is the
 #                   same model scaled down
-#   fountain        the plaza's basin, pedestal, bowl, stem with eight spigots and the spinning chip. The water is in pivots the game gives
+#   fountain        the plaza's basin, pedestal, bowl, stem with eight spigots and the spinning centrepiece: the chip, or the Meridian
+#                   Exchange's dollar sign (`spin` pivots `chip` and `dollar`, extra `kind`; the game builds one). The water is in pivots the game gives
 #                   shader materials: `water` (extra `tier` basin or bowl: a disc the game ripples), `curtain` (the sheet falling from the bowl's
 #                   lip into the basin) and `streams` (the eight arcs from the spigots into the bowl); the `chip` pivot spins about y
 #   bouncer         the door's bouncer: a buff alien in a tux, 2.5 m, arms crossed, no helmet. Pivot `head` (at the neck) turns to watch people
@@ -219,8 +220,10 @@ def fountain():
         s, c = math.sin(a), math.cos(a)
         A.path([(s * 0.45, 5.78, c * 0.45), (s * 0.85, 5.73, c * 0.85), (s * 0.98, 5.71, c * 0.98)], [0.08, 0.08, 0.125], 8)   # (a nozzle with a flared mouth)
     A.flush()
+    # the centrepiece turns in the cradle: the casino's chip, or the Meridian Exchange's dollar sign (one `spin` pivot each, extra `kind`;
+    # the game builds the one it wants)
     # the chip: a pink disc standing on edge, cream inlays and rim notches, a gold ring on each face
-    chip = pivot("chip", (0, 7.6, 0), root, role="spin", speed=0.7)
+    chip = pivot("chip", (0, 7.6, 0), root, role="spin", speed=0.7, kind="chip")
     A = Acc("chipBody", "chip", chip, 0.05)
     A.cylc(0, 0, 0, 1.5, 0.4, 28, "z")
     A.flush()
@@ -234,6 +237,26 @@ def fountain():
     for zz in (-0.215, 0.215):
         A.add(torus_arc(1.2, 0.04, 28, 5), (0, 0, zz), (PI / 2, 0, 0))
         A.add(torus_arc(0.82, 0.035, 22, 5), (0, 0, zz), (PI / 2, 0, 0))
+    A.flush()
+    # the dollar sign: a glowing S (the `accent` slot, the caller's colour) standing on edge, a gold bar through it, 4 m tall
+    dollar = pivot("dollar", (0, 8.3, 0), root, role="spin", speed=0.7, kind="dollar")
+    A = Acc("dollarS", "accent", dollar, 0.03)
+    R = 0.8
+    pts = []
+    for k in range(25):                       # the top bowl: from the tail at the right, over the top, down to the middle
+        a = math.radians(-30 + 300 * k / 24)
+        pts.append((math.cos(a) * R, R + math.sin(a) * R, 0))
+    for k in range(1, 25):                    # the bottom bowl: from the middle, round the right, under, to the tail at the left
+        a = math.radians(90 - 300 * k / 24)
+        pts.append((math.cos(a) * R, -R + math.sin(a) * R, 0))
+    A.path(pts, 0.22, 10)
+    A.ball(pts[0][0], pts[0][1], 0, 0.22, 8, 6)
+    A.ball(pts[-1][0], pts[-1][1], 0, 0.22, 8, 6)
+    A.flush()
+    A = Acc("dollarBar", "gold", dollar, 0.03)
+    A.cylc(0, 0, 0, 0.14, 4.4, 10, "y")
+    A.ball(0, 2.2, 0, 0.14, 8, 6)
+    A.ball(0, -2.2, 0, 0.14, 8, 6)
     A.flush()
     # the water: discs for the two tiers (the game ripples them), the sheet falling from the bowl's lip, and the jets from the spigots
     w1 = pivot("water_basin", (0, 0.72, 0), root, role="water", tier="basin")

@@ -202,7 +202,8 @@ if (m === 'shuttle' || m === 'freighter') {
     for (let i = 0; i < num('n', 1); i++) { const l = makeLampPost(i % 2 ? 0x2ee6ff : acc); l.position.x = i * 4; model.add(l); }
     height = 9;
   } else if (part === 'fountain') {
-    const f = makeFountain();
+    // &top=chip|dollar (the centrepiece)  &accent=hex (the dollar sign's colour)
+    const f = makeFountain({ top: Q.get('top') || 'chip', accent: Q.has('accent') ? parseInt(Q.get('accent'), 16) : 0x2ec4ff });
     model.add(f.root);
     anim = (t, sp, dt) => f.update(t, dt);
     height = 9;

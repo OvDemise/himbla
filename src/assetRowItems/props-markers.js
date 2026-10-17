@@ -418,14 +418,16 @@ function zoneWall(R, height, y, hostile) {
 }
 
 // ---- the casino's lamp posts, fountain, chandelier and signs (casino.glb, tools/blender/build_casino.py): the boulevard's lamp post in pink and cyan and
-// the plaza's scaled-down one, the plaza fountain (the chip turns, the water runs), a hall chandelier (hung 3.6 m up, turning) and the welcome and blackjack signs ----
+// the plaza's scaled-down one, the plaza fountain twice (the casino's with the chip, the Meridian Exchange's with the dollar sign; they turn, the water runs), a hall chandelier (hung 3.6 m up, turning) and the welcome and blackjack signs ----
 function casinoProps() {
   const parts = [], movers = [];
   const scaled = (g, k) => { const w = new THREE.Group(); g.scale.setScalar(k); w.add(g); return w; };
   parts.push({ root: makeLampPost(0xff2e88), w: 3.2, d: 2 }, { root: makeLampPost(0x2ee6ff), w: 3.2, d: 2 }, { root: scaled(makeLampPost(0xff2e88), 0.62), w: 2.2, d: 1.4 });
-  const fnt = makeFountain();
-  movers.push((dt, t) => fnt.update(t, dt));
-  parts.push({ root: fnt.root, w: 20, d: 20 });
+  for (const o of [{ top: 'chip' }, { top: 'dollar', accent: 0x2ec4ff }]) {
+    const fnt = makeFountain(o);
+    movers.push((dt, t) => fnt.update(t, dt));
+    parts.push({ root: fnt.root, w: 20, d: 20 });
+  }
   const ch = makeChandelier();
   ch.root.position.y = 3.6;
   movers.push((dt) => { ch.spin.rotation.y += dt * 0.3; });
@@ -509,7 +511,7 @@ export default {
     { id: 'prop.briefcase', label: 'CREDITS BRIEFCASE', w: 1.4, d: 1.4, make: briefcase },
     { id: 'prop.seismograph', label: 'SEISMOGRAPH', w: 2, d: 2.2, make: seismograph },
     { id: 'prop.vacuum-tube', label: 'VACUUM TUBES', w: 6, d: 1.3, make: tubes },
-    { id: 'prop.casino-props', label: 'CASINO LAMPS · FOUNTAIN · CHANDELIER · SIGNS', w: 68, d: 21, make: casinoProps },
+    { id: 'prop.casino-props', label: 'CASINO LAMPS · FOUNTAINS · CHANDELIER · SIGNS', w: 91, d: 21, make: casinoProps },
     { id: 'prop.blackjack', label: 'BLACKJACK TABLE · CHIPS', w: 14.4, d: 7, make: blackjack },
     { id: 'prop.claw-machine', label: 'ZERO-G CLAW MACHINE', w: 17, d: 8, make: clawMachine },
     { id: 'prop.claw-things', label: 'CLAW TANK: THINGS · CLAW', w: 41, d: 3, make: clawThings },
