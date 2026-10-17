@@ -2285,7 +2285,7 @@ const BJ_TOON = {
   plum: 0x7c50a0, plum2: 0x9561bc, gold: 0xffd23f, cream: 0xfff4e0, dark: 0x594b6f, leather: 0xad5990, brass: 0xd8aa2e,
   chipwhite: 0xfff4e0, chipred: 0xff2a4a, chipcyan: 0x2ee6ff, chipgreen: 0x7dff6a, chipviolet: 0xc77dff,
 };
-const BJ_GLOW = { cyan: 0x2ee6ff, pink: 0xff2e88 };
+const BJ_GLOW = { cyan: 0x2ee6ff, pink: 0xff2e88, suitred: 0xff2a4a, suitcream: 0xfff4e0 };
 
 // The table as a Group (the casino freezes it: the world merges it) and where its hooks are: { stat, spots: { felt: { pos, w, h }, shoe, rack, discard } }.
 export function makeBlackjackTable() {
@@ -2342,7 +2342,7 @@ const CLAW_TOON = {
   plum: 0x7c50a0, plum2: 0x9561bc, gold: 0xffd23f, brass: 0xd8aa2e, steel: 0x8a87a0, dark: 0x2a2540, hazard: 0xffd23f, red: 0xd7263d, crate: 0xffffff, cream: 0xfff4e0,
   chipgold: 0xffd23f, rubber: 0x1d1a29,
 };
-const CLAW_GLOW = { neonpink: 0xff2e88, neoncyan: 0x2ee6ff, glowred: 0xff2a4a, gem: 0x66e6ff, lamp: 0xfff6a8 };
+const CLAW_GLOW = { suitred: 0xff2a4a, suitcream: 0xfff4e0, neonpink: 0xff2e88, neoncyan: 0x2ee6ff, glowred: 0xff2a4a, gem: 0x66e6ff, lamp: 0xfff6a8 };
 const CLAW_SLOT = (slot) => (slot in CLAW_GLOW ? glowShared(CLAW_GLOW[slot]) : toon(CLAW_TOON[slot] ?? 0xff00ff));
 // What floats in the tank (and the claw): the same toon colours with a floor of their own light (a third of the paint), so the side turned away from the hall's lamps is
 // dark paint rather than black; `diffuseColor` already carries the crates' per-instance tint.
@@ -2409,7 +2409,7 @@ const DD_TOON = {
   plum: 0x4a1766, plum2: 0x6a2a8f, gold: 0xffd23f, brass: 0xc79a1f, cream: 0xfff4e0, red: 0xd7263d, dark: 0x1a1030, tile: 0x2aa3c0, velvet: 0xb3123a, steel: 0xc9c3d9, foam: 0xffffff,
   body: 0xffd23f, wing: 0xe0b72f, bill: 0xff9f1c, silk: 0xff2e88,
 };
-const DD_GLOW = { lamp: 0xfff6a8, shine: 0xffffff, glowred: 0xff2a4a, glowamber: 0xff9f1c, glowgreen: 0x7dff6a, lane1: 0xffd23f, lane2: 0xff2e88, lane3: 0x2ee6ff, lane4: 0x7dff6a };
+const DD_GLOW = { suitred: 0xff2a4a, suitcream: 0xfff4e0, lamp: 0xfff6a8, shine: 0xffffff, glowred: 0xff2a4a, glowamber: 0xff9f1c, glowgreen: 0x7dff6a, lane1: 0xffd23f, lane2: 0xff2e88, lane3: 0x2ee6ff, lane4: 0x7dff6a };
 let ddGlass = null;
 function ddGroup(node, tint) {
   const g = new THREE.Group();

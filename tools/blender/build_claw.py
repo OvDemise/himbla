@@ -8,8 +8,8 @@
 # middle of its back (which stands on the wall), its front toward +z. Each mesh has ONE material named after a slot (CLAW_TOON / CLAW_GLOW / CLAW_CLEAR in
 # src/models.js) and an `ink` property for its outline shell.
 #   claw_machine   the cabinet, 16.4 m wide, 5.2 m deep, 6.6 m tall (8.4 m with the marquee box): a plum base with gold trim, a brass frame of mullions round the tank, a
-#                  cornice and a marquee box, a cyan vent floor with a lit DROP hole at the left (where prizes go down), a slanted console with a stick, a beam button and a
-#                  screen, a prize chute at the left end and ten shuffle jets in the ceiling. The tank's inside is x +-7.7, y 1.45 to 6.4, z 0.3 to 3.5; the glass is the
+#                  cornice and a marquee box, a cyan vent floor with a lit DROP hole centre-left (where prizes go down), a slanted console with a stick, a beam button and a
+#                  screen, and ten shuffle jets in the ceiling. The tank's inside is x +-7.7, y 1.45 to 6.4, z 0.3 to 3.5; the glass is the
 #                  slot `glass` (see CLAW_CLEAR). Pivots: marquee (plane w by h), screen (plane, extra tilt), drop (the hole in the tank floor), jets (one per ceiling jet, in
 #                  a group at the ceiling: `jet` roles at their own places)
 #   claw_claw      the energy claw: a brass body on three steel fingers with lamps. About 1 m across; its origin is the middle of its body
@@ -45,7 +45,7 @@ SLOT_COLORS = {
     "plum": (0.2, 0.08, 0.35), "plum2": (0.3, 0.12, 0.5), "gold": (1.0, 0.82, 0.25), "brass": (0.78, 0.6, 0.2), "steel": (0.5, 0.52, 0.62),
     "dark": (0.09, 0.07, 0.14), "hazard": (1.0, 0.8, 0.1), "red": (0.86, 0.13, 0.2), "crate": (0.8, 0.5, 0.2), "cream": (0.97, 0.94, 0.86),
     "neonpink": (1.0, 0.18, 0.53), "neoncyan": (0.18, 0.9, 1.0), "glowred": (1.0, 0.16, 0.29), "chipgold": (1.0, 0.82, 0.25), "gem": (0.4, 0.9, 1.0),
-    "rubber": (0.1, 0.09, 0.12), "lamp": (1.0, 0.96, 0.66), "glass": (0.6, 0.9, 1.0),
+    "rubber": (0.1, 0.09, 0.12), "lamp": (1.0, 0.96, 0.66), "glass": (0.6, 0.9, 1.0), "suitred": (1.0, 0.16, 0.26), "suitcream": (1.0, 0.96, 0.88),
 }
 exec(open(os.path.join(REPO, "tools", "blender", "kit.py"), encoding="utf-8").read(), globals())
 C = coll()
@@ -94,11 +94,14 @@ def flush_all():
     Acc.all = []
 
 
+exec(open(os.path.join(REPO, "tools", "blender", "suits.py"), encoding="utf-8").read(), globals())   # the casino's card-suit panels
+
+
 # =====================================================================================================================
 # the machine
 # =====================================================================================================================
 W, D, H0, H1 = 16.4, 5.2, 1.3, 6.6          # width, depth, the tank's floor (the base's top), the tank's roof (the frame's underside)
-DROP = (-6.55, 2.85)                         # the hole in the tank floor (x, z)
+DROP = (-3.4, 2.3)                           # the hole in the tank floor (x, z): centre-left, mid-depth
 m = pivot("claw_machine", (0, 0, 0), None)
 A = Acc("base", "plum", m, 0.05)
 A.boxc(0, H0 / 2, D / 2 - 0.55, W, H0, D - 1.1)
@@ -107,6 +110,13 @@ A = Acc("baseTrim", "gold", m, 0.03)
 A.boxc(0, H0 + 0.05, 2.1, W + 0.2, 0.12, 4.2)
 A.boxc(0, 0.15, 2.2, W + 0.1, 0.3, 4.5)
 A.flush()
+# the base's card-suit trim (the prize counter's panels, suits.py): along the front either side of the console, and one on each end
+AF = Acc("baseFrames", "brass", m, 0.0); AP = Acc("basePanels", "dark", m, 0.0); AR = Acc("baseRed", "suitred", m, 0.012); AC = Acc("baseCream", "suitcream", m, 0.012)
+for k, x in enumerate((-6.3, -4.7, -3.1, 3.1, 4.7, 6.3)):
+    suit_panel(AF, AP, AR, AC, k % 4, (x, 0.78, D - 1.1), 0, 1.5, 0.66, 0.34)
+suit_panel(AF, AP, AR, AC, 1, (-W / 2, 0.78, 2.0), -PI / 2, 2.8, 0.66, 0.34)
+suit_panel(AF, AP, AR, AC, 2, (W / 2, 0.78, 2.0), PI / 2, 2.8, 0.66, 0.34)
+AF.flush(); AP.flush(); AR.flush(); AC.flush()
 # the frame: six mullions at the front and the back, a post at each end, a roof beam, a cornice and the marquee box
 A = Acc("frame", "brass", m, 0.04)
 for i in range(6):
@@ -174,17 +184,6 @@ A = Acc("buttonRing", "neonpink", m, 0.0)
 A.tor(0.34, 0.03, (0.8, 1.14, 4.65), (0, 0, 0), 20, 5)
 A.flush()
 pivot("screen", (0, 1.45, 4.35), m, role="screen", w=1.7, h=0.5, tilt=0.22)
-# the prize chute at the left end of the front: where the prizes you bank come out
-A = Acc("chute", "hazard", m, 0.04)
-A.boxc(-6.7, 0.6, 4.8, 1.8, 1.0, 0.9)
-A.flush()
-A = Acc("chuteMouth", "dark", m, 0.0)
-A.boxc(-6.7, 0.72, 5.27, 1.4, 0.55, 0.06)
-A.flush()
-A = Acc("chuteLip", "glowred", m, 0.0)
-A.boxc(-6.7, 1.0, 5.27, 1.5, 0.05, 0.07)
-A.boxc(-6.7, 0.45, 5.27, 1.5, 0.05, 0.07)
-A.flush()
 # ten shuffle jets in the roof, one pivot each (the game puffs a plume from every one while the tank is shuffled)
 A = Acc("jets", "neonpink", m, 0.0)
 for i in range(10):

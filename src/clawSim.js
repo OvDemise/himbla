@@ -18,7 +18,7 @@ export const CLAW_COST = 200;           // the entry (credits)
 export const CLAW_TIME = 45;            // seconds a round lasts
 export const HOLD_CAP = 3;              // the weight the beam can carry
 export const TANK = { x0: -7.5, x1: 7.5, y0: 1.5, y1: 6.35, z0: 0.5, z1: 3.3 };
-export const DROP = { x: -6.55, y: 1.46, z: 2.85, r: 0.72 };
+export const DROP = { x: -3.4, y: 1.46, z: 2.3, r: 0.72 };
 export const CLAW_HOME = { x: 0, y: 6.0, z: 1.9 };
 export const MOODS = ['CALM', 'LOW DRIFT', 'STORM', 'SURGE'];
 const CLAW_R = 0.42, CLAW_DY = -0.1;     // the claw's collision ball and where it hangs from its position
@@ -29,19 +29,19 @@ const DT = 1 / 60;
 
 // r: radius of its collision ball; w: weight on the beam; mass; value: credits when banked; rest: bounciness
 export const KINDS = {
-  crate:    { r: 0.52, mass: 1.0, w: 1,   value: 6,  rest: 0.55, model: 'crate' },
-  canister: { r: 0.46, mass: 0.9, w: 1,   value: 9,  rest: 0.5,  model: 'canister', fuel: true },
-  gear:     { r: 0.50, mass: 1.2, w: 1,   value: 7,  rest: 0.45, model: 'gear', steel: true, cog: true },
-  girder:   { r: 0.80, mass: 2.0, w: 2,   value: 14,  rest: 0.4,  model: 'girder', steel: true },
+  crate:    { r: 0.52, mass: 1.0, w: 1,   value: 4,  rest: 0.55, model: 'crate' },
+  canister: { r: 0.46, mass: 0.9, w: 1,   value: 6,  rest: 0.5,  model: 'canister', fuel: true },
+  gear:     { r: 0.50, mass: 1.2, w: 1,   value: 5,  rest: 0.45, model: 'gear', steel: true, cog: true },
+  girder:   { r: 0.80, mass: 2.0, w: 2,   value: 10,  rest: 0.4,  model: 'girder', steel: true },
   mine:     { r: 0.58, mass: 1.5, w: 1,   value: -MINE_PENALTY, rest: 0.5, model: 'mine', steel: true, mine: true },
-  magnet:   { r: 0.50, mass: 1.0, w: 1,   value: 10,  rest: 0.5,  model: 'magnet', magnet: true },
-  tyre:     { r: 0.58, mass: 0.7, w: 1,   value: 4,  rest: 0.95, model: 'tyre' },
-  hullplate:{ r: 0.58, mass: 1.3, w: 1,   value: 8,  rest: 0.4,  model: 'hullplate', steel: true },
-  lockbox:  { r: 0.62, mass: 2.2, w: 2,   value: 14,  rest: 0.35, model: 'lockbox', steel: true, lock: true },
-  gem:      { r: 0.30, mass: 0.3, w: 0.5, value: 18,  rest: 0.7,  model: 'gem' },
-  engine:   { r: 0.95, mass: 5.0, w: 3,   value: 50, rest: 0.3,  model: 'engine', steel: true },
-  case:     { r: 0.58, mass: 1.0, w: 1,   value: 45, rest: 0.45, model: 'case' },
-  chip:     { r: 0.80, mass: 2.0, w: 2,   value: 600, rest: 0.5, model: 'chip', jackpot: true },
+  magnet:   { r: 0.50, mass: 1.0, w: 1,   value: 7,  rest: 0.5,  model: 'magnet', magnet: true },
+  tyre:     { r: 0.58, mass: 0.7, w: 1,   value: 3,  rest: 0.95, model: 'tyre' },
+  hullplate:{ r: 0.58, mass: 1.3, w: 1,   value: 5,  rest: 0.4,  model: 'hullplate', steel: true },
+  lockbox:  { r: 0.62, mass: 2.2, w: 2,   value: 10,  rest: 0.35, model: 'lockbox', steel: true, lock: true },
+  gem:      { r: 0.30, mass: 0.3, w: 0.5, value: 12,  rest: 0.7,  model: 'gem' },
+  engine:   { r: 0.95, mass: 5.0, w: 3,   value: 35, rest: 0.3,  model: 'engine', steel: true },
+  case:     { r: 0.58, mass: 1.0, w: 1,   value: 30, rest: 0.45, model: 'case' },
+  chip:     { r: 0.80, mass: 2.0, w: 2,   value: 500, rest: 0.5, model: 'chip', jackpot: true },
 };
 // the mix of a tank: [kind, least, most, chance of any]
 const MIX = [['crate', 5, 9, 1], ['canister', 2, 5, 1], ['gear', 3, 6, 1], ['girder', 1, 3, 1], ['magnet', 1, 2, 0.8], ['tyre', 2, 4, 1], ['hullplate', 2, 4, 1],

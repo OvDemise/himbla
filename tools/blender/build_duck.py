@@ -47,7 +47,7 @@ HEX = {
     "body": "ffd23f", "wing": "e0b72f", "bill": "ff9f1c", "dark": "1a1030", "foam": "ffffff", "silk": "ff2e88", "glass": "9be7ff", "lamp": "fff6a8", "shine": "ffffff",
     "glowred": "ff2a4a", "glowamber": "ff9f1c", "glowgreen": "7dff6a", "steel": "c9c3d9",
     "lane1": "ffd23f", "lane2": "ff2e88", "lane3": "2ee6ff", "lane4": "7dff6a", "red": "d7263d", "cream": "fff4e0", "gold": "ffd23f", "brass": "c79a1f",
-    "plum": "4a1766", "plum2": "6a2a8f", "tile": "2aa3c0", "velvet": "b3123a",
+    "plum": "4a1766", "plum2": "6a2a8f", "tile": "2aa3c0", "velvet": "b3123a", "suitred": "ff2a4a", "suitcream": "fff4e0",
 }
 SLOT_COLORS = {k: S(v) for k, v in HEX.items()}
 exec(open(os.path.join(REPO, "tools", "blender", "kit.py"), encoding="utf-8").read(), globals())
@@ -121,41 +121,7 @@ def digit(A, n, cx, cy, cz, h=0.3, th=0.045, depth=0.03, face="z"):
             A.boxc(cx, cy + y, cz + x, depth, sh, sw)
 
 
-# the card suits, the prize counter's way (build_plinko.py): smooth extruded outlines in a recessed plum panel with a thin brass frame; hearts and diamonds red, spades and clubs cream
-def heart_outline(flip=False):
-    pts = []
-    for i in range(40):
-        t = 2 * PI * i / 40
-        x = 16 * math.sin(t) ** 3
-        y = 13 * math.cos(t) - 5 * math.cos(2 * t) - 2 * math.cos(3 * t) - math.cos(4 * t)
-        pts.append((x, -y if flip else y))
-    return pts
-
-
-def suit_geos(kind, s, depth):
-    """kind 0 spade, 1 heart, 2 diamond, 3 club: shapes about s metres tall, centred on the origin, facing +z"""
-    if kind == 1:
-        k = s / 29.0
-        return [extrude([(x * k, (y + 2.5) * k) for x, y in heart_outline()], depth, "z")]
-    if kind == 2:
-        return [extrude([(0, 0.5 * s), (0.32 * s, 0), (0, -0.5 * s), (-0.32 * s, 0)], depth, "z")]
-    if kind == 0:
-        k = s / 35.0
-        return [extrude([(x * k, (y - 2.5) * k) for x, y in heart_outline(True)], depth, "z"),
-                extrude([(-2 * k, -2.5 * k), (2 * k, -2.5 * k), (5 * k, -15.5 * k), (-5 * k, -15.5 * k)], depth * 0.7, "z")]
-    r = 0.2 * s
-    return [xf(rbox(r, r, depth / 2, 1, 14, 8), (x * s, y * s, 0)) for x, y in ((0, 0.22), (-0.22, -0.08), (0.22, -0.08))] + \
-        [extrude([(-0.05 * s, 0.0), (0.05 * s, 0.0), (0.12 * s, -0.46 * s), (-0.12 * s, -0.46 * s)], depth * 0.7, "z")]
-
-
-def suit_panel(frame, fill, red, cream, kind, pos, yaw, w, h, s, fr=0.045):
-    """A recessed panel on a face (pos = the middle of the face, yaw 0 faces +z, PI/2 faces +x) with suit `kind` in it."""
-    d = 0.05
-    bars = [xf(cuboid(w, fr, d)[:2], (0, h / 2 - fr / 2, d / 2)), xf(cuboid(w, fr, d)[:2], (0, -(h / 2 - fr / 2), d / 2)),
-            xf(cuboid(fr, h - 2 * fr, d)[:2], (w / 2 - fr / 2, 0, d / 2)), xf(cuboid(fr, h - 2 * fr, d)[:2], (-(w / 2 - fr / 2), 0, d / 2))]
-    frame.add(join(bars), pos, (0, yaw, 0))
-    fill.add(xf(cuboid(w - 2 * fr, h - 2 * fr, 0.03)[:2], (0, 0, 0.015)), pos, (0, yaw, 0))
-    (red if kind in (1, 2) else cream).add(join([xf(g[:2], (0, 0, 0.03 + 0.0125)) for g in suit_geos(kind, s, 0.025)]), pos, (0, yaw, 0))
+exec(open(os.path.join(REPO, "tools", "blender", "suits.py"), encoding="utf-8").read(), globals())   # the card-suit panels (shared with the blackjack table and the claw machine)
 
 
 LANES = (2.4, 0.8, -0.8, -2.4)          # lane centres across the trough (z), lane 1 at +z (the player's side)
@@ -314,7 +280,7 @@ def trough_A():
     for sx in (-1, 1):
         A.boxc(sx * (H - 0.21), 1.07, 0, 0.42, 0.1, WID - 0.84)
     A.flush()
-    A = Acc("tFrame", "gold", o, 0.0); P = Acc("tPanel", "plum", o, 0.0); R = Acc("tSuitRed", "red", o, 0.0); K = Acc("tSuitCream", "cream", o, 0.0)
+    A = Acc("tFrame", "brass", o, 0.0); P = Acc("tPanel", "plum", o, 0.0); R = Acc("tSuitRed", "suitred", o, 0.012); K = Acc("tSuitCream", "suitcream", o, 0.012)
     for sz in (-1, 1):
         for k in range(-6, 7):
             suit_panel(A, P, R, K, (k + 6 + (0 if sz > 0 else 2)) % 4, (k * 2.1, 0.67, sz * WID / 2), 0 if sz > 0 else PI, 1.7, 0.56, 0.3)
@@ -426,7 +392,7 @@ def finish_A():
     A = Acc("fBeam", "plum", o, 0.04)
     A.boxc(0, 5.0, 0, 0.62, 0.5, 2 * PZ - 0.2)
     A.flush()
-    A = Acc("fFrame", "gold", o, 0.0); P = Acc("fPanel", "plum2", o, 0.0); R = Acc("fSuitRed", "red", o, 0.0); K = Acc("fSuitCream", "cream", o, 0.0)
+    A = Acc("fFrame", "brass", o, 0.0); P = Acc("fPanel", "plum2", o, 0.0); R = Acc("fSuitRed", "suitred", o, 0.012); K = Acc("fSuitCream", "suitcream", o, 0.012)
     for k, z in enumerate((-3.6, -1.8, 0.0, 1.8, 3.6)):
         suit_panel(A, P, R, K, k % 4, (0.31, 5.0, z), PI / 2, 1.5, 0.36, 0.2); suit_panel(A, P, R, K, (k + 2) % 4, (-0.31, 5.0, z), -PI / 2, 1.5, 0.36, 0.2)
     A.flush(); P.flush(); R.flush(); K.flush()
@@ -527,7 +493,7 @@ def kiosk_A():
     for sx in (-1, 1):
         A.boxc(sx * 1.4, 0.66, 0.0, 0.1, 1.2, 1.4)
     A.flush()
-    A = Acc("kFrame", "gold", o, 0.0); P = Acc("kPanel", "plum2", o, 0.0); R = Acc("kSuitRed", "red", o, 0.0); K = Acc("kSuitCream", "cream", o, 0.0)
+    A = Acc("kFrame", "brass", o, 0.0); P = Acc("kPanel", "plum2", o, 0.0); R = Acc("kSuitRed", "suitred", o, 0.012); K = Acc("kSuitCream", "suitcream", o, 0.012)
     suit_panel(A, P, R, K, 0, (-0.65, 0.66, 0.65), 0, 1.0, 0.7, 0.4); suit_panel(A, P, R, K, 1, (0.65, 0.66, 0.65), 0, 1.0, 0.7, 0.4)
     A.flush(); P.flush(); R.flush(); K.flush()
     # the window: brass posts and bars, an arched header, the screen inside
