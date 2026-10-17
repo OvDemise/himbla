@@ -145,7 +145,7 @@ export const STATIONS = [
   { id: 'duck', x: DUCK.kiosk[0], z: DUCK.kiosk[1] + 2, r: 2.8, label: 'DUCK DERBY — PICK A DUCK &amp; BET' },
   { id: 'plinko', x: PLK.x, z: PLK.z + 7.8, r: 3.2, label: 'PLAY PLINKO' },
   { id: 'claw', x: CLAW.x, z: CLAW.z - 6.3, r: 3.3, label: `ZERO-G CLAW — ₵${CLAW_COST} A ROUND` },
-  { id: 'classic', x: CLASSIC.x - 3.2, z: CLASSIC.mid, r: 5.4, label: 'CLASSIC GAMES (SLOTS · ROULETTE · WHEEL · HIGH-LOW)' },
+  { id: 'classic', x: CLASSIC.station[0], z: CLASSIC.station[1], r: 5.4, label: 'CLASSIC GAMES (SLOTS · ROULETTE · WHEEL · HIGH-LOW)' },
   { id: 'prizes', x: PRIZE.x - 2.8, z: PRIZE.z, r: 3.8, label: 'PRIZE COUNTER' },
 ];
 

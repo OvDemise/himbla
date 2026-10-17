@@ -9,6 +9,7 @@
 //   - a game's trigger zone (the station circle, from casinoGames.js STATIONS) touches no other footprint and no other station
 //   - the seated camera's corridor (casinoGames.js view(): where the lens flies) holds nothing taller than the lens
 import { writeFileSync } from 'node:fs';
+import { HALL, WALL, BJ, CLAW, DUCK, PLK, CLASSIC, PRIZE, floorShapes, hallPolygon, wallEdges, wallBoxes, inBox, inHall } from '../src/casinoPlan.js';
 
 const AISLE = 2.4;            // the narrowest gap that is left to walk through between two things
 const WALL_T = 2.4;           // wall thickness drawn in the plans
@@ -17,6 +18,7 @@ const TAU = Math.PI * 2;
 // ---------- shapes: rect {x0,x1,z0,z1}, circle {x,z,r} ----------
 const R = (x0, x1, z0, z1) => ({ k: 'r', x0: Math.min(x0, x1), x1: Math.max(x0, x1), z0: Math.min(z0, z1), z1: Math.max(z0, z1) });
 const C = (x, z, r) => ({ k: 'c', x, z, r });
+const C_ = C;
 const rc = (cx, cz, w, d) => R(cx - w / 2, cx + w / 2, cz - d / 2, cz + d / 2);
 const dist = (a, b) => {
   if (a.k === 'c' && b.k === 'c') return Math.hypot(a.x - b.x, a.z - b.z) - a.r - b.r;
@@ -174,32 +176,35 @@ const nave = (() => {
 // game gets a room of its own. Wings 22 wide, 42 long; frontage 110 m.
 // =====================================================================================================================================
 const cross = (() => {
-  const CZ = -13, RR = 15;
-  const floor = [C(0, CZ, RR), R(-9, 9, 0, 14), R(-9, 9, -44, -21), R(-55, -13, -24, -2), R(13, 55, -24, -2)];
-  const eDuck = duck((u, v) => [u, -24 + v], 18.6, 0.9);                    // east wing, along x on its north wall: the standard orientation
+  // everything below comes from src/casinoPlan.js, the numbers the game builds from: a layout that drifts from the game fails here
+  const { C, WING } = HALL, CZ = C[1];
+  const floor = floorShapes();
+  const eDuck = duck((u, v) => [u, DUCK.wallZ + v], DUCK.x0 - 2.2, 0.9);
+  const lane0 = DUCK.wallZ + 0.9 + 6.3;
+  if (Math.abs(lane0 - DUCK.lanes[0]) > 1e-6 || Math.abs(DUCK.kiosk[1] - (lane0 + 5.4)) > 1e-6) throw new Error('DUCK in casinoPlan.js does not match the checker\'s derby');
   const g = merge(
-    prizeAt(9, [0, 5.1], 'W'),
-    { items: [prop('Chip cage', R(-9, -5.5, 3, 7), 3.2, 'game', { grp: 'prize' })], stations: [], corridors: [] },
-    plinko(-44, 0),
-    claw(-2, -27),
-    classic(-2, [-47.6, 0], 'N'),
-    blackjack(-42, -24 + 2.04, 0),
+    prizeAt(PRIZE.wallX, [0, PRIZE.z], 'W'),
+    { items: [prop('Chip cage', R(-HALL.ARM, -5.5, 3, 7), 3.2, 'game', { grp: 'prize' })], stations: [], corridors: [] },
+    plinko(PLK.wallZ, PLK.x),
+    claw(WING.z1, CLAW.x),
+    classic(CLASSIC.wallZ, [CLASSIC.xs.reduce((a, b) => a + b) / CLASSIC.xs.length, 0], 'N'),
+    blackjack(BJ.x, BJ.z, BJ.yaw),
     eDuck,
-    { items: [prop('Chip bar', C(0, CZ, 4.7), 4.2, 'new', { free: true }), prop('Roped lounge (W)', R(-54.4, -49.2, -24, -21.5), 1.2, 'new'), prop('Roped lounge (E)', R(49.6, 55, -24, -19), 1.2, 'new')], stations: [], corridors: [] },
+    { items: [prop('Chip bar', C_(0, CZ, 4.7), 4.2, 'new', { free: true }), prop('Roped lounge (W)', R(-54.4, -49.2, WING.z0, WING.z0 + 2.5), 1.2, 'new'), prop('Roped lounge (E)', R(49.6, 55, WING.z0, WING.z0 + 5), 1.2, 'new')], stations: [], corridors: [] },
   );
   const piers = [];
-  for (const a of [45, 135, 225, 315]) piers.push(prop('Rotunda pier', C(Math.cos((a * Math.PI) / 180) * 13.6, CZ + Math.sin((a * Math.PI) / 180) * 13.6, 1.0), 14, 'struct', { struct: true }));
+  for (const a of [45, 135, 225, 315]) piers.push(prop('Rotunda pier', C_(Math.cos((a * Math.PI) / 180) * 13, CZ + Math.sin((a * Math.PI) / 180) * 13, 1.0), 14, 'struct', { struct: true }));
   return {
     name: 'B: The Crater Cross', file: 'casino-layout-b.svg',
-    floor, doors: [{ x: 0, z: 14, w: 12 }], ...g, items: [...g.items, ...piers],
-    overhead: [['chandelier', 0, 6], ['dome', 0, CZ, 14], ['chandelier', -30, -13], ['chandelier', 34, -10], ['sign', 0, 8, 12, 2.5]],
-    walls: 'union',
+    floor, doors: [{ x: 0, z: HALL.FRONT, w: HALL.DOOR * 2 }], ...g, items: [...g.items, ...piers],
+    overhead: [['chandelier', 0, 6], ['dome', 0, CZ, 14], ['chandelier', -32, -13], ['chandelier', 33, -13], ['sign', 0, 8, 12, 2.5]],
+    walls: 'union', planWalls: true,
     outside: [
-      prop('Porte-cochere', R(-10, 10, 16.4, 23.6), 11, 'new'), prop('Slot carousel W', C(-19.5, 40, 7.6), 10, 'ext'), prop('Slot carousel E', C(19.5, 40, 7.6), 10, 'ext'),
-      prop('Giant die (W court)', C(-34, 6, 4.8), 14, 'ext'), prop('Roulette wheel (E court)', R(29, 39, 5, 7), 22, 'ext'),
-      prop('Court pool W', R(-24, -14, 2, 10), 0.2, 'new'), prop('Court pool E', R(14, 24, 2, 10), 0.2, 'new'),
+      prop('Porte-cochere', R(-10, 10, 16.4, 23.6), 11, 'new'), prop('Slot carousel W', C_(-19.5, 40, 7.6), 10, 'ext'), prop('Slot carousel E', C_(19.5, 40, 7.6), 10, 'ext'),
+      prop('Giant die (W court)', C_(-34, 7, 4.8), 14, 'ext'), prop('Roulette wheel (E court)', R(29, 39, 6, 8), 22, 'ext'),
+      prop('Court pool W', R(-24, -14, 2.5, 10.5), 0.2, 'new'), prop('Court pool E', R(14, 24, 2.5, 10.5), 0.2, 'new'),
     ],
-    note: 'Footprint: rotunda r 15, arms 18 wide, wings 22 x 42; about 3,050 m2 inside (the current hall is 2,200).',
+    note: 'Footprint: a crossing with four rounded corners (r 16.5), foyer and Plinko arm 18 wide, wings 22 x 45; about 3,090 m2 inside (the current hall is 2,200).',
   };
 })();
 
@@ -234,6 +239,21 @@ function check(L) {
       if (dist(cr.s, it.s) < 0) bad.push(`${cr.label}: ${it.id} (${it.h} m) stands in the lens's way`);
     }
     if (!onFloorShape(L, cr.s)) bad.push(`${cr.label}: runs off the floor`);
+  }
+  if (L.planWalls) {      // the wall colliders (casinoPlan.js wallBoxes) tile the outline's band, and leave the floor and the doors free
+    const boxes = wallBoxes(), E = wallEdges();
+    let blocked = 0, gaps = 0;
+    for (let x = -60; x <= 60; x += 0.5) for (let z = -50; z <= 22; z += 0.5) {
+      const hit = boxes.some((bx) => inBox(bx, x, z));
+      if (hit && inHall(x, z, 0.05)) blocked++;                                   // (a collider standing on the floor)
+      if (hit && Math.abs(x) < HALL.DOOR - 0.3 && z > HALL.FRONT && z < HALL.FRONT + WALL) blocked++;   // (or in the doors)
+    }
+    for (const e of E) for (let f = 0.05; f <= 0.951; f += 0.1) for (const d of [0.15, WALL / 2, WALL - 0.15]) {
+      const x = e.p[0] + (e.q[0] - e.p[0]) * f + e.nx * d, z = e.p[1] + (e.q[1] - e.p[1]) * f + e.nz * d;
+      if (!boxes.some((bx) => inBox(bx, x, z, 0.02))) gaps++;                    // (a hole in the wall's band)
+    }
+    if (blocked) bad.push(`wall colliders stand on ${blocked} sampled points of the floor or the doors`);
+    if (gaps) bad.push(`the wall colliders leave ${gaps} sampled points of the wall's band open`);
   }
   tight.sort((a, b) => a[0] - b[0]);
   return { bad, tight: tight.filter((t) => t[2]).slice(0, 4), piers: tight.filter((t) => !t[2]).slice(0, 2) };

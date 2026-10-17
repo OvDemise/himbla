@@ -1,3 +1,4 @@
+import { FRONT_OUT } from './casinoPlan.js'; // casino: where the hall's doors' wall ends and the forecourt starts
 import * as THREE from 'three';
 import { Kit, T, G, D, GLASS, BEAM, prism, sandbags, container, crate, tank, lightString, junkHeap, PALETTE } from './outpostModels.js';
 import { FACTIONS } from './locations.js';
@@ -2484,7 +2485,7 @@ export function dressCasinoLot(world, loc, makeCar) {
   settle(world, loc, 7707, (k) => {
     // ---- the boulevard: asphalt from the doors to the plaza: a funnel from the door's width out to the boulevard's, then the boulevard itself, which runs
     // under the plaza's paving (so no sliver of dust is left between its end and the plaza's curved edge); gold edge lines; Blender-built neon lamp posts both sides ----
-    const b0 = 44, b1 = FZ - PR + 3, DOOR_Z = 13, W_DOOR = 5.5, W_BLV = 7;
+    const b0 = 44, b1 = FZ - PR + 3, DOOR_Z = FRONT_OUT, W_DOOR = 6.5, W_BLV = 7.5;
     {
       const funnel = new THREE.Shape([new THREE.Vector2(-W_DOOR, -DOOR_Z), new THREE.Vector2(W_DOOR, -DOOR_Z), new THREE.Vector2(W_BLV, -b0), new THREE.Vector2(-W_BLV, -b0)]);
       k.add(new THREE.ExtrudeGeometry(funnel, { depth: 0.1, bevelEnabled: false }).rotateX(-Math.PI / 2), T(0x4a4060), 0, 0, 0, { outline: 0 }); // (the shape's y is -z)

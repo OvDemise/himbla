@@ -48,7 +48,7 @@ import { Chamber } from './chamber.js';
 import { Secrets } from './secrets.js';
 import { Settings } from './settings.js'; // settings
 import { Casino } from './casino.js'; // casino
-import { HALL as CASINO_HALL } from './casinoWorld.js'; // casino
+import { HALL as CASINO_HALL, inHall as inCasinoHall } from './casinoWorld.js'; // casino
 import { SaveSlots } from './saves.js'; // save slots
 import { MainMenu } from './menu.js'; // main menu
 import { WEAPONS } from './weapons.js';
@@ -1318,7 +1318,7 @@ class Game {
     const cas = w.casino;
     if (cas && cas.loc.active) {
       const l = cas.toLocal(p, _v);
-      if (l.y > -3 && l.y < CASINO_HALL.H && Math.abs(l.x) < CASINO_HALL.W && l.z > CASINO_HALL.BACK && l.z < CASINO_HALL.FRONT) where = 'casino';
+      if (l.y > -3 && l.y < CASINO_HALL.H && inCasinoHall(l.x, l.z)) where = 'casino';
     }
     const lab = w.lab;
     if (!where && lab && lab.loc.active) {
