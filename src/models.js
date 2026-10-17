@@ -32,6 +32,9 @@ const GLB = {
   duck: () => import('./assets/duck.glb?inline'),
   hall: () => import('./assets/hall.glb?inline'),
   lot: () => import('./assets/lot.glb?inline'),
+  'downs-stand': () => import('./assets/downs-stand.glb?inline'),
+  'downs-club': () => import('./assets/downs-club.glb?inline'),
+  'downs-course': () => import('./assets/downs-course.glb?inline'),
 };
 
 // A model file can be compressed (tools/optimize-glb.mjs: quantized, then meshopt-coded: about a third of the size).
@@ -1390,7 +1393,7 @@ const SHIP_TOON = { trim: 0xd8d4e8, dark: 0x2a2540, metal: 0x8a87a0, steel: 0x55
 const SHIP_FX = new Set(['plume', 'plumeCore', 'lift', 'engine', 'core', 'beacon']); // per-ship materials (they pulse)
 const FLAMES = new Set(['plume', 'plumeCore', 'lift', 'beacon']);
 export async function loadShipParts({ ships } = {}) {
-  const [gltf, sk, wr, ap, lt, cr, ga, di, en, bc, hc, sl, pk, cs, bj, gy, cl, dd, hl, lo] = await Promise.all(['ships', 'skimmer', 'warrig', 'apc', 'landtrain', 'crane', 'garage', 'dish', 'engine', 'briefcase', 'hovercar', 'slots', 'plinko', 'casino', 'blackjack', 'gantry', 'claw', 'duck', 'hall', 'lot'].map((n) => loadGlb(n, n === 'ships' ? ships : undefined)));
+  const [gltf, sk, wr, ap, lt, cr, ga, di, en, bc, hc, sl, pk, cs, bj, gy, cl, dd, hl, lo, ...dn] = await Promise.all(['ships', 'skimmer', 'warrig', 'apc', 'landtrain', 'crane', 'garage', 'dish', 'engine', 'briefcase', 'hovercar', 'slots', 'plinko', 'casino', 'blackjack', 'gantry', 'claw', 'duck', 'hall', 'lot', ...DOWNS_FILES].map((n) => loadGlb(n, n === 'ships' ? ships : undefined)));
   SHIP_PARTS = {};
   for (const name of ['shuttle', 'freighter']) {
     const root = gltf.scene.getObjectByName(name);
@@ -1492,6 +1495,8 @@ export async function loadShipParts({ ships } = {}) {
     if (!root) throw new Error('lot.glb has no ' + name);
     SHIP_PARTS[name] = bakeShip(root);
   }
+  // Chimera Downs' kits (tools/blender/build_downs_*.py): every top-level `dn_*` node of each file
+  for (const g of dn) for (const root of g.scene.children) if (root.name.startsWith('dn_')) SHIP_PARTS[root.name] = bakeShip(root);
   SHIP_PARTS.claw_engine = bakeShip(ENGINE_MODEL);
   SHIP_PARTS.claw_case = bakeShip(CASE_MODEL);
   for (const m of [ENGINE_MODEL, CASE_MODEL, PLINKO_CONSOLE, PLINKO_FRAME]) m.traverse((o) => { if (o.isMesh) { o.userData.slot = o.material.name; o.castShadow = true; } });
@@ -2523,6 +2528,25 @@ export const makeLotPart = (name) => ddGroup(SHIP_PARTS[name], null, LOT_TOON, L
 export const lotNode = (name) => SHIP_PARTS[name];
 export function lotSlot(slot) {
   return slot in LOT_GLOW ? { color: LOT_GLOW[slot], glow: true } : { color: LOT_TOON[slot] ?? 0xff00ff, glow: false };
+}
+// ---- Chimera Downs' kits (built in Blender, see build_downs_*.py and downs_common.py; docs/downs-layouts.md) ----
+// One file per family, each `dn_*` node standing on y = 0. downsNode / downsSlot are for baking into the Downs' kit (race.js build); makeDownsPart gives a piece as a Group (the Asset Row's).
+// The palette is Gold Gleam, Saddle Brown, Black, Money, Barn Red and Touch of Mint (a darker tint of each for shading); slots named glow* and glass* are lit.
+const DOWNS_FILES = ['downs-stand', 'downs-club', 'downs-course'];
+export const DOWNS_TOON = {
+  mint: 0xf8fff8, mint2: 0xdfe8dd, gold: 0xcfb352, gold2: 0xa8903a, saddle: 0xb07c57, saddle2: 0x8c5f3f, black: 0x3b393a, black2: 0x5a5760,
+  money: 0x7b9a6e, money2: 0x5b7a52, barn: 0x8b4044, barn2: 0x6a2e33, seat: 0x7b9a6e, cloth: 0x8b4044,
+};
+export const DOWNS_GLOW = { glasswarm: 0xfff0c0, glowgold: 0xffe9a0, glowmint: 0xe8fff0, glowred: 0xff5a4a };
+export const makeDownsPart = (name, tint) => ddGroup(SHIP_PARTS[name], tint || null, DOWNS_TOON, DOWNS_GLOW);
+export const downsNode = (name) => {
+  if (!SHIP_PARTS[name]) throw new Error('no Downs model ' + name);
+  return SHIP_PARTS[name];
+};
+export const downsParts = () => Object.keys(SHIP_PARTS).filter((n) => n.startsWith('dn_'));
+export function downsSlot(slot, over = {}) {
+  if (slot in over) return { color: over[slot], glow: false };
+  return slot in DOWNS_GLOW ? { color: DOWNS_GLOW[slot], glow: true } : { color: DOWNS_TOON[slot] ?? 0xff00ff, glow: false };
 }
 export function makeRacer(i = 1, color = 0xffd23f, bill = 0xff9f1c) {
   const c = new THREE.Color(color);
