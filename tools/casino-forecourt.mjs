@@ -53,12 +53,11 @@ const proposed = () => {
     L.barrier.push(run(XA - 0.36, XB + 0.36, W0, W0 + 0.6), run(XA - 0.36, XB + 0.36, W1 - 0.6, W1));
     const stub = W0 + 0.3 + 0.36 + 2 * MOD + 0.72;
     L.barrier.push(run(XB - 0.3, XB + 0.3, W0, stub), run(XB - 0.3, XB + 0.3, W0 + W1 - stub, W1));
-    for (const z of [W0 - 1.2, W1 + 1.2]) for (const x of [AV + 1.2, XB + 1.1]) L.lamps.push({ x: s * x, z, sc: 0.92, kind: 'post' });
+    for (const x of [AV + 1.2, XB + 1.1]) L.lamps.push({ x: s * x, z: W0 - 1.2, sc: 0.92, kind: 'post' });
+    L.lamps.push({ x: s * (XB + 1.1), z: W1 + 1.2, sc: 0.92, kind: 'post' }, { x: s * 7.4, z: W1 + 2, sc: 0.92, kind: 'post' });
     for (const dz of [-6.4, 6.4]) L.items.push(rect('P pylon', s * (XB + 2.4) - 0.5, s * (XB + 2.4) + 0.5, MID + dz - 0.5, MID + dz + 0.5, 'prop'));
     L.items.push(circ('Slot carousel', s * 19.5, FRONT_OUT + 11.6, 7.6, 'ext'));
     L.items.push(circ('Chip stack', s * 11, FRONT_OUT + 4.2, 1.7, 'ext'), circ('Chip stack', s * 49, 64, 1.7, 'ext'));
-    for (const z of [26, 34]) L.lamps.push({ x: s * (AV + 0.9), z, sc: 0.92, kind: 'post' });
-    for (const z of [63, 72]) L.lamps.push({ x: s * 7.2, z, sc: 0.92, kind: 'post' });
   }
   // the walkway: from the court's edge to the plaza, paved, the carpet running on down its middle
   L.paving.push({ k: 'r', x0: -5.2, x1: 5.2, z0: W1, z1: FZ - PR + 1 }, { k: 'c', x: 0, z: FZ, r: PR });
@@ -72,7 +71,7 @@ const proposed = () => {
     'A 10 m paved walkway takes over for the last 24 m to the plaza, the red carpet running on down its middle.',
     'The two outer lots become wings of the one court: 24 bays of 5.2 x 6.2 m (it was 32), either side of a 5.6 m aisle that is open at each outer end, and a road runs out of each end to the ring road.',
     'Hedges are gone: a card wall (giant cards dominoed on a plum and gold kerb) edges the court; chip-stack bollards edge the walkway.',
-    'Every lamp is the casino neon post; the old thin poles are gone.',
+    'Every lamp is the casino neon post (eight, one at each corner of the court and one each side where the walkway starts); the old thin poles are gone.',
     'The slot carousels moved 12 m toward the doors so the wings can sit behind them.',
   ];
   return L;

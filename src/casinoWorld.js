@@ -544,8 +544,8 @@ export function buildCasino(w, loc) {
   sill.rotation.x = -Math.PI / 2;
   put(sill, 0, (HALL.FRONT + FRONT_OUT) / 2, 0.08);
   for (const sx of [-1, 1]) {
-    for (let i = 0; i < 7; i++) put(mesh(new THREE.CylinderGeometry(0.15, 0.2, 1.4, 6), toon(0xffd23f), 0.04), sx * 3.6, FRONT_OUT + 3 + i * 5.5, ASPH + 0.7);   // (along the avenue; the walkway's edge is chip bollards)
-    put(new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 33, 5).rotateX(Math.PI / 2), toon(0x8a1030)), sx * 3.6, FRONT_OUT + 3 + 16.5, ASPH + 1.1);
+    for (let i = 0; i < 4; i++) put(mesh(new THREE.CylinderGeometry(0.15, 0.2, 1.4, 6), toon(0xffd23f), 0.04), sx * 3.6, FRONT_OUT + 3 + i * 5.5, ASPH + 0.7);   // (the first 17 m from the doors, to the carousels' far edge)
+    put(new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 16.5, 5).rotateX(Math.PI / 2), toon(0x8a1030)), sx * 3.6, FRONT_OUT + 3 + 8.25, ASPH + 1.1);
   }
 
   // the giant rotating sign, on a mast over the dome

@@ -18,10 +18,10 @@ plaza the way is a **paved walkway**, 10 m wide, and the red carpet runs on down
 
 | Part | Where (x, z) | What |
 |---|---|---|
-| Avenue | x +/-8.6, z 16.4..58.4 | asphalt through the doors' wall to the hall floor, the gold edge lines meeting the wall's plinth beyond the gate's piers; carpet and velvet ropes; lamp pairs at z 26 and 34 |
+| Avenue | x +/-8.6, z 16.4..58.4 | asphalt through the doors' wall to the hall floor, the gold edge lines meeting the wall's plinth beyond the gate's piers; carpet, and velvet ropes on the first 17 m from the doors |
 | Wings | x +/-8.6..43.6, z 38.4..58.4 | two rows of six 5.2 x 6.2 m bays (x 11..42.2) either side of a 5.6 m aisle: **24 bays** (it was 32), the aisle open at each outer end; a gold stud at each bay's head |
-| Roads | z 48.4, x +/-39 out to the ring road (x about 133) | one from each end of the aisle: the traffic's own road bed (`loc.paved`, laid by `traffic.js pavedStrip`), melting in under the wings' asphalt and into the ring on its inner side. Nothing drives on them, as on the Meridian Exchange's avenue |
-| Walkway | x +/-5.2, z 58.4..82 | paving with gold lines at x +/-5, a chip inlay every 6 m, chip-stack bollards every 3 m at x +/-5.6, lamp pairs at z 63 and 72 (x +/-7.2) |
+| Roads | z 48.4, x +/-39 out to the ring road (x about 133) | one from each end of the aisle: the traffic's own road bed (`loc.paved`, laid by `traffic.js pavedStrip`), melting in under the wings' asphalt and joining the ring's inner side by two curved sweeps, as a road T does (`traffic.js inletFor`; the ring's inner berm and ruts make way). Nothing drives on them, as on the Meridian Exchange's avenue |
+| Walkway | x +/-5.2, z 58.4..82 | paving with gold lines at x +/-5, a chip inlay every 6 m, chip-stack bollards every 3 m at x +/-5.6,  |
 | Crossing | z 56.4..58.4 | a card-stripe crossing (gold and plum) where the court gives way to the walkway |
 | Carousels | x +/-19.5, **z 28** (12 m nearer the doors) | so the wings stand behind them with 2.8 m between |
 | Chip stacks | (+/-11, 20.6) and (+/-49, 64) | the doors' pair, clear of the carousels; the other pair marks each wing's outer corner |
@@ -30,8 +30,7 @@ plaza the way is a **paved walkway**, 10 m wide, and the red carpet runs on down
 like dominoes and leaning back 6 degrees, a suit on both faces, lit so the wall reads from the shaded side) between `lot_card_post` posts (a gold shaft with a chip on a pin), 1.25 m high, 0.6 m
 thick, with a collider. North and south runs are 14 modules; the outer end has a two-module stub each side of the aisle's 7.6 m mouth. Chip-stack bollards (`lot_chip_bollard`) edge the walkway.
 
-**Lamps.** Every lamp is the casino's neon post (`lamp_post`, scale 0.92, as on the old boulevard): 4 at each wing's corners (on the kerb outside the wall), 2 on each side of the avenue, 2 on
-each side of the walkway; the old thin poles are gone. The plaza's ring of six is as it was.
+**Lamps.** Every lamp is the casino's neon post (`lamp_post`, scale 0.92): eight, one at each wing's two north corners and outer south corner and one each side where the walkway starts (x +/-7.4, z 60.4); the old thin poles are gone, and so are the avenue's and the walkway's pairs. The plaza's ring of six is as it was.
 
 **Signs.** The flat blue P is `lot_pylon_p`: a plum post on a gold footing and a brass-framed board with a neon P on both faces and a lit diamond on top, two at each wing's outer end, turned to the road.
 

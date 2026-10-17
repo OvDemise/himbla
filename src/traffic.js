@@ -1480,7 +1480,11 @@ export class Traffic {
   // A straight road a settlement asked for inside its own grounds (`loc.paved`: { x0, z0, x1, z1 } in the settlement's frame; the
   // Meridian Exchange's avenue, from its plaza to its gate arch): the road's own bed, ruts and berms, melting into the ground at both
   // ends. Laid with the network, after the rings; nothing drives on it.
-  pavedStrip(loc, { x0, z0, x1, z1 }) {
+  pavedStrip(loc, spec) {
+    let { x0, z0, x1, z1 } = spec;
+    // a road that runs out to the ring runs on a little past where the flared join's sweeps start (inletFor), at full strength
+    const e = spec.ring ? (this.rings.get(loc)?.inlets || []).find((q) => q.spec === spec) : null;
+    if (e) { x1 = x0 + e.ux * (e.tq + 8); z1 = z0 + e.uz * (e.tq + 8); }   // (8 m past where the sweeps start, with its berms fading, so no bare ground shows between them)
     const n = Math.max(2, Math.ceil(Math.hypot(x1 - x0, z1 - z0) / 4));
     const g = [];
     for (let i = 0; i <= n; i++) g.push(this.P.ground(this.w.toWorld(loc, x0 + ((x1 - x0) * i) / n, 0, z0 + ((z1 - z0) * i) / n), new THREE.Vector3()));
@@ -1488,9 +1492,30 @@ export class Traffic {
     const base = this.roadGeo.pos.length / 3;
     for (let i = 0; i <= n; i++) {
       const s = cum[i];
-      this.stripPush(g[i], side[i], s, 1, smooth(s / 8) * smooth((total - s) / 8), smooth((s - 6) / 10) * smooth((total - s - 6) / 10), 1, 1, 0);
+      const bf = e ? 1 - smooth((s - e.tq) / 4) : 1;
+      this.stripPush(g[i], side[i], s, 1, smooth(s / 8) * (e ? 1 : smooth((total - s) / 8)), smooth((s - 6) / 10) * (e ? Math.min(1, smooth((e.tq - s) / 6 + 0.5)) : smooth((total - s - 6) / 10)), bf, bf, 0);
     }
     this.stripIdx(base, n + 1);
+  }
+
+  // Where a paved road (`spec`, in the settlement's frame, a straight line out from its start toward (x1, z1)) meets the settlement's ring R, as a gate for drawJoin: `i` the ring's point, `gate.cl` the
+  // road's centreline from the ring back along the road in 4 m steps, `tq` how far along the road the flared join's sweeps start (FILLET short of the ring), `ux, uz` its direction.
+  inletFor(loc, R, spec) {
+    const dx = spec.x1 - spec.x0, dz = spec.z1 - spec.z0, len = Math.hypot(dx, dz), ux = dx / len, uz = dz / len;
+    let bi = -1, bd = Infinity;
+    for (let i = 0; i < R.M; i++) {
+      const p = this.ringLocal(R, i);
+      if ((p.x - spec.x0) * ux + (p.z - spec.z0) * uz < len * 0.3) continue;       // (the ring's far side of the settlement, not the near one)
+      const d = Math.abs((p.x - spec.x0) * uz - (p.z - spec.z0) * ux);
+      if (d < bd) { bd = d; bi = i; }
+    }
+    const T = this.ringLocal(R, bi), t0 = (T.x - spec.x0) * ux + (T.z - spec.z0) * uz;
+    const pt = (t) => this.P.ground(this.w.toWorld(loc, spec.x0 + ux * t, 0, spec.z0 + uz * t), new THREE.Vector3());
+    const cl = [];
+    for (let k = 0; k <= 14; k++) cl.push(pt(t0 - 4 * k));
+    let kq = 1;
+    while (kq < cl.length - 1 && cl[kq].distanceTo(cl[0]) < FILLET) kq++;
+    return { i: bi, gate: { cl }, spec, ux, uz, tq: t0 - 4 * kq };
   }
 
   // After the ring's pieces are finished: link the garage piece onto the lane arc it meets, and set the rover's height over the garage
@@ -1563,6 +1588,8 @@ export class Traffic {
     // which way round has the town on its right (the stop goes on that lane); the road joins on the other, outer edge
     const c0 = this.w.toWorld(loc, 0, 0, 0);
     R.din = side[0].dot(_a.copy(c0).sub(W[0])) > 0 ? 1 : -1;
+    // a settlement's own paved road that runs out to the ring (`loc.paved` with `ring`: the casino's two roads from its car park): where it meets the ring, and the curved sweeps it joins with
+    R.inlets = (loc.paved || []).filter((s) => s.ring).map((s) => this.inletFor(loc, R, s));
     // the Meridian Exchange's garage road: laid before the ring so that the ring's inner berm can stop where the road comes in
     const gj = loc.garage ? this.garageRoad(loc, R, W, side, tan) : null;
     R.garageJoin = gj;
@@ -1589,6 +1616,10 @@ export class Traffic {
           const q = gj.toGarage(W[wrap(i)]);
           if (q.lz > 0) bi = Math.min(bi, 1 - smooth(Math.min(q.lx - gj.fc.x0 - 2, gj.fc.x1 - 2 - q.lx) / 6));
         }
+        let di = Infinity;
+        for (const e of R.inlets) { const d = Math.abs(e.i - wrap(i)); di = Math.min(di, Math.min(d, M - d) * R.step); }
+        bi = Math.min(bi, smooth((di - 12) / 10));
+        mk = Math.min(mk, smooth((di - 24) / 14));
         this.stripPush(W[wrap(i)], side[wrap(i)], s, 1, 1, mk, R.din > 0 ? b : bi, R.din > 0 ? bi : b);
       }
       this.stripIdx(base, M + 1);
@@ -1600,6 +1631,7 @@ export class Traffic {
     loc.ring = { radius: Math.round(R.Rb), max: Math.round(R.maxR), gates: n };
     // flared joins
     for (const e of gates) this.drawJoin(R, e);
+    for (const e of R.inlets) this.drawJoin(R, e);
     // delineator posts on the outside of the ring, away from the junctions
     const outSide = -R.din;
     const near = (i, list, dist) => list.some((gi) => { const d = Math.abs(gi - i); return Math.min(d, M - d) * R.step < dist; });

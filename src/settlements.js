@@ -2515,10 +2515,11 @@ export function dressCasinoLot(world, loc, makeCar) {
       lampAt(x, z, lampN++ % 2 ? PINK : CYAN, sc, x < 0 ? Math.PI / 2 : -Math.PI / 2);
       k.column(0.5, 7.5, x, z);
     };
+    // (the lamps are few: one at each of the wings' north corners, one at each outer south corner and one each side where the walkway starts)
     for (const s of [-1, 1]) {
-      for (const z of [26, 34]) post(s * (AV + 0.9), z);
-      for (const z of [63, 72]) post(s * 7.2, z);
-      for (const z of [W0 - 1.2, W1 + 1.2]) for (const x of [AV + 1.2, XB + 1.1]) post(s * x, z);
+      for (const x of [AV + 1.2, XB + 1.1]) post(s * x, W0 - 1.2);
+      post(s * (XB + 1.1), W1 + 1.2);
+      post(s * 7.4, W1 + 2);
     }
     // ---- the fountain plaza ----
     // paving with a gold edge, and a ring of chip-coloured tiles round the basin
@@ -2615,8 +2616,8 @@ export function dressCasinoLot(world, loc, makeCar) {
       for (const dz of [-6.4, 6.4]) { lotAt('lot_pylon_p', s * (XB + 2.4), MID + dz, s * Math.PI / 2); k.solid(0.5, 2.3, 0.5, s * (XB + 2.4), MID + dz); }
       keep(s * 26, MID, 22);
     }
-    // the roads into the court: one from each end of the aisle out to the ring road, the traffic's own bed (traffic.js pavedStrip), melting in under the wings' asphalt
-    loc.paved = [-1, 1].map((s) => ({ x0: s * (XB - 4), z0: MID, x1: s * 128, z1: MID }));
+    // the roads into the court: one from each end of the aisle out to the ring road, the traffic's own bed (traffic.js pavedStrip), melting in under the wings' asphalt and joining the ring by curved sweeps (a T)
+    loc.paved = [-1, 1].map((s) => ({ x0: s * (XB - 4), z0: MID, x1: s * 150, z1: MID, ring: true }));   // (to the ring, which the road joins by flared sweeps like any other: traffic.js inletFor)
   });
   // the parked cars (shared baked models), each a solid block to bump into
   cars.forEach(([x, z, yaw], i) => {
