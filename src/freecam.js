@@ -12,7 +12,8 @@ import { glyphHtml, glyphState } from './glyphs.js';
 //   (the keys are the game's own bindings, so a remapped W is the forward key)
 //   controller: right stick look · left stick fly · LB up · RB down · LT fast · d-pad ↑ / ↓ change the speed (held: it keeps going)
 //   · d-pad → hides the HUD (all of #hud: the panels, the speedometer and hull, the prompts, the popups, the cracked visor; the menus
-//   and dialogs are not in it) and shows it again; switching free cam off always brings it back
+//   and dialogs are not in it, and the dev things stay: this hint, the git upstream chip, the F3 overlay) and shows it again;
+//   switching free cam off always brings it back
 //   (gamepad.js hands the pad's buttons over in `pad` each frame; the keys the pad also sends are not read, so A, B and L3 do nothing)
 
 const SPEED_MIN = 2, SPEED_MAX = 3000, SPEED_START = 40; // m/s (the Moon is 3.6 km in radius)
@@ -69,7 +70,7 @@ export class FreeCam {
     if (this.hint) { this.hint.remove(); this.hint = null; }
   }
 
-  // style.css: body.hud-off hides #hud (and this hint)
+  // style.css: body.hud-off hides #hud (but not this hint, nor the git chip inside it)
   setHud(off) {
     this.hudOff = off;
     document.body.classList.toggle('hud-off', off);

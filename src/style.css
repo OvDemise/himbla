@@ -147,7 +147,8 @@ button { font-family: var(--comic); }
 #dev-overlay .dv-none { color: #ffd23f; }
 /* the dev free cam's keys (freecam.js) */
 #free-cam { position: fixed; left: 50%; top: 12px; transform: translateX(-50%); z-index: 45; width: max-content; max-width: calc(100vw - 24px); padding: 4px 10px; font: 12px/1.35 monospace; color: #7dff3a; background: rgba(5, 3, 12, 0.78); border: 1px solid #7dff3a; pointer-events: none; }
-body.hud-off #hud, body.hud-off #free-cam { visibility: hidden; } /* (the dev free cam's d-pad → : a clean picture. The F3 overlay is its own switch; menus and dialogs are not in #hud) */
+body.hud-off #hud { visibility: hidden; } /* (the dev free cam's d-pad → : a clean picture. Menus and dialogs are not in #hud, nor are the free cam's hint and the F3 overlay) */
+body.hud-off #gitchip { visibility: visible; } /* (a dev chip, in #hud's top left: it stays, a child's own visibility beats the one it inherits) */
 #free-cam b { color: #ffd23f; font-weight: normal; }
 #free-cam .fc-pad { display: none; align-items: center; gap: 4px; vertical-align: middle; }
 body.pad-on #free-cam .fc-pad { display: inline-flex; }
