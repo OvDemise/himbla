@@ -4,11 +4,11 @@ import { seat, hexOf } from './props-util.js';
 import { toon, glow, ink, inkMat, textSprite } from '../toon.js';
 import { mulberry32 } from '../rng.js';
 import { FACTIONS, CARGO, MIL_CARGO } from '../locations.js';
-import { makeCrate, makeSeismo, makeTube, makePylon, makeDish, makeTurret, makeRocket, engineModel, caseModel, plinkoConsoleModel, plinkoFrameModel, makeLampPost, makeFountain, makeChandelier, makeCasinoSign, makeChipStack, makeClawMachine, makeClawHead, clawKindParts, clawLit } from '../models.js';
+import { makeCrate, makeSeismo, makeTube, makePylon, makeDish, makeTurret, makeRocket, engineModel, caseModel, plinkoConsoleModel, plinkoFrameModel, makeLampPost, makeFountain, makeChandelier, makeHallPart, makeCasinoSign, makeChipStack, makeClawMachine, makeClawHead, clawKindParts, clawLit, makeDerbyPart } from '../models.js';
 import { makeProp } from '../storyAssets.js';
 import { makeStretcher } from '../medevac.js';
 import { makeLoot } from '../alchemy.js';
-import { slotCabinet, updateSlot, blackjackTable, PLK, canvasTex, FONT } from '../casinoWorld.js';
+import { slotCabinet, updateSlot, blackjackTable, PLK, canvasTex, FONT, makeDuck, waterTex, checkerTex, finishTex, DUCK } from '../casinoWorld.js';
 import { ClawSim, KINDS } from '../clawSim.js';
 import { ClawView } from '../clawView.js';
 import { SLOTS, SPACING, DROP_Y } from '../plinko.js';
@@ -237,15 +237,16 @@ const stubLoc = (faction = 'meridian') => ({ group: new THREE.Group(), faction, 
 // (World.prototype.pad needs its own `this.put`; bound here)
 const padFn = (w, ...a) => World.prototype.pad.call(w, ...a);
 
+// the shuttle's pad (a 14.2 m deck: its ramp comes down inside the railing) and the freighter's (21 m), stairs toward you
 function landingPads() {
   const w = stubWorld(), loc = stubLoc();
   let x = 0;
-  for (const [r, c] of [[12, 0xffd23f], [16, 0x2ec4ff], [13, 0x7dff6a]]) { x += r; padFn(w, loc, x, 0, r, c); x += r + 4; }
+  for (const [r, c] of [[14.2, 0x2ec4ff], [21, 0xff9f1c]]) { x += r; padFn(w, loc, x, 0, r, c, false, { face: Math.PI / 2 }); x += r + 5; }
   return { root: seat(loc.group, { lift: false }).root };
 }
 function rocketPad() {
   const w = stubWorld(), loc = stubLoc();
-  padFn(w, loc, 0, 0, 30, 0xff4f2e); // world.js:973, the launch pad under the ILMB's rocket
+  padFn(w, loc, 0, 0, 30, 0xff4f2e, false, { flat: true }); // world.js, the launch pad under the ILMB's rocket
   return { root: seat(loc.group, { lift: false }).root };
 }
 
@@ -448,6 +449,30 @@ function blackjack() {
   return { root: lineUp([{ root: blackjackTable(), w: 8, d: 7 }, { root: chips, w: 3.4, d: 0.6 }], 3).root };
 }
 
+// ---- the casino's hall kit (hall.glb, tools/blender/build_hall.py; casinoWorld.js tiles it round the plan): the four wall bays (spade, heart, diamond, club) and the filler, a coffer tile
+// (hung 7 m up), the floor medallion, the Chip Bar (its chip turns), the cashier's cage, a lounge banquette with its table, the doors' frame, the four facade panels and the roof's crown ----
+function casinoHall() {
+  const movers = [];
+  const part = (name, w, d, f) => { const o = makeHallPart(name); if (f) f(o); const g = new THREE.Group(); g.add(o); return { root: g, w, d }; };
+  const parts = [];
+  for (let k = 0; k < 4; k++) parts.push(part('hall_bay' + k, 4.5, 0.6));
+  parts.push(part('hall_filler', 2, 0.3, (o) => { o.scale.x = 2; }));
+  parts.push(part('hall_coffer', 4.5, 4.5, (o) => { o.position.y = 7; }));
+  parts.push(part('hall_medallion', 17.2, 17.2));
+  parts.push(part('hall_bar', 9.4, 9.4, (o) => { const spin = o.getObjectByName('bar_spin'); movers.push((dt) => { spin.rotation.y += dt * 0.9; }); }));
+  parts.push(part('hall_cage', 4.2, 1.8));
+  const lounge = new THREE.Group();
+  lounge.add(makeHallPart('hall_sofa'));
+  const table = makeHallPart('hall_table');
+  table.position.z = 2.2;
+  lounge.add(table);
+  parts.push({ root: lounge, w: 4, d: 3 });
+  parts.push(part('hall_gate', 15.4, 1.2));
+  for (let k = 0; k < 4; k++) parts.push(part('facade_panel' + k, 2.8, 0.4));
+  parts.push(part('facade_crown', 33, 33));
+  return { root: lineUp(parts, 3).root, update: (dt) => { for (const f of movers) f(dt); } };
+}
+
 // ---- the casino's zero-g claw (claw.glb, tools/blender/build_claw.py; clawSim.js and clawView.js run it): the machine with its marquee and screen lit and a tank of things drifting
 // about in it while the claw cruises over them (nobody plays: no beam), then every kind of thing in the tank at the size it floats, the six crate tints, and the claw ----
 function clawMachine() {
@@ -501,6 +526,45 @@ function clawThings() {
   return { root: lineUp(parts, 0.5).root };
 }
 
+// ---- the casino's Duck Derby (duck.glb, tools/blender/build_duck.py): the whole track as the hall has it, with the water, lane numbers, banner, odds board and kiosk screen
+// painted on, the four racers at the gate (their number discs on their wings), the front rail along the near side ----
+function duckDerby() {
+  const root = new THREE.Group(), PI = Math.PI;
+  const at = (o, x, y, z, ry = 0) => { o.position.set(x, y, z); o.rotation.y = ry; root.add(o); return o; };
+  const trough = at(makeDerbyPart('dd_trough'), 0, 0, 0);
+  const waterMat = new THREE.MeshBasicMaterial({ map: waterTex() }), checker = new THREE.MeshBasicMaterial({ map: checkerTex(), side: THREE.DoubleSide });
+  const lanes = [0xffd23f, 0xff2e88, 0x2ee6ff, 0x7dff6a];
+  const flat = (geo, mat, p) => { const m = new THREE.Mesh(geo, mat); m.rotation.x = -PI / 2; m.position.copy(p); root.add(m); };
+  lanes.forEach((c, i) => {
+    const wp = trough.getObjectByName('water' + (i + 1)), np = trough.getObjectByName('num' + (i + 1));
+    flat(new THREE.PlaneGeometry(wp.userData.w, wp.userData.h), waterMat, wp.position);
+    flat(new THREE.PlaneGeometry(0.9, 0.9), new THREE.MeshBasicMaterial({ map: canvasTex(64, 64, (x) => { x.fillStyle = '#' + c.toString(16).padStart(6, '0'); x.beginPath(); x.arc(32, 32, 30, 0, PI * 2); x.fill(); x.fillStyle = '#120a1e'; x.font = FONT(44); x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText(String(i + 1), 32, 35); }) }), np.position);
+  });
+  const fl = trough.getObjectByName('finishLine');
+  flat(new THREE.PlaneGeometry(fl.userData.w, fl.userData.h), new THREE.MeshBasicMaterial({ map: finishTex() }), fl.position);
+  const gx = DUCK.x0 - 0.9 - (DUCK.x0 + DUCK.x1) / 2, fx = DUCK.x1 - (DUCK.x0 + DUCK.x1) / 2;   // (the gate and the finish, in the track's own frame)
+  at(makeDerbyPart('dd_gate'), gx, 0, 0);
+  at(makeDerbyPart('dd_grille'), gx, 3.4, 0);
+  const arch = at(makeDerbyPart('dd_finish'), fx, 0, 0);
+  const bn = arch.getObjectByName('banner'), banner = new THREE.Mesh(new THREE.PlaneGeometry(bn.userData.w, bn.userData.h), checker);
+  banner.rotation.y = PI / 2; banner.position.set(fx, bn.position.y, 0); root.add(banner);
+  lanes.forEach((c, i) => { const d = makeDuck(c, i === 0 ? 0xff5a1f : 0xff9f1c, i + 1); d.root.position.set(DUCK.x0 - (DUCK.x0 + DUCK.x1) / 2 + 1 + i * 0, 0.61, [2.4, 0.8, -0.8, -2.4][i]); root.add(d.root); });
+  for (const z of [3.9, -3.9]) for (let k = 0; k <= 8; k++) { const x = -14 + k * 3.5; at(makeDerbyPart('dd_railpost'), x, 0, z); if (k < 8) at(makeDerbyPart('dd_rope'), x, 0, z); }
+  const board = at(makeDerbyPart('dd_board'), 0, 8.4, -8.8, -PI / 2);
+  const face = board.getObjectByName('face');
+  const bp = new THREE.Mesh(new THREE.PlaneGeometry(face.userData.w, face.userData.h), new THREE.MeshBasicMaterial({ map: canvasTex(1024, 384, (x, w, h) => {
+    x.fillStyle = '#05030c'; x.fillRect(0, 0, w, h); x.fillStyle = '#ffd23f'; x.font = FONT(70); x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText('DUCK DERBY', w / 2, 60);
+    ['QUACKERS', 'SIR WADDLES', 'DUCKTOR WHO', 'MOONBILL'].forEach((n, i) => { const y = 170 + i * 52; x.fillStyle = '#' + lanes[i].toString(16).padStart(6, '0'); x.beginPath(); x.arc(110, y, 18, 0, PI * 2); x.fill(); x.fillStyle = '#fff4e0'; x.font = FONT(36); x.textAlign = 'left'; x.fillText(n, 160, y + 2); });
+  }) }));
+  bp.position.set(0, 8.4, -8.8 + face.position.x);
+  root.add(bp);
+  const kiosk = at(makeDerbyPart('dd_kiosk'), 0, 0, 6.5);
+  const ks = kiosk.getObjectByName('screen');
+  const kp = new THREE.Mesh(new THREE.PlaneGeometry(ks.userData.w, ks.userData.h), new THREE.MeshBasicMaterial({ map: canvasTex(512, 256, (x, w, h) => { x.fillStyle = '#120a1e'; x.fillRect(0, 0, w, h); x.strokeStyle = '#2ee6ff'; x.lineWidth = 8; x.strokeRect(6, 6, w - 12, h - 12); x.fillStyle = '#ffd23f'; x.font = FONT(64); x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText('DUCK DERBY', w / 2, h * 0.4); x.fillStyle = '#fff4e0'; x.font = FONT(30); x.fillText('F · PICK A DUCK', w / 2, h * 0.75); }) }));
+  kp.position.copy(ks.position); kp.position.z += 0.02; kiosk.add(kp);
+  return { root };
+}
+
 export default {
   id: 'props.markers',
   title: '04 · PROPS & MARKERS',
@@ -512,7 +576,9 @@ export default {
     { id: 'prop.seismograph', label: 'SEISMOGRAPH', w: 2, d: 2.2, make: seismograph },
     { id: 'prop.vacuum-tube', label: 'VACUUM TUBES', w: 6, d: 1.3, make: tubes },
     { id: 'prop.casino-props', label: 'CASINO LAMPS · FOUNTAINS · CHANDELIER · SIGNS', w: 91, d: 21, make: casinoProps },
+    { id: 'prop.duck-derby', label: 'DUCK DERBY TRACK · RACERS · KIOSK · BOARD', w: 31, d: 21, make: duckDerby },
     { id: 'prop.blackjack', label: 'BLACKJACK TABLE · CHIPS', w: 14.4, d: 7, make: blackjack },
+    { id: 'prop.casino-hall', label: 'CASINO HALL KIT: BAYS · CEILING TILE · MEDALLION · BAR · CAGE · LOUNGE · GATE · FACADE · CROWN', w: 165, d: 36, big: true, make: casinoHall },
     { id: 'prop.claw-machine', label: 'ZERO-G CLAW MACHINE', w: 17, d: 8, make: clawMachine },
     { id: 'prop.claw-things', label: 'CLAW TANK: THINGS · CLAW', w: 41, d: 3, make: clawThings },
     { id: 'prop.slot-machines', label: 'SLOT MACHINES', w: 7 * 2.5 + 6 * 0.9, d: 1.8, make: slotMachines },
@@ -524,7 +590,7 @@ export default {
     { id: 'prop.dish', label: 'DISHES', w: 110, d: 30, make: dishes },
     { id: 'prop.turret', label: 'TURRETS', w: 26, d: 9, make: turrets },
     { id: 'prop.rocket', label: 'ILMB ROCKET', w: 11, d: 11, make: rocket },
-    { id: 'prop.landing-pads', label: 'LANDING PADS', w: 90, d: 33, solid: false, make: landingPads },
+    { id: 'prop.landing-pads', label: 'LANDING PADS', w: 76, d: 49, solid: false, make: landingPads },
     { id: 'prop.rocket-pad', label: 'ROCKET PAD', w: 62, d: 62, solid: false, make: rocketPad },
     { id: 'prop.solar-field', label: 'SOLAR FIELD', w: 52, d: 16, make: solarField },
     { id: 'prop.site-furniture', label: 'FLAGS · LAMPS · TOWER · PYLON · STOP', w: 124, d: 40, make: furniture },

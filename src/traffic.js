@@ -296,12 +296,11 @@ export class Traffic {
   dropSparePads() {
     for (const loc of this.w.locations) {
       if (!loc.pads) continue;
-      loc.pads = loc.pads.filter((p) => {
-        if (!p.spare || p.used) return true;
-        if (p.mesh) p.mesh.removeFromParent();
+      for (const p of loc.pads.slice()) {
+        if (!p.spare || p.used) continue;
+        this.w.dropPad(loc, p); // (its deck, legs, railing and stairs, and their colliders)
         (loc.droppedPads ||= []).push({ x: p.x, z: p.z });
-        return false;
-      });
+      }
     }
   }
 
@@ -416,7 +415,7 @@ export class Traffic {
   padSpot(loc, tw, keeps, spec, kind) {
     const cands = [];
     for (const p of loc.pads || []) {
-      if (p.r >= 25 || p.used) continue;
+      if (p.r >= 25 || p.used || p.flat) continue;
       cands.push({ x: p.x, z: p.z, existing: p });
     }
     for (let fr = 0.4; fr <= 1.16; fr += 0.07) {
@@ -465,67 +464,93 @@ export class Traffic {
   }
 
   // Pick (or reuse) a landing pad in open ground at the settlement's edge, facing `other`. `pin` is a pad that is already built and
-  // reserved (your town's shuttle pad, on its plot): that one is used as it is, with no search.
+  // reserved (your town's shuttle pad, on its plot): that one is used as it is, with no search. Pads are landingPad.js's: a deck up on
+  // legs with a railing, and stairs down on one side, which the passengers use (exchange).
   makePadStop(loc, other, spec, kind, pin = null) {
     const tw = this.toward(loc, other);
     const keeps = this.keepouts(loc);
     const pick = pin ? { x: pin.x, z: pin.z, lo: 0, hi: 0, existing: pin } : this.padSpot(loc, tw, keeps, spec, kind);
     const color = kind === 'ship' ? 0xff9f1c : 0x2ec4ff;
-    let top = pin ? pin.top : 0.27;
-    if (pick.existing && pick.existing.r >= spec.padR * 0.8) {
-      pick.existing.used = true;
-    } else {
-      if (pick.existing) pick.existing.used = true;
-      const raised = pick.hi - pick.lo > 0.3 || Math.abs(pick.hi) > 0.3;
-      const base = raised ? pick.hi + 0.3 : (pick.existing ? -0.12 : 0);
-      const pad = this.w.pad(loc, pick.x, pick.z, spec.padR, color);
-      if (loc.pads && loc.pads.length) loc.pads[loc.pads.length - 1].used = true;
-      pad.position.y = base;
-      pad.updateMatrix();
-      if (raised) {
-        const sk = part(new THREE.CylinderGeometry(spec.padR * 1.02, spec.padR * 1.1, base - pick.lo + 1.5, 24), toon(0x5b5870), 0, 0, 0, 0.1);
-        this.w.put(sk, loc, pick.x, pick.z, (base + pick.lo - 1.5) / 2 - 0.25);
-        this.w.col(loc, { type: 'cyl', x: pick.x, z: pick.z, y0: pick.lo - 1.5, y1: base + 0.27, r: spec.padR * 1.05 });
-      }
-      top = Math.max(top, base + 0.27);
-      // rim lights so the pad reads at night
-      const lights = new THREE.Group();
-      for (let i = 0; i < 6; i++) {
-        const a = (i / 6) * Math.PI * 2;
-        lights.add(part(new THREE.SphereGeometry(spec.padR > 12 ? 0.5 : 0.3, 6, 4), glow(color), Math.cos(a) * spec.padR * 0.92, 0.3, Math.sin(a) * spec.padR * 0.92, 0));
-      }
-      this.w.put(lights, loc, pick.x, pick.z, base);
+    let rec = pick.existing || null;
+    // a pad laid with the settlement is used as it is if it is big enough for this rig's deck (its ramp has to come down on it);
+    // a smaller one gives way to one that is
+    if (rec && !pin && !(rec.stairs && rec.r >= spec.padR - 0.5)) { this.w.dropPad(loc, rec); rec = null; }
+    if (!rec) {
+      const face = this.stairFace(loc, pick, spec.padR, keeps.filter((k) => k !== pick.existing));
+      rec = this.w.pad(loc, pick.x, pick.z, spec.padR, color, false, { face });
     }
+    rec.used = true;
+    const top = rec.top, st = rec.stairs;
     loc.stopKeep.push({ x: pick.x, z: pick.z, r: spec.clearR, flyPad: true });
-    // waiting shelter at the pad edge on the town side
-    const dc = Math.hypot(pick.x, pick.z) || 1;
-    const base = Math.atan2(-pick.z, -pick.x);
-    let wx = pick.x - (pick.x / dc) * (spec.padR + 4), wz = pick.z - (pick.z / dc) * (spec.padR + 4);
-    for (const off of [0, 0.4, -0.4, 0.8, -0.8, 1.3, -1.3]) {
-      const a = base + off;
-      const x = pick.x + Math.cos(a) * (spec.padR + 4.5), z = pick.z + Math.sin(a) * (spec.padR + 4.5);
-      if (keeps.some((k) => k !== pick.existing && Math.hypot(x - k.x, z - k.z) < k.r + 2.5)) continue;
+    // the waiting shelter: on the ground beside the stairs' foot, facing them
+    const fx = st.foot.x, fz = st.foot.z, ox = Math.cos(st.face), oz = Math.sin(st.face), sx = -oz, sz = ox;
+    let wx = st.out.x + ox * 3, wz = st.out.z + oz * 3;
+    for (const [side, along] of [[1, -0.6], [-1, -0.6], [1, 1.5], [-1, 1.5], [1, 3.5], [-1, 3.5]]) {
+      const lat = st.w / 2 + 3.6;
+      const x = fx + sx * side * lat + ox * along, z = fz + sz * side * lat + oz * along;
+      if (keeps.some((k) => k !== pick.existing && k !== rec.keep && Math.hypot(x - k.x, z - k.z) < k.r + 2.5)) continue;
       this.w.toWorld(loc, x, this.groundY(loc, x, z) + 1.5, z, _c);
       if (this.blocked(_c, 2.4)) continue;
       wx = x; wz = z;
       break;
     }
-    const yaw = Math.atan2(pick.x - wx, pick.z - wz);
+    const yaw = Math.atan2(fx - wx, fz - wz);
     const shelterAt = { x: wx, z: wz, yaw, text: `${kind === 'ship' ? 'FREIGHT' : 'SHUTTLE'} > ${other.short}`, color };
     this.shelter(loc, wx, wz, yaw, shelterAt.text, color);
     loc.stopKeep.push({ x: wx, z: wz, r: 3 });
     const stop = {
-      loc, kind: 'pad', x: pick.x, z: pick.z, top, padR: spec.padR, shelterAt,
+      loc, kind: 'pad', x: pick.x, z: pick.z, top, padR: rec.r, shelterAt, stairs: st,
       wait: { x: wx + Math.sin(yaw) * 1.8, y: this.groundY(loc, wx, wz), z: wz + Math.cos(yaw) * 1.8, g: true },
       town: this.townPoint(loc, wx, wz, 70),
       queue: [], queued: false,
     };
-    // where people step off the pad (toward the shelter side): their walks to buildings start here
-    const ea = Math.atan2(stop.wait.z - pick.z, stop.wait.x - pick.x) + 0.5, er = spec.padR + 4;
-    stop.origin = { x: pick.x + Math.cos(ea) * er, z: pick.z + Math.sin(ea) * er };
+    // where people step off the stairs: their walks to buildings start here
+    stop.origin = { x: st.out.x, z: st.out.z };
     stop.world = this.w.toWorld(loc, pick.x, top, pick.z);
     this.stops.push(stop);
     return stop;
+  }
+
+  // Which way a new pad's stairs run out (an angle as Math.atan2(z, x)): toward the middle of the settlement if that ground is clear,
+  // else the nearest way round that is (nothing solid and nothing kept clear where the flight and its foot would stand).
+  stairFace(loc, pick, r, keeps) {
+    const base = Math.atan2(-pick.z, -pick.x);
+    const clear = [];
+    for (const off of [0, 0.45, -0.45, 0.9, -0.9, 1.4, -1.4, 2.0, -2.0, 2.6, -2.6, Math.PI]) {
+      const a = base + off, ca = Math.cos(a), sa = Math.sin(a);
+      let ok = true;
+      for (const d of [r + 1.5, r + 4, r + 7]) {
+        const x = pick.x + ca * d, z = pick.z + sa * d;
+        if (keeps.some((k) => Math.hypot(x - k.x, z - k.z) < k.r + 1)) { ok = false; break; }
+        this.w.toWorld(loc, x, this.groundY(loc, x, z) + 1.4, z, _c);
+        if (this.blocked(_c, 1.7)) { ok = false; break; }
+      }
+      if (ok) clear.push({ a, y: this.groundY(loc, pick.x + ca * (r + 4), pick.z + sa * (r + 4)) });
+    }
+    if (!clear.length) return base;
+    // on a slope the stairs come down on the high side (a shorter flight); on the level, toward the middle (the first clear way)
+    const hi = Math.max(...clear.map((c) => c.y));
+    return (hi - clear[0].y > 1.5 ? clear.find((c) => c.y === hi) : clear[0]).a;
+  }
+
+  // The walk across the deck from where a flyer's ramp comes down to the head of the pad's stairs, round the ship's side rather than
+  // under its belly: out to the side the stairs are on, along the hull, then over to them. Points in the settlement's frame, on the deck.
+  deckRoute(v, stop) {
+    const loc = stop.loc, S = stop.stairs, M = v.model || v;
+    v.root.updateMatrixWorld(true);
+    const toLoc = (x, z) => {
+      const p = this.local(loc, v.root.localToWorld(_a.set(x, M.rampBottom.y, z)), new THREE.Vector3());
+      // (kept on the deck, inside the railing)
+      const dx = p.x - stop.x, dz = p.z - stop.z, d = Math.hypot(dx, dz), max = stop.padR - 1.3;
+      if (d > max) { p.x = stop.x + (dx / d) * max; p.z = stop.z + (dz / d) * max; }
+      return { x: p.x, y: stop.top, z: p.z, g: false };
+    };
+    const e = v.root.worldToLocal(this.w.toWorld(loc, S.edge.x, S.edge.y, S.edge.z, _b));
+    const side = e.x >= 0 ? 1 : -1, W = (M.deck ? M.deck[0] : 3) + 2.4, zb = M.rampBottom.z;
+    const pts = [toLoc(side * W, zb * 0.85)];
+    // along the hull to level with the stairs (if they are forward of the ramp: they usually are, the ramp faces out)
+    if (e.z > zb * 0.85 + 2) pts.push(toLoc(side * W, Math.min(e.z, -zb * 0.6)));
+    return pts;
   }
 
   // Climb vertically off pad A, arc up to cruise, come down over pad B and settle vertically. climb: how high the vertical legs go, one number
@@ -580,9 +605,12 @@ export class Traffic {
     // (a freighter's cargo wears the livery of a faction whose town it serves, as the land-trains do)
     const owners = [A, B].map((l) => l.faction).filter((f) => LAND_TRAIN_FACTIONS[f]);
     const model = ship ? makeFreighter({ stripe: [0xff9f1c, 0xff2e88, 0x2ec4ff][n % 3], faction: owners.length ? owners[n % owners.length] : 'kepler' }) : makeShuttle({ stripe: [0x2ec4ff, 0xff9f1c, 0x7dff6a, 0xc77dff][n % 4] });
+    // (the deck is at least as big as the rig asks, and big enough that the ramp comes down on it, inside the railing: a shuttle's
+    // ramp reaches 13.3 m from its middle, past its 11 m pad)
+    const deckR = Math.max(model.padR, Math.hypot(model.rampBottom.x, model.rampBottom.z) + 0.9);
     const spec = ship
-      ? { padR: model.padR, clearR: 31, heights: [3, 10, 20, 32], climb: 36 }
-      : { padR: model.padR, clearR: 13, heights: [2, 7, 14], climb: 18 };
+      ? { padR: deckR, clearR: Math.max(31, deckR + 2), heights: [3, 10, 20, 32], climb: 36 }
+      : { padR: deckR, clearR: Math.max(13, deckR + 1.5), heights: [2, 7, 14], climb: 18 };
     const cruise = ship ? 55 + (n % 3) * 25 : 24;
     const sA = this.makePadStop(A, B, spec, kind, opts.pinA), sB = this.makePadStop(B, A, spec, kind);
     const path = this.flightPath(sA, sB, model.gearH, [opts.pinA ? TOWN_CLIMB : spec.climb, spec.climb], cruise, model.radius);
@@ -2067,16 +2095,16 @@ export class Traffic {
       bottom.y = stop.top; bottom.g = false;
       door = [pt(v.inside, false), pt(v.rampTop, false), bottom];
     }
-    // off the pad toward the shelter side, then to a building
-    let exit = null;
-    if (stop.kind === 'pad') {
-      const a = Math.atan2(stop.wait.z - stop.z, stop.wait.x - stop.x) + 0.5;
-      exit = { x: stop.x + Math.cos(a) * (stop.padR + 1.5), y: stop.top, z: stop.z + Math.sin(a) * (stop.padR + 1.5), g: false };
+    // off a pad: round the ship to the stairs' head, down the flight, onto the ground at its foot (stop.origin); then to a building
+    let down = [];
+    if (stop.kind === 'pad' && stop.stairs) {
+      const S = stop.stairs;
+      down = [...this.deckRoute(v, stop), { ...S.edge, g: false }, { ...S.head, g: false }, { ...S.foot, g: false }];
     }
     const doors = this.doorsFor(stop);
     const nOff = v.pax[0] + Math.floor(Math.random() * (v.pax[1] - v.pax[0] + 1));
     for (let i = 0; i < nOff; i++) {
-      const via = exit ? [exit, { ...exit, y: this.groundY(loc, exit.x, exit.z), g: true }] : [];
+      const via = down.map((p) => ({ ...p }));
       via.push({ ...stop.origin, y: this.groundY(loc, stop.origin.x, stop.origin.z), g: true });
       let dest;
       if (doors.length) dest = doors[Math.floor(Math.random() * doors.length)].map((q) => ({ ...q }));
@@ -2089,7 +2117,7 @@ export class Traffic {
     stop.queue.forEach((wk, i) => {
       if (wk.done) return;
       const here = { x: wk.fig.root.position.x, y: wk.fig.root.position.y, z: wk.fig.root.position.z, g: true };
-      const via = exit ? [{ ...exit, y: this.groundY(loc, exit.x, exit.z), g: true }, exit] : [];
+      const via = down.length ? [{ ...stop.origin, y: this.groundY(loc, stop.origin.x, stop.origin.z), g: true }, ...[...down].reverse().map((p) => ({ ...p }))] : [];
       wk.pts = [here, ...via, ...back];
       wk.seg = 0; wk.t = 0; wk.idle = false; wk.hold = false;
       wk.delay = Math.max(wk.delay, 0) + nOff * 1.1 + 1.5 + i * 1.2;

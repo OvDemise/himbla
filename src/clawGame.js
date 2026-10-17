@@ -10,6 +10,8 @@ const MOOD_TEXT = ['CALM TANK', 'THICK AIR: THINGS STAY PUT', 'STORM: EVERYTHING
 const fmt = (n) => Math.floor(n).toLocaleString('en-US');
 const _v = new THREE.Vector3();
 const CLAW_EARSHOT = 40; // metres from the machine within which its sounds, pop-ups and shakes play when nobody is seated
+// the machine's frame (build_claw.py): the front glass, and the part of the tank the camera frames (the frame's width, the floor to the roof)
+const GLASS_Z = 3.62, TANK_HALF_W = 8.55, TANK_MID_Y = 3.95, TANK_H = 5.5;
 
 export class ClawGame {
   constructor(games) {
@@ -19,13 +21,16 @@ export class ClawGame {
     this.shuffleT = 0;
     this.msg = '';
     this.msgT = 0;
-    this.fling = false;
     this.pad = { x: 0, z: 0, y: 0 };
+    this.mouse = [false, false, false];   // (the buttons held while seated: left lowers the claw, right raises it)
     this.view = null;
     this.hitT = 0;
     this.last = null;          // how the last round went: { bank, tank }
     this.drawn = '';
     this.sparks = 0;
+    window.addEventListener('mousedown', (e) => { if (this.G.mode === 'claw' && !(e.target && e.target.closest && e.target.closest('#cas3d'))) this.mouse[e.button] = true; });
+    window.addEventListener('mouseup', (e) => { this.mouse[e.button] = false; });
+    window.addEventListener('blur', () => { this.mouse = [false, false, false]; });
   }
 
   get cw() { return this.G.cw; }
@@ -54,20 +59,19 @@ export class ClawGame {
   // ---------- seat ----------
   enter() {
     this.build();
-    this.fling = false;
+    this.mouse = [false, false, false];
     if (this.phase === 'idle' || this.phase === 'over') this.setMsg(this.phase === 'over' ? 'ANOTHER GO?' : 'FLY THE CLAW · HOLD THE BEAM · BANK IT DOWN THE DROP HOLE', 99);
   }
 
   leave() {
     if (this.phase === 'play') this.sim.end();     // (walking away ends the round: you are paid what you have banked)
-    this.fling = false;
+    this.mouse = [false, false, false];
   }
 
   setMsg(t, s = 3) { this.msg = t; this.msgT = s; this.G.msgCls = ''; }
 
   // ---------- keys ----------
   onKey(code) {
-    if (code === 'KeyX' || code === 'ShiftLeft') { this.fling = true; return true; }
     if ((code === 'Space' || code === 'Enter') && (this.phase === 'idle' || this.phase === 'over')) { this.start(); return true; }
     return code.startsWith('Arrow') || code.startsWith('Key') || code === 'Space' || code === 'Minus' || code === 'Equal'; // (the rest of the bar's keys do nothing here)
   }
@@ -100,7 +104,6 @@ export class ClawGame {
     let input = {};
     if (seated && this.phase === 'play') input = this.readInput();
     else if (this.phase === 'shuffle') input = this.home();
-    if (this.fling) { input.fling = true; this.fling = false; }
     sim.update(dt, input);
     this.view.sync(sim, dt);
     for (const e of sim.events) this.event(e);
@@ -120,7 +123,7 @@ export class ClawGame {
     const p = this.pad;
     const mx = (d('KeyD') || d('ArrowRight') ? 1 : 0) - (d('KeyA') || d('ArrowLeft') ? 1 : 0) + p.x;
     const mz = (d('KeyS') || d('ArrowDown') ? 1 : 0) - (d('KeyW') || d('ArrowUp') ? 1 : 0) + p.z;
-    const my = (d('KeyE') ? 1 : 0) - (d('KeyQ') ? 1 : 0) + p.y;
+    const my = (this.mouse[2] ? 1 : 0) - (this.mouse[0] ? 1 : 0) + p.y;   // right click up, left click down
     const cl = (v) => Math.max(-1, Math.min(1, v));
     return { mx: cl(mx), my: cl(my), mz: cl(mz), beam: d('Space') };
   }
@@ -174,7 +177,6 @@ export class ClawGame {
       case 'grab': A.tone(740, 0.07, 'triangle', 0.1); break;
       case 'release': A.tone(500, 0.05, 'triangle', 0.06); break;
       case 'stick': A.tone(1200, 0.04, 'square', 0.05); break;
-      case 'fling': A.burst(0.12, 1400, 0.3); break;
       case 'stun': G.popAt('STUNNED!', ...at(this.sim.claw.x, this.sim.claw.y + 0.6, this.sim.claw.z), { color: '#ff2a4a', size: 56, life: 1.3 }); break;
       case 'overheat': G.popAt('BEAM OVERHEATED', ...at(this.sim.claw.x, this.sim.claw.y + 0.8, this.sim.claw.z), { color: '#ff9f1c', size: 44, life: 1.1 }); A.tone(180, 0.25, 'square', 0.12); break;
       case 'surge': G.popAt('GRAVITY SURGE!', ...at(0, 5.5, 3), { color: '#ff7ad9', size: 80, life: 1.8, prio: 1 }); A.tone(110, 0.9, 'sawtooth', 0.14, 90); this.setMsg('GRAVITY SURGE!', 2.5); break;
@@ -225,8 +227,12 @@ export class ClawGame {
 
   // ---------- the camera ----------
   camView() {
-    // (the whole tank, from across the hall, above the action bar)
-    return [clawPt(0, 4.6, 16.2), clawPt(0, 3.3, 2.0)];
+    // (close to the glass: the tank's width just fills the screen (or its height, on a very wide one), sitting in the part above the action bar)
+    const cam = this.G.g.camera, tv = Math.tan(cam.fov * Math.PI / 360);
+    const bar = Math.min(0.45, ((this.G.ui && this.G.ui.offsetHeight) || 190) / window.innerHeight + 0.02);   // (the share of the screen the bar covers)
+    const dist = Math.max(TANK_HALF_W / (tv * cam.aspect), TANK_H / (1 - bar) / (2 * tv));
+    const lookY = TANK_MID_Y - bar * dist * tv;
+    return [clawPt(0, TANK_MID_Y, GLASS_Z + dist), clawPt(0, lookY, GLASS_Z)];
   }
 
   // ---------- the action bar ----------
@@ -245,8 +251,8 @@ export class ClawGame {
     let btns;
     if (ph === 'idle' || ph === 'over') btns = btn(`INSERT ₵${CLAW_COST} ${key('SPACE', 'A')}`, 'Space', { cls: 'big' });
     else if (ph === 'shuffle') btns = btn('SHUFFLING…', 'x', { dis: true });
-    else btns = btn(pad ? `BEAM ${gl('A')} HOLD` : 'BEAM <i>SPACE</i> HOLD', 'x', { dis: true, cls: 'hint' }) + btn(`FLING ${key('X', 'X')}`, 'KeyX', { cls: 'sm' }) + btn(pad ? `MOVE ${gl('LS')} · ${gl('LB')}${gl('RB')} DOWN/UP` : 'MOVE <i>WASD</i> · <i>Q</i> <i>E</i> DOWN/UP', 'x', { dis: true, cls: 'hint' });
-    const foot = pad ? `${gl('LS')} MOVE · ${gl('LB')} / ${gl('RB')} DOWN / UP · ${gl('A')} BEAM · ${gl('X')} FLING` : 'WASD MOVE · Q / E DOWN / UP · HOLD SPACE FOR THE BEAM · X FLINGS WHAT YOU HOLD (A HELD MINE IS A GRENADE)';
+    else btns = btn(pad ? `BEAM ${gl('A')} HOLD` : 'BEAM <i>SPACE</i> HOLD', 'x', { dis: true, cls: 'hint' }) + btn(pad ? `MOVE ${gl('LS')} · ${gl('LB')}${gl('RB')} DOWN/UP` : 'MOVE <i>WASD</i> · <i>CLICK</i> DOWN · <i>R-CLICK</i> UP', 'x', { dis: true, cls: 'hint' });
+    const foot = pad ? `${gl('LS')} MOVE · ${gl('LB')} / ${gl('RB')} DOWN / UP · ${gl('A')} BEAM` : 'WASD MOVE · LEFT CLICK DOWN · RIGHT CLICK UP · HOLD SPACE FOR THE BEAM';
     return { title: 'ZERO-G CLAW', body, msg: this.msg || (ph === 'idle' ? `₵${CLAW_COST} A ROUND · ${CLAW_TIME} SECONDS · A NEW TANK EVERY TIME` : ''), btns, foot, bet: `ENTRY <b>₵${CLAW_COST}</b>` };
   }
 }

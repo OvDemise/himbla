@@ -106,7 +106,7 @@ function ducksItem() {
     make() {
       const ducks = [];
       const cells = cols.map((c, i) => {
-        const d = makeDuck(c, i === 0 ? 0xff5a1f : 0xff9f1c);
+        const d = makeDuck(c, i === 0 ? 0xff5a1f : 0xff9f1c, i + 1);
         d.root.rotation.y = -Math.PI / 2 + 0.5; // (they swim along +x; turned to show the face)
         ducks.push(d);
         return cell(d.root, 'DUCK ' + (i + 1), DW, 2.4, { h: 0.6, z: 1.4 });

@@ -433,6 +433,8 @@ export function stepSkater(b, input, dt, planet, colliders, params = PHYS, impac
   const prevPlat = b.platform;
   b.platform = null;
   b.onStruct = false;
+  const wasStuck = b.stuck;
+  b.stuck = false;
   if (colliders) {
     const r = params.radius;
     const cp = _cp.copy(b.pos).addScaledVector(up, r);
@@ -440,6 +442,7 @@ export function stepSkater(b, input, dt, planet, colliders, params = PHYS, impac
     for (const c of near) {
       const pen = colliders.contact(c, cp, r, _n);
       if (pen <= 0) continue;
+      if (c.stick && _n.dot(up) > 0.55) b.stuck = true;
       b.pos.addScaledVector(_n, pen);
       cp.addScaledVector(_n, pen);
       // (the velocity of a body riding a deck is the deck's frame, b.velFrame; any other deck is moving under it: it is hit at the speed it closes)
@@ -467,6 +470,29 @@ export function stepSkater(b, input, dt, planet, colliders, params = PHYS, impac
           v.addScaledVector(_n, -vn * 1.35);
           if (-vn > 4) impacts.push({ speed: -vn, kind: 'obstacle', normal: _n.clone() });
         }
+      }
+    }
+  }
+
+  // Walking on a landing pad (landingPad.js marks its deck and its stairs `stick`): over the stairs' head, onto the flight or off it
+  // onto the deck, your boots keep you on them, as they keep you on the ground, instead of the Moon's gravity floating you off the
+  // edge (up the flight at a run you would otherwise sail 4 m over the deck). Not on skates, and not after a jump; ramps that are
+  // not marked still throw you, which is what they are for.
+  if (colliders && wasStuck && !b.stuck && !b.grounded && !b.jumpLock && !input.skates) {
+    const r = params.radius;
+    for (let d = 0.15; d <= 1.2; d += 0.15) {
+      const cp = _cp.copy(b.pos).addScaledVector(up, r - d);
+      let hp = 0;
+      for (const c of colliders.query(cp, r + 2, _near)) {
+        if (!c.stick) continue;
+        const pen = colliders.contact(c, cp, r, _n);
+        if (pen > hp && _n.dot(up) > 0.55) { hp = pen; _tmp.copy(_n); }
+      }
+      if (hp > 0) {
+        b.pos.addScaledVector(up, -d + hp / _tmp.dot(up)); // (straight down onto it: no sliding back down a flight)
+        v.addScaledVector(_tmp, -v.dot(_tmp));
+        b.grounded = true; b.groundN.copy(_tmp); b.altitude = 0; b.onStruct = true; b.stuck = true;
+        break;
       }
     }
   }

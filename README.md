@@ -143,7 +143,7 @@ it round, holding `LB` / `RB` turns the map anticlockwise / clockwise, the right
 ball (hold either to keep them coming), `LB` / `RB` lower and raise the bet, and `B` stands up. At
 the blackjack table `A` deals and hits, `X` stands, `Y` doubles, `R3` zooms in on the cards (`Z` on the keyboard), with the same `LB` / `RB` bet and
 `B` to stand up. At the Duck Derby the left stick (or d-pad) picks a duck and `A` starts the race
-(and sets up the next one), again with `LB` / `RB` for the bet and `B` to stand up. At the Zero-G claw the left stick flies the claw, `LB` / `RB` lower and raise it, holding `A` or `RT` keeps the beam on and `X` flings what you hold. The roulette
+(and sets up the next one), again with `LB` / `RB` for the bet and `B` to stand up. At the Zero-G claw the left stick flies the claw, `LB` / `RB` lower and raise it, holding `A` or `RT` keeps the beam on. The roulette
 table uses the map's cursor: the left stick moves it, `A` or `RT` drops a chip on the number or bet
 under it (or presses the button it's on), d-pad ← → change the chip size, `X` spins and `Y` clears.
 
@@ -400,29 +400,32 @@ yours if you swear in with Rustmoon). Lose him by getting 1.5 km away. Not while
 
 ## Lucky Crater Casino
 
-A walk-in neon hall about 1 km from the ILMB, with a ring road round its grounds like a town's. Out front,
-two slot carousels (seven cabinets round a glowing pillar under a bulb-lit canopy) flank the red carpet, and
-punters wander from game to game: playing the slots (yanking the handle while the cabinet lights up), gawping
-at the giant die and the roulette wheel, admiring the chip towers, chatting by the doors. Walk through the
-front doors and press `F` at a station
-(Esc stands you back up):
+A walk-in hall about 1 km from the ILMB, with a ring road round its grounds like a town's: plum lacquer and gold, a cross-shaped
+building (the Crater Cross) under a ribbed dome, with a rotating sign on its mast. Out front, two slot carousels (seven cabinets
+round a glowing pillar under a bulb-lit canopy) flank the red carpet, and punters wander from game to game: playing the slots
+(yanking the handle while the cabinet lights up), gawping at the giant die and the roulette wheel in the pocket courts either side of
+the foyer, admiring the chip towers, chatting by the doors. Walk through the grand doors into the foyer (the prize counter and the
+cashier's cage), on to the crossing (the Chip Bar under its halo, on a compass-star inlay) and press `F` at a station
+(Esc stands you back up). The Plinko stands at the end of the north arm, the Duck Derby fills the east wing, and the west wing
+holds the claw, the classic slots and the blackjack table:
 - **Blackjack table:** real 3D cards from a 6-deck shoe, dealer stands on 17, blackjack pays 3:2.
   ←/→ bet, Space deal, H hit, S stand, D double.
-- **Duck Derby:** pick one of four ducks at the kiosk (1–4), bet, Space to race. Odds are fair-minus-5%,
-  computed from the same race model; surges, stumbles, photo finishes.
+- **Duck Derby:** pick one of four ducks at the bookmaker's kiosk (1–4), bet, Space to race. Odds are fair-minus-5%,
+  computed from the same race model; surges, stumbles, photo finishes. The track is a gilded regatta basin with lane floats, a brass start gate whose three
+  lamps count the start down, a finish arch with a photo-finish camera, a theatre-bulb odds board, a velvet-roped brass rail; the four racers
+  are QUACKERS (jockey cap and medal), SIR WADDLES (top hat, monocle, moustache), DUCKTOR WHO (fez, bow tie, specs) and MOONBILL (bubble helmet).
 - **Zero-G Claw (₵200 a round):** a 16 m glass tank on the front wall, left of the doors and facing the Duck Derby, full of things floating in zero gravity: crates, fuel
   canisters, cogs, girders, tyres, hull plates, gems, magnets, mines, lockboxes, a salvaged engine and a credits case. Fly the claw in all three directions (WASD,
-  Q / E down and up), hold Space for the beam to pull things to its tip (it carries three units of weight), and let go over the drop hole in the floor to bank
+  left click down, right click up), hold Space for the beam to pull things to its tip (it carries three units of weight), and let go over the drop hole in the floor to bank
   them. Things interact: some come **chained** in pairs or strings, a **magnet** clumps up the steel (cogs, girders, hull plates, mines, lockboxes) and carries it, a hit
-  **mine** goes off and sets the fuel canisters round it off, a **lockbox** pops open when blasted (the lucky chip, the jackpot, is in one of them), and X flings what you hold (a
-  held mine is a grenade). Banks within five seconds build a x1.25-a-step combo, three of a kind banked in a row pay a set bonus, a mine in the drop hole costs you, and an
+  **mine** goes off and sets the fuel canisters round it off, a **lockbox** pops open when blasted (the lucky chip, the jackpot, is in one of them). Banks within five seconds build a x1.25-a-step combo, three of a kind banked in a row pay a set bonus, a mine in the drop hole costs you, and an
   overheated beam or a mine close by stuns the claw. Every round the old tank is flushed out through the roof jets and a **new one is dealt**: a different mix, a different
   layout, a different hiding place for the chip and one of four moods (calm, thick air, storm, gravity surges).
 - **Plinko:** a real-physics board (12 rows, 13 slots from 0.2× to 50×, ~94-97 % return). Aim with A/D or the
   mouse, Space or click to drop; hold Space for a stream of balls.
 - The **Classic Games** cabinets open the slots / roulette / prize wheel / high-low overlay (blackjack now
-  lives only at the 3D table); the prize
-  counter (Lucky Chips cosmetics) is at the back. VIP tiers still raise max bets.
+  lives only at the 3D table); the **prize counter** (Lucky Chips cosmetics) in the foyer is its own screen, with no
+  game tabs, and the cabinets' overlay has no prize tab. VIP tiers still raise max bets.
 
 ## Territory
 
@@ -468,7 +471,11 @@ chimeras come out Turbocharged, the reactor gives you low gravity) plus scrap cr
 nearest town, and a replacement turns up a few minutes later.
 
 Freighters and shuttle-buses fly real routes: they lift off vertically on their belly jets, cruise over everything
-with their main thrusters pulsing, slow down and land on a pad at the edge of each settlement. The landing legs fold
+with their main thrusters pulsing, slow down and land on a pad at the edge of each settlement. A **landing pad** is a round deck 3 m up on
+a closed base of ribbed panels that nothing can get in under (14.3 m across the radius for a shuttle-bus, so its ramp comes down on the deck, 21 m for a freighter), with a hazard band round its
+edge, a lamp-lit safety railing all the way round, and one flight of stairs down to the ground with handrails both sides; the
+waiting shelter stands beside the stairs' foot, and the passengers walk round the ship to the stairs and down them. On a slope the deck still
+stands 3 m over the highest ground under it, and its stairs come down on the uphill side. The landing legs fold
 out of their bays (doors first, then the legs) on the way down and tuck away again after take-off; the shuttle-bus's
 rear door drops into a ramp, the freighter lowers a belly ramp. The **shuttle-bus** is a 19 m lifting-body hopper
 with a wraparound windscreen, porthole windows, two ducted lift-fans and a lit route board on the roof; the
@@ -561,7 +568,7 @@ the unlock counters, toggle any splice-pod mutation (with a reset), or reset all
 ### The Asset Row (dev builds only)
 
 Dev menu (`F8`) → **Full cheat menu** → **Teleport** → option 1, **ASSET ROW**: a flat showroom with every asset in the game
-lined up side by side, 214 of them in 25 sections (the runner and its gear, people, creatures, props and markers,
+lined up side by side, 216 of them in 25 sections (the runner and its gear, people, creatures, props and markers,
 weapons and effects, rocks and nature, the secrets and the Spindle's props, ground vehicles and ships, outposts intact and
 wrecked, the building parts the settlements are made of, the hometown, and all the places). The small ones stand in the
 yellow lane (z = 0), the places over 100 m across in the cyan lane 460 m over; the whole row is about 9 km, so the dev
@@ -735,7 +742,7 @@ src/
   territory.js   faction territory, small outposts, patrols
   vehicles.js    drivable faction vehicles
   settings.js    settings menu + key remapping
-  casino.js      Lucky Crater Casino games, VIP, prizes (casinoWorld.js: the building)
+  casino.js      Lucky Crater Casino games, VIP, prizes (casinoWorld.js: the building; casinoPlan.js: the plan's numbers and outline, no three.js, which tools/casino-layouts.mjs checks)
   clawSim.js     the Zero-G claw's rules and physics (no three.js: tools/check-claw.mjs plays it with bots to tune the payout against the entry); clawView.js draws it (instanced things, the claw, the beam, chains, blasts, shuffle jets); clawGame.js is the seated game (camera, keys, action bar, sounds, the marquee and screen)
   fountainFx.js  the plaza fountain's water: ripple, curtain and jet shaders on the casino.glb water pivots, sharing one clock
   pixelIcons.js  the classic-games overlay's pixel-art sprites (slot symbols, the pit boss, chips, cards' suits…) as plain rows of palette letters
@@ -755,6 +762,7 @@ src/
   settlements.js detailed settlements, HQs and landmarks built with the outpost kit (moving parts, skate park)
   market.js      the Meridian Exchange's stocks: a random-walk market refreshed every 15 s, read by the tower's ticker
   traffic.js     landing pads, ship/bus flights and passengers, roads, land-trains, cars, buggies
+  landingPad.js  the landing pad itself (deck on its closed base, railing, stairs, colliders and the walkers' waypoints), for every size and slope
   roadplan.js    where a road runs: a least-cost search over the terrain (slope, craters, rims, rock, rilles) between two town gates
   wardrobe.js    wardrobe screen with live 3D preview
   trailer.js     trailer director mode (?trailer): the official trailer, shot by shot, from live gameplay
@@ -773,7 +781,9 @@ src/
   assets/garage.glb  the Meridian motor-pool garages: the main one (three bays with open and shut doors, workshop fit-outs, service office, fuel yard, roof plant) and a small two-bay one
   assets/slots.glb   the casino's slot-machine cabinet: a pixel-arcade video slot with a tilted screen under a marquee, speakers, LED chases, arcade buttons, a ticket printer, a coin cup and a lever (the game paints its colour, marquee, side art and reels)
   assets/casino.glb  the casino's lamp post, plaza fountain (basin, pedestal, bowl, spigots, a spinning chip or, for the Meridian Exchange's plaza, a spinning dollar sign, the water as pivots the game gives ripple, curtain and jet shaders), buff alien bouncer, hall chandelier and the welcome and blackjack signs' frames
-  assets/claw.glb    the casino's Zero-G claw: the 16 m glass-tank machine (plum base, brass mullions, marquee box, console, prize chute, ten shuffle jets, the drop hole), the energy claw, a chain link and each kind of thing in the tank (the salvaged engine and the credits case are the game's own models)
+  assets/claw.glb    the casino's Zero-G claw: the 16 m glass-tank machine (plum base, brass mullions, marquee box, console, ten shuffle jets, the drop hole), the energy claw, a chain link and each kind of thing in the tank (the salvaged engine and the credits case are the game's own models)
+  assets/hall.glb    the casino's hall kit: the wall bay (half a gold pilaster each side, a lacquer wainscot with a framed suit panel, a tall arched panel with a cyan line) in four suits, a coffer ceiling tile, the compass-star floor medallion, the Chip Bar with its turning chip and halo, the cashier's cage, a banquette and table, the grand doors' frame, the outside's suit panels and the drum, dome and lantern
+  assets/duck.glb    the casino's Duck Derby: the four racers (a cap, hat, fez or bubble helmet each, a numbered wing disc) and the gilded track: basin with lane floats, start gate and grille, finish arch, odds-board frame, bookmaker's kiosk, brass rail post and velvet rope
   assets/blackjack.glb  the casino's gilded blackjack table (plum lacquer, gold, cream suit panels, a leather rail, a chip rack, shoe and discard well, the dealer's back counter) and its chip
   assets/dish.glb    the dish stations: the two for the research arrays' big dishes, the cryo receiver (a banded Helium-3 vessel with a stair, valve cabinet and branding panel) and the gantry station (a lattice mast, container control rooms, battery bank, fuel tank), the field dish the smaller bases use (an eight-sided tower with a gallery and caged ladder, an equipment-room container, and the gantry's truss-backed reflector) and a light head (the field dish's reflector and trunnions with no tower) for the small dishes on masts and roofs, each with the dish, its yaw and tilt pivots and a livery for every faction (the stations also a number for every dish)
   assets/winch.glb   the Hitch-Line Winch's grapple (a gold three-fluke claw, collar, shank and eye) and a metre of twisted steel cable with an orange tracer strand, which the game lays along the line, a piece per metre
@@ -801,7 +811,13 @@ tools/
   blender/build_slots.py   builds the casino's slot-machine cabinet -> src/assets/slots.glb (also runs headless; checks that the side plaques and decals sit inside the cabinet's silhouette)
   blender/build_casino.py  builds the casino's lamp post, fountain, bouncer, chandelier and signs -> src/assets/casino.glb (also runs headless)
   blender/build_claw.py    builds the Zero-G claw machine, the claw and the things in its tank -> src/assets/claw.glb (also runs headless)
+  casino-layouts.mjs       dev-only: the casino's plans (current, A, B) with the games' footprints, trigger zones and camera corridors; checks the spacing and that the walls leave the floor and doors free (`node tools/casino-layouts.mjs`, `... docs` redraws docs/casino-layout-*.svg); docs/casino-layouts.md is the study
+  casino-zfight.mjs        dev-only: lists the visible pairs of faces on one plane in the running casino (`node tools/casino-zfight.mjs`; needs the dev server)
+  casino-shots.mjs         dev-only: screenshots of the casino from fixed vantage points (needs the dev server)
   check-claw.mjs           dev-only: plays the claw sim with four bots (novice to expert) and prints what each takes home against the ₵200 entry (`node tools/check-claw.mjs 300 [novice|average|skilled|expert]`)
+  blender/suits.py        the casino's card-suit trim as geometry (the prize counter's panels), exec'd by the blackjack, claw and duck builders
+  blender/build_duck.py    builds the Duck Derby's racers and track -> src/assets/duck.glb (also runs headless)
+  blender/build_hall.py    builds the casino's hall kit (wall bays, ceiling tiles, the floor medallion, the Chip Bar, the cage, a banquette, the doors' frame, the facade's panels, the crown) -> src/assets/hall.glb (also runs headless; the build stops if two faces of one model share a plane: `audit_coplanar` in kit.py)
   blender/build_blackjack.py  builds the blackjack table and chip -> src/assets/blackjack.glb (also runs headless; the build stops if anything stands in the places cards, chips and the felt's lettering go)
   blender/build_dish.py    builds the cryo receiver, the gantry station, the field dish and the light dish head -> src/assets/dish.glb (also runs headless)
   blender/build_winch.py   builds the winch's grapple and cable piece -> src/assets/winch.glb and renders the tow-line marker -> src/assets/towmark.png (also runs headless: `pip install bpy`, then `MOONRUNNER_REPO=. python3 tools/blender/build_winch.py`)
@@ -809,7 +825,7 @@ tools/
   blender/dishkit.py       the dish geometry build_dish.py and build_outposts.py share (the reflector and its parts, the trunnion mount, the light dish head); exec'd by them after kit.py, builds nothing itself
   blender/decals.py        flat lettering, emblems, hazard stripes and safety signs (no textures) the land-train builder execs after kit.py
   blender/kit.py           shared geometry/material/export helpers every Blender builder execs (the runner and ships keep their own variants of a few)
-  viewer.html              dev-only model viewer (npm run dev, then /tools/viewer.html?m=shuttle|freighter|apc|landtrain|crane|gantry|cargobox|garage|slots|dish|outpost|mite|lineup…; slots takes &n=<cabinets in a row>&ring=<cabinets round a pillar>&idx=<first colour and name>&play=1 (works them like a patron); casino takes &part=lamp|fountain|bouncer|chandelier|welcome|wall|blackjack|claw|clawthings (&accent=<hex>&n=<lamps> for lamp); freighter takes &faction=spacecom|vostok|kepler|meridian (the cargo's livery); dish takes &kind=cryo|gantry|field|head&faction=…&no=01..04&size=30&tilt=<rad>&sweep=1; apc takes &turret=<rad>&barrel=<rad>; landtrain takes &type=moonliner|prospector&faction=spacecom|vostok|kepler|meridian&cars=pax,tank,cargo,blast&unit=<n>)
+  viewer.html              dev-only model viewer (npm run dev, then /tools/viewer.html?m=shuttle|freighter|apc|landtrain|crane|gantry|cargobox|garage|slots|dish|outpost|mite|lineup…; slots takes &n=<cabinets in a row>&ring=<cabinets round a pillar>&idx=<first colour and name>&play=1 (works them like a patron); casino takes &part=lamp|fountain|bouncer|chandelier|welcome|wall|blackjack|claw|clawthings|duckderby (&accent=<hex>&n=<lamps> for lamp); freighter takes &faction=spacecom|vostok|kepler|meridian (the cargo's livery); dish takes &kind=cryo|gantry|field|head&faction=…&no=01..04&size=30&tilt=<rad>&sweep=1; apc takes &turret=<rad>&barrel=<rad>; landtrain takes &type=moonliner|prospector&faction=spacecom|vostok|kepler|meridian&cars=pax,tank,cargo,blast&unit=<n>)
   meridian-layouts.mjs     the Meridian Exchange layout study (docs/meridian-layouts.md): the footprints of the site as built and of two proposed layouts, a clearance check, and the plan drawings in docs/
   winch-sign-repro.mjs     dev-only headless repro for the winch cable round the Lucky Crater Casino sign post (see docs/winch-handoff.md: what was found, what is open)
 ```

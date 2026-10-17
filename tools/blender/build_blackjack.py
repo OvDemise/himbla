@@ -45,7 +45,7 @@ COLL = "MoonBlackjack"
 SLOT_COLORS = {
     "plum": (0.2, 0.08, 0.35), "plum2": (0.3, 0.12, 0.5), "gold": (1.0, 0.82, 0.25), "cream": (0.97, 0.94, 0.86), "dark": (0.1, 0.07, 0.16),
     "leather": (0.42, 0.1, 0.28), "brass": (0.78, 0.6, 0.2), "cyan": (0.18, 0.9, 1.0), "pink": (1.0, 0.18, 0.53), "chip": (0.17, 0.9, 1.0),
-    "chipwhite": (1.0, 0.96, 0.88), "chipred": (0.86, 0.13, 0.2), "chipcyan": (0.18, 0.9, 1.0), "chipgreen": (0.3, 0.8, 0.3), "chipviolet": (0.78, 0.49, 1.0),
+    "chipwhite": (1.0, 0.96, 0.88), "chipred": (0.86, 0.13, 0.2), "chipcyan": (0.18, 0.9, 1.0), "chipgreen": (0.3, 0.8, 0.3), "chipviolet": (0.78, 0.49, 1.0), "suitred": (1.0, 0.16, 0.26), "suitcream": (1.0, 0.96, 0.88),
 }
 
 exec(open(os.path.join(REPO, "tools", "blender", "kit.py"), encoding="utf-8").read(), globals())
@@ -113,31 +113,7 @@ def arc_tube(A, rad, y, r, a0=0.0, a1=PI, n=40, seg=5):
     A.path([(rad * math.cos(a0 + (a1 - a0) * i / n), y, rad * math.sin(a0 + (a1 - a0) * i / n)) for i in range(n + 1)], r, seg)
 
 
-def spade(A, cx, cy, cz, s):
-    A.ball(cx - 0.23 * s, cy - 0.06 * s, cz, 0.28 * s, 8, 6, s=(1, 1, 0.3))
-    A.ball(cx + 0.23 * s, cy - 0.06 * s, cz, 0.28 * s, 8, 6, s=(1, 1, 0.3))
-    A.add(cylinder(0.0, 0.47 * s, 0.62 * s, 8), (cx, cy + 0.16 * s, cz), (0, 0, 0), (1, 1, 0.3))
-    A.add(cylinder(0.0, 0.2 * s, 0.34 * s, 6), (cx, cy - 0.42 * s, cz), (0, 0, 0), (1, 1, 0.3))
-
-
-def heart(A, cx, cy, cz, s):
-    A.ball(cx - 0.23 * s, cy + 0.12 * s, cz, 0.28 * s, 8, 6, s=(1, 1, 0.3))
-    A.ball(cx + 0.23 * s, cy + 0.12 * s, cz, 0.28 * s, 8, 6, s=(1, 1, 0.3))
-    A.add(cylinder(0.47 * s, 0.0, 0.66 * s, 8), (cx, cy - 0.2 * s, cz), (0, 0, 0), (1, 1, 0.3))
-
-
-def diamond(A, cx, cy, cz, s):
-    A.add(cuboid(0.62 * s, 0.62 * s, 0.1 * s), (cx, cy, cz), (0, 0, PI / 4), (1, 1.3, 1))
-
-
-def club(A, cx, cy, cz, s):
-    A.ball(cx, cy + 0.24 * s, cz, 0.24 * s, 8, 6, s=(1, 1, 0.3))
-    A.ball(cx - 0.25 * s, cy - 0.08 * s, cz, 0.24 * s, 8, 6, s=(1, 1, 0.3))
-    A.ball(cx + 0.25 * s, cy - 0.08 * s, cz, 0.24 * s, 8, 6, s=(1, 1, 0.3))
-    A.add(cylinder(0.0, 0.14 * s, 0.5 * s, 6), (cx, cy - 0.28 * s, cz), (0, 0, 0), (1, 1, 0.3))
-
-
-SUITS = [spade, heart, diamond, club]
+exec(open(os.path.join(REPO, "tools", "blender", "suits.py"), encoding="utf-8").read(), globals())
 
 # ---- the table ----
 table = pivot("bj_table", (0, 0, 0), None)
@@ -174,22 +150,19 @@ A = Acc("railGlow", "cyan", table, 0.0)
 arc_tube(A, 3.285, 1.035, 0.012, 0.0, PI, 48, 4)
 A.flush()
 
-# the apron: eight plum cartouches with the four suits in cream, between gold pilasters
-A = Acc("apronPanels", "plum2", table, 0.0)
-A2 = Acc("apronSuits", "cream", table, 0.0)
+# the apron: eight recessed panels with the four suits (the prize counter's: tools/blender/suits.py), between gold pilasters
+AF = Acc("apronFrames", "brass", table, 0.0)
+AP = Acc("apronPanels", "dark", table, 0.0)
+AR = Acc("apronRed", "suitred", table, 0.012)
+AC = Acc("apronCream", "suitcream", table, 0.012)
 A3 = Acc("apronPilasters", "gold", table, 0.0)
 for i in range(8):
     a = PI * (i + 0.5) / 8
-    A.add(cuboid(0.9, 0.62, 0.04), (3.2 * math.cos(a), 0.56, 3.2 * math.sin(a)), (0, PI / 2 - a, 0))
-    tmp = Acc("tmp", "cream", table, 0.0)
-    SUITS[i % 4](tmp, 0, 0, 0, 0.3)
-    A2.add(join(tmp.geos), (3.225 * math.cos(a), 0.56, 3.225 * math.sin(a)), (0, PI / 2 - a, 0))
-    tmp.geos = []
+    suit_panel(AF, AP, AR, AC, i % 4, (3.2 * math.cos(a), 0.56, 3.2 * math.sin(a)), PI / 2 - a, 0.9, 0.66, 0.34)
 for i in range(9):
     a = PI * i / 8
     A3.add(cuboid(0.1, 0.84, 0.07), (3.2 * math.cos(a), 0.58, 3.2 * math.sin(a)), (0, PI / 2 - a, 0))
-Acc.all = [x for x in Acc.all if x.name != "tmp"]
-A.flush(); A2.flush(); A3.flush()
+AF.flush(); AP.flush(); AR.flush(); AC.flush(); A3.flush()
 
 # the dealer's side: a brass chip rack let into the shelf (behind z = 0.05: clear of the cards), five columns of chips between gold dividers
 A = Acc("rackTray", "brass", table, 0.03)

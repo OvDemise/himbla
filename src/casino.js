@@ -27,10 +27,9 @@ const VIP = [
   { name: 'MOON ROYALTY', min: 150000, max: 50000, color: '#c77dff' },
 ];
 const BETS = [10, 25, 50, 100, 250, 500, 1000, 2500, 5000, 10000, 25000, 50000];
-const TABS = [
-  ['slots', 'LUNAR SLOTS'], ['roulette', 'CRATER ROULETTE'], ['wheel', 'PRIZE WHEEL'],
-  ['hilo', 'HIGH-LOW'], ['prizes', 'PRIZE COUNTER'],
-];
+// the classic cabinets and the prize counter are two places with their own screens: the cabinets' tabs, and the counter's one page
+const TABS = [['slots', 'LUNAR SLOTS'], ['roulette', 'CRATER ROULETTE'], ['wheel', 'PRIZE WHEEL'], ['hilo', 'HIGH-LOW']];
+const PRIZE_TABS = [['prizes', 'PRIZE COUNTER']];
 const DEFAULTS = { wagered: 0, won: 0, biggest: 0, spins: 0, hands: 0, bjs: 0, bestStreak: 0, chips: 0, chipFrac: 0, jackpot: 2500, lastFree: 0, visits: 0, ducks: 0, plinko: 0 };
 const CHIP_RATE = 50; // credits wagered per Lucky Chip
 const FREE_SPIN_MS = 10 * 60 * 1000;
@@ -130,6 +129,8 @@ export class Casino {
     this.game = game;
     this.el = document.getElementById('casino');
     this.tab = 'slots';
+    this.tabs = TABS;
+    this.venue = 'classic';
     this.bet = 10;
     this.busy = false;
     this.auto = 0;
@@ -170,7 +171,7 @@ export class Casino {
     g.hud.prompt(`<b>F</b> — ${s.label}`);
     if (g.input.pressed('KeyF') && g.boardCooldown <= 0) {
       if (s.id === 'classic') this.open();
-      else if (s.id === 'prizes') { this.open(); this.setTab('prizes'); } else this.sit(s.id);
+      else if (s.id === 'prizes') this.open('prizes'); else this.sit(s.id);
     }
     return true;
   }
@@ -188,9 +189,14 @@ export class Casino {
   }
 
   // ---------- open / close / keys ----------
-  open() {
+  open(venue = 'classic') {
     const g = this.game;
     g.openModal('casino');
+    this.venue = venue;
+    this.tabs = venue === 'prizes' ? PRIZE_TABS : TABS;
+    this.tab = venue === 'prizes' ? 'prizes' : (this.tab === 'prizes' ? 'slots' : this.tab);
+    this.root.classList.toggle('venue-prizes', venue === 'prizes');
+    this.$('.cas-tabs').innerHTML = this.tabs.map(([id, name], i) => `<button data-tab="${id}"><i>${i + 1}</i>${name}</button>`).join('');
     this.el.classList.remove('hidden');
     const s = this.st;
     s.visits++;
@@ -224,7 +230,7 @@ export class Casino {
   onKey(code) {
     if (this.mode) { this.games.onKey(code); return; }
     const n = parseInt(code.replace('Digit', ''), 10);
-    if (code.startsWith('Digit') && n >= 1 && n <= TABS.length) { this.setTab(TABS[n - 1][0]); return; }
+    if (code.startsWith('Digit') && n >= 1 && n <= this.tabs.length) { this.setTab(this.tabs[n - 1][0]); return; }
     if (code === 'ArrowLeft' || code === 'Minus') { this.stepBet(-1); return; }
     if (code === 'ArrowRight' || code === 'Equal') { this.stepBet(1); return; }
     const go = code === 'Space' || code === 'Enter';
@@ -317,7 +323,7 @@ export class Casino {
         <button class="cas-x" data-act="close">X LEAVE <small>ESC</small></button>
       </header>
       <div class="cas-boss"><div class="cas-face">${px('lizard')}</div><div class="cas-say"><b>VINNIE "THE VISOR"</b>, PIT BOSS<p data-say></p></div><div class="cas-jp">PROGRESSIVE JACKPOT<b data-jp>₵0</b></div></div>
-      <nav class="cas-tabs">${TABS.map(([id, name], i) => `<button data-tab="${id}"><i>${i + 1}</i>${name}</button>`).join('')}</nav>
+      <nav class="cas-tabs"></nav>
       <div class="cas-body" data-body></div>
       <footer class="cas-foot">
         <div class="cas-bet"><button data-act="betdown">◀</button><span>BET <b data-bet>₵10</b></span><button data-act="betup">▶</button><small data-max></small></div>
@@ -360,7 +366,7 @@ export class Casino {
   }
 
   setTab(id) {
-    if (id === this.tab) return;
+    if (id === this.tab || !this.tabs.some(([t]) => t === id)) return;
     if (this.busy || this.hl.phase === 'play') {
       this.say('wait');
       this.shake(true);

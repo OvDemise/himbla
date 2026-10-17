@@ -458,10 +458,9 @@ export class Gamepad {
       games.padAim(lx || (btn[B.RIGHT] ? 1 : 0) - (btn[B.LEFT] ? 1 : 0), dt);
       this.set('Space', btn[B.A] || trig(B.RT) > 0.35);
     } else if (mode === 'claw') {
-      // the claw: the left stick flies it (across and in and out), LB / RB lower and raise it, A or RT is the beam (held), X flings what it holds
+      // the claw: the left stick flies it (across and in and out), LB / RB lower and raise it, A or RT is the beam (held)
       games.claw.padClaw(lx || (btn[B.RIGHT] ? 1 : 0) - (btn[B.LEFT] ? 1 : 0), ly || (btn[B.DOWN] ? 1 : 0) - (btn[B.UP] ? 1 : 0), (btn[B.RB] ? 1 : 0) - (btn[B.LB] ? 1 : 0));
       this.set('Space', btn[B.A] || trig(B.RT) > 0.35);
-      if (pressed(B.X)) this.tap('KeyX');
       if (pressed(B.B) || pressed(B.START)) { this.set('Space', false); this.key('Escape'); }
       return;
     } else if (mode === 'duck') {

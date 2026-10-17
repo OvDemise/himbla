@@ -1,7 +1,7 @@
 // Dev-only model viewer: renders one model through the game's comic post pass on a turntable.
 import * as THREE from 'three';
 import { loadFonts } from '../src/fonts.js';
-import { loadRunnerParts, loadShipParts, makeRunner, makeCrate, ScarfSim, makeShuttle, makeFreighter, makeHoverCar, makeApc, makeLandTrain, makeTowerCrane, CRANE_TROLLEY_MIN, CRANE_TROLLEY_SPAN, makeGantryCrane, makeCargoBox, GANTRY_TROLLEY_SPAN, makeGarage, makeDishStation, DISH_SIZE, makeLampPost, makeFountain, makeBouncer, makeChandelier, makeCasinoSign, makeChipStack, makeClawMachine, makeClawHead, clawKindParts } from '../src/models.js';
+import { loadRunnerParts, loadShipParts, makeRunner, makeCrate, ScarfSim, makeShuttle, makeFreighter, makeHoverCar, makeApc, makeLandTrain, makeTowerCrane, CRANE_TROLLEY_MIN, CRANE_TROLLEY_SPAN, makeGantryCrane, makeCargoBox, GANTRY_TROLLEY_SPAN, makeGarage, makeDishStation, DISH_SIZE, makeLampPost, makeFountain, makeBouncer, makeChandelier, makeCasinoSign, makeChipStack, makeClawMachine, makeClawHead, clawKindParts, makeDerbyPart, makeRacer } from '../src/models.js';
 import { outpostTemplate } from '../src/outpostModels.js';
 import { loadOutpostParts, GLB_KINDS } from '../src/outpostGlb.js';
 import { makeChimera, makeMite, LIVING, MODIFIERS, spliceGenes } from '../src/chimera.js';
@@ -194,7 +194,7 @@ if (m === 'shuttle' || m === 'freighter') {
     if (t > nextPull) nextPull = t + 3.2;
   };
 } else if (m === 'casino') {
-  // the casino's props (build_casino.py). &part=lamp|fountain|bouncer|chandelier|welcome|wall|blackjack|claw|clawthings  &accent=hex (the lamp post's colour)  &n=3 lamps in a row
+  // the casino's props (build_casino.py). &part=lamp|fountain|bouncer|chandelier|welcome|wall|blackjack|claw|clawthings|duckderby  &accent=hex (the lamp post's colour)  &n=3 lamps in a row
   const part = Q.get('part') || 'lamp';
   model = new THREE.Group();
   if (part === 'lamp') {
@@ -222,6 +222,19 @@ if (m === 'shuttle' || m === 'freighter') {
     model.add(blackjackTable());
     [0xfff4e0, 0xff2a4a, 0x2ee6ff, 0x7dff6a, 0x16121f, 0xc77dff, 0xffd23f].forEach((c, i) => { const g = makeChipStack(c, 5); g.position.set(-1.5 + i * 0.5, 1.155, 1.7); model.add(g); });
     height = 5;
+  } else if (part === 'duckderby') {
+    // the Duck Derby's pieces in a row (build_duck.py): the four racers, the kiosk, a rail post with its rope, the start gate with its grille and the finish arch
+    let x = 0;
+    const put = (g, w, y = 0) => { g.position.x = x + w / 2; g.position.y = y; x += w + 1; model.add(g); };
+    [0xffd23f, 0xff2e88, 0x2ee6ff, 0x7dff6a].forEach((c, i) => { const d = makeRacer(i + 1, c, 0xff9f1c); put(d.root, 1.8, 0.4); });
+    put(makeDerbyPart('dd_kiosk'), 3);
+    const post = makeDerbyPart('dd_railpost'), rope = makeDerbyPart('dd_rope');
+    put(post, 3.5); rope.position.x = post.position.x - 0.0; model.add(rope);
+    const gate = makeDerbyPart('dd_gate'), grille = makeDerbyPart('dd_grille');
+    put(gate, 1); grille.position.set(gate.position.x, 1.35, 0); model.add(grille);
+    put(makeDerbyPart('dd_finish'), 1);
+    model.position.x = -x / 2;
+    height = 7;
   } else if (part === 'claw') {
     model.add(makeClawMachine().stat);   // (the empty machine; the game fills it from clawSim.js through clawView.js)
     height = 12;

@@ -28,6 +28,8 @@ const GLB = {
   briefcase: () => import('./assets/briefcase.glb?inline'),
   plinko: () => import('./assets/plinko.glb?inline'),
   hovercar: () => import('./assets/hovercar.glb?inline'),
+  duck: () => import('./assets/duck.glb?inline'),
+  hall: () => import('./assets/hall.glb?inline'),
 };
 
 // A model file can be compressed (tools/optimize-glb.mjs: quantized, then meshopt-coded: about a third of the size).
@@ -1386,7 +1388,7 @@ const SHIP_TOON = { trim: 0xd8d4e8, dark: 0x2a2540, metal: 0x8a87a0, steel: 0x55
 const SHIP_FX = new Set(['plume', 'plumeCore', 'lift', 'engine', 'core', 'beacon']); // per-ship materials (they pulse)
 const FLAMES = new Set(['plume', 'plumeCore', 'lift', 'beacon']);
 export async function loadShipParts() {
-  const [gltf, sk, wr, ap, lt, cr, ga, di, en, bc, hc, sl, pk, cs, bj, gy, cl] = await Promise.all(['ships', 'skimmer', 'warrig', 'apc', 'landtrain', 'crane', 'garage', 'dish', 'engine', 'briefcase', 'hovercar', 'slots', 'plinko', 'casino', 'blackjack', 'gantry', 'claw'].map(loadGlb));
+  const [gltf, sk, wr, ap, lt, cr, ga, di, en, bc, hc, sl, pk, cs, bj, gy, cl, dd, hl] = await Promise.all(['ships', 'skimmer', 'warrig', 'apc', 'landtrain', 'crane', 'garage', 'dish', 'engine', 'briefcase', 'hovercar', 'slots', 'plinko', 'casino', 'blackjack', 'gantry', 'claw', 'duck', 'hall'].map(loadGlb));
   SHIP_PARTS = {};
   for (const name of ['shuttle', 'freighter']) {
     const root = gltf.scene.getObjectByName(name);
@@ -1468,6 +1470,18 @@ export async function loadShipParts() {
   for (const name of CLAW_PROPS) {
     const root = cl.scene.getObjectByName(name);
     if (!root) throw new Error('claw.glb has no ' + name);
+    SHIP_PARTS[name] = bakeShip(root);
+  }
+  // the Duck Derby's racers and track (tools/blender/build_duck.py)
+  for (const name of DUCK_PROPS) {
+    const root = dd.scene.getObjectByName(name);
+    if (!root) throw new Error('duck.glb has no ' + name);
+    SHIP_PARTS[name] = bakeShip(root);
+  }
+  // the casino's hall kit: wall bays, ceiling tiles, floor inlay, the bar, the cage, the lounge, the doors' frame and the roof's crown (tools/blender/build_hall.py)
+  for (const name of HALL_PROPS) {
+    const root = hl.scene.getObjectByName(name);
+    if (!root) throw new Error('hall.glb has no ' + name);
     SHIP_PARTS[name] = bakeShip(root);
   }
   SHIP_PARTS.claw_engine = bakeShip(ENGINE_MODEL);
@@ -2278,7 +2292,7 @@ const BJ_TOON = {
   plum: 0x7c50a0, plum2: 0x9561bc, gold: 0xffd23f, cream: 0xfff4e0, dark: 0x594b6f, leather: 0xad5990, brass: 0xd8aa2e,
   chipwhite: 0xfff4e0, chipred: 0xff2a4a, chipcyan: 0x2ee6ff, chipgreen: 0x7dff6a, chipviolet: 0xc77dff,
 };
-const BJ_GLOW = { cyan: 0x2ee6ff, pink: 0xff2e88 };
+const BJ_GLOW = { cyan: 0x2ee6ff, pink: 0xff2e88, suitred: 0xff2a4a, suitcream: 0xfff4e0 };
 
 // The table as a Group (the casino freezes it: the world merges it) and where its hooks are: { stat, spots: { felt: { pos, w, h }, shoe, rack, discard } }.
 export function makeBlackjackTable() {
@@ -2335,7 +2349,7 @@ const CLAW_TOON = {
   plum: 0x7c50a0, plum2: 0x9561bc, gold: 0xffd23f, brass: 0xd8aa2e, steel: 0x8a87a0, dark: 0x2a2540, hazard: 0xffd23f, red: 0xd7263d, crate: 0xffffff, cream: 0xfff4e0,
   chipgold: 0xffd23f, rubber: 0x1d1a29,
 };
-const CLAW_GLOW = { neonpink: 0xff2e88, neoncyan: 0x2ee6ff, glowred: 0xff2a4a, gem: 0x66e6ff, lamp: 0xfff6a8 };
+const CLAW_GLOW = { suitred: 0xff2a4a, suitcream: 0xfff4e0, neonpink: 0xff2e88, neoncyan: 0x2ee6ff, glowred: 0xff2a4a, gem: 0x66e6ff, lamp: 0xfff6a8 };
 const CLAW_SLOT = (slot) => (slot in CLAW_GLOW ? glowShared(CLAW_GLOW[slot]) : toon(CLAW_TOON[slot] ?? 0xff00ff));
 // What floats in the tank (and the claw): the same toon colours with a floor of their own light (a third of the paint), so the side turned away from the hall's lamps is
 // dark paint rather than black; `diffuseColor` already carries the crates' per-instance tint.
@@ -2390,6 +2404,58 @@ export function makeClawHead() {
   for (const { slot, geo } of node.parts) { const m = new THREE.Mesh(geo, CLAW_ITEM_SLOT(slot)); m.castShadow = false; g.add(m); }
   if (node.ink) { const m = new THREE.Mesh(node.ink, inkMat); m.userData.isInk = true; g.add(m); }
   return g;
+}
+
+// ---- The casino's Duck Derby (built in Blender, see build_duck.py) ----
+// `dd_duck1..4`: the four racers (QUACKERS, SIR WADDLES, DUCKTOR WHO, MOONBILL), each ~1.3 m long facing +x with `head`, `wingR` and `wingL` pivots; the game tints their
+// `body`, `wing` and `silk` slots. And the track's pieces: `dd_trough` (water1..4, num1..4 and finishLine pivots), `dd_gate` (lamp1..3, startSign), `dd_grille`, `dd_finish`
+// (banner), `dd_board` (face), `dd_kiosk` (screen), `dd_railpost` and `dd_rope`. makeDerbyPart(name) gives a piece as a Group, its pivots as named children (role and
+// extras in userData); makeRacer(i, color, bill) a racer as { root, bob, head, wings }.
+export const DUCK_PROPS = ['dd_duck1', 'dd_duck2', 'dd_duck3', 'dd_duck4', 'dd_trough', 'dd_gate', 'dd_grille', 'dd_finish', 'dd_board', 'dd_kiosk', 'dd_railpost', 'dd_rope'];
+const DD_TOON = {
+  plum: 0x4a1766, plum2: 0x6a2a8f, gold: 0xffd23f, brass: 0xc79a1f, cream: 0xfff4e0, red: 0xd7263d, dark: 0x1a1030, tile: 0x2aa3c0, velvet: 0xb3123a, steel: 0xc9c3d9, foam: 0xffffff,
+  body: 0xffd23f, wing: 0xe0b72f, bill: 0xff9f1c, silk: 0xff2e88,
+};
+const DD_GLOW = { suitred: 0xff2a4a, suitcream: 0xfff4e0, lamp: 0xfff6a8, shine: 0xffffff, glowred: 0xff2a4a, glowamber: 0xff9f1c, glowgreen: 0x7dff6a, lane1: 0xffd23f, lane2: 0xff2e88, lane3: 0x2ee6ff, lane4: 0x7dff6a };
+let ddGlass = null;
+function ddGroup(node, tint, toonMap = DD_TOON, glowMap = DD_GLOW) {
+  const g = new THREE.Group();
+  g.name = node.name;
+  g.position.copy(node.pos);
+  g.quaternion.copy(node.quat);
+  Object.assign(g.userData, node.data);
+  if (node.role) g.userData.role = node.role;
+  for (const { slot, geo } of node.parts) {
+    const glowing = slot in glowMap;
+    let mat;
+    if (slot === 'glass') mat = ddGlass || (ddGlass = new THREE.MeshToonMaterial({ color: 0x9be7ff, transparent: true, opacity: 0.22, depthWrite: false, side: THREE.DoubleSide }));
+    else mat = glowing ? glowShared(glowMap[slot]) : toon(tint?.[slot] ?? toonMap[slot] ?? 0xff00ff);
+    const m = new THREE.Mesh(geo, mat);
+    m.castShadow = !glowing && slot !== 'glass';
+    g.add(m);
+  }
+  if (node.ink) { const m = new THREE.Mesh(node.ink, inkMat); m.userData.isInk = true; g.add(m); }
+  for (const k of node.kids) g.add(ddGroup(k, tint, toonMap, glowMap));
+  return g;
+}
+export const makeDerbyPart = (name) => ddGroup(SHIP_PARTS[name]);
+
+// ---- The casino's hall kit (built in Blender, see build_hall.py) ----
+// The wall bays (`hall_bay0..3`: spade, heart, diamond, club; 4.5 m wide, 16 m tall, the back on the wall, the front toward +z), `hall_filler`, the ceiling tile `hall_coffer`, the floor
+// inlay `hall_medallion`, the Chip Bar `hall_bar` (pivot `bar_spin` carries the chip that turns), the cashier's cage `hall_cage` (pivot `cage_face`), `hall_sofa` and `hall_table`, the
+// doors' frame `hall_gate`, the outside's suit panels `facade_panel0..3` and the roof's drum, dome and lantern `facade_crown`. makeHallPart(name) gives a piece as a Group, its pivots as
+// named children (role and extras in userData); the slots are the palette below, and the game never recolours them.
+export const HALL_PROPS = ['hall_bay0', 'hall_bay1', 'hall_bay2', 'hall_bay3', 'hall_filler', 'hall_coffer', 'hall_medallion', 'hall_bar', 'hall_cage', 'hall_sofa', 'hall_table', 'hall_gate', 'facade_panel0', 'facade_panel1', 'facade_panel2', 'facade_panel3', 'facade_crown'];
+const HALL_TOON = { plum: 0x4a1766, plum2: 0x6a2a8f, gold: 0xffd23f, brass: 0xc79a1f, cream: 0xfff4e0, dark: 0x1a1030, velvet: 0xb3123a, red: 0xd7263d, pink: 0xff2e88 };
+const HALL_GLOW = { suitred: 0xff2a4a, suitcream: 0xfff4e0, lamp: 0xfff6a8, glowcyan: 0x2ee6ff, glowpink: 0xff2e88 };
+export const makeHallPart = (name) => ddGroup(SHIP_PARTS[name], null, HALL_TOON, HALL_GLOW);
+export function makeRacer(i = 1, color = 0xffd23f, bill = 0xff9f1c) {
+  const c = new THREE.Color(color);
+  const model = ddGroup(SHIP_PARTS['dd_duck' + i], { body: color, wing: c.clone().multiplyScalar(0.85).getHex(), silk: color, bill });
+  const root = new THREE.Group(), bob = new THREE.Group();
+  root.add(bob);
+  bob.add(model);
+  return { root, bob, head: model.getObjectByName('dd_duck' + i + '_head'), wings: [model.getObjectByName('dd_duck' + i + '_wingL'), model.getObjectByName('dd_duck' + i + '_wingR')] };
 }
 
 // ---- The dish-array stations (built in Blender, see build_dish.py) ----
