@@ -809,6 +809,11 @@ body.on-ride #hud > :not(#popups):not(#prompt):not(#splash):not(#dilate) { displ
 #cas3d .c3-duck span { flex: 1; }
 #cas3d .c3-duck b { color: var(--green); font-weight: normal; }
 #cas3d .c3-duck em { font-style: normal; color: var(--yellow); }
+#cas3d .c3-meter { display: flex; align-items: center; gap: 10px; margin-top: 6px; font-family: var(--comic); font-size: 10px; color: var(--ui-muted); }
+#cas3d .c3-meter i { flex: 0 0 160px; height: 10px; background: var(--ui-bg2); border: 2px solid var(--ui-edge); display: block; }
+#cas3d .c3-meter u { display: block; height: 100%; background: #2ee6ff; }
+#cas3d .c3-meter u.low { background: #ff9f1c; }
+#cas3d .c3-meter span:last-child { color: var(--ui-text); min-width: 140px; }
 #cas3d .c3-last { display: flex; gap: 4px; margin-top: 4px; min-height: 18px; flex-wrap: wrap; }
 #cas3d .c3-last i { font-style: normal; font-family: var(--comic); font-size: 9px; padding: 3px 4px 2px; background: var(--ui-bg2); color: #9be7ff; border: 2px solid var(--ui-edge); }
 #cas3d .c3-last i.ok { color: var(--green); }

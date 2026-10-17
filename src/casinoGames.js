@@ -1,6 +1,8 @@
 import * as THREE from 'three';
 import { toon, glow, ink } from './toon.js';
-import { canvasTex, FONT, fitText, BJ, bjPt, BJ_RACK, DUCK, PLK, CLASSIC, PRIZE } from './casinoWorld.js';
+import { canvasTex, FONT, fitText, BJ, bjPt, BJ_RACK, DUCK, PLK, CLASSIC, PRIZE, CLAW } from './casinoWorld.js';
+import { ClawGame } from './clawGame.js';
+import { CLAW_COST } from './clawSim.js';
 import { makeChipStack } from './models.js';
 import { PlinkoSim, MULTS, AIM_RANGE, DROP_Y, BALL_R, PEGS, slotCentre } from './plinko.js';
 import { glyphHtml } from './glyphs.js';
@@ -142,6 +144,7 @@ export const STATIONS = [
   { id: 'bj', x: bjPt(0, 0, BJ.R + 1.4)[0], z: bjPt(0, 0, BJ.R + 1.4)[2], r: 2.8, label: 'SIT AT THE BLACKJACK TABLE' },
   { id: 'duck', x: DUCK.kiosk[0], z: DUCK.kiosk[1] + 2, r: 2.8, label: 'DUCK DERBY — PICK A DUCK &amp; BET' },
   { id: 'plinko', x: PLK.x, z: PLK.z + 7.8, r: 3.2, label: 'PLAY PLINKO' },
+  { id: 'claw', x: CLAW.x, z: CLAW.z - 6.3, r: 3.3, label: `ZERO-G CLAW — ₵${CLAW_COST} A ROUND` },
   { id: 'classic', x: CLASSIC.x - 3.2, z: CLASSIC.mid, r: 5.4, label: 'CLASSIC GAMES (SLOTS · ROULETTE · WHEEL · HIGH-LOW)' },
   { id: 'prizes', x: PRIZE.x - 2.8, z: PRIZE.z, r: 3.8, label: 'PRIZE COUNTER' },
 ];
@@ -175,6 +178,8 @@ export class CasinoGames {
     this.sim.onPeg = (p, b, sp) => this.pegHit(p, b, sp);
     this.sim.onLand = (b, s) => this.plinkoLand(b, s);
     this.pk = { aim: 0, cd: 0, dropped: 0, net: 0, tick: 0, msg: 'AIM AND DROP!', last: [] };
+    // the zero-g claw
+    this.claw = new ClawGame(this);
     this.slotGlow = new Array(MULTS.length).fill(0);
     this.ballGeo = new THREE.SphereGeometry(BALL_R, 14, 10);
     this.ballMats = [0xffd23f, 0xff7ad9, 0x2ee6ff, 0x7dff6a, 0xfff4e0].map((c) => toon(c));
@@ -211,6 +216,7 @@ export class CasinoGames {
     this.audio.tone(660, 0.08, 'triangle', 0.12);
     if (id === 'bj') { this.bj.auto = false; if (this.bj.phase === 'done') this.bj.msg = 'ANOTHER HAND?'; }
     if (id === 'duck' && this.dk.phase === 'done') this.newRace();
+    if (id === 'claw') this.claw.enter();
     this.render();
   }
 
@@ -221,6 +227,7 @@ export class CasinoGames {
       this.bj.auto = true;
       if (this.bj.phase === 'play') this.stand();
     }
+    if (this.mode === 'claw') this.claw.leave();
     this.mode = null;
     this.ui.classList.add('hidden');
     document.body.classList.remove('seated');
@@ -230,6 +237,7 @@ export class CasinoGames {
   get audio() { return this.g.audio; }
 
   onKey(code) {
+    if (this.mode === 'claw' && this.claw.onKey(code)) return;
     if (code === 'ArrowLeft' || code === 'Minus') { this.betStep(-1); return; }
     if (code === 'ArrowRight' || code === 'Equal') { this.betStep(1); return; }
     const go = code === 'Space' || code === 'Enter';
@@ -267,6 +275,7 @@ export class CasinoGames {
     if (this.mode === 'bj') this.bj.msg = text;
     else if (this.mode === 'duck') this.dk.msg = text;
     else if (this.mode === 'plinko') this.pk.msg = text;
+    else if (this.mode === 'claw') this.claw.setMsg(text, 4);
     this.msgCls = cls;
     this.render();
   }
@@ -302,9 +311,10 @@ export class CasinoGames {
     this.updateDealer(dt, time);
     this.updateDucks(dt, time);
     this.updatePlinko(dt, time);
+    this.claw.update(dt, time);
     if (this.mode) this.updateCam(dt);
     this.uiTick = (this.uiTick || 0) - dt;
-    if (this.mode && this.uiTick <= 0) { this.uiTick = 0.25; this.renderHead(); }
+    if (this.mode && this.uiTick <= 0) { this.uiTick = 0.25; this.renderHead(); if (this.mode === 'claw') { this.$('.c3-body').innerHTML = this.claw.bodyHtml(); this.$('.c3-msg').textContent = this.claw.msg || this.$('.c3-msg').textContent; } }
     // (picking the controller up or putting it down swaps the hints on the bar)
     if (this.mode && !!this.g.input.padActive !== this.padShown) this.render();
   }
@@ -326,6 +336,7 @@ export class CasinoGames {
     }
     // framed so the whole board sits above the action bar
     if (this.mode === 'plinko') return [[PLK.x, 6.4, PLK.z + 16.5], [PLK.x, 4.4, PLK.z]];
+    if (this.mode === 'claw') return this.claw.camView();
     return null;
   }
 
@@ -951,7 +962,7 @@ export class CasinoGames {
   renderHead() {
     const c = this.casino;
     this.$('.c3-cred').textContent = `₵${fmt(this.g.credits)}`;
-    this.$('.c3-bet').innerHTML = `BET <b>₵${fmt(c.bet)}</b> <small>MAX ₵${fmt(c.maxBet)} · VIP ${c.tier.name}</small>`;
+    this.$('.c3-bet').innerHTML = this.mode === 'claw' ? `ENTRY <b>₵${fmt(CLAW_COST)}</b> <small>BEST ₵${fmt(this.st.clawBest || 0)} · VIP ${c.tier.name}</small>` : `BET <b>₵${fmt(c.bet)}</b> <small>MAX ₵${fmt(c.maxBet)} · VIP ${c.tier.name}</small>`;
   }
 
   render() {
@@ -994,6 +1005,10 @@ export class CasinoGames {
       msg = p.msg;
       if (pad) btns = betBtns(false) + btn(`DROP ₵${fmt(this.casino.bet)} ${gl('A')}`, 'Space', { cls: 'big' }) + btn(`◀ AIM ▶ ${gl('LS')}`, 'x', { dis: true, cls: 'hint' });
       else btns = betBtns(false) + btn('◀ AIM <i>A</i>', 'x', { dis: true, cls: 'hint' }) + btn(`DROP ₵${fmt(this.casino.bet)} <i>SPACE</i>`, 'Space', { cls: 'big' }) + btn('AIM ▶ <i>D</i>', 'x', { dis: true, cls: 'hint' });
+    } else if (this.mode === 'claw') {
+      const u = this.claw.ui({ btn, key, gl, pad });
+      title = u.title; body = u.body; msg = u.msg; btns = u.btns;
+      this.clawFoot = u.foot;
     }
     this.$('.c3-title').textContent = title;
     this.$('.c3-body').innerHTML = body;
@@ -1006,6 +1021,7 @@ export class CasinoGames {
     foot.lastChild.innerHTML = pk ? `${gl('B')} STAND UP` : 'ESC · STAND UP';
     if (pk) foot.firstChild.innerHTML = (this.mode === 'plinko' ? `${gl('LS')} AIM · ${gl('A')} / ${gl('RT')} DROP, HOLD TO POUR` : this.mode === 'duck' ? `${gl('LS')} PICK A DUCK · ${gl('A')} RACE` : `${gl('A')} DEAL / HIT · ${gl('X')} STAND · ${gl('Y')} DOUBLE · ${gl('R3')} ZOOM`) + ` · ${gl('LB')} ${gl('RB')} BET`;
     else foot.firstChild.textContent = this.mode === 'plinko' ? 'MOUSE / A · D AIM · CLICK OR HOLD SPACE TO DROP · ◀ ▶ BET' : this.mode === 'duck' ? '1–4 PICK A DUCK · ◀ ▶ BET' : 'H HIT · S STAND · D DOUBLE · Z ZOOM · ◀ ▶ BET';
+    if (this.mode === 'claw') { if (pk) foot.firstChild.innerHTML = this.clawFoot; else foot.firstChild.textContent = this.clawFoot; }
     this.renderHead();
   }
 }

@@ -1,7 +1,7 @@
 // Dev-only model viewer: renders one model through the game's comic post pass on a turntable.
 import * as THREE from 'three';
 import { loadFonts } from '../src/fonts.js';
-import { loadRunnerParts, loadShipParts, makeRunner, makeCrate, ScarfSim, makeShuttle, makeFreighter, makeHoverCar, makeApc, makeLandTrain, makeTowerCrane, CRANE_TROLLEY_MIN, CRANE_TROLLEY_SPAN, makeGarage, makeDishStation, DISH_SIZE, makeLampPost, makeFountain, makeBouncer, makeChandelier, makeCasinoSign, makeChipStack } from '../src/models.js';
+import { loadRunnerParts, loadShipParts, makeRunner, makeCrate, ScarfSim, makeShuttle, makeFreighter, makeHoverCar, makeApc, makeLandTrain, makeTowerCrane, CRANE_TROLLEY_MIN, CRANE_TROLLEY_SPAN, makeGarage, makeDishStation, DISH_SIZE, makeLampPost, makeFountain, makeBouncer, makeChandelier, makeCasinoSign, makeChipStack, makeClawMachine, makeClawHead, clawKindParts } from '../src/models.js';
 import { outpostTemplate } from '../src/outpostModels.js';
 import { loadOutpostParts, GLB_KINDS } from '../src/outpostGlb.js';
 import { makeChimera, makeMite, LIVING, MODIFIERS, spliceGenes } from '../src/chimera.js';
@@ -9,6 +9,8 @@ import { ComicPost } from '../src/post.js';
 import '../src/wardrobe.js'; // (first: wardrobe and cosmetics import each other, and only this order initialises OUTFITS in time)
 import { dressRunner } from '../src/cosmetics.js';
 import { slotCabinet, updateSlot, blackjackTable } from '../src/casinoWorld.js';
+import { KINDS } from '../src/clawSim.js';
+import { inkMat } from '../src/toon.js';
 
 const Q = new URLSearchParams(location.search);
 const num = (k, d) => (Q.has(k) ? parseFloat(Q.get(k)) : d);
@@ -178,7 +180,7 @@ if (m === 'shuttle' || m === 'freighter') {
     if (t > nextPull) nextPull = t + 3.2;
   };
 } else if (m === 'casino') {
-  // the casino's props (build_casino.py). &part=lamp|fountain|bouncer|chandelier|welcome|wall|blackjack  &accent=hex (the lamp post's colour)  &n=3 lamps in a row
+  // the casino's props (build_casino.py). &part=lamp|fountain|bouncer|chandelier|welcome|wall|blackjack|claw|clawthings  &accent=hex (the lamp post's colour)  &n=3 lamps in a row
   const part = Q.get('part') || 'lamp';
   model = new THREE.Group();
   if (part === 'lamp') {
@@ -205,6 +207,25 @@ if (m === 'shuttle' || m === 'freighter') {
     model.add(blackjackTable());
     [0xfff4e0, 0xff2a4a, 0x2ee6ff, 0x7dff6a, 0x16121f, 0xc77dff, 0xffd23f].forEach((c, i) => { const g = makeChipStack(c, 5); g.position.set(-1.5 + i * 0.5, 1.155, 1.7); model.add(g); });
     height = 5;
+  } else if (part === 'claw') {
+    model.add(makeClawMachine().stat);   // (the empty machine; the game fills it from clawSim.js through clawView.js)
+    height = 12;
+  } else if (part === 'clawthings') {
+    // every kind of thing that floats in the claw's tank, at the size it floats, then the claw (build_claw.py)
+    let x = 0;
+    const put = (g, w) => { g.position.x = x + w / 2; x += w + 0.4; model.add(g); };
+    for (const kind of Object.keys(KINDS)) {
+      const { parts, ink } = clawKindParts(kind), g = new THREE.Group();
+      for (const { geo, material } of parts) g.add(new THREE.Mesh(geo, material));
+      if (ink) { const k = new THREE.Mesh(ink, inkMat); k.userData.isInk = true; g.add(k); }
+      const w = KINDS[kind].r * 2 + 0.3, h = new THREE.Group();
+      g.position.y = KINDS[kind].r;
+      h.add(g);
+      put(h, w);
+    }
+    const hd = makeClawHead(); hd.position.y = 1; put(hd, 1.8);
+    model.position.x = -x / 2;
+    height = 2.5;
   } else {
     const sg = makeCasinoSign(part === 'welcome' ? 'welcome_sign' : 'wall_sign');
     sg.root.position.y = part === 'welcome' ? 7 : 3;

@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { toon, ink, glow, glowShared, textSprite, nameTag } from './toon.js';
-import { makeFigure, makeSlotCabinet, SLOT_LAMP_OFF, plinkoConsoleModel, plinkoFrameModel, makeBouncer, makeChandelier, makeCasinoSign, makeBlackjackTable } from './models.js';
+import { makeFigure, makeSlotCabinet, SLOT_LAMP_OFF, plinkoConsoleModel, plinkoFrameModel, makeBouncer, makeChandelier, makeCasinoSign, makeBlackjackTable, makeClawMachine } from './models.js';
 import { pxCanvas } from './pixelIcons.js';
 import { pixelFont } from './fonts.js';
 import { faceInfo, glyphState } from './glyphs.js';
@@ -428,6 +428,10 @@ export const HALL = { W: 26, FRONT: 12, BACK: -34, H: 16, DOOR: 5, DOOR_H: 9 };
 // point of it in the casino's frame.
 export const BJ = { x: -22.96, z: -8, R: 3.4, top: 1.16, yaw: Math.PI / 2 };
 export const bjPt = (lx, y, lz) => { const c = Math.cos(BJ.yaw), s = Math.sin(BJ.yaw); return [BJ.x + lx * c + lz * s, y, BJ.z - lx * s + lz * c]; };
+// The zero-g claw's machine stands on the front wall left of the doors, turned to face the hall (its back on the wallpaper at z = `z`); the claw's own frame (the
+// machine's: x along the tank, y up, z toward the glass) goes to the hall's through clawPt.
+export const CLAW = { x: -15.6, z: 10.98, yaw: Math.PI };
+export const clawPt = (lx, y, lz) => [CLAW.x - lx, y, CLAW.z - lz];
 export const BJ_RACK = new THREE.Vector3(-0.85, 1.3, -0.26); // (where the dealer's chips come from and go back to, table-local)
 export const DUCK = { x0: -22, x1: 2, lanes: [-21.5, -23.1, -24.7, -26.3], water: 0.86, kiosk: [-10, -17.4] };
 export const PLK = { x: 14, y: 1.2, z: -31 };
@@ -751,6 +755,16 @@ export function buildCasino(w, loc) {
     put(sg.root, -W + 1.06, BJ.z, 5.0, Math.PI / 2); // (against the wallpaper panel, facing +x, over the dealer's counter and the wall's neon band)
     padSign(bjSign, 'BLACKJACK', { color: '#7dff6a', edge: '#ffd23f', sub: 'PAYS 3 TO 2 · {F} AT THE STOOL TO PLAY' });
   }
+
+  // ---------- ZERO-G CLAW (build_claw.py): a glass tank on the front wall left of the doors, facing the hall ----------
+  // `cm.stat` is the frozen machine (the world merges it, the glass stays); `clawDyn` is where casinoGames.js hangs the claw's moving parts and its boards.
+  const cm = makeClawMachine();
+  put(cm.stat, CLAW.x, CLAW.z, 0, CLAW.yaw);
+  const clawDyn = new THREE.Group();
+  put(clawDyn, CLAW.x, CLAW.z, 0, CLAW.yaw, true);
+  col({ type: 'box', x: CLAW.x, y: 3.3, z: CLAW.z - 2.7, hx: 8.3, hy: 3.3, hz: 2.75 });
+  // patrons come to watch (and shake their heads)
+  for (const dx of [-4.8, 3.6, 7.2]) yardSpots.push({ kind: 'watch', x: CLAW.x + dx, z: CLAW.z - 7.4, ax: CLAW.x + dx, az: CLAW.z - 7.4, look: [CLAW.x + dx, CLAW.z - 3], yaw: Math.PI, busy: false });
 
   // ---------- DUCK DERBY TRACK ----------
   const L0 = DUCK.x0 - 2, L1 = DUCK.x1 + 2;
@@ -1160,6 +1174,7 @@ export function buildCasino(w, loc) {
     toWorld: (x, y, z, out) => w.toWorld(loc, x, y, z, out),
     toLocal: (p, out = new THREE.Vector3()) => loc.group.worldToLocal(out.copy(p)),
     bj: { group: bj, dealer },
+    claw: { dyn: clawDyn, spots: cm.spots },
     duck: { ducks, gate, water, oddsCanvas, oddsTex, crowd },
     plinko: { pegs, pegBase, slotMats, aim },
     crowd,
