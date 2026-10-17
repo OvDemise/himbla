@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { toon, glow, ink } from './toon.js';
-import { canvasTex, FONT, fitText, BJ, DUCK, PLK, CLASSIC, PRIZE } from './casinoWorld.js';
+import { canvasTex, FONT, fitText, BJ, bjPt, BJ_RACK, DUCK, PLK, CLASSIC, PRIZE } from './casinoWorld.js';
+import { makeChipStack } from './models.js';
 import { PlinkoSim, MULTS, AIM_RANGE, DROP_Y, BALL_R, PEGS, slotCentre } from './plinko.js';
 import { glyphHtml } from './glyphs.js';
 
@@ -75,9 +76,8 @@ function cardBack() {
 const cardFrontGeo = new THREE.PlaneGeometry(CARD_W, CARD_H).rotateX(-Math.PI / 2).translate(0, 0.003, 0);
 const cardBackGeo = new THREE.PlaneGeometry(CARD_W, CARD_H).rotateX(Math.PI / 2).translate(0, -0.003, 0);
 
-const CHIP_GEO = new THREE.CylinderGeometry(0.16, 0.16, 0.07, 14);
 const CHIP_TIERS = [[5000, 0xffd23f], [1000, 0xc77dff], [250, 0x16121f], [100, 0x7dff6a], [25, 0x2ee6ff], [10, 0xff2a4a], [0, 0xfff4e0]];
-const chipMat = (v) => toon(CHIP_TIERS.find(([min]) => v >= min)[1]);
+const chipColor = (v) => CHIP_TIERS.find(([min]) => v >= min)[1];
 const chipCount = (v) => Math.max(1, Math.min(14, 1 + Math.floor(Math.log2(Math.max(1, v / 10)))));
 
 // ---------- duck derby ----------
@@ -139,7 +139,7 @@ function duckOdds(forms, n = 2500) {
 
 // ---------- interaction spots (casino-local x/z) ----------
 export const STATIONS = [
-  { id: 'bj', x: BJ.x, z: BJ.z + BJ.R + 1.4, r: 2.8, label: 'SIT AT THE BLACKJACK TABLE' },
+  { id: 'bj', x: bjPt(0, 0, BJ.R + 1.4)[0], z: bjPt(0, 0, BJ.R + 1.4)[2], r: 2.8, label: 'SIT AT THE BLACKJACK TABLE' },
   { id: 'duck', x: DUCK.kiosk[0], z: DUCK.kiosk[1] + 2, r: 2.8, label: 'DUCK DERBY — PICK A DUCK &amp; BET' },
   { id: 'plinko', x: PLK.x, z: PLK.z + 7.8, r: 3.2, label: 'PLAY PLINKO' },
   { id: 'classic', x: CLASSIC.x - 3.2, z: CLASSIC.mid, r: 5.4, label: 'CLASSIC GAMES (SLOTS · ROULETTE · WHEEL · HIGH-LOW)' },
@@ -313,7 +313,7 @@ export class CasinoGames {
   view() {
     const R = BJ.R;
     // (zoomed: leaning in over the felt, both hands of cards above the action bar)
-    if (this.mode === 'bj') return this.bj.zoom ? [[BJ.x, 3.7, BJ.z + 3.3], [BJ.x, BJ.top, BJ.z + 1.9]] : [[BJ.x, 3.9, BJ.z + R + 1.9], [BJ.x, 0.75, BJ.z + 0.7]];
+    if (this.mode === 'bj') return this.bj.zoom ? [bjPt(0, 3.7, 3.3), bjPt(0, BJ.top, 1.9)] : [bjPt(0, 3.9, R + 1.9), bjPt(0, 0.75, 0.7)];
     if (this.mode === 'duck') {
       const d = this.dk;
       if (d.phase === 'race' || (d.phase === 'done' && this.clock - d.doneAt < 2.5)) {
@@ -392,7 +392,7 @@ export class CasinoGames {
       this.shoe = [];
       for (let d = 0; d < 6; d++) for (const s of SUITS) for (const r of RANKS) this.shoe.push({ r, s });
       for (let i = this.shoe.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [this.shoe[i], this.shoe[j]] = [this.shoe[j], this.shoe[i]]; }
-      this.popAt('SHUFFLING THE SHOE…', BJ.x, 2.8, BJ.z + 1, { color: '#fff4e0', size: 36 });
+      this.popAt('SHUFFLING THE SHOE…', ...bjPt(0, 2.8, 1), { color: '#fff4e0', size: 36 });
     }
     return this.shoe.pop();
   }
@@ -417,7 +417,7 @@ export class CasinoGames {
       const list = this.bj.cards.filter((k) => k.who === who && !k.gone);
       const n = list.length;
       const z = who === 'p' ? 1.75 : 0.62;
-      const sp = n > 5 ? 0.36 : 0.47;
+      const sp = n > 5 ? Math.min(0.36, 2.9 / (n - 1)) : 0.47;
       list.forEach((k, i) => {
         const to = new THREE.Vector3((i - (n - 1) / 2) * sp, BJ.top + 0.012 + i * 0.006, z + (who === 'p' ? i * 0.02 : 0));
         if (k === fresh) this.tween(k.obj, to, 0.38, { arc: 0.5, rotTo: k.up ? 0 : Math.PI });
@@ -449,15 +449,7 @@ export class CasinoGames {
 
   chipStack(value, at, from = null) {
     const n = chipCount(value);
-    const mat = chipMat(value / Math.max(1, n) * 3);
-    const group = new THREE.Group();
-    for (let i = 0; i < n; i++) {
-      const ch = new THREE.Mesh(CHIP_GEO, mat);
-      ch.position.set(Math.sin(i * 2.3) * 0.015, 0.035 + i * 0.072, Math.cos(i * 1.7) * 0.015);
-      ch.rotation.y = i;
-      group.add(ch);
-    }
-    ink(group.children[0], 0.015);
+    const group = makeChipStack(chipColor(value / Math.max(1, n) * 3), n);
     this.cw.bj.group.add(group);
     group.position.copy(from || at);
     if (from) this.tween(group, at, 0.45, { arc: 0.5 });
@@ -470,7 +462,7 @@ export class CasinoGames {
     const b = this.bj;
     if (b.phase !== 'bet' && b.phase !== 'done') return;
     const bet = this.casino.bet;
-    if (!this.afford(bet, this.cw.toWorld(BJ.x, 2, BJ.z + 2))) return;
+    if (!this.afford(bet, this.cw.toWorld(...bjPt(0, 2, 2)))) return;
     this.clearTable();
     this.casino.take(bet);
     Object.assign(b, { phase: 'dealing', player: [], dealer: [], stake: bet, doubled: false, msg: 'DEALING…' });
@@ -524,12 +516,12 @@ export class CasinoGames {
   double() {
     const b = this.bj;
     if (b.phase !== 'play' || b.player.length !== 2 || b.doubled) return;
-    if (!this.afford(b.stake, this.cw.toWorld(BJ.x, 2, BJ.z + 2))) return;
+    if (!this.afford(b.stake, this.cw.toWorld(...bjPt(0, 2, 2)))) return;
     this.casino.take(b.stake);
     b.doubled = true;
     this.chipStack(b.stake, new THREE.Vector3(0.36, BJ.top, 2.72), new THREE.Vector3(0.3, BJ.top + 0.6, BJ.R + 0.5));
     b.stake *= 2;
-    this.popAt('DOUBLE DOWN!', BJ.x, 2.4, BJ.z + 2, { color: '#ffd23f', size: 54 });
+    this.popAt('DOUBLE DOWN!', ...bjPt(0, 2.4, 2), { color: '#ffd23f', size: 54 });
     const c = this.draw();
     b.player.push(c);
     this.spawnCard(c, 'p', true);
@@ -572,7 +564,7 @@ export class CasinoGames {
     const b = this.bj;
     b.phase = 'done';
     const stake = b.stake;
-    const where = [BJ.x, 1.6, BJ.z + 2.4];
+    const where = bjPt(0, 1.6, 2.4);
     let win = 0;
     if (kind === 'bj') { win = Math.floor(stake * 2.5); this.st.bjs++; } else if (kind === 'win') win = stake * 2;
     else if (kind === 'push') win = stake;
@@ -582,23 +574,23 @@ export class CasinoGames {
     this.msgCls = pay > 0 ? 'good' : kind === 'push' ? '' : 'bad';
     b.last = { kind, pay };
     if (kind === 'bj') {
-      this.popAt('BLACKJACK!!', BJ.x, 2.6, BJ.z + 2, { color: '#ffd23f', size: 92, life: 2, prio: 1 });
-      this.confetti(BJ.x, 1.6, BJ.z + 2, 120, 8);
+      this.popAt('BLACKJACK!!', ...bjPt(0, 2.6, 2), { color: '#ffd23f', size: 92, life: 2, prio: 1 });
+      this.confetti(...bjPt(0, 1.6, 2), 120, 8);
       this.g.cam.shake = Math.max(this.g.cam.shake, 0.6);
       this.fanfare();
       this.cheer(4);
     } else if (kind === 'win') this.celebrate(win, stake, where);
-    else if (kind === 'push') this.popAt('PUSH', BJ.x, 2.2, BJ.z + 2, { color: '#2ee6ff', size: 54 });
+    else if (kind === 'push') this.popAt('PUSH', ...bjPt(0, 2.2, 2), { color: '#2ee6ff', size: 54 });
     else {
-      this.popAt(kind === 'bust' ? 'BUST!' : pick(['NOPE!', 'OOF!', 'WHIFF!']), BJ.x, 2.4, BJ.z + 2, { color: '#ff2a4a', size: 80 });
+      this.popAt(kind === 'bust' ? 'BUST!' : pick(['NOPE!', 'OOF!', 'WHIFF!']), ...bjPt(0, 2.4, 2), { color: '#ff2a4a', size: 80 });
       if (kind === 'bust') this.casino.sadTrombone(); else this.audio.tone(220, 0.25, 'sawtooth', 0.08, 0.6);
     }
     // chips: winnings slide out of the dealer's tray, then everything slides to you (or to the house)
-    if (pay > 0) this.chipStack(pay, new THREE.Vector3(-0.42, BJ.top, 2.72), new THREE.Vector3(-0.4, BJ.top + 0.1, 0.3));
+    if (pay > 0) this.chipStack(pay, new THREE.Vector3(-0.42, BJ.top, 2.72), BJ_RACK.clone());
     const chips = b.chips.slice();
     this.after(1.1, () => {
       for (const c of chips) {
-        const to = win > 0 ? new THREE.Vector3(c.position.x, BJ.top + 0.4, BJ.R + 0.8) : new THREE.Vector3(-0.4, BJ.top + 0.1, 0.3);
+        const to = win > 0 ? new THREE.Vector3(c.position.x, BJ.top + 0.4, BJ.R + 0.8) : BJ_RACK.clone();
         this.tween(c, to, 0.45, { arc: 0.3, onDone: () => { if (c.parent) c.parent.remove(c); } });
       }
       b.chips = b.chips.filter((c) => !chips.includes(c));

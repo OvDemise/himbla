@@ -20,6 +20,7 @@ const GLB = {
   garage: () => import('./assets/garage.glb?inline'),
   slots: () => import('./assets/slots.glb?inline'),
   casino: () => import('./assets/casino.glb?inline'),
+  blackjack: () => import('./assets/blackjack.glb?inline'),
   dish: () => import('./assets/dish.glb?inline'),
   engine: () => import('./assets/engine.glb?inline'),
   briefcase: () => import('./assets/briefcase.glb?inline'),
@@ -1383,7 +1384,7 @@ const SHIP_TOON = { trim: 0xd8d4e8, dark: 0x2a2540, metal: 0x8a87a0, steel: 0x55
 const SHIP_FX = new Set(['plume', 'plumeCore', 'lift', 'engine', 'core', 'beacon']); // per-ship materials (they pulse)
 const FLAMES = new Set(['plume', 'plumeCore', 'lift', 'beacon']);
 export async function loadShipParts() {
-  const [gltf, sk, wr, ap, lt, cr, ga, di, en, bc, hc, sl, pk, cs] = await Promise.all(['ships', 'skimmer', 'warrig', 'apc', 'landtrain', 'crane', 'garage', 'dish', 'engine', 'briefcase', 'hovercar', 'slots', 'plinko', 'casino'].map(loadGlb));
+  const [gltf, sk, wr, ap, lt, cr, ga, di, en, bc, hc, sl, pk, cs, bj] = await Promise.all(['ships', 'skimmer', 'warrig', 'apc', 'landtrain', 'crane', 'garage', 'dish', 'engine', 'briefcase', 'hovercar', 'slots', 'plinko', 'casino', 'blackjack'].map(loadGlb));
   SHIP_PARTS = {};
   for (const name of ['shuttle', 'freighter']) {
     const root = gltf.scene.getObjectByName(name);
@@ -1428,6 +1429,12 @@ export async function loadShipParts() {
     const root = cs.scene.getObjectByName(name);
     if (!root) throw new Error('casino.glb has no ' + name);
     SHIP_PARTS['casino_' + name] = bakeShip(root);
+  }
+  // the blackjack table and its chip (tools/blender/build_blackjack.py)
+  for (const name of ['bj_table', 'bj_chip']) {
+    const root = bj.scene.getObjectByName(name);
+    if (!root) throw new Error('blackjack.glb has no ' + name);
+    SHIP_PARTS[name] = bakeShip(root);
   }
   // the radio-dish array stations and the field dish (tools/blender/build_dish.py)
   for (const kind of [...DISH_KINDS, DISH_FIELD, DISH_HEAD]) {
@@ -2197,6 +2204,61 @@ export function makeFountain() {
   for (const k of node.kids) if (CASINO_WATER.has(k.role)) { const m = waterMesh(k); root.add(m); water.push(m); }
   const chip = root.getObjectByName('chip');
   return { root, chip, update(t, dt = 0) { if (chip) chip.rotation.y += dt * (chip.userData.speed || 0.7); for (const m of water) m.userData.tick(m, dt, t); } };
+}
+
+// ---- The casino's blackjack table (built in Blender, see build_blackjack.py) ----
+// `bj_table`: a half-disc table (R = 3.4 m, the flat dealer's edge along z = 0, the player's stool at z = 4.3) with its dealer's back counter, chip rack, card
+// shoe and discard well; its `felt` pivot (extras w, h) is where the game lays the felt plane (y = 1.155), `shoe`, `rack` and `discard` where cards and chips go
+// and come from. `bj_chip`: one chip (0.16 m across, 0.07 m high), its `chip` slot the stake's tier colour.
+const BJ_TOON = {
+  plum: 0x7c50a0, plum2: 0x9561bc, gold: 0xffd23f, cream: 0xfff4e0, dark: 0x594b6f, leather: 0xad5990, brass: 0xd8aa2e,
+  chipwhite: 0xfff4e0, chipred: 0xff2a4a, chipcyan: 0x2ee6ff, chipgreen: 0x7dff6a, chipviolet: 0xc77dff,
+};
+const BJ_GLOW = { cyan: 0x2ee6ff, pink: 0xff2e88 };
+
+// The table as a Group (the casino freezes it: the world merges it) and where its hooks are: { stat, spots: { felt: { pos, w, h }, shoe, rack, discard } }.
+export function makeBlackjackTable() {
+  const node = SHIP_PARTS.bj_table, stat = new THREE.Group(), spots = {};
+  for (const { slot, geo } of node.parts) {
+    const m = new THREE.Mesh(geo, slot in BJ_GLOW ? glowShared(BJ_GLOW[slot]) : toon(BJ_TOON[slot] ?? 0xff00ff));
+    m.castShadow = !(slot in BJ_GLOW);
+    stat.add(m);
+  }
+  if (node.ink) { const m = new THREE.Mesh(node.ink, inkMat); m.userData.isInk = true; stat.add(m); }
+  for (const k of node.kids) spots[k.role] = { pos: k.pos, w: k.data.w, h: k.data.h };
+  return { stat, spots };
+}
+
+// A stack of `n` chips in `color`, standing on y = 0: three meshes (the tier-coloured bodies, the cream stripes, the gold rings) and an outline shell, each
+// chip a little off the one below and turned. The merged geometry is kept per `n`, so every stake's stack shares it.
+const CHIP_PITCH = 0.072;
+const chipStacks = new Map();
+export function makeChipStack(color, n) {
+  const node = SHIP_PARTS.bj_chip;
+  let G = chipStacks.get(n);
+  if (!G) {
+    const by = new Map(), m = new THREE.Matrix4(), q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0), one = new THREE.Vector3(1, 1, 1);
+    for (let i = 0; i < n; i++) {
+      m.compose(new THREE.Vector3(Math.sin(i * 2.3) * 0.015, i * CHIP_PITCH, Math.cos(i * 1.7) * 0.015), q.setFromAxisAngle(up, i), one);
+      for (const { slot, geo } of node.parts) {
+        if (!by.has(slot)) by.set(slot, []);
+        by.get(slot).push(geo.clone().applyMatrix4(m));
+      }
+    }
+    G = new Map([...by].map(([slot, list]) => [slot, mergeGeometries(list)]));
+    G.ink = shellAt(inkShellGeo(G.get('chip'), 0.012), 1);
+    chipStacks.set(n, G);
+  }
+  const g = new THREE.Group();
+  for (const [slot, geo] of G) {
+    const mesh = new THREE.Mesh(geo, toon(slot === 'chip' ? color : BJ_TOON[slot]));
+    mesh.castShadow = true;
+    g.add(mesh);
+  }
+  const h = new THREE.Mesh(G.ink, inkMat);
+  h.userData.isInk = true;
+  g.add(h);
+  return g;
 }
 
 // ---- The dish-array stations (built in Blender, see build_dish.py) ----

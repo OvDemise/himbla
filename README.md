@@ -548,7 +548,7 @@ the unlock counters, toggle any splice-pod mutation (with a reset), or reset all
 ### The Asset Row (dev builds only)
 
 Dev menu (`F8`) → **Full cheat menu** → **Teleport** → option 1, **ASSET ROW**: a flat showroom with every asset in the game
-lined up side by side, 209 of them in 25 sections (the runner and its gear, people, creatures, props and markers,
+lined up side by side, 210 of them in 25 sections (the runner and its gear, people, creatures, props and markers,
 weapons and effects, rocks and nature, the secrets and the Spindle's props, ground vehicles and ships, outposts intact and
 wrecked, the building parts the settlements are made of, the hometown, and all the places). The small ones stand in the
 yellow lane (z = 0), the places over 100 m across in the cyan lane 460 m over; the whole row is about 9 km, so the dev
@@ -758,6 +758,7 @@ src/
   assets/garage.glb  the Meridian motor-pool garages: the main one (three bays with open and shut doors, workshop fit-outs, service office, fuel yard, roof plant) and a small two-bay one
   assets/slots.glb   the casino's slot-machine cabinet: a pixel-arcade video slot with a tilted screen under a marquee, speakers, LED chases, arcade buttons, a ticket printer, a coin cup and a lever (the game paints its colour, marquee, side art and reels)
   assets/casino.glb  the casino's lamp post, plaza fountain (basin, pedestal, bowl, spigots, a spinning chip, the water as pivots the game gives ripple, curtain and jet shaders), buff alien bouncer, hall chandelier and the welcome and blackjack signs' frames
+  assets/blackjack.glb  the casino's gilded blackjack table (plum lacquer, gold, cream suit panels, a leather rail, a chip rack, shoe and discard well, the dealer's back counter) and its chip
   assets/dish.glb    the dish stations: the two for the research arrays' big dishes, the cryo receiver (a banded Helium-3 vessel with a stair, valve cabinet and branding panel) and the gantry station (a lattice mast, container control rooms, battery bank, fuel tank), the field dish the smaller bases use (an eight-sided tower with a gallery and caged ladder, an equipment-room container, and the gantry's truss-backed reflector) and a light head (the field dish's reflector and trunnions with no tower) for the small dishes on masts and roofs, each with the dish, its yaw and tilt pivots and a livery for every faction (the stations also a number for every dish)
   assets/winch.glb   the Hitch-Line Winch's grapple (a gold three-fluke claw, collar, shank and eye) and a metre of twisted steel cable with an orange tracer strand, which the game lays along the line, a piece per metre
   assets/towmark.png the winch's tow-line marker for the HUD (brackets, a dashed ring and a hook glyph, white on clear, rendered in Blender and tinted by a CSS mask)
@@ -782,6 +783,7 @@ tools/
   blender/build_garage.py  builds the main and small motor-pool garages -> src/assets/garage.glb (also runs headless)
   blender/build_slots.py   builds the casino's slot-machine cabinet -> src/assets/slots.glb (also runs headless; checks that the side plaques and decals sit inside the cabinet's silhouette)
   blender/build_casino.py  builds the casino's lamp post, fountain, bouncer, chandelier and signs -> src/assets/casino.glb (also runs headless)
+  blender/build_blackjack.py  builds the blackjack table and chip -> src/assets/blackjack.glb (also runs headless; the build stops if anything stands in the places cards, chips and the felt's lettering go)
   blender/build_dish.py    builds the cryo receiver, the gantry station, the field dish and the light dish head -> src/assets/dish.glb (also runs headless)
   blender/build_winch.py   builds the winch's grapple and cable piece -> src/assets/winch.glb and renders the tow-line marker -> src/assets/towmark.png (also runs headless: `pip install bpy`, then `MOONRUNNER_REPO=. python3 tools/blender/build_winch.py`)
   blender/build_outposts.py builds the Relay Mast and Watchtower -> src/assets/outposts.glb (also runs headless; `npm run check:outposts` checks the file); the mast's dishes are the dish head of dishkit.py

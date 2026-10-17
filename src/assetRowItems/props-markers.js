@@ -4,11 +4,11 @@ import { seat, hexOf } from './props-util.js';
 import { toon, glow, ink, textSprite } from '../toon.js';
 import { mulberry32 } from '../rng.js';
 import { FACTIONS, CARGO, MIL_CARGO } from '../locations.js';
-import { makeCrate, makeSeismo, makeTube, makePylon, makeDish, makeTurret, makeRocket, engineModel, caseModel, plinkoConsoleModel, plinkoFrameModel, makeLampPost, makeFountain, makeChandelier, makeCasinoSign } from '../models.js';
+import { makeCrate, makeSeismo, makeTube, makePylon, makeDish, makeTurret, makeRocket, engineModel, caseModel, plinkoConsoleModel, plinkoFrameModel, makeLampPost, makeFountain, makeChandelier, makeCasinoSign, makeChipStack } from '../models.js';
 import { makeProp } from '../storyAssets.js';
 import { makeStretcher } from '../medevac.js';
 import { makeLoot } from '../alchemy.js';
-import { slotCabinet, updateSlot, PLK } from '../casinoWorld.js';
+import { slotCabinet, updateSlot, blackjackTable, PLK } from '../casinoWorld.js';
 import { SLOTS, SPACING, DROP_Y } from '../plinko.js';
 import { Events } from '../events.js';
 import { World } from '../world.js';
@@ -436,6 +436,14 @@ function casinoProps() {
   return { root: lineUp(parts, 3).root, update: (dt, t) => { for (const f of movers) f(dt, t); } };
 }
 
+// ---- the casino's blackjack table with its felt and stool (blackjack.glb, tools/blender/build_blackjack.py; casinoWorld.js blackjackTable) and the chip in the
+// seven stakes (makeChipStack), stacked five high ----
+function blackjack() {
+  const chips = new THREE.Group();
+  [0xfff4e0, 0xff2a4a, 0x2ee6ff, 0x7dff6a, 0x16121f, 0xc77dff, 0xffd23f].forEach((c, i) => { const g = makeChipStack(c, 5); g.position.set(i * 0.5 - 1.5, 0, 0); chips.add(g); });
+  return { root: lineUp([{ root: blackjackTable(), w: 8, d: 7 }, { root: chips, w: 3.4, d: 0.6 }], 3).root };
+}
+
 export default {
   id: 'props.markers',
   title: '04 · PROPS & MARKERS',
@@ -447,6 +455,7 @@ export default {
     { id: 'prop.seismograph', label: 'SEISMOGRAPH', w: 2, d: 2.2, make: seismograph },
     { id: 'prop.vacuum-tube', label: 'VACUUM TUBES', w: 6, d: 1.3, make: tubes },
     { id: 'prop.casino-props', label: 'CASINO LAMPS · FOUNTAIN · CHANDELIER · SIGNS', w: 68, d: 21, make: casinoProps },
+    { id: 'prop.blackjack', label: 'BLACKJACK TABLE · CHIPS', w: 14.4, d: 7, make: blackjack },
     { id: 'prop.slot-machines', label: 'SLOT MACHINES', w: 7 * 2.5 + 6 * 0.9, d: 1.8, make: slotMachines },
     { id: 'prop.plinko', label: 'PLINKO BOOTH & FRAME', w: 16.7, d: 9.2, make: plinko },
     { id: 'event.start-props', label: 'EVENT START PROPS', w: 82, d: 7.2, make: startProps },

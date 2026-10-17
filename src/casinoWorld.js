@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { toon, ink, glow, glowShared, textSprite, nameTag } from './toon.js';
-import { makeFigure, makeSlotCabinet, SLOT_LAMP_OFF, plinkoConsoleModel, plinkoFrameModel, makeBouncer, makeChandelier, makeCasinoSign } from './models.js';
+import { makeFigure, makeSlotCabinet, SLOT_LAMP_OFF, plinkoConsoleModel, plinkoFrameModel, makeBouncer, makeChandelier, makeCasinoSign, makeBlackjackTable } from './models.js';
 import { pxCanvas } from './pixelIcons.js';
 import { pixelFont } from './fonts.js';
 import { faceInfo, glyphState } from './glyphs.js';
@@ -179,42 +179,59 @@ function carpetTex() {
   return t;
 }
 
+// The blackjack felt's print (a half disc, the dealer's flat edge at the top; the plane is 2R by R, so 1024 px across is 2R metres). Laid out to
+// the table's zones (tools/blender/build_blackjack.py ZONES), which nothing of the model may stand in: the two card rows are the red areas, each with
+// a gold bracket at every corner exactly on its edge, the bet circle is on its own, and the lettering runs round the rim outside the bet stacks.
+export const BJ_AREAS = { x: 1.6, dealer: [0.26, 0.98], player: [1.39, 2.26] }; // (x: half the width; z from, to: table-local metres)
 function feltTex(R) {
   return canvasTex(1024, 512, (x, w, h) => {
+    const PX = w / (2 * R), mx = (m) => w / 2 + m * PX, mz = (m) => m * PX;
     x.clearRect(0, 0, w, h);
-    // half-disc: flat edge along the top (dealer side), bulging toward the player
-    x.fillStyle = '#16703d';
+    x.fillStyle = '#14603a';
     x.beginPath(); x.moveTo(0, 0); x.arc(w / 2, 0, w / 2, 0, Math.PI); x.closePath(); x.fill();
     const g = x.createRadialGradient(w / 2, 0, 40, w / 2, 0, w / 2);
-    g.addColorStop(0, 'rgba(125,255,106,0.25)'); g.addColorStop(1, 'rgba(0,0,0,0.25)');
+    g.addColorStop(0, 'rgba(125,255,106,0.22)'); g.addColorStop(1, 'rgba(0,0,0,0.3)');
     x.fillStyle = g; x.fill();
-    x.textAlign = 'center'; x.textBaseline = 'middle';
-    x.strokeStyle = '#ffd23f'; x.lineWidth = 6;
-    x.beginPath(); x.arc(w / 2, 0, w * 0.36, 0.12 * Math.PI, 0.88 * Math.PI); x.stroke();
-    x.save();
-    x.fillStyle = '#ffd23f'; x.font = FONT(30);
-    const msg = 'BLACKJACK PAYS 3 TO 2 · DEALER STANDS ON 17';
-    // text along the arc
-    const r = w * 0.39;
-    const total = x.measureText(msg).width;
-    let a = Math.PI / 2 + (total / r) / 2;
+    // a double gold pinstripe round the edge and an inner arc
+    x.strokeStyle = '#ffd23f'; x.lineWidth = 5;
+    x.beginPath(); x.arc(w / 2, 0, w / 2 - 8, 0.02 * Math.PI, 0.98 * Math.PI); x.stroke();
+    x.lineWidth = 2; x.beginPath(); x.arc(w / 2, 0, w / 2 - 19, 0.02 * Math.PI, 0.98 * Math.PI); x.stroke();
+    x.lineWidth = 3; x.beginPath(); x.arc(w / 2, 0, mz(2.42), 0.17 * Math.PI, 0.83 * Math.PI); x.stroke();
+    // the lettering along the rim, outside the bet stacks
+    x.font = FONT(26); x.textAlign = 'center'; x.textBaseline = 'middle';
+    const msg = 'BLACKJACK PAYS 3 TO 2 · DEALER STANDS ON 17', r = mz(3.12);
+    let a = Math.PI / 2 + (x.measureText(msg).width / r) / 2;
     for (const ch of msg) {
       const cw = x.measureText(ch).width;
       a -= cw / 2 / r;
-      x.save(); x.translate(w / 2 + Math.cos(a) * r, Math.sin(a) * r); x.rotate(a - Math.PI / 2); x.fillText(ch, 0, 0); x.restore();
+      x.save(); x.translate(w / 2 + Math.cos(a) * r, Math.sin(a) * r); x.rotate(a - Math.PI / 2);
+      x.lineWidth = 6; x.lineJoin = 'round'; x.strokeStyle = '#0a3a22'; x.strokeText(ch, 0, 0);
+      x.fillStyle = '#ffd23f'; x.fillText(ch, 0, 0); x.restore();
       a -= cw / 2 / r;
     }
-    x.restore();
-    // betting circle (player's spot) and the card box
-    const bx = w / 2, by = h * 0.8;
-    x.strokeStyle = '#fff4e0'; x.lineWidth = 6;
-    x.beginPath(); x.arc(bx, by, 44, 0, Math.PI * 2); x.stroke();
-    x.fillStyle = '#fff4e0'; x.font = FONT(26); x.fillText('BET', bx, by);
-    x.strokeStyle = 'rgba(255,244,224,0.5)'; x.lineWidth = 4;
-    x.strokeRect(w / 2 - 170, h * 0.38, 340, 120);
-    x.strokeRect(w / 2 - 150, h * 0.06, 300, 110);
-    x.fillStyle = 'rgba(255,244,224,0.55)'; x.font = FONT(24);
-    x.fillText('INSURANCE IS FOR COWARDS', w / 2, h * 0.58);
+    // the card rows: a red area each (the cards lie in them), a gold bracket on each corner
+    for (const [z0, z1] of [BJ_AREAS.dealer, BJ_AREAS.player]) {
+      const x0 = mx(-BJ_AREAS.x), x1 = mx(BJ_AREAS.x), y0 = mz(z0), y1 = mz(z1);
+      x.fillStyle = '#a81c3e';
+      x.beginPath(); x.roundRect(x0, y0, x1 - x0, y1 - y0, 8); x.fill();
+      x.strokeStyle = '#ffd23f'; x.lineWidth = 4; x.lineJoin = 'miter'; x.lineCap = 'butt';
+      const L = 28, o = 2; // (the line's own centre on the edge, so it covers the area's edge exactly)
+      for (const [cx, cy, sx, sy] of [[x0, y0, 1, 1], [x1, y0, -1, 1], [x0, y1, 1, -1], [x1, y1, -1, -1]]) {
+        x.beginPath(); x.moveTo(cx + sx * L, cy + sy * o); x.lineTo(cx + sx * o, cy + sy * o); x.lineTo(cx + sx * o, cy + sy * L); x.stroke();
+      }
+    }
+    // the bet circle, a double ring with BET in it
+    x.strokeStyle = '#fff4e0'; x.lineWidth = 4; x.beginPath(); x.arc(mx(0), mz(2.72), 0.34 * PX, 0, Math.PI * 2); x.stroke();
+    x.lineWidth = 2; x.beginPath(); x.arc(mx(0), mz(2.72), 0.28 * PX, 0, Math.PI * 2); x.stroke();
+    x.fillStyle = '#fff4e0'; x.font = FONT(22); x.fillText('BET', mx(0), mz(2.72));
+    // the strip between the two rows: the house's one joke, small
+    x.fillStyle = 'rgba(255,244,224,0.8)'; x.font = FONT(20); x.fillText('INSURANCE IS FOR COWARDS', mx(0), mz(1.18));
+    // the suits at the corners of the arc, and a gold crescent at the dealer's edge
+    x.fillStyle = '#ffd23f'; x.font = '52px serif';
+    x.fillText('♠', mx(-2.9), mz(0.52)); x.fillText('♥', mx(2.9), mz(0.52));
+    x.fillText('♦', mx(-2.55), mz(1.55)); x.fillText('♣', mx(2.55), mz(1.55));
+    x.fillStyle = 'rgba(255,210,63,0.9)'; x.beginPath(); x.arc(mx(0), mz(0.1), 22, 0, Math.PI * 2); x.fill();
+    x.fillStyle = '#14603a'; x.beginPath(); x.arc(mx(0) + 8, mz(0.1) - 4, 19, 0, Math.PI * 2); x.fill();
   });
 }
 
@@ -406,11 +423,28 @@ export function makeDuck(color, bill = 0xff9f1c) {
 
 // ---- layout (casino local frame; the facade faces +z) ----
 export const HALL = { W: 26, FRONT: 12, BACK: -34, H: 16, DOOR: 5, DOOR_H: 9 };
-export const BJ = { x: -14, z: -8, R: 3.4, top: 1.16 };
+// The blackjack table stands against the left wall, turned a quarter (its dealer's back counter on the wall, the players coming from +x): (x, z) is the middle of its
+// flat edge on the floor, `yaw` its turn. The game thinks in the table's own frame (x right, z toward the player: cards and chips go in `bj.group`); bjPt gives a
+// point of it in the casino's frame.
+export const BJ = { x: -22.96, z: -8, R: 3.4, top: 1.16, yaw: Math.PI / 2 };
+export const bjPt = (lx, y, lz) => { const c = Math.cos(BJ.yaw), s = Math.sin(BJ.yaw); return [BJ.x + lx * c + lz * s, y, BJ.z - lx * s + lz * c]; };
+export const BJ_RACK = new THREE.Vector3(-0.85, 1.3, -0.26); // (where the dealer's chips come from and go back to, table-local)
 export const DUCK = { x0: -22, x1: 2, lanes: [-21.5, -23.1, -24.7, -26.3], water: 0.86, kiosk: [-10, -17.4] };
 export const PLK = { x: 14, y: 1.2, z: -31 };
 export const CLASSIC = { x: 22.4, mid: 2.5, zs: [-2.3, 0.9, 4.1, 7.3] };   // (the corner's slot cabinets: facing -x, 3.2 m apart)
 export const PRIZE = { x: 22, z: -13 };
+
+// The blackjack table with its felt (a Group at the table's own origin and frame; buildCasino stands it at BJ, turned, and freezes it): the Blender model
+// (build_blackjack.py) and the felt plane the game prints (feltTex) laid at the model's `felt` pivot.
+export function blackjackTable() {
+  const bjt = makeBlackjackTable();
+  const felt = new THREE.Mesh(new THREE.PlaneGeometry(bjt.spots.felt.w, bjt.spots.felt.h), new THREE.MeshToonMaterial({ map: feltTex(BJ.R), gradientMap: toon(0).gradientMap, transparent: true, alphaTest: 0.5, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }));
+  felt.rotation.x = -Math.PI / 2;
+  felt.position.copy(bjt.spots.felt.pos);
+  felt.receiveShadow = true;
+  bjt.stat.add(felt);
+  return bjt.stat;
+}
 
 export function buildCasino(w, loc) {
   // signs that name a button: redrawn with the pad's own glyph whenever a controller is in use
@@ -691,62 +725,30 @@ export function buildCasino(w, loc) {
     put(sg.root, 0, 5, 9.6);
   }
 
-  // ---------- BLACKJACK TABLE ----------
+  // ---------- BLACKJACK TABLE (build_blackjack.py) ----------
+  // `bjStat` is the frozen table (the world merges it); `bj` is the part that moves: the dealer, and the cards and chips the game puts down (casinoGames.js)
   const bj = new THREE.Group();
   const R = BJ.R;
-  const wood = toon(0x6b3a1f);
-  const tbody = mesh(new THREE.CylinderGeometry(R, R, 0.3, 32, 1, false, -Math.PI / 2, Math.PI), wood, 0.06);
-  tbody.position.y = BJ.top - 0.2;
-  const flat = mesh(new THREE.BoxGeometry(R * 2, 0.36, 0.25), wood, 0.05);
-  flat.position.set(0, BJ.top - 0.12, -0.05);
-  const pedestal = mesh(new THREE.CylinderGeometry(0.6, 1, BJ.top - 0.3, 12), toon(0x2a1450), 0.06);
-  pedestal.position.set(0, (BJ.top - 0.3) / 2, R * 0.45);
-  const felt = new THREE.Mesh(new THREE.PlaneGeometry(R * 2, R), new THREE.MeshToonMaterial({ map: feltTex(R), gradientMap: toon(0).gradientMap, transparent: true, alphaTest: 0.5 }));
-  felt.rotation.x = -Math.PI / 2;
-  felt.position.set(0, BJ.top - 0.04, R / 2);
-  felt.receiveShadow = true;
-  const rail = mesh(new THREE.TorusGeometry(R, 0.16, 8, 40, Math.PI), toon(0x3a0d16), 0.04);
-  rail.rotation.x = Math.PI / 2;
-  rail.position.y = BJ.top;
-  bj.add(tbody, flat, pedestal, felt, rail);
-  // card shoe and chip tray
-  const shoe = mesh(new THREE.BoxGeometry(0.55, 0.4, 0.85), toon(0xd7263d), 0.04);
-  shoe.position.set(R * 0.62, BJ.top + 0.12, 0.55);
-  shoe.rotation.y = -0.4;
-  const shoeLip = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.06, 0.1), glow(0xffd23f));
-  shoeLip.position.set(R * 0.62 - 0.12, BJ.top + 0.3, 0.95);
-  shoeLip.rotation.y = -0.4;
-  const tray = mesh(new THREE.BoxGeometry(2, 0.12, 0.45), toon(0x2a1450), 0.03);
-  tray.position.set(-0.4, BJ.top + 0.02, 0.3);
-  bj.add(shoe, shoeLip, tray);
-  const chipGeo = new THREE.CylinderGeometry(0.17, 0.17, 0.07, 14);
-  const CHIP_COLS = [0xfff4e0, 0xff2a4a, 0x2ee6ff, 0x7dff6a, 0x16121f, 0xc77dff, 0xffd23f];
-  for (let c = 0; c < 5; c++) for (let s = 0; s < 6; s++) {
-    const ch = new THREE.Mesh(chipGeo, toon(CHIP_COLS[c]));
-    ch.position.set(-1.2 + c * 0.4, BJ.top + 0.1 + s * 0.072, 0.3);
-    bj.add(ch);
-  }
-  // the dealer, the player's stool, a hanging sign
+  const bjStat = blackjackTable();
   const dealer = makeFigure({ suit: 0x16121f, helmet: 0xfff4e0, visor: 0xffd23f, scale: 1.05 });
   const bow = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.12, 0.06), glow(0xd7263d));
   bow.position.set(0, 1.62, 0.33);
   dealer.root.add(bow);
   dealer.root.position.set(0, 0, -0.9);
   bj.add(dealer.root);
-  const stool = mesh(new THREE.CylinderGeometry(0.5, 0.4, 0.15, 14), toon(0xd7263d), 0.04);
-  stool.position.set(0, 0.85, R + 0.9);
-  const stoolLeg = mesh(new THREE.CylinderGeometry(0.08, 0.08, 0.8, 6), toon(0xffd23f), 0.02);
-  stoolLeg.position.set(0, 0.4, R + 0.9);
-  bj.add(stool, stoolLeg);
-  put(bj, BJ.x, BJ.z, 0, 0, true);
-  col({ type: 'box', x: BJ.x, y: 0.7, z: BJ.z + R / 2, hx: R + 0.2, hy: 0.7, hz: R / 2 + 0.2 }); // (the table; the dealer behind it has none)
-  // the BLACKJACK sign: no longer hung over the table but mounted flat on the left wall, level with it
+  put(bjStat, BJ.x, BJ.z, 0, BJ.yaw);
+  put(bj, BJ.x, BJ.z, 0, BJ.yaw, true);
+  // the table, and the dealer's station behind it (the counter against the wall, so you cannot walk in behind the dealer)
+  const [tx, , tz] = bjPt(0, 0, R / 2), [dx, , dz] = bjPt(0, 0, -1.05);
+  col({ type: 'box', x: tx, y: 0.7, z: tz, hx: R + 0.2, hy: 0.7, hz: R / 2 + 0.2, yaw: BJ.yaw });
+  col({ type: 'box', x: dx, y: 0.7, z: dz, hx: R + 0.2, hy: 0.7, hz: 0.95, yaw: BJ.yaw });
+  // the BLACKJACK sign, mounted flat on the left wall over the dealer's counter
   {
     const sg = makeCasinoSign('wall_sign');
     const bjSign = new THREE.Mesh(new THREE.PlaneGeometry(sg.face.w, sg.face.h), new THREE.MeshBasicMaterial({ map: neonTex('BLACKJACK', { color: '#7dff6a', edge: '#ffd23f', sub: 'PAYS 3 TO 2 · {F} AT THE STOOL TO PLAY' }) }));
     bjSign.position.copy(sg.face.pos);
     sg.root.add(bjSign);
-    put(sg.root, -W + 1.06, BJ.z, 7.5, Math.PI / 2); // (against the wallpaper panel, facing +x)
+    put(sg.root, -W + 1.06, BJ.z, 5.0, Math.PI / 2); // (against the wallpaper panel, facing +x, over the dealer's counter and the wall's neon band)
     padSign(bjSign, 'BLACKJACK', { color: '#7dff6a', edge: '#ffd23f', sub: 'PAYS 3 TO 2 · {F} AT THE STOOL TO PLAY' });
   }
 
@@ -1157,7 +1159,7 @@ export function buildCasino(w, loc) {
     near(p) { return p.distanceTo(this.entrance) < 10; },
     toWorld: (x, y, z, out) => w.toWorld(loc, x, y, z, out),
     toLocal: (p, out = new THREE.Vector3()) => loc.group.worldToLocal(out.copy(p)),
-    bj: { group: bj, dealer, shoe },
+    bj: { group: bj, dealer },
     duck: { ducks, gate, water, oddsCanvas, oddsTex, crowd },
     plinko: { pegs, pegBase, slotMats, aim },
     crowd,
