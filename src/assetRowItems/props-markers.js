@@ -4,7 +4,7 @@ import { seat, hexOf } from './props-util.js';
 import { toon, glow, ink, textSprite } from '../toon.js';
 import { mulberry32 } from '../rng.js';
 import { FACTIONS, CARGO, MIL_CARGO } from '../locations.js';
-import { makeCrate, makeSeismo, makeTube, makePylon, makeDish, makeTurret, makeRocket } from '../models.js';
+import { makeCrate, makeSeismo, makeTube, makePylon, makeDish, makeTurret, makeRocket, plinkoConsoleModel, plinkoFrameModel } from '../models.js';
 import { makeProp } from '../storyAssets.js';
 import { makeStretcher } from '../medevac.js';
 import { makeLoot } from '../alchemy.js';
@@ -348,12 +348,21 @@ function zoneWall(R, height, y, hostile) {
   };
 }
 
+// ---- the casino's Plinko booth and the cabinet frame that joins the board to the back wall (plinko.glb, tools/blender/build_plinko.py; the board's pegs,
+// rails and sign are built in casinoWorld.js, so only the two Blender pieces stand here) ----
+function plinko() {
+  const frame = plinkoFrameModel(), booth = plinkoConsoleModel();
+  if (!frame || !booth) throw new Error('plinko.glb is not loaded');
+  return { root: lineUp([{ root: frame, w: 16.1, d: 2.7 }, { root: booth, w: 3.6, d: 1.4 }], 3).root };
+}
+
 export default {
   id: 'props.markers',
   title: '04 · PROPS & MARKERS',
   items: [
     { id: 'prop.crate', label: 'CRATES', w: 33, d: 2, make: crates },
     { id: 'prop.loot-drop', label: 'LOOT PICKUPS', w: 33, d: 2.4, solid: false, make: loot },
+    { id: 'prop.plinko', label: 'PLINKO BOOTH · FRAME', w: 23, d: 3, make: plinko },
     { id: 'prop.seismograph', label: 'SEISMOGRAPH', w: 2, d: 2.2, make: seismograph },
     { id: 'prop.vacuum-tube', label: 'VACUUM TUBES', w: 6, d: 1.3, make: tubes },
     { id: 'event.start-props', label: 'EVENT START PROPS', w: 82, d: 7.2, make: startProps },
