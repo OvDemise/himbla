@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { toon, ink, glow, glowShared, textSprite, nameTag } from './toon.js';
-import { makeFigure, makeSlotCabinet, SLOT_LAMP_OFF, plinkoConsoleModel, plinkoFrameModel } from './models.js';
+import { makeFigure, makeSlotCabinet, SLOT_LAMP_OFF, plinkoConsoleModel, plinkoFrameModel, makeBouncer, makeChandelier, makeCasinoSign } from './models.js';
 import { pxCanvas } from './pixelIcons.js';
 import { pixelFont } from './fonts.js';
 import { faceInfo, glyphState } from './glyphs.js';
@@ -506,12 +506,13 @@ export function buildCasino(w, loc) {
   for (let i = 1; i <= nEdge; i++) for (const sx of [-1, 1]) edgeBulb(sx * (W + 1.5), D + 1.5 - i * ((DEP + 3) / nEdge), H + 2.1);
   for (let i = 1; i <= 41; i++) edgeBulb(-(W + 1.5) + i * ((W + 1.5) * 2 / 42), BACK - 1.5, H + 2.1);
   // red carpet + velvet ropes outside, and on inside up to the games
+  const ASPH = 0.1; // the asphalt's thickness
   const carpet = new THREE.Mesh(new THREE.PlaneGeometry(6, 34), toon(0xd7263d));
   carpet.rotation.x = -Math.PI / 2;
-  put(carpet, 0, D + 18, 0.08);
+  put(carpet, 0, D + 18, ASPH + 0.03); // (laid on the asphalt that runs from the doors to the plaza: settlements.js dressCasinoLot)
   for (const sx of [-1, 1]) {
-    for (let i = 0; i < 6; i++) put(mesh(new THREE.CylinderGeometry(0.15, 0.2, 1.4, 6), toon(0xffd23f), 0.04), sx * 3.6, D + 4 + i * 5.5, 0.7);
-    put(new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 27.5, 5).rotateX(Math.PI / 2), toon(0x8a1030)), sx * 3.6, D + 4 + 13.75, 1.1);
+    for (let i = 0; i < 6; i++) put(mesh(new THREE.CylinderGeometry(0.15, 0.2, 1.4, 6), toon(0xffd23f), 0.04), sx * 3.6, D + 4 + i * 5.5, ASPH + 0.7);
+    put(new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 27.5, 5).rotateX(Math.PI / 2), toon(0x8a1030)), sx * 3.6, D + 4 + 13.75, ASPH + 1.1);
   }
 
   // the giant rotating sign
@@ -558,7 +559,7 @@ export function buildCasino(w, loc) {
   const CAR_R = 3.6, STAND_R = 6.2, CAR_N = 7;
   let n = 0;
   for (const sx of [-1, 1]) {
-    const cx = sx * 15, cz = D + 19;
+    const cx = sx * 15.8, cz = D + 19; // (a little out from the asphalt that runs to the doors, so a verge of dust is left between the two)
     put(mesh(new THREE.CylinderGeometry(7.4, 7.6, 0.3, 32), toon(0x2a1450), 0.06), cx, cz, 0.15);
     put(new THREE.Mesh(new THREE.TorusGeometry(7.3, 0.12, 6, 40).rotateX(Math.PI / 2), glow(sx < 0 ? 0xff2e88 : 0x2ee6ff)), cx, cz, 0.33);
     put(mesh(new THREE.CylinderGeometry(1.4, 1.6, 7.5, 16), toon(0x5a1a8f), 0.08), cx, cz, 3.75);
@@ -606,9 +607,10 @@ export function buildCasino(w, loc) {
     loc.group.add(f.root);
     patrons.push({ ...f, spot: sp, path: [], stay: 3 + ((i * 1.7) % 9), phase: i, pull: 0 });
   }
-  // bouncer in a tux by the door
-  const bouncer = makeFigure({ suit: 0x16121f, helmet: 0x16121f, visor: 0xffd23f, scale: 1.35 });
-  put(bouncer.root, 7.6, D + 2.6, 0, 0); // (no collider: the people here, like the patrons, are walked through, not round)
+  // the bouncer by the door (build_casino.py): a buff alien in a tux, arms crossed; he turns his head to watch people go in and breathes
+  const bouncer = makeBouncer();
+  bouncer.root.scale.setScalar(0.94);
+  put(bouncer.root, 7.6, D + 2.6, 0, 0, true); // (no collider: the people here, like the patrons, are walked through, not round)
 
   // chip stacks out front
   const chipCols = [0xff2a4a, 0x2ee6ff, 0x111111, 0x7dff6a, 0xffd23f];
@@ -671,26 +673,23 @@ export function buildCasino(w, loc) {
   put(ceiling, 0, CZ, H - 0.02);
   // ceiling strip lights
   for (const z of [-26, -16, -6, 4]) put(new THREE.Mesh(new THREE.BoxGeometry(W * 2 - 6, 0.2, 0.5), glow(0xfff6a8)), 0, z, H - 0.15);
-  // chandeliers (spinning slowly)
+  // chandeliers (build_casino.py): the rose and chain are frozen (merged by the world), the crystal tiers turn slowly
   const chandeliers = [];
   for (const [x, z] of [[-12, -14], [12, -14], [0, -2]]) {
-    const g = new THREE.Group();
-    put(new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 3, 5), toon(0xffd23f)), x, z, H - 1.5);
-    g.add(new THREE.Mesh(new THREE.IcosahedronGeometry(0.9, 0), glow(0xfff6a8)));
-    const ring = new THREE.Mesh(new THREE.TorusGeometry(1.8, 0.12, 6, 24).rotateX(Math.PI / 2), toon(0xffd23f));
-    g.add(ring);
-    for (let i = 0; i < 8; i++) {
-      const a = (i / 8) * Math.PI * 2;
-      const drop = new THREE.Mesh(new THREE.OctahedronGeometry(0.22, 0), glow(i % 2 ? 0x9be7ff : 0xff9fdc));
-      drop.position.set(Math.cos(a) * 1.8, -0.45, Math.sin(a) * 1.8);
-      g.add(drop);
-    }
-    put(g, x, z, H - 3.3, 0, true);
-    chandeliers.push(g);
+    const ch = makeChandelier();
+    ch.root.remove(ch.spin);
+    put(ch.root, x, z, H - 3.3);
+    put(ch.spin, x, z, H - 3.3, 0, true);
+    chandeliers.push(ch.spin);
   }
-  // a welcome sign hanging inside the door
-  const wel = new THREE.Mesh(new THREE.PlaneGeometry(9, 2.2), new THREE.MeshBasicMaterial({ map: neonTex('BLACKJACK · DUCK DERBY · PLINKO', { color: '#fff6a8', edge: '#2ee6ff' }) }));
-  put(wel, 0, 5, 9.6);
+  // a welcome sign hanging inside the door, on chains from the ceiling (the frame is built in Blender)
+  {
+    const sg = makeCasinoSign('welcome_sign');
+    const face = new THREE.Mesh(new THREE.PlaneGeometry(sg.face.w, sg.face.h), new THREE.MeshBasicMaterial({ map: neonTex('BLACKJACK · DUCK DERBY · PLINKO', { color: '#fff6a8', edge: '#2ee6ff' }) }));
+    face.position.copy(sg.face.pos);
+    sg.root.add(face);
+    put(sg.root, 0, 5, 9.6);
+  }
 
   // ---------- BLACKJACK TABLE ----------
   const bj = new THREE.Group();
@@ -741,10 +740,15 @@ export function buildCasino(w, loc) {
   bj.add(stool, stoolLeg);
   put(bj, BJ.x, BJ.z, 0, 0, true);
   col({ type: 'box', x: BJ.x, y: 0.7, z: BJ.z + R / 2, hx: R + 0.2, hy: 0.7, hz: R / 2 + 0.2 }); // (the table; the dealer behind it has none)
-  const bjSign = new THREE.Mesh(new THREE.PlaneGeometry(7, 1.75), new THREE.MeshBasicMaterial({ map: neonTex('BLACKJACK', { color: '#7dff6a', edge: '#ffd23f', sub: 'PAYS 3 TO 2 · {F} AT THE STOOL TO PLAY' }) }));
-  put(bjSign, BJ.x, BJ.z - 0.3, 7.5);
-  padSign(bjSign, 'BLACKJACK', { color: '#7dff6a', edge: '#ffd23f', sub: 'PAYS 3 TO 2 · {F} AT THE STOOL TO PLAY' });
-  for (const sx of [-1, 1]) put(new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, H - 8.4, 4), toon(0xffd23f)), BJ.x + sx * 3, BJ.z - 0.3, 8.4 + (H - 8.4) / 2);
+  // the BLACKJACK sign: no longer hung over the table but mounted flat on the left wall, level with it
+  {
+    const sg = makeCasinoSign('wall_sign');
+    const bjSign = new THREE.Mesh(new THREE.PlaneGeometry(sg.face.w, sg.face.h), new THREE.MeshBasicMaterial({ map: neonTex('BLACKJACK', { color: '#7dff6a', edge: '#ffd23f', sub: 'PAYS 3 TO 2 · {F} AT THE STOOL TO PLAY' }) }));
+    bjSign.position.copy(sg.face.pos);
+    sg.root.add(bjSign);
+    put(sg.root, -W + 1.06, BJ.z, 7.5, Math.PI / 2); // (against the wallpaper panel, facing +x)
+    padSign(bjSign, 'BLACKJACK', { color: '#7dff6a', edge: '#ffd23f', sub: 'PAYS 3 TO 2 · {F} AT THE STOOL TO PLAY' });
+  }
 
   // ---------- DUCK DERBY TRACK ----------
   const L0 = DUCK.x0 - 2, L1 = DUCK.x1 + 2;
@@ -1176,6 +1180,8 @@ export function buildCasino(w, loc) {
       const step = Math.floor(chase * 7) % 3;
       bulbMats.forEach((m, i) => m.color.setHex(i === step ? 0xfff6a8 : 0x8a5a2a));
       for (const c of chandeliers) c.rotation.y += dt * 0.3;
+      bouncer.head.rotation.y = Math.sin(time * 0.55) * 0.55 * Math.max(0, Math.sin(time * 0.17) + 0.4); // (glances left and right, now and then)
+      bouncer.root.scale.y = 0.94 * (1 + Math.sin(time * 1.6) * 0.006);
       const pulse = 0.75 + 0.25 * Math.sin(time * 3);
       bandMats[0].color.setRGB(1 * pulse, 0.18 * pulse, 0.53 * pulse);
       bandMats[1].color.setRGB(0.18 * (1.75 - pulse), 0.9 * (1.75 - pulse), 1 * (1.75 - pulse));

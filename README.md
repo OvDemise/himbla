@@ -546,7 +546,7 @@ the unlock counters, toggle any splice-pod mutation (with a reset), or reset all
 ### The Asset Row (dev builds only)
 
 Dev menu (`F8`) → **Full cheat menu** → **Teleport** → option 1, **ASSET ROW**: a flat showroom with every asset in the game
-lined up side by side, 208 of them in 25 sections (the runner and its gear, people, creatures, props and markers,
+lined up side by side, 209 of them in 25 sections (the runner and its gear, people, creatures, props and markers,
 weapons and effects, rocks and nature, the secrets and the Spindle's props, ground vehicles and ships, outposts intact and
 wrecked, the building parts the settlements are made of, the hometown, and all the places). The small ones stand in the
 yellow lane (z = 0), the places over 100 m across in the cyan lane 460 m over; the whole row is about 9 km, so the dev
@@ -721,6 +721,7 @@ src/
   vehicles.js    drivable faction vehicles
   settings.js    settings menu + key remapping
   casino.js      Lucky Crater Casino games, VIP, prizes (casinoWorld.js: the building)
+  fountainFx.js  the plaza fountain's water: ripple, curtain and jet shaders on the casino.glb water pivots, sharing one clock
   pixelIcons.js  the classic-games overlay's pixel-art sprites (slot symbols, the pit boss, chips, cards' suits…) as plain rows of palette letters
   cosmetics.js   outfits, skate finishes, laser colours, wardrobe
   race.js        Chimera Downs: racecourse, race card, betting, locked race camera, chaos racing
@@ -754,6 +755,7 @@ src/
   assets/crane.glb   the tower crane (lattice mast, ballasted base, slewing head with cab, trolley and hook)
   assets/garage.glb  the Meridian motor-pool garages: the main one (three bays with open and shut doors, workshop fit-outs, service office, fuel yard, roof plant) and a small two-bay one
   assets/slots.glb   the casino's slot-machine cabinet: a pixel-arcade video slot with a tilted screen under a marquee, speakers, LED chases, arcade buttons, a ticket printer, a coin cup and a lever (the game paints its colour, marquee, side art and reels)
+  assets/casino.glb  the casino's lamp post, plaza fountain (basin, pedestal, bowl, spigots, a spinning chip, the water as pivots the game gives ripple, curtain and jet shaders), buff alien bouncer, hall chandelier and the welcome and blackjack signs' frames
   assets/dish.glb    the dish stations: the two for the research arrays' big dishes, the cryo receiver (a banded Helium-3 vessel with a stair, valve cabinet and branding panel) and the gantry station (a lattice mast, container control rooms, battery bank, fuel tank), the field dish the smaller bases use (an eight-sided tower with a gallery and caged ladder, an equipment-room container, and the gantry's truss-backed reflector) and a light head (the field dish's reflector and trunnions with no tower) for the small dishes on masts and roofs, each with the dish, its yaw and tilt pivots and a livery for every faction (the stations also a number for every dish)
   assets/winch.glb   the Hitch-Line Winch's grapple (a gold three-fluke claw, collar, shank and eye) and a metre of twisted steel cable with an orange tracer strand, which the game lays along the line, a piece per metre
   assets/towmark.png the winch's tow-line marker for the HUD (brackets, a dashed ring and a hook glyph, white on clear, rendered in Blender and tinted by a CSS mask)
@@ -777,13 +779,15 @@ tools/
   blender/build_crane.py   builds the tower crane -> src/assets/crane.glb (also runs headless, like build_apc.py)
   blender/build_garage.py  builds the main and small motor-pool garages -> src/assets/garage.glb (also runs headless)
   blender/build_slots.py   builds the casino's slot-machine cabinet -> src/assets/slots.glb (also runs headless; checks that the side plaques and decals sit inside the cabinet's silhouette)
+  blender/build_casino.py  builds the casino's lamp post, fountain, bouncer, chandelier and signs -> src/assets/casino.glb (also runs headless)
   blender/build_dish.py    builds the cryo receiver, the gantry station, the field dish and the light dish head -> src/assets/dish.glb (also runs headless)
   blender/build_winch.py   builds the winch's grapple and cable piece -> src/assets/winch.glb and renders the tow-line marker -> src/assets/towmark.png (also runs headless: `pip install bpy`, then `MOONRUNNER_REPO=. python3 tools/blender/build_winch.py`)
   blender/build_outposts.py builds the Relay Mast and Watchtower -> src/assets/outposts.glb (also runs headless; `npm run check:outposts` checks the file); the mast's dishes are the dish head of dishkit.py
   blender/dishkit.py       the dish geometry build_dish.py and build_outposts.py share (the reflector and its parts, the trunnion mount, the light dish head); exec'd by them after kit.py, builds nothing itself
   blender/decals.py        flat lettering, emblems, hazard stripes and safety signs (no textures) the land-train builder execs after kit.py
   blender/kit.py           shared geometry/material/export helpers every Blender builder execs (the runner and ships keep their own variants of a few)
-  viewer.html              dev-only model viewer (npm run dev, then /tools/viewer.html?m=shuttle|freighter|apc|landtrain|crane|garage|slots|dish|outpost|mite|lineup…; slots takes &n=<cabinets in a row>&ring=<cabinets round a pillar>&idx=<first colour and name>&play=1 (works them like a patron); freighter takes &faction=spacecom|vostok|kepler|meridian (the cargo's livery); dish takes &kind=cryo|gantry|field|head&faction=…&no=01..04&size=30&tilt=<rad>&sweep=1; apc takes &turret=<rad>&barrel=<rad>; landtrain takes &type=moonliner|prospector&faction=spacecom|vostok|kepler|meridian&cars=pax,tank,cargo,blast&unit=<n>)
+  viewer.html              dev-only model viewer (npm run dev, then /tools/viewer.html?m=shuttle|freighter|apc|landtrain|crane|garage|slots|dish|outpost|mite|lineup…; slots takes &n=<cabinets in a row>&ring=<cabinets round a pillar>&idx=<first colour and name>&play=1 (works them like a patron); casino takes &part=lamp|fountain|bouncer|chandelier|welcome|wall (&accent=<hex>&n=<lamps> for lamp); freighter takes &faction=spacecom|vostok|kepler|meridian (the cargo's livery); dish takes &kind=cryo|gantry|field|head&faction=…&no=01..04&size=30&tilt=<rad>&sweep=1; apc takes &turret=<rad>&barrel=<rad>; landtrain takes &type=moonliner|prospector&faction=spacecom|vostok|kepler|meridian&cars=pax,tank,cargo,blast&unit=<n>)
+  winch-sign-repro.mjs     dev-only headless repro for the winch cable round the Lucky Crater Casino sign post (see docs/winch-handoff.md: what was found, what is open)
 ```
 
 **Editing the runner:** run `tools/blender/build_runner.py` in Blender (Scripting tab, or

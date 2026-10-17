@@ -4,7 +4,7 @@ import { seat, hexOf } from './props-util.js';
 import { toon, glow, ink, textSprite } from '../toon.js';
 import { mulberry32 } from '../rng.js';
 import { FACTIONS, CARGO, MIL_CARGO } from '../locations.js';
-import { makeCrate, makeSeismo, makeTube, makePylon, makeDish, makeTurret, makeRocket, engineModel, caseModel, plinkoConsoleModel, plinkoFrameModel } from '../models.js';
+import { makeCrate, makeSeismo, makeTube, makePylon, makeDish, makeTurret, makeRocket, engineModel, caseModel, plinkoConsoleModel, plinkoFrameModel, makeLampPost, makeFountain, makeChandelier, makeCasinoSign } from '../models.js';
 import { makeProp } from '../storyAssets.js';
 import { makeStretcher } from '../medevac.js';
 import { makeLoot } from '../alchemy.js';
@@ -415,6 +415,27 @@ function zoneWall(R, height, y, hostile) {
   };
 }
 
+// ---- the casino's lamp posts, fountain, chandelier and signs (casino.glb, tools/blender/build_casino.py): the boulevard's lamp post in pink and cyan and
+// the plaza's scaled-down one, the plaza fountain (the chip turns, the water runs), a hall chandelier (hung 3.6 m up, turning) and the welcome and blackjack signs ----
+function casinoProps() {
+  const parts = [], movers = [];
+  const scaled = (g, k) => { const w = new THREE.Group(); g.scale.setScalar(k); w.add(g); return w; };
+  parts.push({ root: makeLampPost(0xff2e88), w: 3.2, d: 2 }, { root: makeLampPost(0x2ee6ff), w: 3.2, d: 2 }, { root: scaled(makeLampPost(0xff2e88), 0.62), w: 2.2, d: 1.4 });
+  const fnt = makeFountain();
+  movers.push((dt, t) => fnt.update(t, dt));
+  parts.push({ root: fnt.root, w: 20, d: 20 });
+  const ch = makeChandelier();
+  ch.root.position.y = 3.6;
+  movers.push((dt) => { ch.spin.rotation.y += dt * 0.3; });
+  parts.push({ root: ch.root, w: 4, d: 4 });
+  for (const [kind, y, w] of [['welcome_sign', 5, 10], ['wall_sign', 3, 8]]) {
+    const sg = makeCasinoSign(kind);
+    sg.root.position.y = y;
+    parts.push({ root: sg.root, w, d: 0.5 });
+  }
+  return { root: lineUp(parts, 3).root, update: (dt, t) => { for (const f of movers) f(dt, t); } };
+}
+
 export default {
   id: 'props.markers',
   title: '04 · PROPS & MARKERS',
@@ -425,6 +446,7 @@ export default {
     { id: 'prop.briefcase', label: 'CREDITS BRIEFCASE', w: 1.4, d: 1.4, make: briefcase },
     { id: 'prop.seismograph', label: 'SEISMOGRAPH', w: 2, d: 2.2, make: seismograph },
     { id: 'prop.vacuum-tube', label: 'VACUUM TUBES', w: 6, d: 1.3, make: tubes },
+    { id: 'prop.casino-props', label: 'CASINO LAMPS · FOUNTAIN · CHANDELIER · SIGNS', w: 68, d: 21, make: casinoProps },
     { id: 'prop.slot-machines', label: 'SLOT MACHINES', w: 7 * 2.5 + 6 * 0.9, d: 1.8, make: slotMachines },
     { id: 'prop.plinko', label: 'PLINKO BOOTH & FRAME', w: 16.7, d: 9.2, make: plinko },
     { id: 'event.start-props', label: 'EVENT START PROPS', w: 82, d: 7.2, make: startProps },

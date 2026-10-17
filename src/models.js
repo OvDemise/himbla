@@ -4,6 +4,7 @@ import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.j
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
+import { waterMesh } from './fountainFx.js';
 // The model files (exported from Blender) are inlined as data URIs, so the desktop build, which runs from file://,
 // can load them without fetch. Each one is imported on demand, which makes it a chunk of its own (as outposts.glb is):
 // the game's code stays small, a change to the code doesn't make anyone download the models again, and each model is
@@ -18,6 +19,7 @@ const GLB = {
   crane: () => import('./assets/crane.glb?inline'),
   garage: () => import('./assets/garage.glb?inline'),
   slots: () => import('./assets/slots.glb?inline'),
+  casino: () => import('./assets/casino.glb?inline'),
   dish: () => import('./assets/dish.glb?inline'),
   engine: () => import('./assets/engine.glb?inline'),
   briefcase: () => import('./assets/briefcase.glb?inline'),
@@ -1381,7 +1383,7 @@ const SHIP_TOON = { trim: 0xd8d4e8, dark: 0x2a2540, metal: 0x8a87a0, steel: 0x55
 const SHIP_FX = new Set(['plume', 'plumeCore', 'lift', 'engine', 'core', 'beacon']); // per-ship materials (they pulse)
 const FLAMES = new Set(['plume', 'plumeCore', 'lift', 'beacon']);
 export async function loadShipParts() {
-  const [gltf, sk, wr, ap, lt, cr, ga, di, en, bc, hc, sl, pk] = await Promise.all(['ships', 'skimmer', 'warrig', 'apc', 'landtrain', 'crane', 'garage', 'dish', 'engine', 'briefcase', 'hovercar', 'slots', 'plinko'].map(loadGlb));
+  const [gltf, sk, wr, ap, lt, cr, ga, di, en, bc, hc, sl, pk, cs] = await Promise.all(['ships', 'skimmer', 'warrig', 'apc', 'landtrain', 'crane', 'garage', 'dish', 'engine', 'briefcase', 'hovercar', 'slots', 'plinko', 'casino'].map(loadGlb));
   SHIP_PARTS = {};
   for (const name of ['shuttle', 'freighter']) {
     const root = gltf.scene.getObjectByName(name);
@@ -1421,6 +1423,12 @@ export async function loadShipParts() {
   const slot = sl.scene.getObjectByName('slot');
   if (!slot) throw new Error('slots.glb has no slot');
   SHIP_PARTS.slot = bakeShip(slot);
+  // the casino's lamp post, fountain, bouncer, chandelier and signs (tools/blender/build_casino.py)
+  for (const name of CASINO_PROPS) {
+    const root = cs.scene.getObjectByName(name);
+    if (!root) throw new Error('casino.glb has no ' + name);
+    SHIP_PARTS['casino_' + name] = bakeShip(root);
+  }
   // the radio-dish array stations and the field dish (tools/blender/build_dish.py)
   for (const kind of [...DISH_KINDS, DISH_FIELD, DISH_HEAD]) {
     const station = di.scene.getObjectByName('dish_' + kind);
@@ -2115,6 +2123,80 @@ export function makeSlotCabinet(color) {
     }
   }
   return { stat, dyn, pull, lamp, spots };
+}
+
+// ---- The casino's props (built in Blender, see build_casino.py) ----
+// Six models in one file, each a root of the baked tree: `lamp_post` (the boulevard's lamp, whose `accent` slot is the colour the game picks;
+// the plaza's ring of posts is the same one scaled down), `fountain` (the plaza basin, with the water in `water`, `curtain` and `streams`
+// pivots that fountainFx.js gives their shaders, and a `chip` pivot that spins), `bouncer` (a buff alien in a tux, a `head` pivot), `chandelier`
+// (a `spin` pivot), `welcome_sign` and `wall_sign` (a `face` pivot where the game puts its text plane).
+export const CASINO_PROPS = ['lamp_post', 'fountain', 'bouncer', 'chandelier', 'welcome_sign', 'wall_sign'];
+const CASINO_TOON = {
+  post: 0x2a1450, base: 0x3a3550, gold: 0xffd23f, dark: 0x120a1e, plum: 0x2a1450, cream: 0xd8d4e8, creamshade: 0xaaa6c0, floor: 0x7a93b0, chip: 0xff2e88, white: 0xfff4e0,
+  skin: 0xa58cff, skin2: 0x6c52c8, suit: 0x16121f, suit2: 0x2e2a40, shirt: 0xfff4e0, tie: 0xd7263d, tusk: 0xf2ecd8, shoe: 0x0c0a12,
+};
+const CASINO_GLOW = { neon: 0xff2e88, eye: 0xffe24a, crystalA: 0xff9fdc, crystalB: 0x9be7ff, bulb: 0xfff6a8 };
+const CASINO_WATER = new Set(['water', 'curtain', 'streams']); // (pivot roles dressed by fountainFx.js, not here)
+
+// The colour of a casino slot and whether it glows; `accent` is the one the caller picks (a lamp post's rings, lantern and small lamp).
+export function casinoSlot(slot, accent = 0xff2e88) {
+  if (slot === 'accent') return { color: accent, glow: true };
+  if (slot in CASINO_GLOW) return { color: CASINO_GLOW[slot], glow: true };
+  return { color: CASINO_TOON[slot] ?? 0xff00ff, glow: false };
+}
+export const casinoNode = (name) => SHIP_PARTS['casino_' + name];
+
+// A baked node as a Group: its meshes dressed by `matFor` with their outline shells, and a child Group for each pivot (at its place, named, its role
+// and extras in userData), except the fountain's water, which the caller dresses (fountainFx.js).
+function casinoGroup(node, matFor, accent) {
+  const g = new THREE.Group();
+  g.name = node.name;
+  g.position.copy(node.pos);
+  g.quaternion.copy(node.quat);
+  Object.assign(g.userData, node.data);
+  for (const { slot, geo } of node.parts) {
+    const c = casinoSlot(slot, accent);
+    const m = new THREE.Mesh(geo, matFor(c));
+    m.castShadow = !c.glow;
+    g.add(m);
+  }
+  if (node.ink) { const m = new THREE.Mesh(node.ink, inkMat); m.userData.isInk = true; g.add(m); }
+  for (const k of node.kids) if (!CASINO_WATER.has(k.role)) g.add(casinoGroup(k, matFor, accent));
+  return g;
+}
+const casinoMat = (c) => (c.glow ? glowShared(c.color) : toon(c.color));
+
+// A lamp post in `accent` (the boulevard's are pink and cyan in turn), 9 m tall with its small lamp toward +z.
+export const makeLampPost = (accent = 0xff2e88) => casinoGroup(casinoNode('lamp_post'), casinoMat, accent);
+
+// The door's bouncer, 2.5 m, facing +z: { root, head } (turn `head` to watch people).
+export function makeBouncer() {
+  const root = casinoGroup(casinoNode('bouncer'), casinoMat);
+  return { root, head: root.getObjectByName('head') };
+}
+
+// A hall chandelier, hanging from the ceiling 3.3 m above its centre: { root, spin } (turn `spin` about y).
+export function makeChandelier() {
+  const root = casinoGroup(casinoNode('chandelier'), casinoMat);
+  return { root, spin: root.getObjectByName('spin') };
+}
+
+// The hung welcome sign ('welcome_sign', 9.6 by 2.5 m, centred, chains 6.4 m up) or the blackjack wall sign ('wall_sign', 7.4 by 1.95 m, its back at
+// z = 0): { root, face } where `face` is { pos, w, h } for the text plane.
+export function makeCasinoSign(kind) {
+  const node = casinoNode(kind), root = casinoGroup(node, casinoMat);
+  const f = node.kids.find((k) => k.role === 'face');
+  return { root, face: { pos: f.pos, w: f.data.w, h: f.data.h } };
+}
+
+// The plaza fountain as plain meshes (the viewer's and the Asset Row's): { root, update(t, dt) }; the chip spins and the water runs with `t`.
+export function makeFountain() {
+  const node = casinoNode('fountain');
+  const root = casinoGroup(node, casinoMat);
+  const water = [];
+  for (const k of node.kids) if (CASINO_WATER.has(k.role)) { const m = waterMesh(k); root.add(m); water.push(m); }
+  const chip = root.getObjectByName('chip');
+  return { root, chip, update(t, dt = 0) { if (chip) chip.rotation.y += dt * (chip.userData.speed || 0.7); for (const m of water) m.userData.tick(m, dt, t); } };
 }
 
 // ---- The dish-array stations (built in Blender, see build_dish.py) ----
