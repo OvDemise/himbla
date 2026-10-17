@@ -721,6 +721,7 @@ src/
   chimera.js     gene splicing + procedural chimera models
   cheats.js      testing menu (backtick)
   devoverlay.js  dev overlay (F3): every on-screen dev readout in one panel (frame times, CPU / GPU graphs, CPU time by stage, draw calls, world counts, pirate spawns, AI paths, input monitor); perfgraph.js has its graphs
+  freecam.js     dev free cam (Dev menu → Debug overlay → FREE CAM): the camera flies on its own (mouse, WASD, wheel for speed) while the runner stands still and the game runs on
   story.js       faction leaders, chapters, outposts you found, tech, Captain Kade
   storyAssets.js faction troops, boss war machines, mission props, founded-outpost compounds
   hometown.js    your town (Kepler finale): its plots and buildings, the Moon Council and its votes
