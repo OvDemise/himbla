@@ -21,12 +21,12 @@ MOONRUNNER_REPO=. python3 tools/blender/build_crane.py    # -> src/assets/crane.
 MOONRUNNER_REPO=. python3 tools/blender/build_idles.py    # -> src/assets/idles.json
 ```
 
-Each run takes 1 to 3 s. Builders: runner, idles, ships, skimmer, warrig, apc, landtrain, crane, garage, slots, casino, blackjack, claw, dish,
+Each run takes 1 to 3 s. Builders: runner, idles, ships, skimmer, warrig, apc, landtrain, crane, garage, slots, casino, blackjack, claw, duck, dish,
 outposts. In the Blender app they run with `exec(open(r"<repo>/tools/blender/build_x.py").read())`.
 
 ## After a build
 
-1. `npm run optimize:glb` for the compressed models (ships, skimmer, warrig, apc, landtrain, crane, garage, slots, casino, blackjack, dish).
+1. `npm run optimize:glb` for the compressed models (ships, skimmer, warrig, apc, landtrain, crane, garage, slots, casino, blackjack, claw, duck, dish).
    `runner.glb` and `outposts.glb` stay plain. A build overwrites a compressed file with a plain one, so a
    model you did not change shows as modified if you rebuilt it: `git checkout` it.
 2. `npm run check:outposts` after touching outposts.

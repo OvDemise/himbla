@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { toon, ink, glow, glowShared, textSprite, nameTag } from './toon.js';
-import { makeFigure, makeSlotCabinet, SLOT_LAMP_OFF, plinkoConsoleModel, plinkoFrameModel, makeBouncer, makeChandelier, makeCasinoSign, makeBlackjackTable, makeClawMachine } from './models.js';
+import { makeFigure, makeSlotCabinet, SLOT_LAMP_OFF, plinkoConsoleModel, plinkoFrameModel, makeBouncer, makeChandelier, makeCasinoSign, makeBlackjackTable, makeClawMachine, makeDerbyPart, makeRacer } from './models.js';
 import { pxCanvas } from './pixelIcons.js';
 import { pixelFont } from './fonts.js';
 import { faceInfo, glyphState } from './glyphs.js';
@@ -235,14 +235,14 @@ function feltTex(R) {
   });
 }
 
-function checkerTex() {
+export function checkerTex() {
   return canvasTex(256, 64, (x, w, h) => {
     for (let i = 0; i < 16; i++) for (let j = 0; j < 4; j++) { x.fillStyle = (i + j) % 2 ? '#120a1e' : '#fff4e0'; x.fillRect(i * 16, j * 16, 16, 16); }
     void w; void h;
   });
 }
 
-function waterTex() {
+export function waterTex() {
   const t = canvasTex(128, 64, (x, w, h) => {
     x.fillStyle = '#1aa9d6'; x.fillRect(0, 0, w, h);
     x.strokeStyle = '#7fe8ff'; x.lineWidth = 5;
@@ -383,42 +383,9 @@ export function updateSlot(u, dt, time) {
   }
 }
 
-// A rubber duck, ~1.3 m long, facing +x.
-export function makeDuck(color, bill = 0xff9f1c) {
-  const root = new THREE.Group();
-  const bob = new THREE.Group();
-  root.add(bob);
-  const mat = toon(color);
-  const body = mesh(new THREE.SphereGeometry(0.55, 16, 12), mat, 0.05);
-  body.scale.set(1.25, 0.8, 0.95);
-  body.position.y = 0.35;
-  const tail = mesh(new THREE.ConeGeometry(0.25, 0.5, 8), mat, 0.04);
-  tail.rotation.z = Math.PI / 2 + 0.7;
-  tail.position.set(-0.68, 0.62, 0);
-  const head = mesh(new THREE.SphereGeometry(0.36, 14, 12), mat, 0.05);
-  head.position.set(0.42, 1.0, 0);
-  const beak = mesh(new THREE.ConeGeometry(0.15, 0.4, 8), toon(bill), 0.03);
-  beak.rotation.z = -Math.PI / 2;
-  beak.scale.set(1, 1, 0.55);
-  beak.position.set(0.86, 0.94, 0);
-  bob.add(body, tail, head, beak);
-  for (const s of [-1, 1]) {
-    const eye = new THREE.Mesh(new THREE.SphereGeometry(0.09, 8, 6), toon(0x120a1e));
-    eye.position.set(0.66, 1.1, s * 0.18);
-    const shine = new THREE.Mesh(new THREE.SphereGeometry(0.035, 6, 4), glow(0xffffff));
-    shine.position.set(0.73, 1.14, s * 0.2);
-    bob.add(eye, shine);
-  }
-  const wingMat = toon(new THREE.Color(color).multiplyScalar(0.85).getHex());
-  const wings = [];
-  for (const s of [-1, 1]) {
-    const wing = mesh(new THREE.SphereGeometry(0.3, 10, 8), wingMat, 0.03);
-    wing.scale.set(1.3, 0.5, 0.35);
-    wing.position.set(-0.05, 0.5, s * 0.5);
-    bob.add(wing);
-    wings.push(wing);
-  }
-  return { root, bob, head, wings };
+// A racing duck, ~1.3 m long, facing +x (tools/blender/build_duck.py): { root, bob, head, wings }. `n` picks which of the four (1 QUACKERS, 2 SIR WADDLES, 3 DUCKTOR WHO, 4 MOONBILL).
+export function makeDuck(color, bill = 0xff9f1c, n = 1) {
+  return makeRacer(n, color, bill);
 }
 
 // ---- layout (casino local frame; the facade faces +z) ----
@@ -766,81 +733,94 @@ export function buildCasino(w, loc) {
   // patrons come to watch (and shake their heads)
   for (const dx of [-4.8, 3.6, 7.2]) yardSpots.push({ kind: 'watch', x: CLAW.x + dx, z: CLAW.z - 7.4, ax: CLAW.x + dx, az: CLAW.z - 7.4, look: [CLAW.x + dx, CLAW.z - 3], yaw: Math.PI, busy: false });
 
-  // ---------- DUCK DERBY TRACK ----------
+  // ---------- DUCK DERBY TRACK (tools/blender/build_duck.py): a gilded basin with lane floats, a brass start gate, a finish arch with a photo-finish camera, the odds board's frame,
+  // a bookmaker's kiosk and a velvet-roped brass rail. The game gives the pieces their pictures: the water, the lane numbers, the finish line, the banner, the board and the screen. ----------
   const L0 = DUCK.x0 - 2, L1 = DUCK.x1 + 2;
   const tlen = L1 - L0, tcx = (L0 + L1) / 2;
   const lz0 = DUCK.lanes[0] + 0.95, lz1 = DUCK.lanes[3] - 0.95, tcz = (lz0 + lz1) / 2, tdep = lz0 - lz1;
-  put(mesh(new THREE.BoxGeometry(tlen, 0.8, tdep), toon(0x3a3550), 0.1), tcx, tcz, 0.4);
-  col({ type: 'box', x: tcx, y: 1.1, z: tcz, hx: tlen / 2, hy: 1.1, hz: tdep / 2 + 0.6 });
+  const trough = makeDerbyPart('dd_trough');
+  put(trough, tcx, tcz, 0);
+  col({ type: 'box', x: tcx, y: 1.1, z: tcz, hx: tlen / 2 + 0.3, hy: 1.1, hz: tdep / 2 + 0.6 });
   const water = waterTex();
   const waterMat = new THREE.MeshBasicMaterial({ map: water });
   const laneCols = [0xffd23f, 0xff2e88, 0x2ee6ff, 0x7dff6a];
-  DUCK.lanes.forEach((z, i) => {
-    const wm = new THREE.Mesh(new THREE.PlaneGeometry(tlen - 0.4, 1.3), waterMat);
-    wm.rotation.x = -Math.PI / 2;
-    put(wm, tcx, z, DUCK.water);
-    // lane number at the start, coloured
-    const num = new THREE.Mesh(new THREE.PlaneGeometry(0.9, 0.9), new THREE.MeshBasicMaterial({ map: canvasTex(64, 64, (x) => {
-      x.fillStyle = '#' + laneCols[i].toString(16).padStart(6, '0'); x.beginPath(); x.arc(32, 32, 30, 0, Math.PI * 2); x.fill();
+  const flat = (geo, mat, p) => { const m = new THREE.Mesh(geo, mat); m.rotation.x = -Math.PI / 2; put(m, tcx + p.x, tcz + p.z, p.y); return m; };
+  laneCols.forEach((c, i) => {
+    const wp = trough.getObjectByName('water' + (i + 1)), np = trough.getObjectByName('num' + (i + 1));
+    flat(new THREE.PlaneGeometry(wp.userData.w, wp.userData.h), waterMat, wp.position);
+    flat(new THREE.PlaneGeometry(0.9, 0.9), new THREE.MeshBasicMaterial({ map: canvasTex(64, 64, (x) => {
+      x.fillStyle = '#' + c.toString(16).padStart(6, '0'); x.beginPath(); x.arc(32, 32, 30, 0, Math.PI * 2); x.fill();
       x.fillStyle = '#120a1e'; x.font = FONT(44); x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText(String(i + 1), 32, 35);
-    }) }));
-    num.rotation.x = -Math.PI / 2;
-    put(num, L0 + 0.7, z, DUCK.water + 0.02);
+    }) }), np.position);
   });
-  for (let i = 0; i <= 4; i++) {
-    const z = DUCK.lanes[0] + 0.8 - i * 1.6;
-    put(new THREE.Mesh(new THREE.BoxGeometry(tlen, 0.22, 0.2), i % 4 === 0 ? toon(0xffd23f) : toon(0xfff4e0)), tcx, z, 0.95);
+  const checker = new THREE.MeshBasicMaterial({ map: checkerTex(), side: THREE.DoubleSide });
+  const fl = trough.getObjectByName('finishLine');
+  flat(new THREE.PlaneGeometry(fl.userData.w, fl.userData.h), checker, fl.position);
+  // the front rail: a brass post every 3.5 m along the player's side with a velvet rope between
+  const railZ = lz0 + 0.55;
+  for (let x = L0, k = 0; k <= 8; x += 3.5, k++) {
+    put(makeDerbyPart('dd_railpost'), x, railZ, 0);
+    if (k < 8) put(makeDerbyPart('dd_rope'), x, railZ, 0);
   }
-  // front rail with posts, so you watch from the carpet
-  const railZ = lz0 + 0.5;
-  put(mesh(new THREE.BoxGeometry(tlen, 0.16, 0.16), toon(0xffd23f), 0.03), tcx, railZ, 1.5);
-  for (let x = L0; x <= L1 + 0.01; x += 2) put(new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, 1.5, 5), toon(0xffd23f)), x, railZ, 0.75);
-  // start gate + finish arch with a checkered banner
-  const gate = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.9, tdep), toon(0xd7263d));
-  ink(gate, 0.04);
+  // the start gate: the frame stands, the brass grille is what lifts; three lamps count the start down (a lit disc each side of each lens)
+  const gate = makeDerbyPart('dd_grille');
   put(gate, DUCK.x0 - 0.9, tcz, 1.35, 0, true);
-  const checker = new THREE.MeshBasicMaterial({ map: checkerTex() });
-  for (const z of [lz0 + 0.2, lz1 - 0.2]) put(mesh(new THREE.BoxGeometry(0.4, 5.5, 0.4), toon(0xfff4e0), 0.04), DUCK.x1, z, 2.75);
-  const banner = new THREE.Mesh(new THREE.BoxGeometry(0.3, 1, tdep + 0.8), [checker, checker, toon(0x120a1e), toon(0x120a1e), checker, checker]);
-  put(banner, DUCK.x1, tcz, 5.2);
-  const finLine = new THREE.Mesh(new THREE.PlaneGeometry(0.5, tdep), checker);
-  finLine.rotation.x = -Math.PI / 2;
-  put(finLine, DUCK.x1, tcz, DUCK.water + 0.03);
+  const gateFrame = makeDerbyPart('dd_gate');
+  put(gateFrame, DUCK.x0 - 0.9, tcz, 0);
+  const lamps = [0xff2a4a, 0xff9f1c, 0x7dff6a].map((c, k) => {
+    const mat = new THREE.MeshBasicMaterial({ color: new THREE.Color(c).multiplyScalar(0.22) });
+    const lp = gateFrame.getObjectByName('lamp' + (k + 1));
+    for (const sx of [-1, 1]) {
+      const d = new THREE.Mesh(new THREE.CylinderGeometry(0.19, 0.19, 0.03, 14), mat);
+      d.rotation.z = Math.PI / 2;
+      put(d, DUCK.x0 - 0.9 + sx * lp.position.x, tcz + lp.position.z, lp.position.y, 0, true);
+    }
+    return { mat, color: new THREE.Color(c) };
+  });
+  const startPlate = gateFrame.getObjectByName('startSign');
+  for (const sx of [-1, 1]) {
+    const sp = new THREE.Mesh(new THREE.PlaneGeometry(startPlate.userData.w, startPlate.userData.h), new THREE.MeshBasicMaterial({ map: canvasTex(256, 64, (x, pw, ph) => {
+      x.fillStyle = '#120a1e'; x.fillRect(0, 0, pw, ph); x.fillStyle = '#ffd23f'; x.font = FONT(40); x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText('START', pw / 2, ph / 2 + 2);
+    }) }));
+    sp.rotation.y = sx * Math.PI / 2;
+    put(sp, DUCK.x0 - 0.9 + sx * (startPlate.position.x + 0.01), tcz + startPlate.position.z, startPlate.position.y);
+  }
+  // the finish arch, its banner (the checker both ways) and the finish line
+  const arch = makeDerbyPart('dd_finish');
+  put(arch, DUCK.x1, tcz, 0);
+  const bn = arch.getObjectByName('banner');
+  const banner = new THREE.Mesh(new THREE.PlaneGeometry(bn.userData.w, bn.userData.h), checker);
+  banner.rotation.y = Math.PI / 2;
+  put(banner, DUCK.x1, tcz, bn.position.y);
   const ducks = laneCols.map((c, i) => {
-    const d = makeDuck(c, i === 0 ? 0xff5a1f : 0xff9f1c);
+    const d = makeDuck(c, i === 0 ? 0xff5a1f : 0xff9f1c, i + 1);
     put(d.root, DUCK.x0, DUCK.lanes[i], DUCK.water - 0.25, 0, true);
     return d;
   });
-  // odds board on the back wall
+  // the winner's cup, at the finish end of the rail
+  put(makeDerbyPart('dd_trophy'), DUCK.x1 + 2.6, lz0 + 1.2, 0);
+  col({ type: 'box', x: DUCK.x1 + 2.6, y: 1.2, z: lz0 + 1.2, hx: 0.75, hy: 1.2, hz: 0.75 });
+  // odds board on the back wall: its gilded frame (the Blender model faces +x, turned to face the hall) and the plane the game paints
   const oddsCanvas = document.createElement('canvas');
   oddsCanvas.width = 1024; oddsCanvas.height = 384;
   const oddsTex = new THREE.CanvasTexture(oddsCanvas);
   oddsTex.colorSpace = THREE.SRGBColorSpace;
-  // sits clearly in front of its frame (it used to share the frame's front face and z-fought)
-  const oddsBoard = new THREE.Mesh(new THREE.PlaneGeometry(16, 6), new THREE.MeshBasicMaterial({ map: oddsTex, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }));
-  put(oddsBoard, tcx, BACK + 1.3, 8.4);
-  put(mesh(new THREE.BoxGeometry(16.6, 6.6, 0.3), toon(0xffd23f), 0.05), tcx, BACK + 1.0, 8.4);
-  // betting kiosk
-  const kiosk = new THREE.Group();
-  const kb = mesh(new THREE.BoxGeometry(2.6, 1.3, 1.2), toon(0xffd23f), 0.06);
-  kb.position.y = 0.65;
-  const kt = mesh(new THREE.BoxGeometry(2.8, 0.18, 1.4), toon(0xff2e88), 0.04);
-  kt.position.y = 1.38;
-  const kscr = new THREE.Mesh(new THREE.PlaneGeometry(2.4, 1.2), new THREE.MeshBasicMaterial({ map: neonTex('DUCK DERBY', { w: 512, h: 256, color: '#ffd23f', edge: '#2ee6ff', sub: '{F} · PICK A DUCK' }) }));
+  const board = makeDerbyPart('dd_board');
+  put(board, tcx, BACK + 1.0, 8.4, -Math.PI / 2);
+  const oddsFace = board.getObjectByName('face');
+  // (clearly in front of its frame: it used to share the frame's front face and z-fought)
+  const oddsBoard = new THREE.Mesh(new THREE.PlaneGeometry(oddsFace.userData.w, oddsFace.userData.h), new THREE.MeshBasicMaterial({ map: oddsTex, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }));
+  put(oddsBoard, tcx, BACK + 1.0 + oddsFace.position.x, 8.4);
+  // betting kiosk: a bookmaker's window with its screen, a button in each duck's colour on the counter
+  const kiosk = makeDerbyPart('dd_kiosk');
+  const ksp = kiosk.getObjectByName('screen');
+  const kscr = new THREE.Mesh(new THREE.PlaneGeometry(ksp.userData.w, ksp.userData.h), new THREE.MeshBasicMaterial({ map: neonTex('DUCK DERBY', { w: 512, h: 256, color: '#ffd23f', edge: '#2ee6ff', sub: '{F} · PICK A DUCK' }) }));
   padSign(kscr, 'DUCK DERBY', { w: 512, h: 256, color: '#ffd23f', edge: '#2ee6ff', sub: '{F} · PICK A DUCK' });
-  kscr.position.set(0, 2.35, -0.25);
-  kscr.rotation.x = -0.25;
-  const kpost = mesh(new THREE.BoxGeometry(2.6, 1.5, 0.2), toon(0x2a1450), 0.04);
-  kpost.position.set(0, 2.3, -0.4);
-  kpost.rotation.x = -0.25;
-  kiosk.add(kb, kt, kpost, kscr);
-  laneCols.forEach((c, i) => {
-    const b = new THREE.Mesh(new THREE.CylinderGeometry(0.17, 0.17, 0.12, 12), glow(c));
-    b.position.set(-0.75 + i * 0.5, 1.5, 0.15);
-    kiosk.add(b);
-  });
+  kscr.position.copy(ksp.position);
+  kscr.position.z += 0.02;
+  kiosk.add(kscr);
   put(kiosk, DUCK.kiosk[0], DUCK.kiosk[1], 0, 0);
-  col({ type: 'box', x: DUCK.kiosk[0], y: 0.8, z: DUCK.kiosk[1], hx: 1.4, hy: 0.8, hz: 0.7 });
+  col({ type: 'box', x: DUCK.kiosk[0], y: 0.9, z: DUCK.kiosk[1] - 0.1, hx: 1.5, hy: 0.9, hz: 0.85 });
 
   // ---------- PLINKO ----------
   const P = PLK;
@@ -1175,7 +1155,7 @@ export function buildCasino(w, loc) {
     toLocal: (p, out = new THREE.Vector3()) => loc.group.worldToLocal(out.copy(p)),
     bj: { group: bj, dealer },
     claw: { dyn: clawDyn, spots: cm.spots },
-    duck: { ducks, gate, water, oddsCanvas, oddsTex, crowd },
+    duck: { ducks, gate, lamps, water, oddsCanvas, oddsTex, crowd },
     plinko: { pegs, pegBase, slotMats, aim },
     crowd,
     onUpdate: null, // set by the game logic (casinoGames.js)

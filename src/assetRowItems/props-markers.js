@@ -4,11 +4,11 @@ import { seat, hexOf } from './props-util.js';
 import { toon, glow, ink, inkMat, textSprite } from '../toon.js';
 import { mulberry32 } from '../rng.js';
 import { FACTIONS, CARGO, MIL_CARGO } from '../locations.js';
-import { makeCrate, makeSeismo, makeTube, makePylon, makeDish, makeTurret, makeRocket, engineModel, caseModel, plinkoConsoleModel, plinkoFrameModel, makeLampPost, makeFountain, makeChandelier, makeCasinoSign, makeChipStack, makeClawMachine, makeClawHead, clawKindParts, clawLit } from '../models.js';
+import { makeCrate, makeSeismo, makeTube, makePylon, makeDish, makeTurret, makeRocket, engineModel, caseModel, plinkoConsoleModel, plinkoFrameModel, makeLampPost, makeFountain, makeChandelier, makeCasinoSign, makeChipStack, makeClawMachine, makeClawHead, clawKindParts, clawLit, makeDerbyPart } from '../models.js';
 import { makeProp } from '../storyAssets.js';
 import { makeStretcher } from '../medevac.js';
 import { makeLoot } from '../alchemy.js';
-import { slotCabinet, updateSlot, blackjackTable, PLK, canvasTex, FONT } from '../casinoWorld.js';
+import { slotCabinet, updateSlot, blackjackTable, PLK, canvasTex, FONT, makeDuck, waterTex, checkerTex, DUCK } from '../casinoWorld.js';
 import { ClawSim, KINDS } from '../clawSim.js';
 import { ClawView } from '../clawView.js';
 import { SLOTS, SPACING, DROP_Y } from '../plinko.js';
@@ -499,6 +499,46 @@ function clawThings() {
   return { root: lineUp(parts, 0.5).root };
 }
 
+// ---- the casino's Duck Derby (duck.glb, tools/blender/build_duck.py): the whole track as the hall has it, with the water, lane numbers, banner, odds board and kiosk screen
+// painted on, the four racers at the gate (their number discs on their wings), the front rail along the near side and the winner's cup ----
+function duckDerby() {
+  const root = new THREE.Group(), PI = Math.PI;
+  const at = (o, x, y, z, ry = 0) => { o.position.set(x, y, z); o.rotation.y = ry; root.add(o); return o; };
+  const trough = at(makeDerbyPart('dd_trough'), 0, 0, 0);
+  const waterMat = new THREE.MeshBasicMaterial({ map: waterTex() }), checker = new THREE.MeshBasicMaterial({ map: checkerTex(), side: THREE.DoubleSide });
+  const lanes = [0xffd23f, 0xff2e88, 0x2ee6ff, 0x7dff6a];
+  const flat = (geo, mat, p) => { const m = new THREE.Mesh(geo, mat); m.rotation.x = -PI / 2; m.position.copy(p); root.add(m); };
+  lanes.forEach((c, i) => {
+    const wp = trough.getObjectByName('water' + (i + 1)), np = trough.getObjectByName('num' + (i + 1));
+    flat(new THREE.PlaneGeometry(wp.userData.w, wp.userData.h), waterMat, wp.position);
+    flat(new THREE.PlaneGeometry(0.9, 0.9), new THREE.MeshBasicMaterial({ map: canvasTex(64, 64, (x) => { x.fillStyle = '#' + c.toString(16).padStart(6, '0'); x.beginPath(); x.arc(32, 32, 30, 0, PI * 2); x.fill(); x.fillStyle = '#120a1e'; x.font = FONT(44); x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText(String(i + 1), 32, 35); }) }), np.position);
+  });
+  const fl = trough.getObjectByName('finishLine');
+  flat(new THREE.PlaneGeometry(fl.userData.w, fl.userData.h), checker, fl.position);
+  const gx = DUCK.x0 - 0.9 - (DUCK.x0 + DUCK.x1) / 2, fx = DUCK.x1 - (DUCK.x0 + DUCK.x1) / 2;   // (the gate and the finish, in the track's own frame)
+  at(makeDerbyPart('dd_gate'), gx, 0, 0);
+  at(makeDerbyPart('dd_grille'), gx, 3.4, 0);
+  const arch = at(makeDerbyPart('dd_finish'), fx, 0, 0);
+  const bn = arch.getObjectByName('banner'), banner = new THREE.Mesh(new THREE.PlaneGeometry(bn.userData.w, bn.userData.h), checker);
+  banner.rotation.y = PI / 2; banner.position.set(fx, bn.position.y, 0); root.add(banner);
+  lanes.forEach((c, i) => { const d = makeDuck(c, i === 0 ? 0xff5a1f : 0xff9f1c, i + 1); d.root.position.set(DUCK.x0 - (DUCK.x0 + DUCK.x1) / 2 + 1 + i * 0, 0.61, [2.4, 0.8, -0.8, -2.4][i]); root.add(d.root); });
+  for (let k = 0; k <= 8; k++) { const x = -14 + k * 3.5; at(makeDerbyPart('dd_railpost'), x, 0, 3.95); if (k < 8) at(makeDerbyPart('dd_rope'), x, 0, 3.95); }
+  at(makeDerbyPart('dd_trophy'), 14.6, 0, 5.0);
+  const board = at(makeDerbyPart('dd_board'), 0, 8.4, -8.8, -PI / 2);
+  const face = board.getObjectByName('face');
+  const bp = new THREE.Mesh(new THREE.PlaneGeometry(face.userData.w, face.userData.h), new THREE.MeshBasicMaterial({ map: canvasTex(1024, 384, (x, w, h) => {
+    x.fillStyle = '#05030c'; x.fillRect(0, 0, w, h); x.fillStyle = '#ffd23f'; x.font = FONT(70); x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText('DUCK DERBY', w / 2, 60);
+    ['QUACKERS', 'SIR WADDLES', 'DUCKTOR WHO', 'MOONBILL'].forEach((n, i) => { const y = 170 + i * 52; x.fillStyle = '#' + lanes[i].toString(16).padStart(6, '0'); x.beginPath(); x.arc(110, y, 18, 0, PI * 2); x.fill(); x.fillStyle = '#fff4e0'; x.font = FONT(36); x.textAlign = 'left'; x.fillText(n, 160, y + 2); });
+  }) }));
+  bp.position.set(0, 8.4, -8.8 + face.position.x);
+  root.add(bp);
+  const kiosk = at(makeDerbyPart('dd_kiosk'), 0, 0, 6.5);
+  const ks = kiosk.getObjectByName('screen');
+  const kp = new THREE.Mesh(new THREE.PlaneGeometry(ks.userData.w, ks.userData.h), new THREE.MeshBasicMaterial({ map: canvasTex(512, 256, (x, w, h) => { x.fillStyle = '#120a1e'; x.fillRect(0, 0, w, h); x.strokeStyle = '#2ee6ff'; x.lineWidth = 8; x.strokeRect(6, 6, w - 12, h - 12); x.fillStyle = '#ffd23f'; x.font = FONT(64); x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText('DUCK DERBY', w / 2, h * 0.4); x.fillStyle = '#fff4e0'; x.font = FONT(30); x.fillText('F · PICK A DUCK', w / 2, h * 0.75); }) }));
+  kp.position.copy(ks.position); kp.position.z += 0.02; kiosk.add(kp);
+  return { root };
+}
+
 export default {
   id: 'props.markers',
   title: '04 · PROPS & MARKERS',
@@ -510,6 +550,7 @@ export default {
     { id: 'prop.seismograph', label: 'SEISMOGRAPH', w: 2, d: 2.2, make: seismograph },
     { id: 'prop.vacuum-tube', label: 'VACUUM TUBES', w: 6, d: 1.3, make: tubes },
     { id: 'prop.casino-props', label: 'CASINO LAMPS · FOUNTAIN · CHANDELIER · SIGNS', w: 68, d: 21, make: casinoProps },
+    { id: 'prop.duck-derby', label: 'DUCK DERBY TRACK · RACERS · KIOSK · BOARD', w: 31, d: 21, make: duckDerby },
     { id: 'prop.blackjack', label: 'BLACKJACK TABLE · CHIPS', w: 14.4, d: 7, make: blackjack },
     { id: 'prop.claw-machine', label: 'ZERO-G CLAW MACHINE', w: 17, d: 8, make: clawMachine },
     { id: 'prop.claw-things', label: 'CLAW TANK: THINGS · CLAW', w: 41, d: 3, make: clawThings },

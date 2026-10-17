@@ -633,9 +633,13 @@ export class CasinoGames {
     d.acc = 0;
     d.msg = 'PICK A DUCK (1–4), SET YOUR BET, RACE!';
     this.cw.duck.gate.position.y = 1.35;
+    this.derbyLamps(0);
     this.cw.duck.ducks.forEach((q, i) => { q.root.position.set(DUCK.x0, DUCK.water - 0.25, DUCK.lanes[i]); q.root.rotation.set(0, 0, 0); });
     this.drawOddsBoard();
   }
+
+  // the start gate's three lamps: the first n are lit (red, amber, green)
+  derbyLamps(n) { this.cw.duck.lamps.forEach((l, k) => l.mat.color.copy(l.color).multiplyScalar(k < n ? 1 : 0.22)); }
 
   pickDuck(i) {
     if (this.dk.phase === 'race') return;
@@ -662,7 +666,7 @@ export class CasinoGames {
     d.phase = 'count';
     d.msg = `₵${fmt(bet)} ON #${d.pick + 1} ${DUCKS[d.pick].name} AT ×${d.odds[d.pick]}`;
     const cx = (DUCK.x0 + DUCK.x1) / 2;
-    ['3', '2', '1'].forEach((t, i) => this.after(i * 0.6, () => { this.popAt(t, DUCK.x0 + 3, 3.2, DUCK.lanes[1], { color: '#fff4e0', size: 90, life: 0.6, prio: 1 }); this.audio.tone(440, 0.15, 'square', 0.12); }));
+    ['3', '2', '1'].forEach((t, i) => this.after(i * 0.6, () => { this.derbyLamps(i + 1); this.popAt(t, DUCK.x0 + 3, 3.2, DUCK.lanes[1], { color: '#fff4e0', size: 90, life: 0.6, prio: 1 }); this.audio.tone(440, 0.15, 'square', 0.12); }));
     this.after(1.8, () => {
       d.phase = 'race';
       d.t = 0;
