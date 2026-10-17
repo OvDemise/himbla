@@ -507,6 +507,10 @@ export class Traffic {
     // where people step off the stairs: their walks to buildings start here
     stop.origin = { x: st.out.x, z: st.out.z };
     stop.world = this.w.toWorld(loc, pick.x, top, pick.z);
+    // the way a flyer faces once it is down: nose away from the stairs, so its ramp (at the tail) comes down toward them
+    const head = this.w.toWorld(loc, st.head.x, top, st.head.z), up = stop.world.clone().normalize();
+    stop.land = stop.world.clone().sub(head);
+    stop.land.addScaledVector(up, -stop.land.dot(up)).normalize();
     this.stops.push(stop);
     return stop;
   }
@@ -547,6 +551,8 @@ export class Traffic {
     };
     const e = v.root.worldToLocal(this.w.toWorld(loc, S.edge.x, S.edge.y, S.edge.z, _b));
     const side = e.x >= 0 ? 1 : -1, W = (M.deck ? M.deck[0] : 3) + 2.4, zb = M.rampBottom.z;
+    // (landed the way it should, the ramp comes down toward the stairs: straight there, nothing to walk round)
+    if (e.z < zb + 1 && Math.abs(e.x) < 3) return [];
     const pts = [toLoc(side * W, zb * 0.85)];
     // along the hull to level with the stairs (if they are forward of the ramp: they usually are, the ramp faces out)
     if (e.z > zb * 0.85 + 2) pts.push(toLoc(side * W, Math.min(e.z, -zb * 0.6)));
@@ -639,6 +645,7 @@ export class Traffic {
     v.heading.addScaledVector(up, -v.heading.dot(up));
     if (v.heading.lengthSq() < 1e-6) v.heading.set(1, 0, 0);
     v.heading.normalize();
+    if (v.stop && v.stop.land) v.heading.copy(v.stop.land); // (parked: as it would have landed, ramp toward the stairs)
     frameQuat(up, v.heading, model.root.quaternion);
     model.root.position.copy(v.pos);
     v.fwd.copy(v.heading);
@@ -2099,7 +2106,10 @@ export class Traffic {
     let down = [];
     if (stop.kind === 'pad' && stop.stairs) {
       const S = stop.stairs;
-      down = [...this.deckRoute(v, stop), { ...S.edge, g: false }, { ...S.head, g: false }, { ...S.foot, g: false }];
+      const around = this.deckRoute(v, stop);
+      // (the deck-edge point only if it lies between the ramp's foot and the stairs, not behind the foot)
+      const bottom = door[door.length - 1], past = Math.hypot(bottom.x - stop.x, bottom.z - stop.z) > stop.padR - 1.6;
+      down = [...around, ...(around.length || !past ? [{ ...S.edge, g: false }] : []), { ...S.head, g: false }, { ...S.foot, g: false }];
     }
     const doors = this.doorsFor(stop);
     const nOff = v.pax[0] + Math.floor(Math.random() * (v.pax[1] - v.pax[0] + 1));
@@ -2428,8 +2438,10 @@ export class Traffic {
       const near = v.kind === 'ship' ? 90 : 40;
       lift = v.state === 'park' ? 0 : clamp01(1.25 - d / near);
       main = v.state === 'park' ? 0 : 0.25 + 0.75 * clamp01(sp / v.vmax);
-      // heading follows the route a little ahead; never swing round while still low over the pad
-      if (dS > v.turnMin) {
+      // heading follows the route a little ahead; never swing round while still low over the pad it left. On the way down onto a pad it
+      // swings round to land with its ramp toward the pad's stairs (stop.land)
+      if (dE < (v.kind === 'ship' ? 150 : 70) && dest.land) v.heading.copy(dest.land);
+      else if (dS > v.turnMin) {
         sample(path, v.s + v.dir * 30, _a, v.ahint);
         _a.sub(v.pos);
         const up = _u.copy(v.pos).normalize();
