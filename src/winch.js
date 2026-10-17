@@ -42,6 +42,7 @@ const REEL_DEC = 5;      // m/s²: and winds down, so it eases to a stop at REST
 const PULL_ACC = 14;     // m/s²: the most the cable tugs you up to the drum's speed
 const LEAD = 0.6;        // the drum never gets further than this ahead of you (so a blocked pull doesn't snap)
 const PICK_EVERY = 0.1;  // seconds between targeting scans
+const AIM_W = 12;        // targeting score lost per radian the target is off the reticle (distance counts for little beside it)
 const MIN_COS = 0.35;    // how far off the reticle a target can be (cosine of the angle)
 const MIN_GAP = 4;       // too close to hook
 const MIN_STRUCT_R = 2.5; // (smaller colliders are props and rocks, not structures)
@@ -542,8 +543,11 @@ export class Winch {
       const dE = _to.length() || 1e-6;
       const cos = _to.divideScalar(dE).dot(look);
       if (cos < MIN_COS) return;
+      // The reticle rules. Under it: that surface, the nearest of them. Off it: whatever it points nearest, weighted by how far
+      // off it is (an angle, so 1 degree costs the same near or far) with distance only a tiebreak. A target 5 degrees
+      // off the reticle beats a closer one 10 degrees off, and anything under the reticle beats everything that is not.
       const sticky = prev && (col ? prev.col === col : T.obj === prev.obj) ? 0.6 : 0;
-      const score = (looked ? 10 : cos * 4) - dP / RANGE + sticky;
+      const score = looked ? 10 - dP / RANGE + sticky : 6 - Math.acos(Math.min(1, cos)) * AIM_W - dP / RANGE * 0.3 + sticky;
       if (best.length >= 4 && score <= best[3].score) return;
       best.push({ T, col, looked, dP, score, point: _pt.clone(), nrm: nrm.clone() });
       best.sort((p, q) => q.score - p.score);
@@ -561,7 +565,14 @@ export class Winch {
       if (c.mid.distanceTo(P.pos) - c.br > RANGE) continue;
       const t = rayCollider(c, eye, look, RANGE + 80);
       const looked = t < Infinity;
-      if (looked) { _pt.copy(look).multiplyScalar(t).add(eye); colliderPoint(c, _pt, _wp, _nv); _nv.normalize(); } else colliderPoint(c, eye, _pt, _nv);
+      if (looked) { _pt.copy(look).multiplyScalar(t).add(eye); colliderPoint(c, _pt, _wp, _nv); _nv.normalize(); } else {
+        // the spot on its surface nearest the reticle's line (not nearest the eye: for a tower that is its foot, nowhere near where you are aiming)
+        let u = Math.min(Math.max(_wp.copy(c.mid).sub(eye).dot(look), 0), RANGE + 80);
+        for (let i = 0; i < 4; i++) {
+          colliderPoint(c, _wp.copy(look).multiplyScalar(u).add(eye), _pt, _nv);
+          u = Math.min(Math.max(_wp.copy(_pt).sub(eye).dot(look), 0), RANGE + 80);
+        }
+      }
       offer(null, c, looked, _nv);
     }
     for (const b of best) {
