@@ -179,9 +179,22 @@ button { font-family: var(--comic); }
 #input-mon .im-meter { fill: #e3e6ee; stroke: #aab1c3; stroke-width: 4; }
 #input-mon .im-meter-fill { fill: #3fd15f; }
 #input-mon .im-meter-t { fill: #1c2030; text-anchor: middle; dominant-baseline: central; font-family: monospace; font-weight: bold; }
-#grab { position: absolute; top: 60%; left: 50%; transform: translateX(-50%); width: 360px; text-align: center; }
-.grab-label { font-family: var(--comic); font-size: 12px; line-height: 1.4; color: var(--green); text-shadow: 2px 2px 0 #05030c; margin-bottom: 6px; animation: blink 0.3s steps(2) infinite; }
-#grab .fill { background: var(--green); width: 0; }
+/* ---- progress bars over the picture: the story's hold meter (story.js), hold-to-recall / empty the jar (hud.js recallHold) and the pirate grab ----
+   One stack at the bottom centre, under the prompt, so they stay off the runner and the crosshair; each is a panel like the rest of the HUD in its own
+   colour (--col), and two at once sit one above the other instead of on top of each other. */
+#holdbars { position: absolute; left: 50%; bottom: 16px; transform: translateX(-50%); width: min(360px, calc(100vw - 32px)); display: flex; flex-direction: column-reverse; gap: 8px; pointer-events: none; z-index: 30; }
+#holdbars > * { box-sizing: border-box; padding: 8px 12px 9px; text-align: center; background: var(--ui-bg); border: 2px solid var(--col, var(--ui-edge)); box-shadow: 0 0 0 2px #05030c, var(--ui-shadow); }
+#holdbars .hb-label { font-family: var(--comic); font-size: 10px; line-height: 1.4; color: var(--col, var(--ui-text)); margin-bottom: 7px; }
+#holdbars .hb-track { height: 12px; background: var(--ui-bg2); border: 2px solid var(--ui-edge); overflow: hidden; }
+#holdbars .hb-fill { height: 100%; width: 0; background: var(--col, var(--cyan)); transition: width 0.1s linear; }
+#storymeter { display: none; }
+#storymeter.on { display: block; animation: hbin 0.15s ease-out; }
+#recallhold { --col: var(--cyan); display: none; }
+#recallhold.show { display: block; }
+#grab { --col: var(--green); }
+#grab .grab-label { animation: blink 0.3s steps(2) infinite; }
+@keyframes hbin { from { opacity: 0; } to { opacity: 1; } }
+@media (max-width: 860px) { #holdbars { left: calc(50% + 80px); width: min(320px, calc(100vw - 300px)); } } /* (clear of the speedometer, which is scaled down but still on the left) */
 
 #banner { position: absolute; top: 22%; left: 50%; transform: translateX(-50%); text-align: center; width: min(760px, calc(100vw - 32px)); }
 #banner.slam { animation: slam 0.45s cubic-bezier(.2,1.4,.4,1); }
@@ -761,6 +774,8 @@ body.council #hud > *:not(#popups):not(#cinebars) { visibility: hidden; } /* (ju
 body.in-casino #hud > :not(#popups):not(#prompt):not(#toast):not(#splash):not(#dilate) { display: none !important; }
 /* seated at blackjack, the Duck Derby or Plinko: only the game's bar and its pop-ups (wins, QUACK!) stay up */
 body.seated #hud > :not(#popups) { display: none !important; }
+/* seated on the funpark's carousel or ferris wheel (rides.js): sightseeing, so no HUD; the prompt stays to say how to hop off, and the pop-ups (WHEEE!) */
+body.on-ride #hud > :not(#popups):not(#prompt):not(#splash):not(#dilate) { display: none !important; }
 #cas3d .c3-head { display: flex; align-items: center; gap: 12px; font-family: var(--comic); font-size: 11px; line-height: 1.4; border-bottom: 2px solid var(--ui-edge); padding-bottom: 6px; flex-wrap: wrap; }
 #cas3d .c3-title { color: var(--yellow); font-size: 14px; font-weight: normal; }
 #cas3d .c3-cred { margin-left: auto; color: #05030c; background: var(--yellow); padding: 3px 6px 2px; }
@@ -1073,11 +1088,6 @@ body.trailer #vehbar { display: none !important; }
   .wd-sub { display: none; }
 }
 
-/* ---- hold-to-recall ---- */
-#recallhold { position: absolute; left: 50%; top: 62%; transform: translateX(-50%); width: min(360px, calc(100vw - 32px)); padding: 10px 12px; background: rgba(5, 3, 12, 0.85); border: 2px solid var(--cyan, #2ee6ff); box-shadow: 4px 4px 0 rgba(0,0,0,0.5); font-family: var(--comic); font-size: 9px; line-height: 1.2; color: #fff; text-align: center; pointer-events: none; display: none; }
-#recallhold.show { display: block; }
-#recallhold .rh-track { margin-top: 8px; height: 10px; background: #120a1e; border: 2px solid #05030c; }
-#recallhold .rh-fill { height: 100%; width: 0; background: var(--cyan, #2ee6ff); }
 
 /* ---- title tour fade ---- */
 #tourfade { position: fixed; inset: 0; background: #05030c; opacity: 0; pointer-events: none; }
@@ -1324,11 +1334,6 @@ body.trailer #tutorial, body.trailer #racepanel, body.trailer #vehbar { display:
 @keyframes dawn-out { from { opacity: 1; } to { opacity: 0; } }
 
 /* story hold meter: centre-low, in the faction's colour */
-#storymeter { position: fixed; left: 50%; top: 63%; transform: translateX(-50%); width: 340px; pointer-events: none; opacity: 0; transition: opacity .15s; z-index: 30; text-align: center; }
-#storymeter.on { opacity: 1; }
-#storymeter .sm-label { font-family: var(--comic); font-size: 12px; color: var(--col, #2ec4ff); text-shadow: 2px 2px 0 #05030c; margin-bottom: 5px; letter-spacing: 1px; }
-#storymeter .sm-track { height: 14px; background: rgba(5,3,12,.75); border: 2px solid var(--col, #2ec4ff); border-radius: 3px; overflow: hidden; box-shadow: 0 0 12px rgba(0,0,0,.4); }
-#storymeter .sm-fill { height: 100%; width: 0; background: var(--col, #2ec4ff); transition: width .08s linear; }
 
 /* boss health bar, upper-centre */
 #bossbar { position: fixed; left: 50%; top: 96px; transform: translateX(-50%); width: 420px; pointer-events: none; opacity: 0; transition: opacity .2s; z-index: 30; text-align: center; }

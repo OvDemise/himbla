@@ -2049,19 +2049,19 @@ export class Story {
   }
 
   // ---------- per frame ----------
-  // the hold meter, centre-low on screen (see meter())
+  // the hold meter, in the stack of progress bars at the bottom of the screen (see meter())
   renderMeter() {
     if (!this.meterEl) {
       this.meterEl = document.createElement('div');
       this.meterEl.id = 'storymeter';
-      this.meterEl.innerHTML = '<div class="sm-label"></div><div class="sm-track"><div class="sm-fill"></div></div>';
-      document.getElementById('hud').appendChild(this.meterEl);
+      this.meterEl.innerHTML = '<div class="hb-label"></div><div class="hb-track"><div class="hb-fill"></div></div>';
+      document.getElementById('holdbars').appendChild(this.meterEl);
     }
     const m = this.meter();
     this.meterEl.classList.toggle('on', !!m);
     if (!m) return;
-    this.meterEl.querySelector('.sm-label').textContent = m.label;
-    const f = this.meterEl.querySelector('.sm-fill');
+    this.meterEl.querySelector('.hb-label').textContent = m.label;
+    const f = this.meterEl.querySelector('.hb-fill');
     f.style.width = `${Math.round(Math.min(1, Math.max(0, m.k)) * 100)}%`;
     f.style.background = m.col;
     this.meterEl.style.setProperty('--col', m.col);

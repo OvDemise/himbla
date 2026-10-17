@@ -649,7 +649,8 @@ crowd-noise bed for now (the cheering is due a rework), and the race countdown b
   fly clean over), a kicker line with a big launch off the plateau edge, a big **half-pipe** (two matching ~7 m walls
   facing each other across a flat bottom, with decks and stairs) and a pyramid funbox, spread out on the east side. The big ferris wheel (twelve open gondolas, ~50 m tall) and the carousel are **rideable**: `F`
   beside one pops you into the nearest gondola or onto the nearest horse, `F` hops you off (from the top of the
-  wheel, too, if you're brave). (The chimera races moved to Chimera Downs.)
+  wheel, too, if you're brave). While you sit in one the HUD steps aside: just the picture and the hop-off prompt.
+  (The chimera races moved to Chimera Downs.)
 
 ## Locations
 
