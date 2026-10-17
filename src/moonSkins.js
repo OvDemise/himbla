@@ -27,6 +27,8 @@ const SKIN_U = {
   uSkinQ: { value: 2 },
 };
 export function skinUniforms() { return SKIN_U; }
+// true when the address asked for a look (?moonskin=N): then the Settings toggle leaves the look alone until it is first used
+export const SKIN_FROM_URL = q !== null;
 
 // The value noise the terrain shader carries (planet.js), for the rocks' shaders.
 const SK_NOISE = /* glsl */`
