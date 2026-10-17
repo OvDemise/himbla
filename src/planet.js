@@ -6,6 +6,8 @@ import { shapedRocks } from './rocks.js';
 import { railOf } from './rails.js';
 import { rayCollider } from './physics.js';
 import { TerrainField, faceDir, dirToGrid, N, CH, CPF, N1, R, MAX_LOD } from './terrainField.js';
+import { skinUniforms, patchRockMaterial, SKIN_COMMON, SKIN_NORMAL, SKIN_COLOR, SKIN_LIGHT } from './moonSkins.js';
+import { makeBoulderShapes, makeBoulderInk, BOULDER_COLLIDER_K } from './boulders.js';
 
 export { faceDir };
 const _g = { f: 0, i: 0, j: 0 };
@@ -45,15 +47,16 @@ export class Planet extends TerrainField {
       uHoleMin: { value: new THREE.Vector2() }, uHoleMax: { value: new THREE.Vector2() },
       // crater rims near the camera, for the ink line along their crests (updateRimInk)
       uRimC: { value: Array.from({ length: RIM_INK_MAX }, () => new THREE.Vector4()) }, uRimN: { value: 0 },
+      ...skinUniforms(), // (moonSkins.js: candidate ground textures, off unless ?moonskin=N)
     };
     this.rimInkAt = new THREE.Vector3(1e9, 0, 0);
     this.tunnel = null; // set by the secrets system: overrides the floor underground
     this.material = this.makeMaterial();
     this.material.shadowSide = THREE.BackSide;
     this.material.defines = { ...(this.material.defines || {}), KEEP_GRAZE_SHADOW: '' }; // (toon.js: the ground keeps its long dusk shadows)
-    this.boulderGeo = new THREE.DodecahedronGeometry(1, 0);
-    this.boulderMat = new THREE.MeshToonMaterial({ color: 0x8d8898, gradientMap: gradientMap() });
-    this.boulderInk = new THREE.MeshBasicMaterial({ color: 0x0b0612, side: THREE.BackSide });
+    this.boulderShapes = makeBoulderShapes(); // (boulders.js: a few lumpy shapes, one per chunk, set to unit RMS radius)
+    this.boulderMat = patchRockMaterial(new THREE.MeshToonMaterial({ color: 0x8d8898, gradientMap: gradientMap() })); // (moonSkins.js: grain and dust when ?moonskin=1)
+    this.boulderInk = makeBoulderInk();
     this.colliders = null;
     // dark backing sphere hides any sub-pixel cracks between LOD levels
     this.core = new THREE.Mesh(new THREE.SphereGeometry(R - 330, 96, 48), new THREE.MeshBasicMaterial({ color: 0x16121f }));
@@ -293,13 +296,18 @@ float rimNoise(vec3 x) {
   vec3 i = floor(x), f = fract(x); f = f * f * (3.0 - 2.0 * f);
   return mix(mix(mix(rimHash(i), rimHash(i + vec3(1, 0, 0)), f.x), mix(rimHash(i + vec3(0, 1, 0)), rimHash(i + vec3(1, 1, 0)), f.x), f.y),
              mix(mix(rimHash(i + vec3(0, 0, 1)), rimHash(i + vec3(1, 0, 1)), f.x), mix(rimHash(i + vec3(0, 1, 1)), rimHash(i + vec3(1, 1, 1)), f.x), f.y), f.z);
-}`)
+}
+${SKIN_COMMON}`)
         .replace('void main() {', `void main() {
   if (uHoleOn > 0.5) {
     vec3 hq = vHoleW - uHoleO;
     float hx = dot(hq, uHoleX), hz = dot(hq, uHoleZ), hy = dot(hq, uHoleY);
     if (hx > uHoleMin.x && hx < uHoleMax.x && hz > uHoleMin.y && hz < uHoleMax.y && hy > -45.0 && hy < 8.0) discard;
-  }`)
+  }
+  float skPx = length(fwidth(vHoleW)); // (metres per pixel on the ground: the surface textures fade out with it)
+  float skHeight = 0.0; // (the regolith's relief in metres, worked out in the colour and read again by the normal)`)
+        .replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>\n${SKIN_NORMAL}`)
+        .replace('#include <opaque_fragment>', `${SKIN_LIGHT}\n#include <opaque_fragment>`)
         // a soft shade over the rim, and a crisp black ink line along each crest: a circle round the
         // crater, measured per pixel on the sphere (so it's smooth whatever the triangles do). It
         // fades out where the rim itself does (worn away, or flattened under a settlement), and
@@ -354,7 +362,8 @@ diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.93, 0.9, 0.86), rimChip * rimCor
   float alt = 1.0 + uAltK * smoothstep(40.0, 600.0, uCamAlt);
   float k = mix(uCoolK, uWarmK, smoothstep(-0.004, 0.004, warmth)) * alt;
   diffuseColor.rgb = max(diffuseColor.rgb + vTint * (k - 1.0), 0.0);
-}`);
+}
+${SKIN_COLOR}`);
     };
     return mat;
   }
@@ -571,8 +580,13 @@ diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.93, 0.9, 0.86), rimChip * rimCor
     const rock = this.attr.rock;
     const extra = Math.floor(rock * 12);
     const rx = mulberry32((ch.f * 7919 + ch.cy * 131 + ch.cx) * 2246822519 ^ 0x7ee);
-    const im = new THREE.InstancedMesh(this.boulderGeo, this.boulderMat, count + extra);
-    const hull = new THREE.InstancedMesh(this.boulderGeo, this.boulderInk, count + extra);
+    // one lumpy shape for the whole chunk, and each boulder stretched a little its own way (from a sequence of its own: the
+    // places, sizes and turns above come from rr and rx, and stay as they were)
+    const seed = ch.f * 7919 + ch.cy * 131 + ch.cx;
+    const shape = this.boulderShapes[((seed * 2654435761) >>> 0) % this.boulderShapes.length];
+    const rv = mulberry32(seed * 40503 ^ 0x6b0d1e);
+    const im = new THREE.InstancedMesh(shape, this.boulderMat, count + extra);
+    const hull = new THREE.InstancedMesh(shape, this.boulderInk, count + extra);
     const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler(), sc = new THREE.Vector3(), p = new THREE.Vector3();
     const cols = [];
     let n = 0;
@@ -585,6 +599,7 @@ diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.93, 0.9, 0.86), rimChip * rimCor
       if (ok && this.noBoulders) for (const c of this.noBoulders) if (p.dot(c) > this.noBouldersCos) { ok = false; break; } // (spots kept bare: the trailer)
       const s = 1.2 + Math.pow(g0(), 3) * 7;
       e.set(g0() * 3, g0() * 3, g0() * 3);
+      const sx = 0.85 + rv() * 0.35, sy = 0.85 + rv() * 0.35, sz = 0.85 + rv() * 0.35; // (drawn for every spot, taken or not, so that one being refused moves none of the others)
       // (nor on a road: clear of the strip and its berm, whatever the boulder's size; clearDirs are samples of the road network, its edges included)
       if (ok && this.clearDirs) { const cr = Math.cos((ROAD_KEEP + s) / R); for (const c of this.clearDirs) if (p.dot(c) > cr) { ok = false; break; } }
       // (nor in a black lake, or at its edge: the liquid would swallow it or stand it on the surface)
@@ -593,11 +608,12 @@ diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.93, 0.9, 0.86), rimChip * rimCor
       const r = this.surface(p);
       p.multiplyScalar(r + s * 0.3);
       q.setFromEuler(e);
-      m4.compose(p, q, sc.set(s, s * 0.8, s));
+      m4.compose(p, q, sc.set(s * sx, s * 0.8 * sy, s * sz));
       im.setMatrixAt(n, m4);
-      m4.compose(p, q, sc.set(s + 0.15, s * 0.8 + 0.15, s + 0.15));
-      hull.setMatrixAt(n, m4);
-      cols.push({ type: 'sphere', c: p.clone().addScaledVector(p.clone().normalize(), -s * 0.1), r: s * 0.85 });
+      hull.setMatrixAt(n, m4); // (the ink is the same shell, pushed out along its normals in its shader: boulders.js)
+      // the collision sphere: its radius is the boulder's RMS radius (the shapes have unit RMS before they are scaled by
+      // sx, 0.8 sy and sz) times BOULDER_COLLIDER_K, which for an unstretched boulder is the 0.85 s it always was
+      cols.push({ type: 'sphere', c: p.clone().addScaledVector(p.clone().normalize(), -s * 0.1), r: s * BOULDER_COLLIDER_K * Math.sqrt((sx * sx + 0.64 * sy * sy + sz * sz) / 3) });
       n++;
     }
     im.count = hull.count = n;
