@@ -143,7 +143,7 @@ it round, holding `LB` / `RB` turns the map anticlockwise / clockwise, the right
 ball (hold either to keep them coming), `LB` / `RB` lower and raise the bet, and `B` stands up. At
 the blackjack table `A` deals and hits, `X` stands, `Y` doubles, `R3` zooms in on the cards (`Z` on the keyboard), with the same `LB` / `RB` bet and
 `B` to stand up. At the Duck Derby the left stick (or d-pad) picks a duck and `A` starts the race
-(and sets up the next one), again with `LB` / `RB` for the bet and `B` to stand up. At the Zero-G claw the left stick flies the claw, `LB` / `RB` lower and raise it, holding `A` or `RT` keeps the beam on and `X` flings what you hold. The roulette
+(and sets up the next one), again with `LB` / `RB` for the bet and `B` to stand up. At the Zero-G claw the left stick flies the claw, `LB` / `RB` lower and raise it, holding `A` or `RT` keeps the beam on. The roulette
 table uses the map's cursor: the left stick moves it, `A` or `RT` drops a chip on the number or bet
 under it (or presses the button it's on), d-pad ← → change the chip size, `X` spins and `Y` clears.
 
@@ -414,10 +414,9 @@ front doors and press `F` at a station
   are QUACKERS (jockey cap and medal), SIR WADDLES (top hat, monocle, moustache), DUCKTOR WHO (fez, bow tie, specs) and MOONBILL (bubble helmet).
 - **Zero-G Claw (₵200 a round):** a 16 m glass tank on the front wall, left of the doors and facing the Duck Derby, full of things floating in zero gravity: crates, fuel
   canisters, cogs, girders, tyres, hull plates, gems, magnets, mines, lockboxes, a salvaged engine and a credits case. Fly the claw in all three directions (WASD,
-  Q / E down and up), hold Space for the beam to pull things to its tip (it carries three units of weight), and let go over the drop hole in the floor to bank
+  left click down, right click up), hold Space for the beam to pull things to its tip (it carries three units of weight), and let go over the drop hole in the floor to bank
   them. Things interact: some come **chained** in pairs or strings, a **magnet** clumps up the steel (cogs, girders, hull plates, mines, lockboxes) and carries it, a hit
-  **mine** goes off and sets the fuel canisters round it off, a **lockbox** pops open when blasted (the lucky chip, the jackpot, is in one of them), and X flings what you hold (a
-  held mine is a grenade). Banks within five seconds build a x1.25-a-step combo, three of a kind banked in a row pay a set bonus, a mine in the drop hole costs you, and an
+  **mine** goes off and sets the fuel canisters round it off, a **lockbox** pops open when blasted (the lucky chip, the jackpot, is in one of them). Banks within five seconds build a x1.25-a-step combo, three of a kind banked in a row pay a set bonus, a mine in the drop hole costs you, and an
   overheated beam or a mine close by stuns the claw. Every round the old tank is flushed out through the roof jets and a **new one is dealt**: a different mix, a different
   layout, a different hiding place for the chip and one of four moods (calm, thick air, storm, gravity surges).
 - **Plinko:** a real-physics board (12 rows, 13 slots from 0.2× to 50×, ~94-97 % return). Aim with A/D or the

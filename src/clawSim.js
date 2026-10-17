@@ -193,24 +193,7 @@ export class ClawSim {
     if (c.y < TANK.y0 + 1.5) { c.y = TANK.y0 + 1.5; c.vy = Math.max(0, c.vy); } else if (c.y > TANK.y1 - 0.35) { c.y = TANK.y1 - 0.35; c.vy = Math.min(0, c.vy); }
     if (c.z < TANK.z0 + 0.55) { c.z = TANK.z0 + 0.55; c.vz = Math.max(0, c.vz); } else if (c.z > TANK.z1 - 0.5) { c.z = TANK.z1 - 0.5; c.vz = Math.min(0, c.vz); }
     if (c.stun > 0) { c.stun -= dt; c.spin += dt * 9; }
-    if (ctl.fling) {                                     // FLING: everything the claw holds is thrown the way it is being steered (a held mine is a grenade)
-      const held = this.items.filter((i) => i.st === 'held');
-      if (held.length) {
-        let dx = ctl.mx || 0, dy = ctl.my || 0, dz = ctl.mz || 0, l = Math.hypot(dx, dy, dz);
-        if (l < 0.2) { dx = c.vx; dy = c.vy; dz = c.vz; l = Math.hypot(dx, dy, dz); }
-        if (l < 0.2) { dx = 0; dy = 0; dz = 1; l = 1; }
-        for (const it of held) {
-          this.release(it);
-          it.rel = 0;
-          const k = 8.5 / (l || 1) / Math.sqrt(it.mass);
-          it.vx = c.vx + dx * k; it.vy = c.vy + dy * k; it.vz = c.vz + dz * k;
-        }
-        c.vx -= (dx / l) * 1.5; c.vy -= (dy / l) * 1.5; c.vz -= (dz / l) * 1.5;
-        c.beam = false; c.energy = Math.max(0, c.energy - 0.12);
-        this.emit({ type: 'fling' });
-      }
-    }
-    const wantBeam = !!ctl.beam && playing && c.energy > 0.02 && !ctl.fling;
+    const wantBeam = !!ctl.beam && playing && c.energy > 0.02;
     if (wantBeam !== c.beam) { c.beam = wantBeam; this.emit({ type: wantBeam ? 'beamOn' : 'beamOff' }); if (!wantBeam) for (const it of this.items) if (it.st === 'held') this.release(it); }
     c.energy = Math.max(0, Math.min(1, c.energy + (c.beam ? -0.09 : 0.35) * dt));
     if (c.beam && c.energy <= 0) { c.beam = false; this.emit({ type: 'overheat' }); for (const it of this.items) if (it.st === 'held') this.release(it); }

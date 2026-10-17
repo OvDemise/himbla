@@ -11,10 +11,10 @@ import { mulberry32 } from '../src/rng.js';
 
 const SKILLS = {
   // vmax: how fast it flies the claw; think: seconds it dithers before each grab; noise: how far the stick wanders; hold: how steadily it keeps the beam on
-  novice:  { vmax: 2.4, think: 1.6, noise: 0.9, pick: 'near', mines: 0.3, multi: false, hold: 0.8, grenade: false },   // grabs what is close, wobbles, sometimes lets go early, takes mines
-  average: { vmax: 3.0, think: 0.9, noise: 0.4, pick: 'value', mines: 0, multi: false, hold: 0.95, grenade: false },
-  skilled: { vmax: 3.8, think: 0.45, noise: 0.15, pick: 'value', mines: 0, multi: true, hold: 1, grenade: false },
-  expert:  { vmax: 4.6, think: 0.2, noise: 0.05, pick: 'value', mines: 0, multi: true, hold: 1, grenade: true },       // and throws a mine at the lockbox that holds the jackpot
+  novice:  { vmax: 2.4, think: 1.6, noise: 0.9, pick: 'near', mines: 0.3, multi: false, hold: 0.8 },   // grabs what is close, wobbles, sometimes lets go early, takes mines
+  average: { vmax: 3.0, think: 0.9, noise: 0.4, pick: 'value', mines: 0, multi: false, hold: 0.95 },
+  skilled: { vmax: 3.8, think: 0.45, noise: 0.15, pick: 'value', mines: 0, multi: true, hold: 1 },
+  expert:  { vmax: 4.6, think: 0.2, noise: 0.05, pick: 'value', mines: 0, multi: true, hold: 1 },
 };
 
 const WHY = {};
@@ -24,7 +24,7 @@ function playRound(seed, S, rng) {
   const c = sim.claw;
   let mode = 'seek', target = null, tmr = 0, wobX = 0, wobZ = 0, box = null, lastMode = '';
   const dt = 1 / 30;
-  const stats = { banked: 0, mines: 0, chipBanked: false, booms: 0, opens: 0, chipLoose: false, chipPay: 0, grenades: 0 };
+  const stats = { banked: 0, mines: 0, chipBanked: false, booms: 0, opens: 0, chipLoose: false, chipPay: 0 };
   const hover = (tx, ty, tz) => {
     const k = 2.6;
     const des = (e) => Math.max(-S.vmax, Math.min(S.vmax, e * k));
@@ -49,13 +49,10 @@ function playRound(seed, S, rng) {
     let input = { mx: 0, my: 0, mz: 0, beam: held.length > 0 };
     if (c.stun > 0) { sim.update(dt, input); continue; }
     if (mode === 'seek') {
-      const chipBox = sim.items.find((i) => i.kind === 'lockbox' && i.inside === 'chip' && i.st === 'free');
-      const mine = S.grenade && chipBox && sim.timeLeft > 16 ? free().filter((i) => i.kind === 'mine').sort((a, b) => Math.hypot(a.x - chipBox.x, a.z - chipBox.z) - Math.hypot(b.x - chipBox.x, b.z - chipBox.z))[0] : null;
-      if (held.length && held[0].kind === 'mine' && S.grenade && chipBox) { box = chipBox; mode = 'aim'; }
-      else if (held.length && (!S.multi || sim.heldWeight >= HOLD_CAP - 0.5)) mode = 'carry';
+      if (held.length && (!S.multi || sim.heldWeight >= HOLD_CAP - 0.5)) mode = 'carry';
       else {
-        let best = mine, bs = mine ? 1 : 0;
-        if (!best) for (const it of free()) { const sc = score(it); if (sc > bs && sim.heldWeight + KINDS[it.kind].w <= HOLD_CAP) { bs = sc; best = it; } }
+        let best = null, bs = 0;
+        for (const it of free()) { const sc = score(it); if (sc > bs && sim.heldWeight + KINDS[it.kind].w <= HOLD_CAP) { bs = sc; best = it; } }
         if (!best) mode = held.length ? 'carry' : 'wait';
         else if (S.multi && held.length && Math.hypot(best.x - c.x, best.y - c.y, best.z - c.z) > 2.6) mode = 'carry';
         else { target = best; mode = 'approach'; tmr = S.think * (0.6 + rng() * 0.8); }
@@ -85,16 +82,6 @@ function playRound(seed, S, rng) {
     } else if (mode === 'release') {
       input = { ...hover(DROP.x, 3.8, DROP.z), beam: false };
       if (tmr < 0 || (!sim.holding.length && free().every((i) => !(i.rel > 0)))) mode = 'seek';
-    } else if (mode === 'aim') {
-      // grenade: line up 3.4 m from the box on the open side, level with it, and fling
-      if (!box || box.st !== 'free' || !held.length || held[0].kind !== 'mine') mode = 'seek';
-      else {
-        const side = box.x > 0 ? -1 : 1;
-        const lx = Math.max(TANK.x0 + 0.8, Math.min(TANK.x1 - 0.8, box.x - side * 3.4)), ly = Math.max(TANK.y0 + 1.6, Math.min(TANK.y1 - 0.5, box.y + 1.13)), lz = Math.max(TANK.z0 + 0.6, Math.min(TANK.z1 - 0.6, box.z));
-        input = { ...hover(lx, ly, lz), beam: true };
-        const near = Math.hypot(lx - c.x, ly - c.y, lz - c.z) < 0.45 && Math.hypot(c.vx, c.vy, c.vz) < 1;
-        if (near) { input = { mx: Math.sign(box.x - c.x) || 1, my: 0, mz: 0, beam: false, fling: true }; stats.grenades++; mode = 'seek'; tmr = 0; }
-      }
     }
     if (input.beam && c.energy < 0.03) input.beam = false;
     if (process.env.CLAW_TRACE && mode !== lastMode) { console.log((CLAW_TIME - sim.timeLeft).toFixed(1), mode, target ? target.kind + '#' + target.id + ' st=' + target.st : '', 'held', held.length, 'claw', c.x.toFixed(1), c.y.toFixed(1), c.z.toFixed(1)); lastMode = mode; }
@@ -109,7 +96,7 @@ if (process.env.CLAW_NORUN) process.exit0 = 1;
 const rounds = parseInt(process.argv[2] || '200', 10) || 200;
 const only = process.argv[3];
 console.log(`entry ₵${CLAW_COST}, ${CLAW_TIME} s, ${rounds} rounds each\n`);
-console.log('bot      mean  ratio  p10  p50  p90  max   <entry  >=2x  jackpot  banks/round  mines/round  booms  opens  chip freed  grenades  mean w/o chip');
+console.log('bot      mean  ratio  p10  p50  p90  max   <entry  >=2x  jackpot  banks/round  mines/round  booms  opens  chip freed  mean w/o chip');
 for (const [name, S] of Object.entries(SKILLS)) {
   if (only && only !== name) continue;
   const rng = mulberry32(777 + name.length);
@@ -118,7 +105,7 @@ for (const [name, S] of Object.entries(SKILLS)) {
   const pays = res.map((r) => r.pay).sort((a, b) => a - b);
   const mean = pays.reduce((a, b) => a + b, 0) / pays.length, q = (p) => pays[Math.min(pays.length - 1, Math.floor(p * pays.length))];
   const f = (n, w) => String(Math.round(n)).padStart(w);
-  console.log(`${name.padEnd(8)} ${f(mean, 5)} ${(mean / CLAW_COST).toFixed(2).padStart(5)} ${f(q(0.1), 4)} ${f(q(0.5), 4)} ${f(q(0.9), 4)} ${f(pays[pays.length - 1], 5)}  ${(pays.filter((p) => p < CLAW_COST).length / pays.length * 100).toFixed(0).padStart(5)}% ${(pays.filter((p) => p >= 2 * CLAW_COST).length / pays.length * 100).toFixed(0).padStart(4)}% ${(res.filter((r) => r.chipBanked).length / res.length * 100).toFixed(0).padStart(6)}%   ${(res.reduce((a, r) => a + r.banked, 0) / res.length).toFixed(1).padStart(8)}  ${(res.reduce((a, r) => a + r.mines, 0) / res.length).toFixed(2).padStart(10)}  ${(res.reduce((a, r) => a + r.booms, 0) / res.length).toFixed(1).padStart(5)} ${(res.reduce((a, r) => a + r.opens, 0) / res.length).toFixed(1).padStart(6)} ${(res.filter((r) => r.chipLoose).length / res.length * 100).toFixed(0).padStart(8)}% ${(res.reduce((a, r) => a + r.grenades, 0) / res.length).toFixed(2).padStart(9)}  ${f(res.reduce((a, r) => a + r.pay - r.chipPay, 0) / res.length, 8)}`);
+  console.log(`${name.padEnd(8)} ${f(mean, 5)} ${(mean / CLAW_COST).toFixed(2).padStart(5)} ${f(q(0.1), 4)} ${f(q(0.5), 4)} ${f(q(0.9), 4)} ${f(pays[pays.length - 1], 5)}  ${(pays.filter((p) => p < CLAW_COST).length / pays.length * 100).toFixed(0).padStart(5)}% ${(pays.filter((p) => p >= 2 * CLAW_COST).length / pays.length * 100).toFixed(0).padStart(4)}% ${(res.filter((r) => r.chipBanked).length / res.length * 100).toFixed(0).padStart(6)}%   ${(res.reduce((a, r) => a + r.banked, 0) / res.length).toFixed(1).padStart(8)}  ${(res.reduce((a, r) => a + r.mines, 0) / res.length).toFixed(2).padStart(10)}  ${(res.reduce((a, r) => a + r.booms, 0) / res.length).toFixed(1).padStart(5)} ${(res.reduce((a, r) => a + r.opens, 0) / res.length).toFixed(1).padStart(6)} ${(res.filter((r) => r.chipLoose).length / res.length * 100).toFixed(0).padStart(8)}%  ${f(res.reduce((a, r) => a + r.pay - r.chipPay, 0) / res.length, 8)}`);
 }
 
 if (process.env.CLAW_WHY) console.log('mine fuses by cause:', WHY);
