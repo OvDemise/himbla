@@ -535,17 +535,17 @@ export function buildCasino(w, loc) {
   }
   // red carpet + velvet ropes outside, and on inside up to the games
   const ASPH = 0.1; // the asphalt's thickness
-  const carpet = new THREE.Mesh(new THREE.PlaneGeometry(6, 36), toon(0xd7263d));
+  const carpet = new THREE.Mesh(new THREE.PlaneGeometry(6, 65.6), toon(0xd7263d));   // (the whole way to the plaza: the court's asphalt, then the walkway's paving)
   carpet.rotation.x = -Math.PI / 2;
-  put(carpet, 0, FRONT_OUT + 18, ASPH + 0.03); // (laid on the asphalt that runs from the doors to the plaza: settlements.js dressCasinoLot)
+  put(carpet, 0, FRONT_OUT + 32.8, ASPH + 0.03); // (laid on the court's asphalt and the walkway's paving, which are as high: settlements.js dressCasinoLot)
   // through the doors: the same width, rising from the runner inside (y 0.08) to the carpet outside as one sloped strip over the wall's thickness
   const sill = new THREE.Mesh(new THREE.PlaneGeometry(6, FRONT_OUT - HALL.FRONT, 1, 1), toon(0xd7263d));
   { const pos = sill.geometry.attributes.position; for (let i = 0; i < pos.count; i++) pos.setZ(i, pos.getY(i) < 0 ? 0.05 : 0); pos.needsUpdate = true; sill.geometry.computeVertexNormals(); }
   sill.rotation.x = -Math.PI / 2;
   put(sill, 0, (HALL.FRONT + FRONT_OUT) / 2, 0.08);
   for (const sx of [-1, 1]) {
-    for (let i = 0; i < 6; i++) put(mesh(new THREE.CylinderGeometry(0.15, 0.2, 1.4, 6), toon(0xffd23f), 0.04), sx * 3.6, FRONT_OUT + 3 + i * 5.5, ASPH + 0.7);
-    put(new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 27.5, 5).rotateX(Math.PI / 2), toon(0x8a1030)), sx * 3.6, FRONT_OUT + 3 + 13.75, ASPH + 1.1);
+    for (let i = 0; i < 7; i++) put(mesh(new THREE.CylinderGeometry(0.15, 0.2, 1.4, 6), toon(0xffd23f), 0.04), sx * 3.6, FRONT_OUT + 3 + i * 5.5, ASPH + 0.7);   // (along the avenue; the walkway's edge is chip bollards)
+    put(new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 33, 5).rotateX(Math.PI / 2), toon(0x8a1030)), sx * 3.6, FRONT_OUT + 3 + 16.5, ASPH + 1.1);
   }
 
   // the giant rotating sign, on a mast over the dome
@@ -592,7 +592,7 @@ export function buildCasino(w, loc) {
   const CAR_R = 3.6, STAND_R = 6.2, CAR_N = 7;
   let n = 0;
   for (const sx of [-1, 1]) {
-    const cx = sx * 19.5, cz = FRONT_OUT + 23.6;
+    const cx = sx * 19.5, cz = FRONT_OUT + 11.6;   // (z 28: clear of the court's wings, which stand behind them)
     put(mesh(new THREE.CylinderGeometry(7.4, 7.6, 0.3, 32), toon(0x2a1450), 0.06), cx, cz, 0.15);
     put(new THREE.Mesh(new THREE.TorusGeometry(7.3, 0.12, 6, 40).rotateX(Math.PI / 2), glow(sx < 0 ? 0xff2e88 : 0x2ee6ff)), cx, cz, 0.33);
     put(mesh(new THREE.CylinderGeometry(1.4, 1.6, 7.5, 16), toon(0x5a1a8f), 0.08), cx, cz, 3.75);
@@ -620,7 +620,7 @@ export function buildCasino(w, loc) {
     }
   }
   // places to stand and gawp: round the giant die, in front of the roulette wheel, by the chip towers, and chatting by the doors
-  const CHIPS = [[-14, FRONT_OUT + 5], [14, FRONT_OUT + 5], [-27, 44], [27, 46]];
+  const CHIPS = [[-11, FRONT_OUT + 4.2], [11, FRONT_OUT + 4.2], [-49, 64], [49, 64]];   // (the doors' pair, and one marking each wing of the court's outer corner)
   for (let i = 0; i < 3; i++) { const a = 0.5 + i * 0.55; yardSpots.push({ kind: 'watch', x: -34 + Math.cos(a) * 8, z: 7 + Math.sin(a) * 8, look: [-34, 7], busy: false }); }
   for (let i = 0; i < 3; i++) yardSpots.push({ kind: 'watch', x: 30 + i * 4, z: 16, look: [34, 7], busy: false });
   for (const [x, z] of CHIPS) yardSpots.push({ kind: 'watch', x: x * 0.85, z: z + 3, look: [x, z], busy: false });
@@ -690,8 +690,8 @@ export function buildCasino(w, loc) {
   // round the outline, see `band`) and, at every bay of every long enough run, the hall kit's bay: half a gold pilaster each side, framed suit panels, a tall arched panel
   band(0.02, -0.04, 0, H - 0.02, toon(0x45207a));
   band(0.03, -0.16, 0, 0.25, BRASS, 0.01);
-  band(0.04, -0.14, 1.8, 1.95, GOLD, 0.01);
-  band(0.04, -0.10, 1.735, 1.795, bandMats[1]);
+  band(0.04, -0.14, 1.84, 1.99, GOLD, 0.01);
+  band(0.04, -0.10, 1.756, 1.826, bandMats[1]);   // (7 cm: clear of the wainscot's top, 1.75, and under the girdle)
   band(0.05, -0.55, 13.12, 13.55, GOLD, 0.012);
   band(-0.45, -0.52, 13.06, 13.12, bandMats[0]);
   band(0.06, -0.28, 15.4, 15.95, BRASS, 0.01);

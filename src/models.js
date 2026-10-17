@@ -30,6 +30,7 @@ const GLB = {
   hovercar: () => import('./assets/hovercar.glb?inline'),
   duck: () => import('./assets/duck.glb?inline'),
   hall: () => import('./assets/hall.glb?inline'),
+  lot: () => import('./assets/lot.glb?inline'),
 };
 
 // A model file can be compressed (tools/optimize-glb.mjs: quantized, then meshopt-coded: about a third of the size).
@@ -1388,7 +1389,7 @@ const SHIP_TOON = { trim: 0xd8d4e8, dark: 0x2a2540, metal: 0x8a87a0, steel: 0x55
 const SHIP_FX = new Set(['plume', 'plumeCore', 'lift', 'engine', 'core', 'beacon']); // per-ship materials (they pulse)
 const FLAMES = new Set(['plume', 'plumeCore', 'lift', 'beacon']);
 export async function loadShipParts() {
-  const [gltf, sk, wr, ap, lt, cr, ga, di, en, bc, hc, sl, pk, cs, bj, gy, cl, dd, hl] = await Promise.all(['ships', 'skimmer', 'warrig', 'apc', 'landtrain', 'crane', 'garage', 'dish', 'engine', 'briefcase', 'hovercar', 'slots', 'plinko', 'casino', 'blackjack', 'gantry', 'claw', 'duck', 'hall'].map(loadGlb));
+  const [gltf, sk, wr, ap, lt, cr, ga, di, en, bc, hc, sl, pk, cs, bj, gy, cl, dd, hl, lo] = await Promise.all(['ships', 'skimmer', 'warrig', 'apc', 'landtrain', 'crane', 'garage', 'dish', 'engine', 'briefcase', 'hovercar', 'slots', 'plinko', 'casino', 'blackjack', 'gantry', 'claw', 'duck', 'hall', 'lot'].map(loadGlb));
   SHIP_PARTS = {};
   for (const name of ['shuttle', 'freighter']) {
     const root = gltf.scene.getObjectByName(name);
@@ -1482,6 +1483,12 @@ export async function loadShipParts() {
   for (const name of HALL_PROPS) {
     const root = hl.scene.getObjectByName(name);
     if (!root) throw new Error('hall.glb has no ' + name);
+    SHIP_PARTS[name] = bakeShip(root);
+  }
+  // the forecourt's kit: the card wall, its posts, the walkway's chip bollards, the P pylon and the bay studs (tools/blender/build_lot.py)
+  for (const name of LOT_PROPS) {
+    const root = lo.scene.getObjectByName(name);
+    if (!root) throw new Error('lot.glb has no ' + name);
     SHIP_PARTS[name] = bakeShip(root);
   }
   SHIP_PARTS.claw_engine = bakeShip(ENGINE_MODEL);
@@ -2449,6 +2456,19 @@ export const HALL_PROPS = ['hall_bay0', 'hall_bay1', 'hall_bay2', 'hall_bay3', '
 const HALL_TOON = { plum: 0x4a1766, plum2: 0x6a2a8f, gold: 0xffd23f, brass: 0xc79a1f, cream: 0xfff4e0, dark: 0x1a1030, velvet: 0xb3123a, red: 0xd7263d, pink: 0xff2e88 };
 const HALL_GLOW = { suitred: 0xff2a4a, suitcream: 0xfff4e0, lamp: 0xfff6a8, glowcyan: 0x2ee6ff, glowpink: 0xff2e88 };
 export const makeHallPart = (name) => ddGroup(SHIP_PARTS[name], null, HALL_TOON, HALL_GLOW);
+
+// ---- The casino's forecourt kit (built in Blender, see build_lot.py; docs/casino-forecourt.md) ----
+// `lot_card_wall` (2.4 m of the court's barrier, 0.6 m deep), `lot_card_post` (its end and corner post), `lot_chip_bollard` (the walkway's), `lot_pylon_p` (the parking sign, facing +z) and
+// `lot_bay_stud` (a bay's head stop), each standing on y = 0. makeLotPart(name) gives one as a Group (the Asset Row's); lotNode / lotSlot are for baking into a settlement's kit
+// (settlements.js dressCasinoLot).
+export const LOT_PROPS = ['lot_card_wall', 'lot_card_post', 'lot_chip_bollard', 'lot_pylon_p', 'lot_bay_stud'];
+const LOT_TOON = { plum: 0x4a1766, plum2: 0x6a2a8f, gold: 0xffd23f, brass: 0xc79a1f, cream: 0xfff4e0, dark: 0x1a1030, red: 0xd7263d, pink: 0xff2e88 };
+const LOT_GLOW = { suitred: 0xff2a4a, suitcream: 0xfff4e0, lamp: 0xfff6a8, glowcyan: 0x2ee6ff, cardface: 0xd9d2ee };
+export const makeLotPart = (name) => ddGroup(SHIP_PARTS[name], null, LOT_TOON, LOT_GLOW);
+export const lotNode = (name) => SHIP_PARTS[name];
+export function lotSlot(slot) {
+  return slot in LOT_GLOW ? { color: LOT_GLOW[slot], glow: true } : { color: LOT_TOON[slot] ?? 0xff00ff, glow: false };
+}
 export function makeRacer(i = 1, color = 0xffd23f, bill = 0xff9f1c) {
   const c = new THREE.Color(color);
   const model = ddGroup(SHIP_PARTS['dd_duck' + i], { body: color, wing: c.clone().multiplyScalar(0.85).getHex(), silk: color, bill });

@@ -568,7 +568,7 @@ the unlock counters, toggle any splice-pod mutation (with a reset), or reset all
 ### The Asset Row (dev builds only)
 
 Dev menu (`F8`) → **Full cheat menu** → **Teleport** → option 1, **ASSET ROW**: a flat showroom with every asset in the game
-lined up side by side, 216 of them in 25 sections (the runner and its gear, people, creatures, props and markers,
+lined up side by side, 217 of them in 25 sections (the runner and its gear, people, creatures, props and markers,
 weapons and effects, rocks and nature, the secrets and the Spindle's props, ground vehicles and ships, outposts intact and
 wrecked, the building parts the settlements are made of, the hometown, and all the places). The small ones stand in the
 yellow lane (z = 0), the places over 100 m across in the cyan lane 460 m over; the whole row is about 9 km, so the dev
@@ -783,6 +783,7 @@ src/
   assets/casino.glb  the casino's lamp post, plaza fountain (basin, pedestal, bowl, spigots, a spinning chip or, for the Meridian Exchange's plaza, a spinning dollar sign, the water as pivots the game gives ripple, curtain and jet shaders), buff alien bouncer, hall chandelier and the welcome and blackjack signs' frames
   assets/claw.glb    the casino's Zero-G claw: the 16 m glass-tank machine (plum base, brass mullions, marquee box, console, ten shuffle jets, the drop hole), the energy claw, a chain link and each kind of thing in the tank (the salvaged engine and the credits case are the game's own models)
   assets/hall.glb    the casino's hall kit: the wall bay (half a gold pilaster each side, a lacquer wainscot with a framed suit panel, a tall arched panel with a cyan line) in four suits, a coffer ceiling tile, the compass-star floor medallion, the Chip Bar with its turning chip and halo, the cashier's cage, a banquette and table, the grand doors' frame, the outside's suit panels and the drum, dome and lantern
+  assets/lot.glb     the casino forecourt's kit: the card wall (giant cards dominoed on a plum and gold kerb), its posts, the walkway's chip bollard, the P pylon and a bay stud
   assets/duck.glb    the casino's Duck Derby: the four racers (a cap, hat, fez or bubble helmet each, a numbered wing disc) and the gilded track: basin with lane floats, start gate and grille, finish arch, odds-board frame, bookmaker's kiosk, brass rail post and velvet rope
   assets/blackjack.glb  the casino's gilded blackjack table (plum lacquer, gold, cream suit panels, a leather rail, a chip rack, shoe and discard well, the dealer's back counter) and its chip
   assets/dish.glb    the dish stations: the two for the research arrays' big dishes, the cryo receiver (a banded Helium-3 vessel with a stair, valve cabinet and branding panel) and the gantry station (a lattice mast, container control rooms, battery bank, fuel tank), the field dish the smaller bases use (an eight-sided tower with a gallery and caged ladder, an equipment-room container, and the gantry's truss-backed reflector) and a light head (the field dish's reflector and trunnions with no tower) for the small dishes on masts and roofs, each with the dish, its yaw and tilt pivots and a livery for every faction (the stations also a number for every dish)
@@ -812,13 +813,14 @@ tools/
   blender/build_casino.py  builds the casino's lamp post, fountain, bouncer, chandelier and signs -> src/assets/casino.glb (also runs headless)
   blender/build_claw.py    builds the Zero-G claw machine, the claw and the things in its tank -> src/assets/claw.glb (also runs headless)
   casino-layouts.mjs       dev-only: the casino's plans (current, A, B) with the games' footprints, trigger zones and camera corridors; checks the spacing and that the walls leave the floor and doors free (`node tools/casino-layouts.mjs`, `... docs` redraws docs/casino-layout-*.svg); docs/casino-layouts.md is the study
-  casino-forecourt.mjs     dev-only: the forecourt (boulevard, car parks, plaza) today and as proposed in docs/casino-forecourt.md; draws both plans and checks the proposal's spacing
+  casino-forecourt.mjs     dev-only: the forecourt (avenue, car parks, plaza) before and as built (docs/casino-forecourt.md); draws both plans and checks the Valet Court's spacing
   casino-zfight.mjs        dev-only: lists the visible pairs of faces on one plane in the running casino (`node tools/casino-zfight.mjs`; needs the dev server)
   casino-shots.mjs         dev-only: screenshots of the casino from fixed vantage points (needs the dev server)
   check-claw.mjs           dev-only: plays the claw sim with four bots (novice to expert) and prints what each takes home against the ₵200 entry (`node tools/check-claw.mjs 300 [novice|average|skilled|expert]`)
   blender/suits.py        the casino's card-suit trim as geometry (the prize counter's panels), exec'd by the blackjack, claw and duck builders
   blender/build_duck.py    builds the Duck Derby's racers and track -> src/assets/duck.glb (also runs headless)
   blender/build_hall.py    builds the casino's hall kit (wall bays, ceiling tiles, the floor medallion, the Chip Bar, the cage, a banquette, the doors' frame, the facade's panels, the crown) -> src/assets/hall.glb (also runs headless; the build stops if two faces of one model share a plane: `audit_coplanar` in kit.py)
+  blender/build_lot.py     builds the forecourt kit (card wall, post, chip bollard, P pylon, bay stud) -> src/assets/lot.glb (runs `audit_coplanar` too)
   blender/build_blackjack.py  builds the blackjack table and chip -> src/assets/blackjack.glb (also runs headless; the build stops if anything stands in the places cards, chips and the felt's lettering go)
   blender/build_dish.py    builds the cryo receiver, the gantry station, the field dish and the light dish head -> src/assets/dish.glb (also runs headless)
   blender/build_winch.py   builds the winch's grapple and cable piece -> src/assets/winch.glb and renders the tow-line marker -> src/assets/towmark.png (also runs headless: `pip install bpy`, then `MOONRUNNER_REPO=. python3 tools/blender/build_winch.py`)

@@ -35,43 +35,45 @@ const current = () => {
   return L;
 };
 
-// ---- proposed ----
+// ---- proposed (as built: settlements.js dressCasinoLot, casinoWorld.js, models/lot.glb) ----
 const proposed = () => {
-  const L = { name: 'The Valet Court', asphalt: [], paving: [], items: [], lamps: [], bays: [], barrier: [], bollards: [], notes: [] };
-  const AV = 8.6, WX = 41, EW = 41.6, W0 = 39.6, W1 = 58;    // the avenue's half width; the bays' outer end; the end wall's inner face; the wings' north and south edges
+  const L = { name: 'The Valet Court', asphalt: [], paving: [], items: [], lamps: [], bays: [], barrier: [], bollards: [], roads: [], notes: [] };
+  const AV = 8.6, W0 = 38.4, W1 = 58.4, MID = (W0 + W1) / 2, MOD = 2.4, NMOD = 14, XA = AV + 0.36, XB = XA + 0.72 + NMOD * MOD;
+  const BX0 = 11, BAYW = 5.2, NB = 6, BAYD = 6.2;
+  const bayZ = [W0 + 1.0 + BAYD / 2, W1 - 1.0 - BAYD / 2];  // the two rows' middles
   L.asphalt.push({ k: 'poly', pts: [[-AV, FRONT_OUT], [AV, FRONT_OUT], [AV, W1], [-AV, W1]] });
   for (const s of [-1, 1]) {
-    L.asphalt.push({ k: 'r', x0: Math.min(s * AV, s * (EW + 0.6)), x1: Math.max(s * AV, s * (EW + 0.6)), z0: W0, z1: W1 });
-    // two rows of five-metre bays face a six-metre aisle: bays z 40.8..45.8 and 51.8..56.8, the aisle between; the card wall stands 0.6 m clear of them
-    for (const [z0, row] of [[40.8, 1], [51.8, -1]]) for (let i = 0; i < 6; i++) {
-      const x = s * (11 + i * 5 + 2.5);
-      L.bays.push({ x, z: z0 + 2.5, w: 5, d: 5, taken: (i * 5 + (row > 0 ? 1 : 3) + (s > 0 ? 2 : 0)) % 4 !== 0 });
+    L.asphalt.push({ k: 'r', x0: Math.min(s * AV, s * (XB + 0.36)), x1: Math.max(s * AV, s * (XB + 0.36)), z0: W0, z1: W1 });
+    L.roads.push({ x0: Math.min(s * (XB - 4), s * 140), x1: Math.max(s * (XB - 4), s * 140), z0: MID - 9, z1: MID + 9 });
+    for (const [row, rz] of bayZ.entries()) for (let i = 0; i < NB; i++) {
+      L.bays.push({ x: s * (BX0 + (i + 0.5) * BAYW), z: rz, w: BAYW, d: BAYD, taken: (i * 5 + (row === 0 ? 1 : 3) + (s > 0 ? 2 : 0)) % 4 !== 0 });
     }
-    // the card wall round the outside of each wing, 0.6 m thick (the wing's end open at the aisle: the way in and out)
-    const x0 = Math.min(s * AV, s * (EW + 0.6)), x1 = Math.max(s * AV, s * (EW + 0.6));
-    L.barrier.push({ k: 'r', x0, x1, z0: W0, z1: W0 + 0.6 }, { k: 'r', x0, x1, z0: W1 - 0.6, z1: W1 });
-    for (const [z0, z1] of [[W0, 45.8], [51.8, W1]]) L.barrier.push({ k: 'r', x0: Math.min(s * EW, s * (EW + 0.6)), x1: Math.max(s * EW, s * (EW + 0.6)), z0, z1 });
-    for (const z of [W0 - 0.2, W1 + 0.2]) for (const x of [AV + 1.2, EW + 0.2]) L.lamps.push({ x: s * x, z, sc: 0.92, kind: 'post' });   // (on the kerb outside the wall)
-    for (const z of [42.8, 54.8]) L.items.push(rect('P pylon', s * 44.4 - 0.6, s * 44.4 + 0.6, z - 0.6, z + 0.6, 'prop'));
-    L.items.push(circ('Slot carousel', s * 19.5, 29.5, 7.6, 'ext'));
-    L.items.push(circ('Chip stack', s * 11, 20.6, 1.7, 'ext'), circ('Chip stack', s * 45, 61, 1.7, 'ext'));
-    for (const z of [25, 36]) L.lamps.push({ x: s * 8.5, z, sc: 0.92, kind: 'post' });
+    // the card wall: the north and south runs between their posts, the outer end's two stubs either side of the aisle's mouth (the posts are 0.72 m square, the wall 0.6 thick)
+    const run = (x0, x1, z0, z1) => ({ k: 'r', x0: Math.min(s * x0, s * x1), x1: Math.max(s * x0, s * x1), z0, z1 });
+    L.barrier.push(run(XA - 0.36, XB + 0.36, W0, W0 + 0.6), run(XA - 0.36, XB + 0.36, W1 - 0.6, W1));
+    const stub = W0 + 0.3 + 0.36 + 2 * MOD + 0.72;
+    L.barrier.push(run(XB - 0.3, XB + 0.3, W0, stub), run(XB - 0.3, XB + 0.3, W0 + W1 - stub, W1));
+    for (const z of [W0 - 1.2, W1 + 1.2]) for (const x of [AV + 1.2, XB + 1.1]) L.lamps.push({ x: s * x, z, sc: 0.92, kind: 'post' });
+    for (const dz of [-6.4, 6.4]) L.items.push(rect('P pylon', s * (XB + 2.4) - 0.5, s * (XB + 2.4) + 0.5, MID + dz - 0.5, MID + dz + 0.5, 'prop'));
+    L.items.push(circ('Slot carousel', s * 19.5, FRONT_OUT + 11.6, 7.6, 'ext'));
+    L.items.push(circ('Chip stack', s * 11, FRONT_OUT + 4.2, 1.7, 'ext'), circ('Chip stack', s * 49, 64, 1.7, 'ext'));
+    for (const z of [26, 34]) L.lamps.push({ x: s * (AV + 0.9), z, sc: 0.92, kind: 'post' });
     for (const z of [63, 72]) L.lamps.push({ x: s * 7.2, z, sc: 0.92, kind: 'post' });
   }
   // the walkway: from the court's edge to the plaza, paved, the carpet running on down its middle
   L.paving.push({ k: 'r', x0: -5.2, x1: 5.2, z0: W1, z1: FZ - PR + 1 }, { k: 'c', x: 0, z: FZ, r: PR });
   L.crossing = { x0: -AV, x1: AV, z0: W1 - 2, z1: W1 };
-  for (const s of [-1, 1]) for (let z = W1 + 2.5; z <= FZ - PR - 1; z += 3) L.bollards.push({ x: s * 5.6, z });
+  for (const s of [-1, 1]) for (let z = W1 + 2; z < FZ - PR; z += 3) L.bollards.push({ x: s * 5.6, z });
   L.items.push(circ('Fountain', 0, FZ, 5.5, 'game'));
   L.items.push(rect('Pylon sign', 18, 33, 117.2, 118.8, 'prop'));
   L.carpet = { x0: -3, x1: 3, z0: FRONT_OUT, z1: FZ - PR + 1 };
   L.notes = [
-    'The asphalt ends halfway: the central court runs from the doors to z 58 (the fountain is at 98, the doors at 16.4: the middle is 57).',
-    'A 10 m paved walkway takes over for the last 23 m to the plaza, the red carpet running on down its middle.',
-    'The two outer lots become wings of the one court: 24 bays (it was 32), all within 41 m of the avenue.',
-    'Hedges are gone: a low card wall (giant cards dominoed along a plum and gold kerb) edges the court; chip-stack bollards edge the walkway.',
+    'The asphalt ends halfway: the central court runs from the doors to z 58.4 (the fountain is at 98, the doors at 16.4: the middle is 57).',
+    'A 10 m paved walkway takes over for the last 24 m to the plaza, the red carpet running on down its middle.',
+    'The two outer lots become wings of the one court: 24 bays of 5.2 x 6.2 m (it was 32), either side of a 5.6 m aisle that is open at each outer end, and a road runs out of each end to the ring road.',
+    'Hedges are gone: a card wall (giant cards dominoed on a plum and gold kerb) edges the court; chip-stack bollards edge the walkway.',
     'Every lamp is the casino neon post; the old thin poles are gone.',
-    'The slot carousels move 10 m toward the doors so the wings can sit behind them.',
+    'The slot carousels moved 12 m toward the doors so the wings can sit behind them.',
   ];
   return L;
 };
@@ -101,7 +103,7 @@ export function check(L) {
     if (a.bay && b.bay) continue;
     if ((a.wall && b.wall) || (a.id === 'Lamp post' && b.wall) || (b.id === 'Lamp post' && a.wall)) continue;   // (lamps stand in the wall's line, in place of a card)
     const g = gap(a.s, b.s);
-    const need = a.id === 'Bay' || b.id === 'Bay' ? 0.5 : 1.5;
+    const need = a.id === 'Bay' || b.id === 'Bay' ? 0.3 : 1.5;   // (a bay is paint: the cars in it stand a hand's breadth inside)
     if (g < need) issues.push(`${a.id} / ${b.id}: ${g.toFixed(2)} m (needs ${need})`);
     else if (g < tight) { tight = g; tightPair = `${a.id} / ${b.id}`; }
   }
@@ -124,6 +126,7 @@ export function svg(L, proposed) {
   o.push(sh({ k: 'r', x0: -57.4, x1: 57.4, z0: 0, z1: 16.4 }, C.hall, 'opacity="0.55"'));
   o.push(sh({ k: 'r', x0: -9, x1: 9, z0: 0, z1: 16.4 }, C.wall, 'opacity="0.9"'));
   o.push(sh({ k: 'r', x0: -6, x1: 6, z0: 14, z1: 16.4 }, C.ground));
+  for (const r of L.roads || []) o.push(sh({ k: 'r', ...r }, '#6b6580', 'opacity="0.85"'));
   for (const a of L.asphalt) o.push(sh(a, C.asphalt));
   for (const a of L.paving) o.push(sh(a, C.paving, 'opacity="0.9"'));
   if (L.crossing) for (let i = 0; i < 9; i++) o.push(sh({ k: 'r', x0: -8.6 + i * 1.9 + 0.2, x1: -8.6 + i * 1.9 + 1.3, z0: L.crossing.z0, z1: L.crossing.z1 }, i % 2 ? C.gold : '#2a1450'));

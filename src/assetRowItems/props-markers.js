@@ -4,7 +4,7 @@ import { seat, hexOf } from './props-util.js';
 import { toon, glow, ink, inkMat, textSprite } from '../toon.js';
 import { mulberry32 } from '../rng.js';
 import { FACTIONS, CARGO, MIL_CARGO } from '../locations.js';
-import { makeCrate, makeSeismo, makeTube, makePylon, makeDish, makeTurret, makeRocket, engineModel, caseModel, plinkoConsoleModel, plinkoFrameModel, makeLampPost, makeFountain, makeChandelier, makeHallPart, makeCasinoSign, makeChipStack, makeClawMachine, makeClawHead, clawKindParts, clawLit, makeDerbyPart } from '../models.js';
+import { makeCrate, makeSeismo, makeTube, makePylon, makeDish, makeTurret, makeRocket, engineModel, caseModel, plinkoConsoleModel, plinkoFrameModel, makeLampPost, makeFountain, makeChandelier, makeHallPart, makeLotPart, makeCasinoSign, makeChipStack, makeClawMachine, makeClawHead, clawKindParts, clawLit, makeDerbyPart } from '../models.js';
 import { makeProp } from '../storyAssets.js';
 import { makeStretcher } from '../medevac.js';
 import { makeLoot } from '../alchemy.js';
@@ -473,6 +473,17 @@ function casinoHall() {
   return { root: lineUp(parts, 3).root, update: (dt) => { for (const f of movers) f(dt); } };
 }
 
+// ---- the casino's forecourt kit (lot.glb, tools/blender/build_lot.py; settlements.js dressCasinoLot, docs/casino-forecourt.md): a run of the card wall between its posts, a walkway chip bollard, the P pylon and a bay stud ----
+function casinoLot() {
+  const part = (name, w, d, f) => { const o = makeLotPart(name); if (f) f(o); const g = new THREE.Group(); g.add(o); return { root: g, w, d }; };
+  const wall = new THREE.Group();
+  const post = (x) => { const o = makeLotPart('lot_card_post'); o.position.x = x; wall.add(o); };
+  post(-3.96); post(3.96);
+  for (let i = 0; i < 3; i++) { const o = makeLotPart('lot_card_wall'); o.position.x = -2.4 + i * 2.4; wall.add(o); }
+  const parts = [{ root: wall, w: 8.6, d: 0.8 }, part('lot_chip_bollard', 1, 1), part('lot_pylon_p', 1.8, 1), part('lot_bay_stud', 0.6, 0.6)];
+  return { root: lineUp(parts, 2).root };
+}
+
 // ---- the casino's zero-g claw (claw.glb, tools/blender/build_claw.py; clawSim.js and clawView.js run it): the machine with its marquee and screen lit and a tank of things drifting
 // about in it while the claw cruises over them (nobody plays: no beam), then every kind of thing in the tank at the size it floats, the six crate tints, and the claw ----
 function clawMachine() {
@@ -578,6 +589,7 @@ export default {
     { id: 'prop.casino-props', label: 'CASINO LAMPS · FOUNTAINS · CHANDELIER · SIGNS', w: 91, d: 21, make: casinoProps },
     { id: 'prop.duck-derby', label: 'DUCK DERBY TRACK · RACERS · KIOSK · BOARD', w: 31, d: 21, make: duckDerby },
     { id: 'prop.blackjack', label: 'BLACKJACK TABLE · CHIPS', w: 14.4, d: 7, make: blackjack },
+    { id: 'prop.casino-lot', label: 'CASINO FORECOURT KIT: CARD WALL · POSTS · CHIP BOLLARD · P PYLON · BAY STUD', w: 24, d: 8, make: casinoLot },
     { id: 'prop.casino-hall', label: 'CASINO HALL KIT: BAYS · CEILING TILE · MEDALLION · BAR · CAGE · LOUNGE · GATE · FACADE · CROWN', w: 165, d: 36, big: true, make: casinoHall },
     { id: 'prop.claw-machine', label: 'ZERO-G CLAW MACHINE', w: 17, d: 8, make: clawMachine },
     { id: 'prop.claw-things', label: 'CLAW TANK: THINGS · CLAW', w: 41, d: 3, make: clawThings },

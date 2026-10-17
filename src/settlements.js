@@ -5,7 +5,7 @@ import { FACTIONS } from './locations.js';
 import { pixelFont } from './fonts.js';
 import { glow } from './toon.js';
 import { market, tickerText } from './market.js';
-import { casinoNode, casinoSlot } from './models.js';
+import { casinoNode, casinoSlot, lotNode, lotSlot } from './models.js';
 import { waterMesh } from './fountainFx.js';
 import { craneModel, craneSlot, CRANE_H, CRANE_LOAD_DROP, CRANE_TROLLEY_MIN, CRANE_TROLLEY_SPAN, gantryModel, cargoSlot, GANTRY_TROLLEY_SPAN, CARGO_BOX, garageModel, garageSlot, GARAGE_HALL, dishModel, dishSlot, DISH_KINDS } from './models.js';
 
@@ -2478,27 +2478,24 @@ export function jobTerminal(world, loc, x, z, yaw = 0, color = 0xffd23f) {
 // of parked hover-cars, so the hall doesn't sit alone in an empty crater.
 // =============================================================================================
 export function dressCasinoLot(world, loc, makeCar) {
-  const PINK = 0xff2e88, CYAN = 0x2ee6ff, GOLD = 0xffd23f, PURP = 0x5a1a8f, ASPH = 0x34304a, CRM = 0xd8d4e8, HEDGE = 0x2f6b3a;
+  const PINK = 0xff2e88, CYAN = 0x2ee6ff, GOLD = 0xffd23f, PURP = 0x5a1a8f, ASPH = 0x34304a, CRM = 0xd8d4e8;
   const keep = (x, z, r) => (loc.keep ||= []).push({ x, z, r });
   const cars = [];
   const FZ = 98, PR = 17; // the plaza: its centre and radius
+  // The Valet Court (docs/casino-forecourt.md): one asphalt court from the doors to halfway to the fountain (z 58), a paved walkway from there to the plaza. The court is an avenue (AV
+  // either side of the middle) the carpet runs down, with a wing of parking each side behind the slot carousels: two rows of bays (BAYW x BAYD) either side of an aisle, edged by a
+  // wall of giant cards (NMOD modules of MOD m between posts), its outer end open at the aisle's mouth.
+  const AV = 8.6, W0 = 38.4, W1 = 58.4, MID = (W0 + W1) / 2, MOD = 2.4, NMOD = 14, XA = AV + 0.36, XB = XA + 0.72 + NMOD * MOD;
+  const BX0 = 11, BAYW = 5.2, NB = 6, BAYD = 6.2, AISLE = 5.6;
+  const bayZ = [W0 + 0.6 + 0.4 + BAYD / 2, W1 - 0.6 - 0.4 - BAYD / 2];   // the two rows' middles (z 42.5 and 54.3)
   settle(world, loc, 7707, (k) => {
-    // ---- the boulevard: asphalt from the doors to the plaza: a funnel from the door's width out to the boulevard's, then the boulevard itself, which runs
-    // under the plaza's paving (so no sliver of dust is left between its end and the plaza's curved edge); gold edge lines; Blender-built neon lamp posts both sides ----
-    const b0 = 44, b1 = FZ - PR + 3, DOOR_Z = FRONT_OUT, W_DOOR = 8.6, W_BLV = 7.5;   // (W_DOOR: clear of the gate's piers and their plinths, which stand at 6 to 7.35)
-    {
-      // the funnel flares out from the boulevard's width to the gate's over its whole length (2 degrees), so the piers stand on asphalt and the gold edge line meets the wall's plinth beyond them
-      const funnel = new THREE.Shape([new THREE.Vector2(-W_DOOR, -DOOR_Z), new THREE.Vector2(W_DOOR, -DOOR_Z), new THREE.Vector2(W_BLV, -b0), new THREE.Vector2(-W_BLV, -b0)]);
-      k.add(new THREE.ExtrudeGeometry(funnel, { depth: 0.1, bevelEnabled: false }).rotateX(-Math.PI / 2), T(0x4a4060), 0, 0, 0, { outline: 0 }); // (the shape's y is -z)
-      for (const s of [-1, 1]) {
-        const dx = W_DOOR - W_BLV, dz = b0 - DOOR_Z;
-        k.box(0.3, 0.13, Math.hypot(dx, dz) + 0.1, T(GOLD), (s * (W_DOOR + W_BLV)) / 2, 0, (DOOR_Z + b0) / 2, { ry: -s * Math.atan2(dx, dz), outline: 0 });
-      }
-      // through the doors: the same asphalt over the wall's thickness (a little under the red carpet's strip, which rises from the hall's runner to the outside carpet), so the road runs right up to the hall's floor
-      k.box(2 * HALL.DOOR + 1, 0.06, DOOR_Z - HALL.FRONT + 0.1, T(0x4a4060), 0, 0, (HALL.FRONT + DOOR_Z) / 2, { outline: 0 });
-    }
-    k.box(2 * W_BLV, 0.1, b1 - b0, T(0x4a4060), 0, 0, (b0 + b1) / 2, { outline: 0 });   // (the funnel's width at its end: no step in the edge line where the two meet)
-    for (const s of [-1, 1]) k.box(0.3, 0.13, b1 - b0, T(GOLD), s * W_BLV, 0, (b0 + b1) / 2, { outline: 0 });
+    // ---- the avenue: asphalt from the doors to the court's far edge, its gold edge lines meeting the wall's plinth beyond the gate's piers (which stand at 6 to 7.35), and the same
+    // asphalt through the doors' wall to the hall's floor; Blender-built neon lamp posts ----
+    const DOOR_Z = FRONT_OUT, b1 = FZ - PR + 1;
+    k.box(2 * AV, 0.1, W1 - DOOR_Z, T(0x4a4060), 0, 0, (DOOR_Z + W1) / 2, { outline: 0 });
+    for (const s of [-1, 1]) k.box(0.3, 0.13, W0 - DOOR_Z, T(GOLD), s * AV, 0, (DOOR_Z + W0) / 2, { outline: 0 });
+    // through the doors: a little under the red carpet's strip, which rises from the hall's runner to the outside carpet, so the road runs right up to the hall's floor
+    k.box(2 * HALL.DOOR + 1, 0.06, DOOR_Z - HALL.FRONT + 0.1, T(0x4a4060), 0, 0, (HALL.FRONT + DOOR_Z) / 2, { outline: 0 });
     // a lamp post (build_casino.py) at `sc` times its size, its small lamp toward `yaw`'s +z; `accent` colours its rings, lantern and small lamp
     const lamp = casinoNode('lamp_post');
     const lampAt = (x, z, accent, sc, yaw) => {
@@ -2506,10 +2503,22 @@ export function dressCasinoLot(world, loc, makeCar) {
       k.baked(lamp, (slot) => { const c = casinoSlot(slot, accent); return c.glow ? G(c.color) : T(c.color); }, new THREE.Matrix4().makeScale(sc, sc, sc));
       k.at();
     };
-    for (let i = 0; i < 3; i++) for (const s of [-1, 1]) {
-      const z = 50 + i * 11, x = s * 8.5;
-      lampAt(x, z, (i + (s > 0)) % 2 ? PINK : CYAN, 0.92, -s * Math.PI / 2); // (the small lamp faces the road)
+    // a forecourt-kit piece (build_lot.py) at (x, z) turned by yaw
+    const I4 = new THREE.Matrix4();
+    const lotAt = (name, x, z, yaw = 0) => {
+      k.at(x, z, yaw);
+      k.baked(lotNode(name), (slot) => { const c = lotSlot(slot); return c.glow ? G(c.color) : T(c.color); }, I4);
+      k.at();
+    };
+    let lampN = 0;
+    const post = (x, z, sc = 0.92) => {            // (the small lamp faces the middle of the way)
+      lampAt(x, z, lampN++ % 2 ? PINK : CYAN, sc, x < 0 ? Math.PI / 2 : -Math.PI / 2);
       k.column(0.5, 7.5, x, z);
+    };
+    for (const s of [-1, 1]) {
+      for (const z of [26, 34]) post(s * (AV + 0.9), z);
+      for (const z of [63, 72]) post(s * 7.2, z);
+      for (const z of [W0 - 1.2, W1 + 1.2]) for (const x of [AV + 1.2, XB + 1.1]) post(s * x, z);
     }
     // ---- the fountain plaza ----
     // paving with a gold edge, and a ring of chip-coloured tiles round the basin
@@ -2543,7 +2552,7 @@ export function dressCasinoLot(world, loc, makeCar) {
       k.column(0.25, 5, x, z);
     }
     keep(0, FZ, PR + 2);
-    keep(0, (b0 + b1) / 2, 10);
+    keep(0, 40, 22);
     // ---- the pylon sign out by the road: twin posts, a tall marquee, chasing bulbs ----
     {
       const px = 26, pz = 118;
@@ -2566,45 +2575,48 @@ export function dressCasinoLot(world, loc, makeCar) {
       k.at();
       keep(px, pz, 9);
     }
-    // ---- car parks either side of the boulevard: asphalt in a curb, bays, wheel stops, hedges ----
+    // ---- the walkway: from the court's edge to the plaza, paved, gold lines either side of the carpet's strip, a chip inlay every 6 m, chip-stack bollards along both sides ----
+    k.box(10.4, 0.1, b1 - W1, T(0x6a5a8a), 0, 0, (W1 + b1) / 2, { outline: 0 });
     for (const s of [-1, 1]) {
-      const cx = s * 52, cz = 70, W = 44, Dp = 34, xin = cx - (s * W) / 2, xout = cx + (s * W) / 2;
-      k.box(W, 0.08, Dp, T(ASPH), cx, 0, cz, { outline: 0.02 });
-      // the curb all round, with a gap in the side toward the boulevard (the way in)
-      for (const z of [cz - Dp / 2, cz + Dp / 2]) k.box(W + 0.6, 0.3, 0.6, T(CRM), cx, 0, z, { outline: 0.03 });
-      k.box(0.6, 0.3, Dp, T(CRM), xout, 0, cz, { outline: 0.03 });
-      for (const t of [-1, 1]) k.box(0.6, 0.3, (Dp - 10) / 2, T(CRM), xin, 0, cz + (t * (Dp + 10)) / 4, { outline: 0.03 });
-      // hedges along the outer three sides, a striped strip across the entrance
-      k.box(1.2, 1.0, Dp + 4, T(HEDGE), xout + s * 1.4, 0, cz, { outline: 0.05 });
-      k.solid(0.6, 0.5, Dp / 2 + 2, xout + s * 1.4, cz);
-      for (const t of [-1, 1]) {
-        k.box(W - 2, 1.0, 1.2, T(HEDGE), cx + s * 1, 0, cz + t * (Dp / 2 + 1.4), { outline: 0.05 });
-        k.solid(W / 2 - 1, 0.5, 0.6, cx + s * 1, cz + t * (Dp / 2 + 1.4));
-      }
-      for (let i = 0; i < 6; i++) k.box(0.6, 0.1, 1.4, T(i % 2 ? GOLD : DARK), xin + s * 0.4, 0, cz - 4.2 + i * 1.7, { outline: 0 });
-      // a P sign by the way in, facing the boulevard
-      {
-        const sx = xin - s * 1.2, sz = cz + 7, face = -s * Math.PI / 2;
-        k.cyl(0.1, 0.12, 3.4, 6, T(0x2a1450), sx, 0, sz, { outline: 0.02 });
-        k.at(sx, sz, face);
-        k.box(1.6, 1.6, 0.2, T(0x2e7fa8), 0, 3.2, 0, { outline: 0.04 });
-        k.text('P', 0, 4.0, 0, 0, 1.0, { fg: '#ffffff', bg: '#2e7fa8', off: 0.12 });
-        k.at();
-        k.column(0.25, 4.8, sx, sz);
-      }
-      for (const row of [-1, 1]) {
-        const rz = cz + row * 9;
-        for (let i = 0; i <= 8; i++) k.box(0.18, 0.1, 6, T(CRM), cx - W / 2 + 4 + i * 4.5, 0, rz, { outline: 0 });
-        for (let i = 0; i < 8; i++) {
-          const bx = cx - W / 2 + 6.25 + i * 4.5;
-          k.box(1.8, 0.22, 0.35, T(GOLD), bx, 0, rz + row * 2.6, { outline: 0.02 });
+      k.box(0.25, 0.13, b1 - W1, T(GOLD), s * 5.0, 0, (W1 + b1) / 2, { outline: 0 });
+      for (let i = 0, z = W1 + 3.6; z < b1 - 1; i++, z += 6) k.cyl(0.7, 0.7, 0.04, 16, i % 2 ? G(CYAN) : G(PINK), s * 4.1, 0.1, z, { outline: 0 });
+      for (let z = W1 + 2; z < b1 - 1; z += 3) { lotAt('lot_chip_bollard', s * 5.6, z); k.column(0.45, 1, s * 5.6, z); }
+    }
+    // the card-stripe crossing where the court gives way to the walkway
+    for (let i = 0; i < 9; i++) k.box(1.1, 0.02, 2, T(i % 2 ? GOLD : 0x2a1450), -AV + 0.6 + i * 1.9, 0.1, W1 - 1, { outline: 0 });
+    keep(0, (W1 + b1) / 2, 14);
+
+    // ---- the two wings of the court, one each side of the avenue ----
+    for (const s of [-1, 1]) {
+      const x0 = AV, x1 = XB + 0.36;
+      k.box(x1 - x0, 0.1, W1 - W0, T(ASPH), s * (x0 + x1) / 2, 0, MID, { outline: 0 });
+      for (const [row, rz] of bayZ.entries()) {
+        for (let i = 0; i <= NB; i++) k.box(0.12, 0.02, BAYD - 0.2, T(CRM), s * (BX0 + i * BAYW), 0.1, rz, { outline: 0 });
+        for (let i = 0; i < NB; i++) {
+          const bx = s * (BX0 + (i + 0.5) * BAYW), head = row === 0 ? W0 + 1.0 + 0.5 : W1 - 1.0 - 0.5;
+          lotAt('lot_bay_stud', bx, head);
           // most bays taken: a hover-car parked nose-in
-          if ((i * 3 + (s > 0 ? 1 : 0) + (row > 0 ? 2 : 0)) % 4 !== 0) cars.push([bx, rz - row * 0.2, row > 0 ? 0 : Math.PI]);
+          if ((i * 5 + (row === 0 ? 1 : 3) + (s > 0 ? 2 : 0)) % 4 !== 0) cars.push([bx, rz, row === 0 ? Math.PI : 0]);
         }
       }
-      for (const lz of [cz - 4, cz + 4]) k.lamp(xout - s * 1.5, lz, 7, 0xff9fdc);
-      keep(cx, cz, 27);
+      // the wall of cards: the north and south runs between their posts, the outer end's two stubs either side of the aisle's mouth
+      for (const z of [W0 + 0.3, W1 - 0.3]) {
+        for (let i = 0; i < NMOD; i++) lotAt('lot_card_wall', s * (XA + 0.36 + MOD * (i + 0.5)), z);
+        for (const x of [XA, XB]) lotAt('lot_card_post', s * x, z);
+        k.solid((XB - XA) / 2 + 0.36, 0.65, 0.3, s * (XA + XB) / 2, z);
+      }
+      for (const dir of [1, -1]) {
+        const zc = (z) => MID + dir * (z - MID);                                  // (the south stub mirrors the north one)
+        for (let i = 0; i < 2; i++) lotAt('lot_card_wall', s * XB, zc(W0 + 0.3 + 0.36 + MOD * (i + 0.5)), Math.PI / 2);
+        lotAt('lot_card_post', s * XB, zc(W0 + 0.3 + 0.36 + 2 * MOD + 0.36));
+        k.solid(0.3, 0.65, 2.4 + 0.36, s * XB, zc(W0 + 0.3 + 0.36 + MOD + 0.18));
+      }
+      // the P pylons outside the outer end, turned to the road
+      for (const dz of [-6.4, 6.4]) { lotAt('lot_pylon_p', s * (XB + 2.4), MID + dz, s * Math.PI / 2); k.solid(0.5, 2.3, 0.5, s * (XB + 2.4), MID + dz); }
+      keep(s * 26, MID, 22);
     }
+    // the roads into the court: one from each end of the aisle out to the ring road, the traffic's own bed (traffic.js pavedStrip), melting in under the wings' asphalt
+    loc.paved = [-1, 1].map((s) => ({ x0: s * (XB - 4), z0: MID, x1: s * 128, z1: MID }));
   });
   // the parked cars (shared baked models), each a solid block to bump into
   cars.forEach(([x, z, yaw], i) => {
