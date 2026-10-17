@@ -4,10 +4,12 @@ import { seat, hexOf } from './props-util.js';
 import { toon, glow, ink, textSprite } from '../toon.js';
 import { mulberry32 } from '../rng.js';
 import { FACTIONS, CARGO, MIL_CARGO } from '../locations.js';
-import { makeCrate, makeSeismo, makeTube, makePylon, makeDish, makeTurret, makeRocket, plinkoConsoleModel, plinkoFrameModel } from '../models.js';
+import { makeCrate, makeSeismo, makeTube, makePylon, makeDish, makeTurret, makeRocket, engineModel, caseModel, plinkoConsoleModel, plinkoFrameModel } from '../models.js';
 import { makeProp } from '../storyAssets.js';
 import { makeStretcher } from '../medevac.js';
 import { makeLoot } from '../alchemy.js';
+import { slotCabinet, updateSlot, PLK } from '../casinoWorld.js';
+import { SLOTS, SPACING, DROP_Y } from '../plinko.js';
 import { Events } from '../events.js';
 import { World } from '../world.js';
 import { Traffic } from '../traffic.js';
@@ -44,6 +46,71 @@ function loot() {
   return {
     root: row.root,
     update: (dt, t) => { spin.forEach((c, i) => { c.rotation.y += dt * 2; c.position.y = Math.sin(t * 3 + i) * 0.15; }); }, // (alchemy.updateLoot)
+  };
+}
+
+// ---- wreck salvage: the engine and the credits briefcase (models.js engineModel / caseModel; tools/blender/build_engine.py, build_briefcase.py) ----
+// In the game they lie on the ground as pickups, spinning and bobbing (alchemy.js makeLoot: they are also in LOOT PICKUPS above, small among the
+// others). Here each stands on the floor at its real size and turns slowly, so every side can be seen.
+function salvage(build, what) {
+  const m = build();
+  if (!m) throw new Error(`${what} has not loaded`); // (null until the models have loaded)
+  const p = seat(m);
+  const root = new THREE.Group();
+  root.add(p.root);
+  return { root, update: (dt) => { p.root.rotation.y += dt * 0.5; } };
+}
+const engine = () => salvage(engineModel, 'engine.glb');
+const briefcase = () => salvage(caseModel, 'briefcase.glb');
+
+// ---- the casino's slot machines (casinoWorld.js slotCabinet; the cabinet is tools/blender/build_slots.py) --------------------------------
+// The seven paints of the carousels (buildCasino), each with its own marquee word and side pictures (the marquee and the pixel sprites are
+// planes the casino hangs on the model), facing the walker. Every few seconds one is worked: the lever swings, the lamp bar flashes and the
+// reels run and stop one after another (updateSlot).
+function slotMachines() {
+  const paints = [0xff2e88, 0x2ee6ff, 0x7dff6a, 0xff9f1c, 0xc77dff, 0xffd23f, 0x4d7cff];
+  const users = [];
+  const parts = paints.map((c, i) => {
+    const cab = slotCabinet(c, i);
+    const g = new THREE.Group();
+    g.add(cab.userData.stat, cab); // (the casino places the frozen part and the moving part alike)
+    users.push(cab.userData);
+    return seat(g);
+  });
+  const row = lineUp(parts, 0.9);
+  let acc = 2, k = 0;
+  return {
+    root: row.root,
+    update: (dt, t) => {
+      acc -= dt;
+      if (acc <= 0) { acc = 3.2; const u = users[k++ % users.length]; u.playing = 2.4; u.pullT = 0.3; }
+      for (const u of users) updateSlot(u, dt, t);
+    },
+  };
+}
+
+// ---- the Plinko booth and the board's cabinet frame (models.js plinkoConsoleModel / plinkoFrameModel; tools/blender/build_plinko.py) ------
+// As buildCasino stands them: the frame (a plinth, two pillars, a cornice and the sign backing) with the board's dark panel in it, and the
+// booth you play from 6 m in front. The pegs, the ball, the slot labels and the neon sign are built inline in buildCasino and are seen with
+// the casino itself (places: LUCKY CRATER CASINO); the board's own colliders are the casino's (a box for the frame, one for the booth).
+function plinko() {
+  const frame = plinkoFrameModel(), booth = plinkoConsoleModel();
+  if (!frame || !booth) throw new Error('plinko.glb has not loaded');
+  const bw = SLOTS * SPACING + 2.4, bh = DROP_Y + 2.4;
+  const z0 = -2.2; // (the frame's origin: puts the middle of frame and booth on the item's own)
+  const root = new THREE.Group();
+  frame.position.set(0, 0, z0);
+  booth.position.set(0, 0, z0 + 6);
+  const board = new THREE.Mesh(new THREE.BoxGeometry(bw, bh, 0.5), toon(0x1a0f2e));
+  ink(board, 0.1);
+  board.position.set(0, PLK.y + bh / 2 - 0.9, z0 - 0.45);
+  root.add(frame, booth, board);
+  return {
+    root,
+    cols: [
+      { type: 'box', x: 0, y: 6.9, z: z0 - 0.675, hx: bw / 2 + 0.95, hy: 6.9, hz: 1.375, yaw: 0 },
+      { type: 'box', x: 0, y: 0.7, z: z0 + 6, hx: 1.8, hy: 0.7, hz: 0.7, yaw: 0 },
+    ],
   };
 }
 
@@ -348,23 +415,18 @@ function zoneWall(R, height, y, hostile) {
   };
 }
 
-// ---- the casino's Plinko booth and the cabinet frame that joins the board to the back wall (plinko.glb, tools/blender/build_plinko.py; the board's pegs,
-// rails and sign are built in casinoWorld.js, so only the two Blender pieces stand here) ----
-function plinko() {
-  const frame = plinkoFrameModel(), booth = plinkoConsoleModel();
-  if (!frame || !booth) throw new Error('plinko.glb is not loaded');
-  return { root: lineUp([{ root: frame, w: 16.1, d: 2.7 }, { root: booth, w: 3.6, d: 1.4 }], 3).root };
-}
-
 export default {
   id: 'props.markers',
   title: '04 · PROPS & MARKERS',
   items: [
     { id: 'prop.crate', label: 'CRATES', w: 33, d: 2, make: crates },
     { id: 'prop.loot-drop', label: 'LOOT PICKUPS', w: 33, d: 2.4, solid: false, make: loot },
-    { id: 'prop.plinko', label: 'PLINKO BOOTH · FRAME', w: 23, d: 3, make: plinko },
+    { id: 'prop.engine', label: 'SALVAGED ENGINE', w: 2.4, d: 2.4, make: engine },
+    { id: 'prop.briefcase', label: 'CREDITS BRIEFCASE', w: 1.4, d: 1.4, make: briefcase },
     { id: 'prop.seismograph', label: 'SEISMOGRAPH', w: 2, d: 2.2, make: seismograph },
     { id: 'prop.vacuum-tube', label: 'VACUUM TUBES', w: 6, d: 1.3, make: tubes },
+    { id: 'prop.slot-machines', label: 'SLOT MACHINES', w: 7 * 2.5 + 6 * 0.9, d: 1.8, make: slotMachines },
+    { id: 'prop.plinko', label: 'PLINKO BOOTH & FRAME', w: 16.7, d: 9.2, make: plinko },
     { id: 'event.start-props', label: 'EVENT START PROPS', w: 82, d: 7.2, make: startProps },
     { id: 'story.props', label: 'STORY PROPS', w: 94, d: 17, make: storyProps },
     { id: 'prop.launch-complex', label: 'MERIDIAN LAUNCH COMPLEX', w: 39, d: 39, make: launchComplex },
