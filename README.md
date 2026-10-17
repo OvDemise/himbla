@@ -470,7 +470,11 @@ chimeras come out Turbocharged, the reactor gives you low gravity) plus scrap cr
 nearest town, and a replacement turns up a few minutes later.
 
 Freighters and shuttle-buses fly real routes: they lift off vertically on their belly jets, cruise over everything
-with their main thrusters pulsing, slow down and land on a pad at the edge of each settlement. The landing legs fold
+with their main thrusters pulsing, slow down and land on a pad at the edge of each settlement. A **landing pad** is a round deck 3 m up on
+steel legs (14.3 m across the radius for a shuttle-bus, so its ramp comes down on the deck, 21 m for a freighter), with a hazard band round its
+edge, a lamp-lit safety railing all the way round, and one flight of stairs down to the ground with handrails both sides; the
+waiting shelter stands beside the stairs' foot, and the passengers walk round the ship to the stairs and down them. On a slope the deck still
+stands 3 m over the highest ground under it, and its stairs come down on the uphill side. The landing legs fold
 out of their bays (doors first, then the legs) on the way down and tuck away again after take-off; the shuttle-bus's
 rear door drops into a ramp, the freighter lowers a belly ramp. The **shuttle-bus** is a 19 m lifting-body hopper
 with a wraparound windscreen, porthole windows, two ducted lift-fans and a lit route board on the roof; the
@@ -563,7 +567,7 @@ the unlock counters, toggle any splice-pod mutation (with a reset), or reset all
 ### The Asset Row (dev builds only)
 
 Dev menu (`F8`) → **Full cheat menu** → **Teleport** → option 1, **ASSET ROW**: a flat showroom with every asset in the game
-lined up side by side, 213 of them in 25 sections (the runner and its gear, people, creatures, props and markers,
+lined up side by side, 215 of them in 25 sections (the runner and its gear, people, creatures, props and markers,
 weapons and effects, rocks and nature, the secrets and the Spindle's props, ground vehicles and ships, outposts intact and
 wrecked, the building parts the settlements are made of, the hometown, and all the places). The small ones stand in the
 yellow lane (z = 0), the places over 100 m across in the cyan lane 460 m over; the whole row is about 9 km, so the dev
@@ -673,7 +677,7 @@ crowd-noise bed for now (the cheering is due a rework), and the race countdown b
 | Location | Type | Notes |
 | --- | --- | --- |
 | International Moon Base (ILMB) | SPACECOM HQ | Fortress walls, turrets, artillery, embassies, job board, repair bay, launch pad |
-| Meridian Exchange · Shackleton Radar Array · Helium-3 Exchange | Meridian | Trade hub (a gate arch and a lamp-lined avenue down to the portico of the trading tower with its live price ticker, the lab dome and a sawtooth trade hall facing each other across the avenue, a motor-pool garage with its own service road, a container gantry and tower cranes at work behind the tower), radar research (four big dishes that turn and nod, each on a Blender-built station: a cryo receiver, a Helium-3 tanker stood on end, or a gantry station, a lattice mast over container control rooms; plus an observatory with a turning cupola), and a working strip-mine (bucket-wheel excavator, ore conveyor, pumping derrick, Horton-sphere tank farm) |
+| Meridian Exchange · Shackleton Radar Array · Helium-3 Exchange | Meridian | Trade hub (a gate arch and a lamp-lined avenue down to the plaza fountain (the casino's, with a glowing dollar sign turning on top) and the portico of the trading tower with its live price ticker, the lab dome and a sawtooth trade hall facing each other across the avenue, a motor-pool garage with its own service road, a container gantry and tower cranes at work behind the tower), radar research (four big dishes that turn and nod, each on a Blender-built station: a cryo receiver, a Helium-3 tanker stood on end, or a gantry station, a lattice mast over container control rooms; plus an observatory with a turning cupola), and a working strip-mine (bucket-wheel excavator, ore conveyor, pumping derrick, Horton-sphere tank farm) |
 | Kepler Civic Center · Tranquility Commons · Aldrin Heights · Twilight Waystation · Hertzsprung Refuge | Kepler | Towns, safe rest and repair |
 | Farside Listening Post | SPACECOM (dark side) | Hazard-pay destination: the same four-dish array in SPACECOM paint, the two station designs swapped round |
 | Bastion Vostok-9 · Vostok-4 Outpost | Vostok | Restricted zones: turrets, patrols, artillery |
@@ -757,6 +761,7 @@ src/
   settlements.js detailed settlements, HQs and landmarks built with the outpost kit (moving parts, skate park)
   market.js      the Meridian Exchange's stocks: a random-walk market refreshed every 15 s, read by the tower's ticker
   traffic.js     landing pads, ship/bus flights and passengers, roads, land-trains, cars, buggies
+  landingPad.js  the landing pad itself (deck on legs, railing, stairs, colliders and the walkers' waypoints), for every size and slope
   roadplan.js    where a road runs: a least-cost search over the terrain (slope, craters, rims, rock, rilles) between two town gates
   wardrobe.js    wardrobe screen with live 3D preview
   trailer.js     trailer director mode (?trailer): the official trailer, shot by shot, from live gameplay
@@ -771,9 +776,10 @@ src/
   assets/apc.glb     the Vostok BTR-M Moon APC (eight wheels, a turret that yaws and a barrel that elevates)
   assets/landtrain.glb  the Moonliner and Prospector land-trains: two tractors and four trailers, each with a livery for every faction
   assets/crane.glb   the tower crane (lattice mast, ballasted base, slewing head with cab, trolley and hook)
+  assets/gantry.glb  the gantry crane over the Meridian container yard (lattice legs on rail bogies, truss girder, the tower crane's trolley and hook carrying the land-train's box container) and that container on its own, for the yard's stacks
   assets/garage.glb  the Meridian motor-pool garages: the main one (three bays with open and shut doors, workshop fit-outs, service office, fuel yard, roof plant) and a small two-bay one
   assets/slots.glb   the casino's slot-machine cabinet: a pixel-arcade video slot with a tilted screen under a marquee, speakers, LED chases, arcade buttons, a ticket printer, a coin cup and a lever (the game paints its colour, marquee, side art and reels)
-  assets/casino.glb  the casino's lamp post, plaza fountain (basin, pedestal, bowl, spigots, a spinning chip, the water as pivots the game gives ripple, curtain and jet shaders), buff alien bouncer, hall chandelier and the welcome and blackjack signs' frames
+  assets/casino.glb  the casino's lamp post, plaza fountain (basin, pedestal, bowl, spigots, a spinning chip or, for the Meridian Exchange's plaza, a spinning dollar sign, the water as pivots the game gives ripple, curtain and jet shaders), buff alien bouncer, hall chandelier and the welcome and blackjack signs' frames
   assets/claw.glb    the casino's Zero-G claw: the 16 m glass-tank machine (plum base, brass mullions, marquee box, console, prize chute, ten shuffle jets, the drop hole), the energy claw, a chain link and each kind of thing in the tank (the salvaged engine and the credits case are the game's own models)
   assets/duck.glb    the casino's Duck Derby: the four racers (a cap, hat, fez or bubble helmet each, a numbered wing disc) and the gilded track: basin with lane floats, start gate and grille, finish arch, odds-board frame, bookmaker's kiosk, brass rail post and velvet rope, trophy
   assets/blackjack.glb  the casino's gilded blackjack table (plum lacquer, gold, cream suit panels, a leather rail, a chip rack, shoe and discard well, the dealer's back counter) and its chip
@@ -798,6 +804,7 @@ tools/
   blender/build_apc.py     builds the Vostok APC and its turret -> src/assets/apc.glb (also runs headless: `pip install bpy`, then `MOONRUNNER_REPO=. python3 tools/blender/build_apc.py`)
   blender/build_landtrain.py builds the Moonliner and Prospector tractors and trailers -> src/assets/landtrain.glb (also runs headless, like build_apc.py)
   blender/build_crane.py   builds the tower crane -> src/assets/crane.glb (also runs headless, like build_apc.py)
+  blender/build_gantry.py  builds the gantry crane and the yard's box container -> src/assets/gantry.glb (the tower crane's lattice work, trolley, hook and slings; the container from cargo.py)
   blender/build_garage.py  builds the main and small motor-pool garages -> src/assets/garage.glb (also runs headless)
   blender/build_slots.py   builds the casino's slot-machine cabinet -> src/assets/slots.glb (also runs headless; checks that the side plaques and decals sit inside the cabinet's silhouette)
   blender/build_casino.py  builds the casino's lamp post, fountain, bouncer, chandelier and signs -> src/assets/casino.glb (also runs headless)
@@ -811,7 +818,7 @@ tools/
   blender/dishkit.py       the dish geometry build_dish.py and build_outposts.py share (the reflector and its parts, the trunnion mount, the light dish head); exec'd by them after kit.py, builds nothing itself
   blender/decals.py        flat lettering, emblems, hazard stripes and safety signs (no textures) the land-train builder execs after kit.py
   blender/kit.py           shared geometry/material/export helpers every Blender builder execs (the runner and ships keep their own variants of a few)
-  viewer.html              dev-only model viewer (npm run dev, then /tools/viewer.html?m=shuttle|freighter|apc|landtrain|crane|garage|slots|dish|outpost|mite|lineup…; slots takes &n=<cabinets in a row>&ring=<cabinets round a pillar>&idx=<first colour and name>&play=1 (works them like a patron); casino takes &part=lamp|fountain|bouncer|chandelier|welcome|wall|blackjack|claw|clawthings|duckderby (&accent=<hex>&n=<lamps> for lamp); freighter takes &faction=spacecom|vostok|kepler|meridian (the cargo's livery); dish takes &kind=cryo|gantry|field|head&faction=…&no=01..04&size=30&tilt=<rad>&sweep=1; apc takes &turret=<rad>&barrel=<rad>; landtrain takes &type=moonliner|prospector&faction=spacecom|vostok|kepler|meridian&cars=pax,tank,cargo,blast&unit=<n>)
+  viewer.html              dev-only model viewer (npm run dev, then /tools/viewer.html?m=shuttle|freighter|apc|landtrain|crane|gantry|cargobox|garage|slots|dish|outpost|mite|lineup…; slots takes &n=<cabinets in a row>&ring=<cabinets round a pillar>&idx=<first colour and name>&play=1 (works them like a patron); casino takes &part=lamp|fountain|bouncer|chandelier|welcome|wall|blackjack|claw|clawthings|duckderby (&accent=<hex>&n=<lamps> for lamp); freighter takes &faction=spacecom|vostok|kepler|meridian (the cargo's livery); dish takes &kind=cryo|gantry|field|head&faction=…&no=01..04&size=30&tilt=<rad>&sweep=1; apc takes &turret=<rad>&barrel=<rad>; landtrain takes &type=moonliner|prospector&faction=spacecom|vostok|kepler|meridian&cars=pax,tank,cargo,blast&unit=<n>)
   meridian-layouts.mjs     the Meridian Exchange layout study (docs/meridian-layouts.md): the footprints of the site as built and of two proposed layouts, a clearance check, and the plan drawings in docs/
   winch-sign-repro.mjs     dev-only headless repro for the winch cable round the Lucky Crater Casino sign post (see docs/winch-handoff.md: what was found, what is open)
 ```

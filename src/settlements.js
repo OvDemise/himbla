@@ -6,7 +6,7 @@ import { glow } from './toon.js';
 import { market, tickerText } from './market.js';
 import { casinoNode, casinoSlot } from './models.js';
 import { waterMesh } from './fountainFx.js';
-import { craneModel, craneSlot, CRANE_H, CRANE_LOAD_DROP, CRANE_TROLLEY_MIN, CRANE_TROLLEY_SPAN, garageModel, garageSlot, GARAGE_HALL, dishModel, dishSlot, DISH_KINDS } from './models.js';
+import { craneModel, craneSlot, CRANE_H, CRANE_LOAD_DROP, CRANE_TROLLEY_MIN, CRANE_TROLLEY_SPAN, gantryModel, cargoSlot, GANTRY_TROLLEY_SPAN, CARGO_BOX, garageModel, garageSlot, GARAGE_HALL, dishModel, dishSlot, DISH_KINDS } from './models.js';
 
 // Settlements, HQs and landmarks built with the outpost Kit (outpostModels.js): every static part
 // of a place bakes into one merged mesh per material plus one ink hull, so a detailed settlement
@@ -307,6 +307,78 @@ export function towerCrane(k, x, z, h, jib, color, { speed = 0.12, phase = 0 } =
   };
   k.dyn(top, 0, top.position.y, 0);
   k.at();
+}
+
+// Gantry crane (built in Blender, tools/blender/build_gantry.py): the tower crane's sibling over a container yard. A portal of two
+// lattice legs on rail bogies under a truss girder; the whole crane is one moving object that runs along x on its rails (`travel` m
+// either way of `x`), the trolley (the tower crane's) hangs under the girder at `lane` along z, and the hook block lowers the
+// crane's load (the land-train's box container on a spreader, in `faction`'s livery) to the ground at each end of the run, then
+// lifts it and comes back: a cycle every 1 / `speed` seconds, starting `phase` of the way through. Drawn in the settlement's frame
+// (call with k at the origin); the legs ride at z +- GANTRY_LEG of `z`. No colliders: it never stands still.
+export function gantryCrane(k, x, z, color, { speed = 1 / 70, phase = 0, travel = 24, lane = 10, faction = 'meridian' } = {}) {
+  const C = gantryModel();
+  const mat = (slot, cargo) => { const c = cargo ? cargoSlot(slot, faction) : craneSlot(slot, color, faction); return c.glow ? G(c.color) : T(c.color); };
+  // a moving piece: the node's own meshes, and under its `load` the spreader, the cargo unit and its matching livery
+  const piece = (node) => part(color, (q) => {
+    const walk = (n, m, cargo) => {
+      q.baked(n, (slot) => mat(slot, cargo), m);
+      for (const c of n.kids) {
+        if (c.role === 'load' || c.role === 'cargo' || (c.role === 'livery' && c.data.faction === faction)) {
+          walk(c, new THREE.Matrix4().compose(c.pos, c.quat, new THREE.Vector3(1, 1, 1)).premultiply(m), cargo || c.role === 'cargo');
+        }
+      }
+    };
+    walk(node, new THREE.Matrix4(), false);
+  });
+  const body = piece(C.root);
+  for (const b of C.blinkers) {
+    const lamp = new THREE.Mesh(new THREE.SphereGeometry(b.data.radius || 0.3, 8, 6), G(0xff2a4a));
+    lamp.userData.blink = true;
+    lamp.position.copy(b.pos);
+    body.add(lamp);
+  }
+  const trolley = piece(C.trolley), cable = piece(C.cable), hook = piece(C.hook);
+  trolley.position.copy(C.trolley.pos);
+  cable.position.copy(C.cable.pos);
+  hook.position.copy(C.hook.pos);
+  trolley.add(cable, hook);
+  body.add(trolley);
+  // the rope pays out until the container's bottom is 0.3 m off the ground
+  const drop = C.hook.data.drop || 8.9;
+  const ropeMin = 1.5, ropeMax = C.trolley.pos.y + C.hook.pos.y - drop - 0.3;
+  const ease = (f) => 0.5 - 0.5 * Math.cos(Math.PI * Math.min(1, Math.max(0, f)));
+  body.userData.tick = (o, dt, t) => {
+    const u = ((t * speed + phase) % 1 + 1) % 1;
+    // the cycle: set down and lift at this end (0 - 0.2), run to the far end (0.2 - 0.5), set down and lift there (0.5 - 0.7), run back
+    let along, dip;
+    if (u < 0.2) { along = 0; dip = Math.sin(Math.PI * u / 0.2); }
+    else if (u < 0.5) { along = ease((u - 0.2) / 0.3); dip = 0; }
+    else if (u < 0.7) { along = 1; dip = Math.sin(Math.PI * (u - 0.5) / 0.2); }
+    else { along = 1 - ease((u - 0.7) / 0.3); dip = 0; }
+    o.position.x = x - travel + 2 * travel * along;
+    trolley.position.z = lane + Math.sin(t * 0.5 + phase * 7) * 0.4;
+    const rope = ropeMin + (ropeMax - ropeMin) * dip;
+    cable.scale.y = rope;
+    hook.position.y = C.hook.pos.y - rope;
+  };
+  k.dyn(body, x, 0, z);
+}
+
+// A stack of `n` of the land-train's box containers (the gantry file's own, gantryModel().box) at (x, z), each in the livery of
+// `factions[j]` (bottom first), lying along local z, turned by `ry`, standing on y0; one collider the size of the stack.
+export function cargoStack(k, x, z, n, factions, ry = 0, y0 = 0) {
+  const C = gantryModel();
+  for (let j = 0; j < n; j++) {
+    const f = factions[j % factions.length];
+    const mat = (slot) => { const c = cargoSlot(slot, f); return c.glow ? G(c.color) : T(c.color); };
+    const m = new THREE.Matrix4().makeRotationY(ry).setPosition(x, y0 + j * CARGO_BOX.h, z);
+    k.baked(C.box, mat, m);
+    for (const c of C.box.kids) {
+      if (c.role === 'livery' && c.data.faction !== f) continue;
+      k.baked(c, mat, new THREE.Matrix4().compose(c.pos, c.quat, new THREE.Vector3(1, 1, 1)).premultiply(m));
+    }
+  }
+  k.solid(CARGO_BOX.hx + 0.1, (n * CARGO_BOX.h) / 2, CARGO_BOX.hz + 0.1, x, z, ry, y0);
 }
 
 // Radio-dish array station (built in Blender, tools/blender/build_dish.py): 'cryo' (the Helium-3 tanker on end under a banded dish) or
@@ -682,6 +754,29 @@ function tradeHall(k, x, z, w, d, trim, name = 'TRADE HALL') {
   k.at();
 }
 
+// The plaza fountain (built in Blender, tools/blender/build_casino.py): the basin, pedestal, bowl, stem and spigots are baked into
+// the kit; the centrepiece turns (`top`: the casino's 'chip', or the 'dollar' sign in `accent`, the Meridian Exchange's), and the
+// two tiers' ripples, the curtain spilling over the bowl's lip and the jets from the spigots under it run on shaders
+// (fountainFx.js). Colliders for the basin, the pedestal and the stem. Drawn in the settlement's frame (k at the origin).
+export function fountain(k, x, z, { top = 'chip', accent = 0xff2e88 } = {}) {
+  const F = casinoNode('fountain'), I = new THREE.Matrix4();
+  const mat = (slot) => { const c = casinoSlot(slot, accent); return c.glow ? G(c.color) : T(c.color); };
+  k.at(x, z);
+  k.baked(F, mat, I);
+  for (const n of F.kids) {
+    if (n.role === 'spin') {
+      if ((n.data.kind || 'chip') !== top) continue;
+      const piece = part(0xffffff, (q) => q.baked(n, mat, I));
+      piece.userData.spin = n.data.speed || 0.7;
+      k.dyn(piece, n.pos.x, n.pos.y, n.pos.z);
+    } else k.dyn(waterMesh(n), n.pos.x, n.pos.y, n.pos.z);
+  }
+  k.at();
+  k.column(9.8, 1.05, x, z);
+  k.column(2.7, 4.7, x, z);
+  k.column(1.7, 9.2, x, z, 4.7);
+}
+
 // =============================================================================================
 // Meridian Exchange: the trade HQ, laid out on one axis (docs/meridian-layouts.md, layout A): a gate
 // arch on the +z side, a 118 m avenue down to the plaza and the portico of the stepped glass trading
@@ -694,7 +789,7 @@ export function buildMeridian(world, loc) {
     const blue = 0x2ec4ff, cols = [0x2ec4ff, 0xff9f1c, 0x7dff6a, 0xff3b5c, 0xffd23f, 0xc77dff];
     // layout: the tower 24 m south of the origin (the name and HQ sprites hang over the origin at
     // y 50 and 62, which would be inside the tower's cone), its portico facing +z onto the plaza at
-    // (0, 20); the avenue runs from the plaza north to the gate arch at (0, 140); the dome west of
+    // (0, 34); the avenue runs from the plaza north to the gate arch at (0, 140); the dome west of
     // the avenue and the hall east of it; the chairwoman at the foot of the steps; the yard, the
     // cranes and the garage south of the tower
     const TZ = -24;
@@ -769,8 +864,9 @@ export function buildMeridian(world, loc) {
       k.at();
       k.lamp(-11, TZ + fz + 10.5, 6); k.lamp(11, TZ + fz + 10.5, 6);
     }
-    // the chairwoman (story.buildLeaders) stands at the foot of the portico's steps, off the doors' line, facing the plaza
-    loc.leaderSpot = { x: 8, z: 6, yaw: Math.atan2(-8, 14) };
+    // the chairwoman (story.buildLeaders) stands at the foot of the portico's steps, off the doors' line, facing the plaza's fountain
+    // (her ballot stand, 5.5 m in front of her, stays clear of the basin)
+    loc.leaderSpot = { x: 9.5, z: 6, yaw: Math.atan2(-9.5, 14) };
     const crown = part(blue, (q) => {
       for (let i = 0; i < 4; i++) {
         const a = (i / 4) * TAU;
@@ -786,76 +882,53 @@ export function buildMeridian(world, loc) {
     const GA = GARAGE_AT;
     garage(k, GA.x, GA.z, GA.yaw, [true, false, true], 'main');
     loc.garage = { ...GA, bay: 2 }; // (the bay the rovers come out of: it is open and has nothing in the way)
-    // container yard under a travelling gantry crane: 70 x 30, three rows of seven stacks
+    // the container yard: a 70 x 30 slab with the gantry crane's rails along its long edges, three rows of stacks of the
+    // land-train's box container (cargo.py, as the cranes carry it) in the freight factions' liveries, a lane along the
+    // north side for the gantry to set its load down in, and the gantry running the length of the yard over it all
     const yx = 0, yz = -97;
     k.at(yx, yz);
     k.box(70, 0.3, 30, T(0x6b6880), 0, 0, 0, { outline: 0.04 });
-    for (const s of [-1, 1]) k.box(72, 0.3, 0.6, T(STEEL), 0, 0.3, s * 15, { outline: 0 });
-    for (let i = 0; i < 21; i++) {
-      const cx = -30 + (i % 7) * 10, cz = -6 + Math.floor(i / 7) * 6;
-      const hgt = 1 + ((i * 7) % 3);
-      for (let j = 0; j < hgt; j++) container(k, cx, 0.3 + j * 2.62, cz, cols[(i + j) % cols.length], Math.PI / 2);
-      k.solid(3.2, (hgt * 2.62) / 2, 1.4, cx, cz, 0, 0.3);
+    for (const s of [-1, 1]) {
+      k.box(70, 0.25, 0.5, T(STEEL), 0, 0.3, s * 15, { outline: 0 });
+      for (let x = -33; x <= 33; x += 3) k.box(0.5, 0.12, 1.6, T(DARK), x, 0.3, s * 15, { outline: 0 });
+      for (const bx of [-34.2, 34.2]) k.box(0.6, 1.1, 1.2, T(YEL), bx, 0.3, s * 15, { outline: 0.03 });
+    }
+    const freight = ['meridian', 'kepler', 'spacecom', 'vostok'];
+    for (let i = 0; i < 18; i++) {
+      const col = i % 6, row = Math.floor(i / 6);
+      if (i === 4 || i === 13) continue; // (two bays stand empty)
+      const cx = -26 + col * 9.5, cz = -8.5 + row * 7;
+      const n = 1 + ((i * 7 + row) % 3);
+      cargoStack(k, cx, cz, n, [freight[(i + row) % 4], freight[(i * 3 + 1) % 4], freight[(i + 2) % 4]], Math.PI / 2, 0.3);
     }
     k.at();
-    const gantry = part(YEL, (q) => {
-      for (const s of [-1, 1]) {
-        for (const t of [-1, 1]) q.beam([t * 2.4, 0.6, s * 15], [t * 1.2, 15, s * 15], 0.45, T(YEL), { outline: 0.05 });
-        q.box(5.6, 1.2, 2, T(DARK), 0, 0, s * 15, { outline: 0.04 });
-        q.box(3, 0.8, 1.2, T(YEL), 0, 6, s * 15, { outline: 0 });
-      }
-      q.box(2.2, 1.6, 33, T(YEL), 0, 15, 0, { outline: 0.06 });
-      q.box(2.6, 2.2, 2.6, T(WHITE), 0, 12.6, 13, { outline: 0.04 });
-      q.box(2.64, 0.8, 2.64, G(0xcfefff), 0, 13.6, 13, { outline: 0 });
-      q.blinker(0, 17, -15, 0xffd23f, 0.3);
-      q.blinker(0, 17, 15, 0xffd23f, 0.3);
-    });
-    const trolley = new THREE.Group();
-    trolley.add(new THREE.Mesh(new THREE.BoxGeometry(2.8, 1, 2.6), T(DARK)));
-    const spreader = part(YEL, (q) => {
-      q.box(2.8, 0.5, 6.4, T(YEL), 0, -0.25, 0, { outline: 0.04 });
-      container(q, 0, -3.2, 0, 0xff3b5c, 0);
-    });
-    const cab = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 1, 4).translate(0, -0.5, 0), T(DARK));
-    trolley.add(cab, spreader);
-    gantry.add(trolley);
-    gantry.userData.tick = (o, dt, t) => {
-      o.position.x = yx + Math.sin(t * 0.07) * 28;
-      trolley.position.set(0, 15, Math.sin(t * 0.21) * 10);
-      const drop = 3 + 6 * (0.5 + 0.5 * Math.sin(t * 0.33));
-      cab.scale.y = drop; spreader.position.y = -drop;
-    };
-    k.dyn(gantry, yx, 0.3, yz);
+    gantryCrane(k, yx, yz, YEL, { speed: 1 / 70, phase: 0.3, travel: 24, lane: 10, faction: 'meridian' });
     // the yard's slab, the plaza and the avenue have no colliders to say they are taken: keep the traffic's pads, the ring's stop and
     // the defence pylons off them (traffic.js keepouts, world.js defensePylons); the yard's is sized so the turret at (25, -122) stays put
-    (loc.keep ||= []).push({ x: yx, z: yz, r: 30 }, { x: 0, z: 20, r: 14 }, ...[45, 75, 105, 135].map((z) => ({ x: 0, z, r: 20 })));
+    (loc.keep ||= []).push({ x: yx, z: yz, r: 30 }, { x: 0, z: 34, r: 14 }, ...[56, 82, 108, 134].map((z) => ({ x: 0, z, r: 16 })));
     // two tower cranes over the yard
     towerCrane(k, -54, -72, 34, 30, YEL, { speed: 0.09, phase: 0 });
     towerCrane(k, 62, -78, 34, 30, YEL, { speed: 0.11, phase: 2.2 });
     // the lab dome west of the avenue, its airlock facing it; the trade hall east of it, its doors facing it
     habDome(k, -58, 40, 22, 0x9be7ff, { door: Math.PI / 2, trim: blue });
     tradeHall(k, 64, 24, 24, 56, blue);
-    // the plaza between the portico and the avenue: paving, a lit beacon, benches, lamps
-    k.at(0, 20);
+    // the plaza between the portico and the avenue, a good way out from the steps so the fountain has room: paving, the
+    // fountain (the casino's, with a dollar sign in Meridian blue turning on top), benches round the basin, lamps
+    k.at(0, 34);
     k.cyl(12, 12.4, 0.25, 32, T(0xd8d4e8), 0, 0, 0, { outline: 0.04 });
     k.ring(12.2, 0.15, T(blue), 0, 0.25, 0);
-    k.cyl(1.6, 2, 3.2, 10, T(blue), 0, 0, 0, { outline: 0.05 });
-    k.ball(1.4, G(0xbfe9ff), 0, 4.2, 0, { outline: 0 });
-    k.column(2, 3.4, 0, 0);
     for (let i = 0; i < 6; i++) {
       const a = (i / 6) * TAU + 0.3;
-      k.box(2.6, 0.5, 0.8, T(0x8a5a3a), Math.cos(a) * 9, 0.5, Math.sin(a) * 9, { ry: -a + Math.PI / 2, outline: 0.03 });
+      k.box(2.6, 0.5, 0.8, T(0x8a5a3a), Math.cos(a) * 11, 0.5, Math.sin(a) * 11, { ry: -a + Math.PI / 2, outline: 0.03 });
     }
     k.at();
-    k.lamp(16, 20, 8); k.lamp(-16, 20, 8);
-    // the avenue: 28 m of paving from the plaza to the gate, kerbed, a cream band every 20 m and a line of
-    // inset lights down the middle; lamps and banners in pairs along it (the flags between them are the world's)
+    fountain(k, 0, 34, { top: 'dollar', accent: blue });
+    k.lamp(16, 34, 8); k.lamp(-16, 34, 8);
+    // the avenue: a road from the plaza's edge to the gate, the traffic's own (traffic.js pavedStrip lays its bed, ruts and
+    // berms with the road network, melting in under the plaza's paving and out past the arch); lamps and banners in pairs
+    // along it (the flags between them are the world's)
     {
-      const z0 = 32, z1 = 150, zc = (z0 + z1) / 2;
-      k.box(28, 0.3, z1 - z0, T(0x6b6880), 0, 0, zc, { outline: 0.04 });
-      for (const s of [-1, 1]) k.box(0.7, 0.35, z1 - z0, T(0xd8d4e8), s * 14, 0.3, zc, { outline: 0.02 });
-      for (let z = 50; z < z1; z += 20) k.box(28, 0.32, 1.2, T(0xd8d4e8), 0, 0, z, { outline: 0 });
-      for (let z = z0 + 4; z < z1 - 2; z += 6) k.box(0.5, 0.06, 1.4, G(blue), 0, 0.3, z, { outline: 0 });
+      loc.paved = [{ x0: 0, z0: 44, x1: 0, z1: 150 }];
       for (const z of [50, 90, 130]) { k.lamp(20, z, 8); k.lamp(-20, z, 8); }
       for (const z of [70, 130]) for (const sx of [-1, 1]) {
         k.cyl(0.12, 0.14, 12, 6, T(DARK), sx * 20, 0, z + 4, { outline: 0.02 });
@@ -2443,25 +2516,8 @@ export function dressCasinoLot(world, loc, makeCar) {
       k.add(g, T(i % 2 ? 0x8a1030 : 0x2a1450), 0, 0.16, FZ, { outline: 0 });
     }
     k.ring(12.6, 0.1, G(GOLD), 0, 0.17, FZ);
-    // the fountain (build_casino.py): the basin, pedestal, bowl, stem and spigots are baked into the kit; the chip turns, and the two tiers' ripples, the curtain
-    // spilling over the bowl's lip and the jets from the spigots under the chip run on shaders (fountainFx.js)
-    {
-      const F = casinoNode('fountain'), I = new THREE.Matrix4();
-      const mat = (slot) => { const c = casinoSlot(slot); return c.glow ? G(c.color) : T(c.color); };
-      k.at(0, FZ);
-      k.baked(F, mat, I);
-      for (const n of F.kids) {
-        if (n.role === 'spin') {
-          const chip = part(0xffffff, (q) => q.baked(n, mat, I));
-          chip.userData.spin = n.data.speed || 0.7;
-          k.dyn(chip, n.pos.x, n.pos.y, n.pos.z);
-        } else k.dyn(waterMesh(n), n.pos.x, n.pos.y, n.pos.z);
-      }
-      k.at();
-    }
-    k.column(9.8, 1.05, 0, FZ);
-    k.column(2.7, 4.7, 0, FZ);
-    k.column(1.7, 9.2, 0, FZ, 4.7);
+    // the fountain (build_casino.py), with the casino's chip turning on top
+    fountain(k, 0, FZ);
     // benches round the outside of the tiles, facing in (none across the way in, at -z)
     for (let i = 0; i < 6; i++) {
       const a = (i / 6) * TAU + TAU / 12;

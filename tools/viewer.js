@@ -1,7 +1,7 @@
 // Dev-only model viewer: renders one model through the game's comic post pass on a turntable.
 import * as THREE from 'three';
 import { loadFonts } from '../src/fonts.js';
-import { loadRunnerParts, loadShipParts, makeRunner, makeCrate, ScarfSim, makeShuttle, makeFreighter, makeHoverCar, makeApc, makeLandTrain, makeTowerCrane, CRANE_TROLLEY_MIN, CRANE_TROLLEY_SPAN, makeGarage, makeDishStation, DISH_SIZE, makeLampPost, makeFountain, makeBouncer, makeChandelier, makeCasinoSign, makeChipStack, makeClawMachine, makeClawHead, clawKindParts, makeDerbyPart, makeRacer } from '../src/models.js';
+import { loadRunnerParts, loadShipParts, makeRunner, makeCrate, ScarfSim, makeShuttle, makeFreighter, makeHoverCar, makeApc, makeLandTrain, makeTowerCrane, CRANE_TROLLEY_MIN, CRANE_TROLLEY_SPAN, makeGantryCrane, makeCargoBox, GANTRY_TROLLEY_SPAN, makeGarage, makeDishStation, DISH_SIZE, makeLampPost, makeFountain, makeBouncer, makeChandelier, makeCasinoSign, makeChipStack, makeClawMachine, makeClawHead, clawKindParts, makeDerbyPart, makeRacer } from '../src/models.js';
 import { outpostTemplate } from '../src/outpostModels.js';
 import { loadOutpostParts, GLB_KINDS } from '../src/outpostGlb.js';
 import { makeChimera, makeMite, LIVING, MODIFIERS, spliceGenes } from '../src/chimera.js';
@@ -141,6 +141,20 @@ if (m === 'shuttle' || m === 'freighter') {
   c.hook.position.y = (-0.7 - num('rope', 14)) * sc;
   model = c.root;
   height = 25;
+} else if (m === 'gantry') {
+  // &trolley=0..1 (along the girder)  &rope=<m of rope>  &color=hex  &faction=kepler|meridian|spacecom|vostok (the cargo)
+  const c = makeGantryCrane({ color: Q.has('color') ? parseInt(Q.get('color'), 16) : 0xffd23f, faction: Q.get('faction') || 'meridian' });
+  c.trolley.position.z = GANTRY_TROLLEY_SPAN * (2 * num('trolley', 0.5) - 1);
+  c.cable.scale.y = num('rope', 6);
+  c.hook.position.y = -0.7 - num('rope', 6);
+  model = c.root;
+  height = 14;
+} else if (m === 'cargobox') {
+  // the yard's box container on its own: &faction=kepler|meridian|spacecom|vostok  &n=3 (a stack)
+  model = new THREE.Group();
+  const n = num('n', 1);
+  for (let i = 0; i < n; i++) { const b = makeCargoBox({ faction: Q.get('faction') || 'meridian' }).root; b.position.y = i * 3.2; model.add(b); }
+  height = 2;
 } else if (m === 'garage') {
   // &kind=main|small  &open=101 (which bays are up, bay 0 first: 1 open, 0 shut)  &trim=hex
   const o = (Q.get('open') || '101').padEnd(3, '0').split('').map((c) => c === '1');
@@ -188,7 +202,8 @@ if (m === 'shuttle' || m === 'freighter') {
     for (let i = 0; i < num('n', 1); i++) { const l = makeLampPost(i % 2 ? 0x2ee6ff : acc); l.position.x = i * 4; model.add(l); }
     height = 9;
   } else if (part === 'fountain') {
-    const f = makeFountain();
+    // &top=chip|dollar (the centrepiece)  &accent=hex (the dollar sign's colour)
+    const f = makeFountain({ top: Q.get('top') || 'chip', accent: Q.has('accent') ? parseInt(Q.get('accent'), 16) : 0x2ec4ff });
     model.add(f.root);
     anim = (t, sp, dt) => f.update(t, dt);
     height = 9;

@@ -34,8 +34,8 @@ const current = {
 
 const bourse = {
   name: 'A: The Bourse', items: [
-    ...tower(0, -24, 0), circ('plaza + fountain', 0, 20, 12, { cls: 'plaza' }),
-    box('the avenue', 0, 91, 28, 118, { cls: 'road', soft: true }),
+    ...tower(0, -24, 0), circ('plaza + fountain', 0, 34, 12, { cls: 'plaza' }),
+    box('the avenue', 0, 97, 18, 106, { cls: 'road', soft: true }),
     dome(-58, 40), box('trade hall (new)', 64, 24, 24, 56, { cls: 'hall' }),
     mainGarage(),
     box('container yard', 0, -97, 70, 30, { cls: 'yard' }), crane('tower crane W', -54, -72), crane('tower crane E', 62, -78),

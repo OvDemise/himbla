@@ -237,15 +237,16 @@ const stubLoc = (faction = 'meridian') => ({ group: new THREE.Group(), faction, 
 // (World.prototype.pad needs its own `this.put`; bound here)
 const padFn = (w, ...a) => World.prototype.pad.call(w, ...a);
 
+// the shuttle's pad (a 14.2 m deck: its ramp comes down inside the railing) and the freighter's (21 m), stairs toward you
 function landingPads() {
   const w = stubWorld(), loc = stubLoc();
   let x = 0;
-  for (const [r, c] of [[12, 0xffd23f], [16, 0x2ec4ff], [13, 0x7dff6a]]) { x += r; padFn(w, loc, x, 0, r, c); x += r + 4; }
+  for (const [r, c] of [[14.2, 0x2ec4ff], [21, 0xff9f1c]]) { x += r; padFn(w, loc, x, 0, r, c, false, { face: Math.PI / 2 }); x += r + 5; }
   return { root: seat(loc.group, { lift: false }).root };
 }
 function rocketPad() {
   const w = stubWorld(), loc = stubLoc();
-  padFn(w, loc, 0, 0, 30, 0xff4f2e); // world.js:973, the launch pad under the ILMB's rocket
+  padFn(w, loc, 0, 0, 30, 0xff4f2e, false, { flat: true }); // world.js, the launch pad under the ILMB's rocket
   return { root: seat(loc.group, { lift: false }).root };
 }
 
@@ -418,14 +419,16 @@ function zoneWall(R, height, y, hostile) {
 }
 
 // ---- the casino's lamp posts, fountain, chandelier and signs (casino.glb, tools/blender/build_casino.py): the boulevard's lamp post in pink and cyan and
-// the plaza's scaled-down one, the plaza fountain (the chip turns, the water runs), a hall chandelier (hung 3.6 m up, turning) and the welcome and blackjack signs ----
+// the plaza's scaled-down one, the plaza fountain twice (the casino's with the chip, the Meridian Exchange's with the dollar sign; they turn, the water runs), a hall chandelier (hung 3.6 m up, turning) and the welcome and blackjack signs ----
 function casinoProps() {
   const parts = [], movers = [];
   const scaled = (g, k) => { const w = new THREE.Group(); g.scale.setScalar(k); w.add(g); return w; };
   parts.push({ root: makeLampPost(0xff2e88), w: 3.2, d: 2 }, { root: makeLampPost(0x2ee6ff), w: 3.2, d: 2 }, { root: scaled(makeLampPost(0xff2e88), 0.62), w: 2.2, d: 1.4 });
-  const fnt = makeFountain();
-  movers.push((dt, t) => fnt.update(t, dt));
-  parts.push({ root: fnt.root, w: 20, d: 20 });
+  for (const o of [{ top: 'chip' }, { top: 'dollar', accent: 0x2ec4ff }]) {
+    const fnt = makeFountain(o);
+    movers.push((dt, t) => fnt.update(t, dt));
+    parts.push({ root: fnt.root, w: 20, d: 20 });
+  }
   const ch = makeChandelier();
   ch.root.position.y = 3.6;
   movers.push((dt) => { ch.spin.rotation.y += dt * 0.3; });
@@ -549,7 +552,7 @@ export default {
     { id: 'prop.briefcase', label: 'CREDITS BRIEFCASE', w: 1.4, d: 1.4, make: briefcase },
     { id: 'prop.seismograph', label: 'SEISMOGRAPH', w: 2, d: 2.2, make: seismograph },
     { id: 'prop.vacuum-tube', label: 'VACUUM TUBES', w: 6, d: 1.3, make: tubes },
-    { id: 'prop.casino-props', label: 'CASINO LAMPS · FOUNTAIN · CHANDELIER · SIGNS', w: 68, d: 21, make: casinoProps },
+    { id: 'prop.casino-props', label: 'CASINO LAMPS · FOUNTAINS · CHANDELIER · SIGNS', w: 91, d: 21, make: casinoProps },
     { id: 'prop.duck-derby', label: 'DUCK DERBY TRACK · RACERS · KIOSK · BOARD', w: 31, d: 21, make: duckDerby },
     { id: 'prop.blackjack', label: 'BLACKJACK TABLE · CHIPS', w: 14.4, d: 7, make: blackjack },
     { id: 'prop.claw-machine', label: 'ZERO-G CLAW MACHINE', w: 17, d: 8, make: clawMachine },
@@ -563,7 +566,7 @@ export default {
     { id: 'prop.dish', label: 'DISHES', w: 110, d: 30, make: dishes },
     { id: 'prop.turret', label: 'TURRETS', w: 26, d: 9, make: turrets },
     { id: 'prop.rocket', label: 'ILMB ROCKET', w: 11, d: 11, make: rocket },
-    { id: 'prop.landing-pads', label: 'LANDING PADS', w: 90, d: 33, solid: false, make: landingPads },
+    { id: 'prop.landing-pads', label: 'LANDING PADS', w: 76, d: 49, solid: false, make: landingPads },
     { id: 'prop.rocket-pad', label: 'ROCKET PAD', w: 62, d: 62, solid: false, make: rocketPad },
     { id: 'prop.solar-field', label: 'SOLAR FIELD', w: 52, d: 16, make: solarField },
     { id: 'prop.site-furniture', label: 'FLAGS · LAMPS · TOWER · PYLON · STOP', w: 124, d: 40, make: furniture },

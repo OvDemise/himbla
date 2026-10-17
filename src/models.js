@@ -17,6 +17,7 @@ const GLB = {
   apc: () => import('./assets/apc.glb?inline'),
   landtrain: () => import('./assets/landtrain.glb?inline'),
   crane: () => import('./assets/crane.glb?inline'),
+  gantry: () => import('./assets/gantry.glb?inline'),
   garage: () => import('./assets/garage.glb?inline'),
   slots: () => import('./assets/slots.glb?inline'),
   casino: () => import('./assets/casino.glb?inline'),
@@ -1386,7 +1387,7 @@ const SHIP_TOON = { trim: 0xd8d4e8, dark: 0x2a2540, metal: 0x8a87a0, steel: 0x55
 const SHIP_FX = new Set(['plume', 'plumeCore', 'lift', 'engine', 'core', 'beacon']); // per-ship materials (they pulse)
 const FLAMES = new Set(['plume', 'plumeCore', 'lift', 'beacon']);
 export async function loadShipParts() {
-  const [gltf, sk, wr, ap, lt, cr, ga, di, en, bc, hc, sl, pk, cs, bj, cl, dd] = await Promise.all(['ships', 'skimmer', 'warrig', 'apc', 'landtrain', 'crane', 'garage', 'dish', 'engine', 'briefcase', 'hovercar', 'slots', 'plinko', 'casino', 'blackjack', 'claw', 'duck'].map(loadGlb));
+  const [gltf, sk, wr, ap, lt, cr, ga, di, en, bc, hc, sl, pk, cs, bj, gy, cl, dd] = await Promise.all(['ships', 'skimmer', 'warrig', 'apc', 'landtrain', 'crane', 'garage', 'dish', 'engine', 'briefcase', 'hovercar', 'slots', 'plinko', 'casino', 'blackjack', 'gantry', 'claw', 'duck'].map(loadGlb));
   SHIP_PARTS = {};
   for (const name of ['shuttle', 'freighter']) {
     const root = gltf.scene.getObjectByName(name);
@@ -1415,6 +1416,11 @@ export async function loadShipParts() {
   const crane = cr.scene.getObjectByName('crane');
   if (!crane) throw new Error('crane.glb has no crane');
   SHIP_PARTS.crane = bakeShip(crane);
+  // the gantry crane and its yard box (tools/blender/build_gantry.py)
+  const gantry = gy.scene.getObjectByName('gantry'), yardBox = gy.scene.getObjectByName('gantry_box');
+  if (!gantry || !yardBox) throw new Error('gantry.glb has no gantry / gantry_box');
+  SHIP_PARTS.gantry = bakeShip(gantry);
+  SHIP_PARTS.gantryBox = bakeShip(yardBox);
   // the Meridian motor pool garage (tools/blender/build_garage.py)
   const garage = ga.scene.getObjectByName('garage');
   if (!garage) throw new Error('garage.glb has no garage');
@@ -1566,11 +1572,10 @@ function makeShip(kind, { color, stripe, faction = 'kepler' }) {
   // The land-train's own cargo units ride in the freighter's bays (the box, the Helium-3 tanker, the explosives magazine: build_ships.py,
   // cargo.py). Under a `cargo` pivot every slot takes the land-train's palette in the faction the freighter serves, and only that
   // faction's `livery` pivots (its plates, numbers and marks) exist.
-  const pal = LAND_TRAIN_FACTIONS[faction] || LAND_TRAIN_FACTIONS.kepler;
   const fac = LAND_TRAIN_FACTIONS[faction] ? faction : 'kepler';
   const cargoMats = new Map();
   const cargoMat = (slot) => {
-    if (!cargoMats.has(slot)) cargoMats.set(slot, slot in pal ? toon(pal[slot]) : LT_GLOW[slot] !== undefined ? glow(LT_GLOW[slot]) : toon(LT_TOON[slot] ?? 0xff00ff));
+    if (!cargoMats.has(slot)) { const c = cargoSlot(slot, fac); cargoMats.set(slot, c.glow ? glow(c.color) : toon(c.color)); }
     return cargoMats.get(slot);
   };
   const rig = { legs: [], doors: [], ramps: [], hatches: [], plumes: [], lifts: [], blinkers: [], cranes: [] };
@@ -1893,6 +1898,16 @@ export const LAND_TRAIN_FACTIONS = {
 const LT_TOON = { dark: 0x2a2540, steel: 0x55607a, metal: 0x8a87a0, tire: 0x1d1a29, white: 0xf3eee4, hazard: 0xffd23f, tank: 0xc6d6ea, brand: 0x14a3b8, redsafe: 0xc9202e, orange: 0xff7a1a, blue: 0x1d63d6 };
 const LT_GLOW = { glass: 0x9be7ff, window: 0xfff6a8, lamp: 0xfff6a8, tail: 0xff2a4a, green: 0x7dff6a, hot: 0xff9f1c };
 
+// The colour of a slot under a `cargo` pivot (the land-train's cargo units as other models carry them, cargo.py: the freighter's
+// bays, the gantry crane's load, the Meridian yard's stacks), and whether it glows: the land-train palette of `faction` for body,
+// stripe, accent and label, the land-train's fixed colours for the rest.
+export function cargoSlot(slot, faction = 'kepler') {
+  const pal = LAND_TRAIN_FACTIONS[faction] || LAND_TRAIN_FACTIONS.kepler;
+  if (slot in pal) return { color: pal[slot], glow: false };
+  if (LT_GLOW[slot] !== undefined) return { color: LT_GLOW[slot], glow: true };
+  return { color: LT_TOON[slot] ?? 0xff00ff, glow: false };
+}
+
 // One unit of the train, painted. Returns its root and the pivots the traffic code drives.
 function ltUnit(name, pal, faction) {
   const B = SHIP_PARTS['lt_' + name];
@@ -1981,28 +1996,21 @@ export function craneModel() {
   return { root, slew, trolley, cable: find(trolley, 'cable'), hook, load: find(hook, 'load'), blinkers: slew.kids.filter((k) => k.role === 'blinker') };
 }
 
-// A whole crane as plain meshes (the model viewer's): returns the root group and the pivots to drive. The settlements bake
-// the same parts into their own kit instead (settlements.js towerCrane).
-export function makeTowerCrane({ color = 0xffd23f, faction = 'kepler', h = CRANE_H } = {}) {
-  const C = craneModel();
-  const mats = new Map();
-  const matFor = (slot) => {
-    if (!mats.has(slot)) {
-      const c = craneSlot(slot, color, faction);
-      mats.set(slot, c.glow ? glow(c.color) : toon(c.color));
-    }
-    return mats.get(slot);
-  };
+// A whole crane as plain meshes (the model viewer's and the Asset Row's): returns the root group and the pivots to drive (slew,
+// trolley, cable, hook; the blinker lamps). The settlements bake the same parts into their own kit instead (settlements.js
+// towerCrane, gantryCrane). `matFor(slot, cargo)` paints a slot (cargo: under a `cargo` pivot); only `faction`'s liveries exist.
+function craneRig(root, matFor, faction) {
   const rig = { blinkers: [] };
-  const build = (node) => {
+  const build = (node, cargo = false) => {
     if (node.role === 'livery' && node.data.faction !== faction) return null; // (the other factions' marks never exist)
+    cargo = cargo || node.role === 'cargo';
     const g = new THREE.Group();
     g.name = node.name;
     g.position.copy(node.pos);
     g.quaternion.copy(node.quat);
     for (const { slot, geo } of node.parts) {
-      const m = new THREE.Mesh(geo, matFor(slot));
-      m.castShadow = !CRANE_GLOW.has(slot) && node.role !== 'livery';
+      const m = new THREE.Mesh(geo, matFor(slot, cargo));
+      m.castShadow = !(cargo ? cargoSlot(slot, faction).glow : CRANE_GLOW.has(slot)) && node.role !== 'livery';
       g.add(m);
     }
     if (node.ink) {
@@ -2018,14 +2026,60 @@ export function makeTowerCrane({ color = 0xffd23f, faction = 'kepler', h = CRANE
     }
     if (node.role in { slew: 1, trolley: 1, cable: 1, hook: 1 }) rig[node.role] = g;
     for (const k of node.kids) {
-      const c = build(k);
+      const c = build(k, cargo);
       if (c) g.add(c);
     }
     return g;
   };
-  rig.root = build(C.root);
+  rig.root = build(root);
+  return rig;
+}
+
+// a slot painter for a crane: the crane's own slots in `color` (body) and the fixed colours, a cargo unit's in `faction`'s livery
+function cranePainter(color, faction) {
+  const mats = new Map();
+  return (slot, cargo = false) => {
+    const key = (cargo ? 'cargo:' : '') + slot;
+    if (!mats.has(key)) {
+      const c = cargo ? cargoSlot(slot, faction) : craneSlot(slot, color, faction);
+      mats.set(key, c.glow ? glow(c.color) : toon(c.color));
+    }
+    return mats.get(key);
+  };
+}
+
+export function makeTowerCrane({ color = 0xffd23f, faction = 'kepler', h = CRANE_H } = {}) {
+  const rig = craneRig(craneModel().root, cranePainter(color, faction), faction);
   rig.root.scale.setScalar(h / CRANE_H);
   return rig;
+}
+
+// ---- The gantry crane (built in Blender, see build_gantry.py) ----
+// The tower crane's sibling for the Meridian Exchange's container yard: a portal of two lattice legs on rail bogies under a truss
+// girder, which the game slides along x on its rails (the root); its `trolley` runs along z under the girder, with the tower crane's
+// `cable` and `hook`, whose `load` is a spreader over a `cargo` pivot (cargo.py's box container, lying along the girder, with a
+// `livery` pivot per faction: only the crane's cargo's is built); `blinker` pivots on the girder's ends and the legs' tops.
+// `gantryBox` is one such container on its own (a `cargo` pivot, its origin the middle of its footprint on the ground), which the
+// settlements bake per stack in a faction's colours.
+export const GANTRY_H = 23, GANTRY_LEG = 15; // the trolley's rails' height; the legs (and the rails the crane runs on) at z = +-LEG
+export const GANTRY_TROLLEY_SPAN = 10; // the trolley runs z in [-span, span] (clear of the knees under the girder at the legs)
+export const CARGO_BOX = { hx: 1.75, hz: 3.95, h: 3.2 }; // the yard box's footprint (its rack) and its height (it stacks at this pitch)
+
+export function gantryModel() {
+  const root = SHIP_PARTS.gantry;
+  const find = (n, role) => n.kids.find((k) => k.role === role);
+  const trolley = find(root, 'trolley'), hook = find(trolley, 'hook'), load = find(hook, 'load');
+  return { root, trolley, cable: find(trolley, 'cable'), hook, load, cargo: find(load, 'cargo'), box: SHIP_PARTS.gantryBox, blinkers: root.kids.filter((k) => k.role === 'blinker') };
+}
+
+export function makeGantryCrane({ color = 0xffd23f, faction = 'kepler' } = {}) {
+  return craneRig(gantryModel().root, cranePainter(color, faction), faction);
+}
+
+// The yard's box container as plain meshes, in `faction`'s livery (the Asset Row's; the settlements bake it: settlements.js cargoStack).
+export function makeCargoBox({ faction = 'kepler' } = {}) {
+  const paint = cranePainter(0xffd23f, faction);
+  return craneRig(gantryModel().box, (slot) => paint(slot, true), faction); // (the box is the cargo pivot itself: all of it is cargo)
 }
 
 // ---- The vehicle garage (built in Blender, see build_garage.py) ----
@@ -2151,7 +2205,7 @@ export function makeSlotCabinet(color) {
 // ---- The casino's props (built in Blender, see build_casino.py) ----
 // Six models in one file, each a root of the baked tree: `lamp_post` (the boulevard's lamp, whose `accent` slot is the colour the game picks;
 // the plaza's ring of posts is the same one scaled down), `fountain` (the plaza basin, with the water in `water`, `curtain` and `streams`
-// pivots that fountainFx.js gives their shaders, and a `chip` pivot that spins), `bouncer` (a buff alien in a tux, a `head` pivot), `chandelier`
+// pivots that fountainFx.js gives their shaders, and `spin` pivots `chip` and `dollar`, the centrepieces, of which one is built), `bouncer` (a buff alien in a tux, a `head` pivot), `chandelier`
 // (a `spin` pivot), `welcome_sign` and `wall_sign` (a `face` pivot where the game puts its text plane).
 export const CASINO_PROPS = ['lamp_post', 'fountain', 'bouncer', 'chandelier', 'welcome_sign', 'wall_sign'];
 const CASINO_TOON = {
@@ -2170,8 +2224,8 @@ export function casinoSlot(slot, accent = 0xff2e88) {
 export const casinoNode = (name) => SHIP_PARTS['casino_' + name];
 
 // A baked node as a Group: its meshes dressed by `matFor` with their outline shells, and a child Group for each pivot (at its place, named, its role
-// and extras in userData), except the fountain's water, which the caller dresses (fountainFx.js).
-function casinoGroup(node, matFor, accent) {
+// and extras in userData), except the fountain's water, which the caller dresses (fountainFx.js), and any pivot `keep` refuses.
+function casinoGroup(node, matFor, accent, keep = () => true) {
   const g = new THREE.Group();
   g.name = node.name;
   g.position.copy(node.pos);
@@ -2184,7 +2238,7 @@ function casinoGroup(node, matFor, accent) {
     g.add(m);
   }
   if (node.ink) { const m = new THREE.Mesh(node.ink, inkMat); m.userData.isInk = true; g.add(m); }
-  for (const k of node.kids) if (!CASINO_WATER.has(k.role)) g.add(casinoGroup(k, matFor, accent));
+  for (const k of node.kids) if (!CASINO_WATER.has(k.role) && keep(k)) g.add(casinoGroup(k, matFor, accent, keep));
   return g;
 }
 const casinoMat = (c) => (c.glow ? glowShared(c.color) : toon(c.color));
@@ -2212,14 +2266,15 @@ export function makeCasinoSign(kind) {
   return { root, face: { pos: f.pos, w: f.data.w, h: f.data.h } };
 }
 
-// The plaza fountain as plain meshes (the viewer's and the Asset Row's): { root, update(t, dt) }; the chip spins and the water runs with `t`.
-export function makeFountain() {
+// The plaza fountain as plain meshes (the viewer's and the Asset Row's): { root, spinner, update(t, dt) }; the centrepiece (`top`: the
+// casino's 'chip', or the 'dollar' sign in `accent`, the Meridian Exchange's) spins and the water runs with `t`.
+export function makeFountain({ top = 'chip', accent = 0xff2e88 } = {}) {
   const node = casinoNode('fountain');
-  const root = casinoGroup(node, casinoMat);
+  const root = casinoGroup(node, casinoMat, accent, (k) => k.role !== 'spin' || (k.data.kind || 'chip') === top);
   const water = [];
   for (const k of node.kids) if (CASINO_WATER.has(k.role)) { const m = waterMesh(k); root.add(m); water.push(m); }
-  const chip = root.getObjectByName('chip');
-  return { root, chip, update(t, dt = 0) { if (chip) chip.rotation.y += dt * (chip.userData.speed || 0.7); for (const m of water) m.userData.tick(m, dt, t); } };
+  const spinner = root.getObjectByName(top);
+  return { root, spinner, chip: spinner, update(t, dt = 0) { if (spinner) spinner.rotation.y += dt * (spinner.userData.speed || 0.7); for (const m of water) m.userData.tick(m, dt, t); } };
 }
 
 // ---- The casino's blackjack table (built in Blender, see build_blackjack.py) ----
