@@ -16,7 +16,7 @@
 // it when you let go (traffic.js applyTug), and a rover's own driving takes it back. SAT-7 doesn't move
 // at all: hook it and you go round with it.
 //
-// The cable bends round structures like a rope round pegs: every 20th of a second it checks each leg of its path for a structure in the
+// The cable bends round structures like a rope round pegs: every frame it checks each leg of its path for a structure in the
 // way and, if there is one, bends round it: a box at the best point along its edges, a cylinder or sphere along an arc from tangent to tangent
 // (a round tower is a chain of bend points, counted as one structure; up to WRAP_MAX structures). Slim things (a column, a rail) don't bend it,
 // a bend point has to be out in the open, and what it can't be bent round it passes through; your own physics and the pull sort the rest out,
@@ -53,7 +53,7 @@ const WRAP_MAX = 5;      // the cable bends round at most this many different st
 const WRAP_PTS = 40;     // ... and has at most this many bend points in all (a round structure takes a chain of them)
 const BOX_BENDS = 12;    // bend points on one box at once (three laps round a post), then the cable passes through it
 const WRAP_MIN_R = 4;    // (only structures this big, by bounding radius, bend it: boulders and props smaller than that don't)
-const WRAP_EVERY = 0.05; // seconds between wrap checks (20 Hz)
+const WRAP_STEPS = 4;    // wrap passes per frame, at most (a pass adds a bend or a whole arc, or lets one go)
 const WRAP_MARGIN = 0.4; // a wrap point stands this far outside the corner it bends round
 const UNWRAP_FAT = 0.5;  // a wrap lets go only when the straight line past it is clear with this much room to spare (so it can't flicker)
 const UNWRAP_HOLD = 0.2; // ... and has been for this long
@@ -87,6 +87,8 @@ const _nn = new THREE.Vector3();
 const ZERO = new THREE.Vector3();
 const _up = new THREE.Vector3(); // (the way you are pulled along the cable)
 const _ut = new THREE.Vector3(); // (the way the hook is)
+const _gUp = new THREE.Vector3(); // (the first leg as it really lies: for the position correction)
+const _gUt = new THREE.Vector3(); // (and the last leg)
 const _upv = new THREE.Vector3();
 const _hA = new THREE.Vector3(), _hB = new THREE.Vector3(), _lat = new THREE.Vector3();
 
@@ -510,7 +512,7 @@ export class Winch {
     let off, n;
     if (T.root) { _rinv.copy(T.root.matrixWorld).invert(); off = point.clone().applyMatrix4(_rinv); n = nrm.clone().transformDirection(_rinv); } // (the pose it was found in)
     else { off = point.clone().sub(T.pos()); n = nrm.clone(); }
-    return { target: T, off, goal: off.clone(), nrm: n, looked, dist, len: dist, t: 0, reel: 0, wraps: [], free: [], grp: [], ignore: new Set(), bends: new Map(), wT: 0, strain: 0, creakT: 0, snagged: false };
+    return { target: T, off, goal: off.clone(), nrm: n, looked, dist, len: dist, t: 0, reel: 0, wraps: [], free: [], grp: [], ignore: new Set(), bends: new Map(), strain: 0, creakT: 0 };
   }
 
   // where a handle's hook point is now
@@ -646,10 +648,10 @@ export class Winch {
     return L;
   }
 
-  // Twenty times a second: let go of any bend the cable has straightened past, and bend it round any structure it has run into (a
+  // Every frame: let go of any bend the cable has straightened past, and bend it round any structure it has run into (a
   // corner or edge for a box, an arc for a cylinder or sphere). Returns 'changed' or null. A structure it can't bend round (no free place to
   // bend, the cap, still in the way after a bend or two) is given up on: the cable passes through it.
-  tendWraps(o, el = WRAP_EVERY) {
+  tendWraps(o, el) {
     try { return this.tendWrapsIn(o, el); } finally { _ignore = null; }
   }
 
@@ -662,8 +664,12 @@ export class Winch {
       if (!(k === 0 || k === n - 1 || o.grp[k - 1] !== o.grp[k] || o.grp[k + 1] !== o.grp[k])) continue;
       const fat = Math.min(P[k].distanceTo(P[k + 1]), P[k + 1].distanceTo(P[k + 2])) < 2.5 ? 0.1 : UNWRAP_FAT;
       if (clearFat(cols, P[k], P[k + 2], fat, k === n - 1 ? 3 : 0.35)) { // (the hook end: a shallow line to the hook's own surface grazes it)
-        o.free[k] += el; // (the time since the last check: that is every frame while bent)
-        if (o.free[k] >= UNWRAP_HOLD) { o.wraps.splice(k, 1); o.free.splice(k, 1); o.grp.splice(k, 1); this.ropeDirty = true; return 'changed'; }
+        o.free[k] += el; // (the frame's time, credited once: the repeat passes within a frame come with el = 0)
+        if (o.free[k] >= UNWRAP_HOLD) {
+          o.wraps.splice(k, 1); o.free.splice(k, 1); o.grp.splice(k, 1); this.ropeDirty = true;
+          this.buildPath(o, _hA.copy(P[0]), _hB.copy(P[this.pathN - 1])); // (the path is stale until rebuilt, and the next step reads it)
+          return 'changed';
+        }
       } else o.free[k] = 0;
     }
     // bending: each leg is checked, bar the chords between two points of one arc (those can't be blocked by what they hug)
@@ -684,6 +690,8 @@ export class Winch {
       const before = this.pathLen();
       let pts = hit.c.type === 'cyl' || hit.c.type === 'sphere' ? arcPoints(hit.c, A, B) : null;
       if (pts && !pts.every((q) => pointFree(cols, q))) pts = null; // (an arc through something else won't do: try the edges)
+      // (nor will an arc that still runs into what it wraps: that is no bend, and with the hook buried in the structure it would pile up)
+      if (pts && (blocker(cols, A, pts[0], 0.35, hit.c) || blocker(cols, pts[pts.length - 1], B, 0.35, hit.c, i === this.pathN - 2 ? 2.5 : 0.35))) pts = null;
       if (!pts) {
         let best = null, bs = -Infinity;
         for (const p of wrapCandidates(hit.c, A, B)) {
@@ -749,15 +757,12 @@ export class Winch {
     const T = o.target;
     if (!held || o.t > HOLD || !this.hasHand() || !T.alive()) { this.release(); return; }
     this.buildPath(o, this.hand(_a), this.anchorOf(o, _b));
-    // (the wraps: checked 20 times a second while the cable runs straight, and every frame once it has bends round something: dragged round a
-    // post at 15 m/s you cover 0.75 m between 20 Hz checks, and the leg from you to the last bend ran through the post for those frames)
-    o.wDt = (o.wDt || 0) + dt;
-    if ((o.wT -= dt) <= 0) {
-      o.wT = o.wraps.length ? 0 : WRAP_EVERY;
-      const el = o.wDt; o.wDt = 0;
-      const r = this.tendWraps(o, el);
-      o.snagged = r === 'snag'; // (kept for the strain rule below; tendWraps gives up on a structure now, and the cable passes through it)
-    }
+    // (the wraps are checked every frame, bent or not: at 20 Hz a player running at a post at 15 m/s covers 0.75 m between checks, and the
+    // cable ran through the post for up to three frames before the first bend. el = the frame time, so the 0.2 s unwrap hold counts real
+    // time, once. A frame can need more than one pass: a post and the board edge it overlaps, a second post. This ships with the position step
+    // along the real legs below: checked every frame alone, the old step along the eased direction ran away more often.)
+    let r = this.tendWraps(o, dt);
+    for (let it = 1; r && it < WRAP_STEPS; it++) r = this.tendWraps(o, 0);
     this.releaseFirst(o);
     const nP = this.pathN;
     let len = this.pathLen();
@@ -766,8 +771,11 @@ export class Winch {
     const P0 = this.path[0], P1 = this.path[1], Pn = this.path[nP - 1], Pm = this.path[nP - 2];
     _up.subVectors(P1, P0); if (_up.lengthSq() > 1e-8) _up.normalize();
     _ut.subVectors(Pm, Pn); if (_ut.lengthSq() > 1e-8) _ut.normalize();
+    _gUp.copy(_up); _gUt.copy(_ut);
     // (the directions you and the hook are pulled along change in one step when a bend is added or let go: eased over about 80 ms, so the
-    // pull swings round the corner and doesn't flip, and the player isn't thrown by it)
+    // pull swings round the corner and doesn't flip, and the player isn't thrown by it. The eased copies drive the pull and the velocity
+    // constraint only; the position correction runs along the real legs, since the eased direction can trail the real one by more than a
+    // quarter turn after a bend and a step along it would lengthen the path)
     if (!o.dirP) { o.dirP = _up.clone(); o.dirT = _ut.clone(); }
     else {
       const sm = 1 - Math.exp(-dt * 12);
@@ -804,8 +812,7 @@ export class Winch {
 
     // the strain: the drum is running but you are not coming in (something is in the way, or what you hooked won't budge); it creaks
     // louder and higher, and after a moment the line slips off, gently
-    if (o.snagged) o.strain = Math.min(STRAIN_MAX, o.strain + dt * 1.5);
-    else if (o.reel > 0.5 && len - o.len > LEAD * 0.5 && closeNow < 1) o.strain = Math.min(STRAIN_MAX, o.strain + dt);
+    if (o.reel > 0.5 && len - o.len > LEAD * 0.5 && closeNow < 1) o.strain = Math.min(STRAIN_MAX, o.strain + dt);
     else o.strain = Math.max(0, o.strain - dt * 1.5);
     if (o.strain > 0.3 && (o.creakT -= dt) <= 0) { o.creakT = 0.28; g.audio.tone(170 + (o.strain / STRAIN_MAX) * 260, 0.1, 'sawtooth', 0.03 + 0.03 * (o.strain / STRAIN_MAX), 1.4); }
     // (and while it strains, a jostle: a small sideways wiggle and lift on the pull, growing with the strain, so that a player wedged against
@@ -819,7 +826,7 @@ export class Winch {
         P.vel.addScaledVector(_upv, (3 + 6 * k) * dt);
       }
     }
-    if (o.strain >= STRAIN_MAX) { this.release(); g.hud.toast(o.snagged ? 'The line snagged!' : 'The line slipped!', 1.5); g.audio.tone(300, 0.18, 'square', 0.07, 0.4); return; }
+    if (o.strain >= STRAIN_MAX) { this.release(); g.hud.toast('The line slipped!', 1.5); g.audio.tone(300, 0.18, 'square', 0.07, 0.4); return; }
 
     if (len > o.len && len > 1e-3) {
       const mP = 1, mT = T.mass;
@@ -827,8 +834,12 @@ export class Winch {
       // positions: back to the cable's length
       const over = len - o.len;
       const ease = 1 - Math.exp(-dt * 20); // (the correction is taken up over a few frames: a snap of up to LEAD in one frame was a visible jump)
-      P.body.pos.addScaledVector(_up, over * share * ease);
-      T.shift(_d.copy(_ut).multiplyScalar(over * (1 - share) * ease));
+      // (along the real legs, never past the bend: a step along a leg shortens the path by exactly the step, so the cable can't come out longer;
+      // this goes with the every-frame wrap check above)
+      const sP = Math.min(over * share * ease, Math.max(0, P0.distanceTo(P1) - 0.05));
+      const sT = Math.min(over * (1 - share) * ease, Math.max(0, Pn.distanceTo(Pm) - 0.05));
+      P.body.pos.addScaledVector(_gUp, sP);
+      T.shift(_d.copy(_gUt).multiplyScalar(sT));
       // velocities: no moving apart along the cable (the swing, the tow, the drag all come from this)
       const rel = -(P.vel.dot(_up) + T.vel().dot(_ut));
       if (rel > 0) {

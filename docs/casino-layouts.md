@@ -13,7 +13,7 @@ not 15; the wings run from x 10 to 55; the cage is 4 m by 1.75 m). What exists i
   redraws the plans, `node tools/casino-layouts.mjs dump` lists the placements.
 - `docs/casino-layout-current.svg`, `-a.svg`, `-b.svg`: the plans (looking down, +x to the right, the doors at the bottom).
 - `tools/casino-zfight.mjs`: a Z-fighting audit that runs against the live scene (section "Z-fighting"), and
-  `tools/casino-shots.mjs`: screenshots from fixed vantage points. Dev-only, like `tools/winch-sign-repro.mjs`.
+  `tools/casino-shots.mjs`: screenshots from fixed vantage points. Dev-only, like `tools/winch-ride.mjs`.
 
 All positions are in the casino's own frame, metres: +x right, +z toward the doors, y up (what `casinoWorld.js` calls
 local). The proposals share one kit of Blender pieces; they differ in plan.
