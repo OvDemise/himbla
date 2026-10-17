@@ -204,12 +204,12 @@ vec2 skBlocksOn(vec2 uv, vec2 sd, float px, float cell, float rmin, float rmax, 
     if (dl < bd) { bd = dl; bv = d; bid = id; bz = hh.z; }
   }
   float dome = max(1.0 - bd * bd, 0.0);
-  float top = smoothstep(0.0, 0.5, dome); // (flat on top with steep sides, like a block: a dome looks like an egg)
+  float top = sqrt(dome); // (rounded: a flat top with steep sides made a ring of light and shade round each stone, like a pit's lip)
   float body = 1.0 - smoothstep(0.82, 1.0, bd);
   float shadow = (1.0 - smoothstep(0.6, 1.1, length(bv + sd * 0.95))) * (1.0 - body);
   float foot = smoothstep(0.92, 1.02, bd) * (1.0 - smoothstep(1.02, 1.25, bd));
   float f = skFade(cell * 0.2, px);
-  float lum = mix(1.0, mix(tlo, thi, fract(bid * 7.3 + bz * 13.1)) * (1.0 + 0.1 * dome), body * f) * (1.0 - (0.45 * shadow + 0.12 * foot) * f);
+  float lum = mix(1.0, mix(tlo, thi, fract(bid * 7.3 + bz * 13.1)) * (1.0 + 0.1 * dome), body * f) * (1.0 - (0.45 * shadow + 0.06 * foot) * f);
   return vec2(top * top * mix(rmin, rmax, bid) * cell * hk * skFade(cell * 0.1, px), lum);
 }
 void skBlocks(vec3 p, float px, float cell, float rmin, float rmax, float seed, float keep, float hk, float tlo, float thi, inout float h, inout float lum) {
@@ -230,21 +230,22 @@ void skBlocks(vec3 p, float px, float cell, float rmin, float rmax, float seed, 
   lum *= r.y;
 }
 
-// A crater rim for the regolith look, made of rock rather than paint. The crest is crowded with blocks of fresh rock; the
-// ejecta outside is paler, in radial lanes, with blocks thinning out over some 30 m; the wall inside has lanes of pale outcrop
-// and dark slumped dust running down it. A thin dark line runs along the crest itself (ln): it is how you find the rail
-// (rails.js) you grind, so it keeps a pixel's width at any distance. have is 1 where the crest's exact place is known (the
-// craters of 24 to 120 m within reach, planet.js updateRimInk): sd is then the distance to it in metres (negative inside) and
-// cen the crater's centre. Elsewhere only vrim (0 to 1 over every crater's rim zone) is known, and the rim is a rubbly zone.
-// p is the world position, pr the same pushed to the Moon's radius (for the direction from the crater's centre).
-void skRim(vec3 p, vec3 pr, float px, float have, float sd, vec3 cen, float far, float vrim, inout float h, inout float lum, out float ln, out float band) {
-  ln = 0.0;
+// A crater rim for the regolith look: the classic rim's ragged band of shattered rock (a core a few metres wide whose edges
+// break up into patches, a faint halo about three times as wide, both widening with distance so the band never falls below a
+// few pixels), but made of the ground's own stuff: the dust itself darkened (so its patches and grain carry on through the
+// band), crowded with stones that have the ground's lighting and cast shadows, and a few pale freshly broken chips. There is no
+// line along the crest (the classic rim had none: its core is what marks the rail you grind, rails.js). Outside the crest the
+// ejecta is paler in broad radial lanes with fewer stones, and the wall inside has pale outcrop and dark dust running down it.
+// have is 1 where the crest's exact place is known (the craters of 24 to 120 m within reach, planet.js updateRimInk): sd is then
+// the distance to it in metres (negative inside) and cen the crater's centre. Elsewhere only vrim (0 to 1 over every crater's
+// rim zone) is known, and the rim is a rubbly zone. p is the world position, pr the same pushed to the Moon's radius (for the
+// direction from the crater's centre). band comes out as how much the band darkens the paint (0 to about 0.87, as the classic's).
+void skRim(vec3 p, vec3 pr, float px, float have, float sd, vec3 cen, float far, float vrim, inout float h, inout float lum, out float band) {
   band = 0.0;
   float zv = smoothstep(0.55, 1.0, vrim);
-  float zc = 0.0, zo = 0.0, zi = 0.0, lane = 0.5;
+  float core = 0.0, halo = 0.0, zo = 0.0, zi = 0.0, lane = 0.5;
   if (have > 0.5) {
     float a = abs(sd);
-    zc = exp(-a * a / 4.8);                    // the crest, about 2 m either side
     zo = sd > 0.0 ? exp(-sd / 14.0) : 0.0;     // the ejecta outside
     zi = sd < 0.0 ? exp(sd / 8.0) : 0.0;       // the foot of the wall inside
     vec3 dr = normalize(pr - cen);
@@ -258,30 +259,32 @@ void skRim(vec3 p, vec3 pr, float px, float have, float sd, vec3 cen, float far,
     float wall = smoothstep(0.0, 3.0, tin) * (1.0 - smoothstep(20.0, 45.0, tin));           // the wall: from the crest down about 30 m
     lum *= 1.0 + 0.11 * wall * (lane * 2.0 - 1.0) * far * fl;                                // pale outcrop and dark dust, running down it
     lum *= 1.0 + 0.05 * sin(sd * 1.4 + rimNoise(p * 0.3) * 4.0) * zi * far * fl;             // faint terraces
-    float t = (sd - 0.4) / 0.9;
-    lum *= 1.0 + 0.2 * exp(-t * t) * far;                                                     // the crest's lit lip
-    float w = max(0.05 + 0.04 * rimNoise(p * 0.45 + 5.0), px * 0.9);                         // the crest line: thin, swelling a little
-    float d = abs(sd + (rimNoise(p * 1.7 + 2.0) - 0.5) * 0.15);
-    ln = (1.0 - smoothstep(w * 0.6, w * 1.2 + px * 0.5, d)) * far;
-    // the soft dark band under the crest line, as in the classic look: a shattered-rock core a few metres wide, a faint halo three
-    // times that, with ragged edges. It comes in as the blocks go out (from about 3 cm a pixel, full from 30 cm: about 100 m up),
-    // so from the ground the crest is blocks and a line, and from above a ring on a band
-    float bk = smoothstep(0.03, 0.3, px);
-    float bw = max(2.2 + 1.5 * rimNoise(p * 0.03 + 9.0), px * 3.0);
-    float be = abs(sd + (rimNoise(p * 0.21 + 1.7) - 0.5) * 2.2 + (rimNoise(p * 0.55 - 6.0) - 0.5));
-    float core = 1.0 - smoothstep(bw * 0.55, bw * 1.35 + px, be);
-    float halo = (1.0 - smoothstep(bw, bw * 3.2, be)) * 0.35;
-    band = max(core * (0.5 + 0.2 * rimNoise(p * 0.09 - 3.0)), halo) * bk * far; // (lighter than the classic's 0.62-0.87: the crest line is drawn over it)
+    // the band itself, as the classic rim's (planet.js): a ragged core and a halo
+    float rag = (rimNoise(p * 0.21 + 1.7) - 0.5) * 2.2 + (rimNoise(p * 0.55 - 6.0) - 0.5);
+    float hw = max(1.3 + 1.9 * rimNoise(p * 0.03 + 9.0), px * 1.2);
+    core = 1.0 - smoothstep(hw * 0.55, hw * 1.35 + px, a + rag);
+    halo = (1.0 - smoothstep(hw, hw * 3.2, a + rag * 1.5)) * 0.35;
+    band = max(core * (0.62 + 0.25 * rimNoise(p * 0.09 - 3.0)), halo) * far;
   }
-  float dens = max(zv * 0.22, far * max(zc * 0.85, max(zo * (0.35 + 0.65 * lane) * 0.55, zi * 0.4)));
+  // the stones: as thick as the band is dark (the classic's rule: the core, or the halo at 1.6 times), thinning out over the ejecta
+  // and the foot of the wall
+  float dens = max(zv * 0.22, far * max(max(core, halo * 1.6), max(zo * (0.35 + 0.65 * lane) * 0.4, zi * 0.35)));
   if (dens > 0.03) {
-    // several sizes of block, each its own layer (the small ones go first when the quality is turned down). Mostly darker
-    // than the dust, a few pale and freshly broken
-    if (uSkinQ > 1.5) skBlocks(p, px, 0.45, 0.1, 0.2, 61.0, dens, 1.5, 0.66, 1.1, h, lum);      // rubble, radius 5 to 9 cm
-    if (uSkinQ > 0.5) skBlocks(p, px, 0.8, 0.1, 0.2, 67.0, dens, 1.5, 0.66, 1.1, h, lum);       // blocks, 8 to 16 cm
-    skBlocks(p, px, 1.5, 0.1, 0.2, 71.0, dens * 0.9, 1.5, 0.62, 1.08, h, lum);                   // big blocks, 15 to 30 cm
-    skBlocks(p, px, 3.0, 0.1, 0.2, 73.0, dens * 0.6, 1.4, 0.62, 1.08, h, lum);                   // boulders, 30 to 60 cm
+    // several sizes, each its own layer (the small ones go first when the quality is turned down), against the darkened dust
+    // of the band: mostly a little darker still, some about as dark as the dust round them
+    if (uSkinQ > 1.5) skBlocks(p, px, 0.45, 0.1, 0.2, 61.0, dens, 1.5, 0.6, 1.05, h, lum);      // rubble, radius 5 to 9 cm
+    if (uSkinQ > 0.5) skBlocks(p, px, 0.8, 0.1, 0.2, 67.0, dens, 1.5, 0.6, 1.05, h, lum);       // stones, 8 to 16 cm
+    skBlocks(p, px, 1.5, 0.1, 0.2, 71.0, dens * 0.9, 1.5, 0.55, 1.0, h, lum);                   // big stones, 15 to 30 cm
+    skBlocks(p, px, 3.0, 0.1, 0.2, 73.0, dens * 0.6, 1.4, 0.55, 1.0, h, lum);                   // boulders, 30 to 60 cm
+    // and the classic's bright chips of fresh rock, on the core
+    if (uSkinQ > 0.5) skBlocks(p, px, 0.55, 0.08, 0.16, 79.0, core * 0.45 * far, 1.0, 1.15, 1.9, h, lum);
     lum *= 1.0 + (rimNoise(p * 0.9 + 4.0) - 0.5) * 0.3 * dens * skFade(1.2, px);               // the rubble's own patchiness
+    // and, for the range where single stones are under a pixel (30 to 150 m), the classic's speckle: dark pebbles and bright chips
+    // about half a metre across, on the band, fading out past a pixel of 8 to 35 cm
+    float grit = 1.0 - smoothstep(0.08, 0.35, px);
+    float peb = smoothstep(0.62, 0.72, rimNoise(p * 1.3 + 11.0)) * grit;
+    float chip = smoothstep(0.8, 0.86, rimNoise(p * 1.9 - 4.0)) * grit;
+    lum *= (1.0 - 0.45 * peb * max(core, halo * 1.6) * far) * (1.0 + 0.7 * chip * core * far);
   }
 }
 
@@ -342,15 +345,15 @@ if (uSkin > 0.5 && uSkin < 1.5) {
   // one nested inside a bigger one's, rimWob the wobble they share, each with its crater's centre)
   float rHave = (rimU < 1e5 || abs(rimOwn) < 1e5) ? 1.0 : 0.0;
   float rUseU = abs(rimU + rimWob) <= abs(rimOwn + rimWob) ? 1.0 : 0.0;
-  float rLine = 0.0, rBand = 0.0;
-  skRim(vHoleW, rimP, skPx, rHave, (rUseU > 0.5 ? rimU : rimOwn) + rimWob, rUseU > 0.5 ? rimCenU : rimCenO, rimFar, vRim, skHeight, skLum, rLine, rBand);
+  float rBand = 0.0;
+  skRim(vHoleW, rimP, skPx, rHave, (rUseU > 0.5 ? rimU : rimOwn) + rimWob, rUseU > 0.5 ? rimCenU : rimCenO, rimFar, vRim, skHeight, skLum, rBand);
   diffuseColor.rgb *= skLum * vec3(1.0 + skWarm, 1.0, 1.0 - skWarm);
-  diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.24, 0.21, 0.29), rBand); // (the classic rim colour)
+  // the band darkens the ground's own colour (so its patches carry on through it) and cools it towards the classic rim's rock
+  diffuseColor.rgb = mix(diffuseColor.rgb, mix(diffuseColor.rgb * 0.42, vec3(0.24, 0.21, 0.29), 0.35), rBand);
   vec3 nG = normalize(vNormal);
   vec3 nR = skPerturb(-vViewPosition, nG, vec2(dFdx(skHeight), dFdy(skHeight)), 1.0, 1.0);
   vec3 sunV = normalize((viewMatrix * vec4(uSunW, 0.0)).xyz);
   diffuseColor.rgb *= 1.0 + clamp((dot(nR, sunV) - dot(nG, sunV)) * uSkinShade, -0.45, 0.3);
-  diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.05, 0.04, 0.08), rLine * 0.85); // (after the shading, so the crest line stays crisp)
 } else if (uSkin > 2.5) {
   // survey: the ground recoloured by altitude, in steps, keeping the shading the painted Moon already has
   float alt = length(vHoleW) - ${R.toFixed(1)};
