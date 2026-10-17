@@ -22,6 +22,7 @@ const GLB = {
   slots: () => import('./assets/slots.glb?inline'),
   casino: () => import('./assets/casino.glb?inline'),
   blackjack: () => import('./assets/blackjack.glb?inline'),
+  claw: () => import('./assets/claw.glb?inline'),
   dish: () => import('./assets/dish.glb?inline'),
   engine: () => import('./assets/engine.glb?inline'),
   briefcase: () => import('./assets/briefcase.glb?inline'),
@@ -1385,7 +1386,7 @@ const SHIP_TOON = { trim: 0xd8d4e8, dark: 0x2a2540, metal: 0x8a87a0, steel: 0x55
 const SHIP_FX = new Set(['plume', 'plumeCore', 'lift', 'engine', 'core', 'beacon']); // per-ship materials (they pulse)
 const FLAMES = new Set(['plume', 'plumeCore', 'lift', 'beacon']);
 export async function loadShipParts() {
-  const [gltf, sk, wr, ap, lt, cr, ga, di, en, bc, hc, sl, pk, cs, bj, gy] = await Promise.all(['ships', 'skimmer', 'warrig', 'apc', 'landtrain', 'crane', 'garage', 'dish', 'engine', 'briefcase', 'hovercar', 'slots', 'plinko', 'casino', 'blackjack', 'gantry'].map(loadGlb));
+  const [gltf, sk, wr, ap, lt, cr, ga, di, en, bc, hc, sl, pk, cs, bj, gy, cl] = await Promise.all(['ships', 'skimmer', 'warrig', 'apc', 'landtrain', 'crane', 'garage', 'dish', 'engine', 'briefcase', 'hovercar', 'slots', 'plinko', 'casino', 'blackjack', 'gantry', 'claw'].map(loadGlb));
   SHIP_PARTS = {};
   for (const name of ['shuttle', 'freighter']) {
     const root = gltf.scene.getObjectByName(name);
@@ -1463,6 +1464,14 @@ export async function loadShipParts() {
   PLINKO_CONSOLE = pk.scene.getObjectByName('plinko_console');
   PLINKO_FRAME = pk.scene.getObjectByName('plinko_frame');
   if (!PLINKO_CONSOLE || !PLINKO_FRAME) throw new Error('plinko.glb has no plinko_console / plinko_frame');
+  // the zero-g claw's machine, claw and the things in its tank (tools/blender/build_claw.py); the engine and the case in it are the salvage models above
+  for (const name of CLAW_PROPS) {
+    const root = cl.scene.getObjectByName(name);
+    if (!root) throw new Error('claw.glb has no ' + name);
+    SHIP_PARTS[name] = bakeShip(root);
+  }
+  SHIP_PARTS.claw_engine = bakeShip(ENGINE_MODEL);
+  SHIP_PARTS.claw_case = bakeShip(CASE_MODEL);
   for (const m of [ENGINE_MODEL, CASE_MODEL, PLINKO_CONSOLE, PLINKO_FRAME]) m.traverse((o) => { if (o.isMesh) { o.userData.slot = o.material.name; o.castShadow = true; } });
 }
 
@@ -2312,6 +2321,73 @@ export function makeChipStack(color, n) {
   const h = new THREE.Mesh(G.ink, inkMat);
   h.userData.isInk = true;
   g.add(h);
+  return g;
+}
+
+// ---- The casino's zero-g claw (built in Blender, see build_claw.py) ----
+// `claw_machine`: the 16.4 m glass tank on the hall's front wall (its back at z = 0, its front toward +z; the `glass` slot is the see-through panes, the pivots say where
+// the marquee and the console screen go, where the DROP hole is and where the ten ceiling jets are), `claw_claw`: the energy claw, `claw_link`: one link of a chain, and one
+// model for each kind of thing in the tank (the salvaged engine and the credits case are the game's own models). clawKindParts() gives what an InstancedMesh needs.
+export const CLAW_PROPS = ['claw_machine', 'claw_claw', 'claw_link', 'claw_crate', 'claw_canister', 'claw_gear', 'claw_girder', 'claw_mine', 'claw_magnet', 'claw_tyre', 'claw_hullplate',
+  'claw_chip', 'claw_lockbox', 'claw_gem'];
+const CLAW_TOON = {
+  plum: 0x7c50a0, plum2: 0x9561bc, gold: 0xffd23f, brass: 0xd8aa2e, steel: 0x8a87a0, dark: 0x2a2540, hazard: 0xffd23f, red: 0xd7263d, crate: 0xffffff, cream: 0xfff4e0,
+  chipgold: 0xffd23f, rubber: 0x1d1a29,
+};
+const CLAW_GLOW = { neonpink: 0xff2e88, neoncyan: 0x2ee6ff, glowred: 0xff2a4a, gem: 0x66e6ff, lamp: 0xfff6a8 };
+const CLAW_SLOT = (slot) => (slot in CLAW_GLOW ? glowShared(CLAW_GLOW[slot]) : toon(CLAW_TOON[slot] ?? 0xff00ff));
+// What floats in the tank (and the claw): the same toon colours with a floor of their own light (a third of the paint), so the side turned away from the hall's lamps is
+// dark paint rather than black; `diffuseColor` already carries the crates' per-instance tint.
+const clawLitCache = new Map();
+export function clawLit(color) {
+  let m = clawLitCache.get(color);
+  if (!m) {
+    m = toon(color, {});
+    m.onBeforeCompile = (sh) => { sh.fragmentShader = sh.fragmentShader.replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\n totalEmissiveRadiance += diffuseColor.rgb * 0.32;'); };
+    m.customProgramCacheKey = () => 'clawLit';
+    clawLitCache.set(color, m);
+  }
+  return m;
+}
+const CLAW_ITEM_SLOT = (slot) => (slot in CLAW_GLOW ? glowShared(CLAW_GLOW[slot]) : clawLit(CLAW_TOON[slot] ?? 0xff00ff));
+let clawGlass = null;
+// (opacity this low: the scene is blended in linear light before the post pass's gamma, so a few percent of a bright cyan already lifts the dark tank to teal and washes out what floats in it)
+const clawGlassMat = () => clawGlass || (clawGlass = new THREE.MeshBasicMaterial({ color: 0x9be7ff, transparent: true, opacity: 0.035, depthWrite: false, side: THREE.DoubleSide }));
+
+// The machine's frozen body (the casino merges it) and where its parts are: { stat, glass: [panes], spots: { marquee, screen, drop, jets: [] } } (each spot { pos, w, h, tilt }).
+export function makeClawMachine() {
+  const node = SHIP_PARTS.claw_machine, stat = new THREE.Group(), glass = [], spots = { jets: [] };
+  for (const { slot, geo } of node.parts) {
+    if (slot === 'glass') { const m = new THREE.Mesh(geo, clawGlassMat()); m.renderOrder = 3; glass.push(m); stat.add(m); continue; }
+    const m = new THREE.Mesh(geo, CLAW_SLOT(slot));
+    m.castShadow = !(slot in CLAW_GLOW);
+    stat.add(m);
+  }
+  if (node.ink) { const m = new THREE.Mesh(node.ink, inkMat); m.userData.isInk = true; stat.add(m); }
+  for (const k of node.kids) {
+    const spot = { pos: k.pos, w: k.data.w, h: k.data.h, tilt: k.data.tilt || 0, r: k.data.r };
+    if (k.role === 'jet') spots.jets.push(spot); else spots[k.role] = spot;
+  }
+  return { stat, glass, spots };
+}
+
+// What an InstancedMesh needs to draw a kind of thing from the tank (casino.glb-style baked parts): { parts: [{ geo, material }], ink: geometry | null }. `crate`'s paint is white:
+// the view tints each crate per instance. 'engine' and 'case' use the salvage models' own colours.
+export function clawKindParts(kind) {
+  const node = SHIP_PARTS['claw_' + kind];
+  const pal = kind === 'engine' ? ENGINE_TOON : kind === 'case' ? CASE_TOON : null;
+  const parts = node.parts.map(({ slot, geo }) => ({
+    geo, slot,
+    material: pal ? (slot === 'hot' ? glowShared(0xff6a2a) : clawLit(pal[slot] ?? 0x8a87a0)) : CLAW_ITEM_SLOT(slot),
+  }));
+  return { parts, ink: node.ink };
+}
+export const clawNode = (name) => SHIP_PARTS[name];
+// the claw itself as a Group (its parts and outline shell)
+export function makeClawHead() {
+  const node = SHIP_PARTS.claw_claw, g = new THREE.Group();
+  for (const { slot, geo } of node.parts) { const m = new THREE.Mesh(geo, CLAW_ITEM_SLOT(slot)); m.castShadow = false; g.add(m); }
+  if (node.ink) { const m = new THREE.Mesh(node.ink, inkMat); m.userData.isInk = true; g.add(m); }
   return g;
 }
 

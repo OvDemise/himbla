@@ -1,14 +1,16 @@
 import * as THREE from 'three';
 import { animate, lineUp } from './common.js';
 import { seat, hexOf } from './props-util.js';
-import { toon, glow, ink, textSprite } from '../toon.js';
+import { toon, glow, ink, inkMat, textSprite } from '../toon.js';
 import { mulberry32 } from '../rng.js';
 import { FACTIONS, CARGO, MIL_CARGO } from '../locations.js';
-import { makeCrate, makeSeismo, makeTube, makePylon, makeDish, makeTurret, makeRocket, engineModel, caseModel, plinkoConsoleModel, plinkoFrameModel, makeLampPost, makeFountain, makeChandelier, makeCasinoSign, makeChipStack } from '../models.js';
+import { makeCrate, makeSeismo, makeTube, makePylon, makeDish, makeTurret, makeRocket, engineModel, caseModel, plinkoConsoleModel, plinkoFrameModel, makeLampPost, makeFountain, makeChandelier, makeCasinoSign, makeChipStack, makeClawMachine, makeClawHead, clawKindParts, clawLit } from '../models.js';
 import { makeProp } from '../storyAssets.js';
 import { makeStretcher } from '../medevac.js';
 import { makeLoot } from '../alchemy.js';
-import { slotCabinet, updateSlot, blackjackTable, PLK } from '../casinoWorld.js';
+import { slotCabinet, updateSlot, blackjackTable, PLK, canvasTex, FONT } from '../casinoWorld.js';
+import { ClawSim, KINDS } from '../clawSim.js';
+import { ClawView } from '../clawView.js';
 import { SLOTS, SPACING, DROP_Y } from '../plinko.js';
 import { Events } from '../events.js';
 import { World } from '../world.js';
@@ -444,6 +446,59 @@ function blackjack() {
   return { root: lineUp([{ root: blackjackTable(), w: 8, d: 7 }, { root: chips, w: 3.4, d: 0.6 }], 3).root };
 }
 
+// ---- the casino's zero-g claw (claw.glb, tools/blender/build_claw.py; clawSim.js and clawView.js run it): the machine with its marquee and screen lit and a tank of things drifting
+// about in it while the claw cruises over them (nobody plays: no beam), then every kind of thing in the tank at the size it floats, the six crate tints, and the claw ----
+function clawMachine() {
+  const cm = makeClawMachine(), root = new THREE.Group(), sim = new ClawSim(2077), view = new ClawView(cm.spots);
+  root.add(cm.stat, view.group);
+  const board = (spot, pw, ph, paint) => {
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(spot.w, spot.h), new THREE.MeshBasicMaterial({ map: canvasTex(pw, ph, (x) => paint(x, pw, ph)), polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }));
+    m.position.copy(spot.pos);
+    m.rotation.x = -spot.tilt;
+    root.add(m);
+  };
+  const say = (x, w, h, text, col, px) => { x.fillStyle = '#120a1e'; x.fillRect(0, 0, w, h); x.strokeStyle = col; x.lineWidth = 8; x.strokeRect(5, 5, w - 10, h - 10); x.fillStyle = col; x.font = FONT(px); x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText(text, w / 2, h / 2 + 4); };
+  board(cm.spots.marquee, 1024, 120, (x, w, h) => say(x, w, h, 'ZERO-G CLAW', '#ffd23f', 78));
+  board(cm.spots.screen, 512, 150, (x, w, h) => { x.fillStyle = '#05030c'; x.fillRect(0, 0, w, h); x.fillStyle = '#ffd23f'; x.font = FONT(40); x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText('₵200', w / 2, h * 0.32); x.fillStyle = '#fff4e0'; x.fillText('INSERT', w / 2, h * 0.72); });
+  const clamp = (v) => Math.max(-1, Math.min(1, v));
+  view.sync(sim, 0.016);
+  const mid = new THREE.Group();   // (the machine's origin is the middle of its back wall: stand it in the middle of its footprint)
+  mid.add(root);
+  root.position.z = -2.7;
+  return {
+    root: mid,
+    update: (dt, t) => {
+      const c = sim.claw, k = 2.6;
+      const tx = Math.sin(t * 0.31) * 5.5, ty = 4.6 + Math.sin(t * 0.5) * 0.9, tz = 1.9 + Math.cos(t * 0.23) * 0.8;
+      sim.update(Math.min(dt, 0.05), { mx: clamp(((tx - c.x) * k - c.vx) / 5), my: clamp(((ty - c.y) * k - c.vy) / 4), mz: clamp(((tz - c.z) * k - c.vz) / 5), beam: false });
+      sim.events.length = 0;
+      view.sync(sim, dt);
+    },
+  };
+}
+
+function clawThings() {
+  const parts = [];
+  const thing = (kind, tint) => {
+    const g = new THREE.Group(), { parts: ps, ink: ik } = clawKindParts(kind);
+    for (const { geo, material, slot } of ps) g.add(new THREE.Mesh(geo, tint && slot === 'crate' ? clawLit(tint) : material));
+    if (ik) { const m = new THREE.Mesh(ik, inkMat); m.userData.isInk = true; g.add(m); }
+    g.position.y = KINDS[kind].r + 0.2;
+    const w = KINDS[kind].r * 2 + 0.5, root = new THREE.Group();
+    root.add(g);
+    parts.push({ root, w, d: w });
+  };
+  for (const kind of Object.keys(KINDS)) {
+    if (kind === 'crate') for (const t of [0xff9f1c, 0x2ee6ff, 0x7dff6a, 0xff2e88, 0xc77dff, 0xffd23f]) thing('crate', t);
+    else thing(kind);
+  }
+  const head = makeClawHead(), root = new THREE.Group();
+  head.position.y = 1.1;
+  root.add(head);
+  parts.push({ root, w: 1.8, d: 1.8 });
+  return { root: lineUp(parts, 0.5).root };
+}
+
 export default {
   id: 'props.markers',
   title: '04 · PROPS & MARKERS',
@@ -456,6 +511,8 @@ export default {
     { id: 'prop.vacuum-tube', label: 'VACUUM TUBES', w: 6, d: 1.3, make: tubes },
     { id: 'prop.casino-props', label: 'CASINO LAMPS · FOUNTAIN · CHANDELIER · SIGNS', w: 68, d: 21, make: casinoProps },
     { id: 'prop.blackjack', label: 'BLACKJACK TABLE · CHIPS', w: 14.4, d: 7, make: blackjack },
+    { id: 'prop.claw-machine', label: 'ZERO-G CLAW MACHINE', w: 17, d: 8, make: clawMachine },
+    { id: 'prop.claw-things', label: 'CLAW TANK: THINGS · CLAW', w: 41, d: 3, make: clawThings },
     { id: 'prop.slot-machines', label: 'SLOT MACHINES', w: 7 * 2.5 + 6 * 0.9, d: 1.8, make: slotMachines },
     { id: 'prop.plinko', label: 'PLINKO BOOTH & FRAME', w: 16.7, d: 9.2, make: plinko },
     { id: 'event.start-props', label: 'EVENT START PROPS', w: 82, d: 7.2, make: startProps },
