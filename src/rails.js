@@ -136,6 +136,7 @@ export class Grinder {
       this.active = { r: n.r, s: n.s, dir, speed: Math.max(Math.abs(along), hsp * 0.85, 9), t: 0, spark: 0 };
       g.fx.pop('GRIND!', null, { color: '#ffd23f', size: 44 });
       g.audio.tone(1400, 0.08, 'square', 0.08);
+      g.haptics.play('grind');
     }
     const A = this.active, r = A.r;
     railAt(r, A.s, _p, _t);
@@ -243,7 +244,7 @@ export class Grinder {
       const pts = Math.round(15 + A.t * 30);
       g.style(pts, 'GRIND');
     }
-    if (jumped) g.audio.jump();
+    if (jumped) { g.audio.jump(); g.haptics.play('jump'); }
     this.active = null;
     this.cool = 0.6;
   }

@@ -31,6 +31,7 @@ import { Rides } from './rides.js';
 import { Meteors } from './meteors.js';
 import { Grinder } from './rails.js';
 import { Gamepad } from './gamepad.js';
+import { Haptics } from './haptics.js';
 import { DILATE_RATE } from './monolith.js';
 import { Cosmetics } from './cosmetics.js';
 import { Cheats, DEV_TOOLS, loadDevTools } from './devtools.js';
@@ -245,6 +246,9 @@ class Game {
     this.meteors = new Meteors(this);
     this.grind = new Grinder(this);
     this.pad = new Gamepad(this); // controller support
+    this.haptics = new Haptics(this); // ...and its rumble
+    if (this.settings) this.haptics.configure(this.settings.v.rumble, this.settings.v.rumbleLevel);
+    this.audio.onSfx = (k) => this.haptics.play(k); // (a pickup or a payout is felt as well as heard)
     this.cosmetics = new Cosmetics(this);
     this.cosmetics.apply();
     this.cheats = new Cheats(this);
@@ -771,6 +775,7 @@ class Game {
     // the vehicle soaks hits (and can be wrecked); a sniper round goes straight through the glass
     if (P.vehicle && cause !== 'sniper') { amount = this.garage.hit(amount); if (amount <= 0) return; }
     P.health -= amount;
+    this.haptics.hit(amount);
     this.damageFlash = Math.min(1, this.damageFlash + 0.25 + amount / 40);
     this.cam.shake = Math.min(1.5, this.cam.shake + amount / 25);
     if (!(P.vehicle && P.vehicle.def.cargoSafe)) this.missions.onDamage(amount);
@@ -785,6 +790,7 @@ class Game {
     P.dead = true;
     P.model.root.visible = false;
     this.fx.explosion(P.center, 8, true);
+    this.haptics.play('death');
     this.fx.pop('K.O.!', P.center.clone().addScaledVector(P.up, 3), { color: '#ff2a4a', size: 110, life: 2, prio: 2 });
     this.audio.boom(true);
     if (this.missions.active) this.missions.failAll('You went down — the cargo is lost.');
@@ -842,6 +848,7 @@ class Game {
     const P = this.player;
     const dCam = pos.distanceTo(this.camera.position);
     if (dCam < 600) this.audio.boom(big);
+    this.haptics.boom(dCam, big);
     if (big && dCam < 200) this.cam.shake = Math.min(1.5, this.cam.shake + (1 - dCam / 200));
     if (owner !== 'player' && Math.random() < 0.5 && dCam < 150) this.fx.pop(pick(['BLAM!', 'ZAKK!', 'FWOOM!']), pos.clone().addScaledVector(up, 2), { color: '#ff4f2e', size: 46, life: 0.7 });
     if (!P.dead && !spare) {
@@ -1210,6 +1217,7 @@ class Game {
     const P = this.player;
     this.audio.setZone(this.musicZone());
     this.audio.update(P.dead ? 0 : P.speed, P.body.skating, P.body.grounded, P.body.thrusting && playing, frozen); // (frozen: a pause, the map, a dialog: no wind, skate hum or thrusters)
+    this.haptics.update(rdt);
     dbg.lap('hud');
 
     const dark = darkness(P.up);

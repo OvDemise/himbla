@@ -372,7 +372,7 @@ export class Player {
       ctrl.jump = false;
     }
     g.devOverlay.lap('physics');
-    if (b.jumped) { g.audio.jump(); g.fx.dust(b.pos, b.vel, 6, up); }
+    if (b.jumped) { g.audio.jump(); g.haptics.play('jump'); g.fx.dust(b.pos, b.vel, 6, up); }
     // the Vanes at work: teal and violet sparks shed off the skates and a rising shimmer
     this.vaneCarve = vanes && !b.grounded ? b.airCarve || 0 : 0;
     if (this.vaneCarve) {
@@ -526,6 +526,7 @@ export class Player {
         pts += Math.round(landedAfter * 5);
         const name = parts.join(' + ');
         g.style(pts, name);
+        g.haptics.play('stick');
         g.fx.pop('STUCK IT!', null, { color: '#7dff6a', size: 70, rot: 6, prio: 1 });
         this.trickLanding = true;
         g.stats.bestTrick = Math.max(g.stats.bestTrick || 0, pts);
@@ -535,6 +536,7 @@ export class Player {
         b.vel.multiplyScalar(0.55);
         g.missions.jostle(18, true);
         g.audio.thud(30);
+        g.haptics.play('wipeout');
         this.trickLanding = true;
         wiped = true;
       }
@@ -552,7 +554,7 @@ export class Player {
     const g = this.game;
     let safe = (g.alchemy && g.alchemy.buffs.cushion > 0) ? 1e9 : skates ? this.params.skateSafeImpact * (g.cheats ? g.cheats.speed : 1) : this.params.bootSafeImpact * (g.cheats ? g.cheats.speed : 1);
     if (g.winch && g.winch.on) safe += 14; // (the winch's own pull is controlled: fetching up against a wall or a ship's tower at its pace is a bump, not a crash)
-    if (it.speed > 6) g.audio.thud(it.speed);
+    if (it.speed > 6) { g.audio.thud(it.speed); g.haptics.land(it.speed); }
     if (it.speed > 4 && this.model.halo) this.model.halo.kick(Math.min(1, it.speed / 25)); // (a bump rings the halo)
     if (g.alchemy && g.alchemy.buffs.bouncy > 0 && it.kind === 'ground' && it.speed > 5) {
       this.body.bounceReady = Math.max(this.body.bounceReady || 0, it.speed);

@@ -6,6 +6,7 @@ export class Audio {
     this.mix = { hum: 1, wind: 1 }; // per-layer level trims for the ambient loops (the trailer lowers them)
     this.levelFloor = 0; // the roaming groove never drops below this (the trailer keeps it up)
     this.skateTone = 'hum'; // which skate voice sings (cosmetics: each pair of skates has one)
+    this.onSfx = null; // heard a pickup or a payout: told to the controller's rumble too (main.js)
   }
 
   init() {
@@ -581,8 +582,8 @@ export class Audio {
   enemyShot() { this.tone(420, 0.15, 'sawtooth', 0.06, 0.5); }
   boom(big) { this.burst(big ? 1.2 : 0.6, big ? 1800 : 1200, big ? 0.8 : 0.5); }
   thud(v) { this.burst(0.25, 300 + v * 10, Math.min(0.6, v / 40)); }
-  pickup() { this.tone(660, 0.1, 'triangle', 0.2); setTimeout(() => this.tone(990, 0.15, 'triangle', 0.2), 90); }
-  cash() { [523, 659, 784, 1046].forEach((f, i) => setTimeout(() => this.tone(f, 0.18, 'triangle', 0.18), i * 80)); }
+  pickup() { if (this.onSfx) this.onSfx('pickup'); this.tone(660, 0.1, 'triangle', 0.2); setTimeout(() => this.tone(990, 0.15, 'triangle', 0.2), 90); }
+  cash() { if (this.onSfx) this.onSfx('cash'); [523, 659, 784, 1046].forEach((f, i) => setTimeout(() => this.tone(f, 0.18, 'triangle', 0.18), i * 80)); }
   alarm() { this.tone(740, 0.2, 'square', 0.1); setTimeout(() => this.tone(520, 0.2, 'square', 0.1), 200); }
   hurt() { this.tone(160, 0.25, 'sawtooth', 0.2, 0.5); }
   jump() { this.tone(300, 0.15, 'sine', 0.15, 2.2); }

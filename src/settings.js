@@ -78,6 +78,8 @@ export const SCHEMA = {
     { key: 'gyroRange', label: 'Gyro: tilt for a full push', type: 'range', min: 15, max: 60, step: 5, def: 30, fmt: (v) => `${v}°`, hint: 'Smaller = more sensitive' },
     { key: 'gyroInvX', label: 'Gyro: flip left / right', type: 'toggle', def: false },
     { key: 'gyroInvY', label: 'Gyro: flip forward / back', type: 'toggle', def: false },
+    { key: 'rumble', label: 'Controller vibration', type: 'toggle', def: true, hint: 'Jumps, landings, hits, blasts and weapons, and a hum from the skates, thrusters and rails' },
+    { key: 'rumbleLevel', label: 'Vibration strength', type: 'range', min: 0.2, max: 1.5, step: 0.1, def: 1, fmt: pct },
   ],
   audio: [
     { key: 'mute', label: 'Mute all audio', type: 'toggle', def: false, hint: 'Silences everything: music, effects, wind, skates and thrusters' },
@@ -296,6 +298,7 @@ export class Settings {
       if (u.lines) u.lines.value = v.speedLines ? 1 : 0;
       if (u.inkK) u.inkK.value = v.ink;
     }
+    if (g.haptics) g.haptics.configure(v.rumble, v.rumbleLevel);
     if (g.audio && g.audio.setVolumes) g.audio.setVolumes(v.master, v.music, v.sfx, v.mute);
     if (g.input && g.input.setBindings) g.input.setBindings(v.binds);
     const mm = document.getElementById('minimap');

@@ -127,6 +127,8 @@ back. Prompts show the pad's buttons while it's in use.
 | `Circle` held + tilt the pad (PlayStation) | **Gyro:** how far you turn the pad since Circle went down acts like the left stick: pitch it forward / back and turn it like a steering wheel to move on the ground, or to flip and spin in the air. Settings → Gameplay: on / off, how far is a full push, flip either axis |
 | `View` (tap · hold) · `Start` | Globe map · emergency recall · pause |
 
+**Vibration:** while the pad is in use it rumbles (any pad whose browser exposes the rumble motors: Xbox, PlayStation and most others in Chrome, Edge and the desktop app): a tick off the ground, a thump on landing that grows with the impact, a hard knock for each hit you take and a long one when you go down, blasts by how close they are, a kick for each weapon (the Rail Lance and the APC's cannon heaviest), clean tricks and wipeouts, pickups and payouts, and a low hum from the skates (rising with speed), the thrusters, a rail under the skates and a vehicle's engine. Menus tick as the highlight moves. Settings → Gameplay: on / off and the strength (changing it gives a test buzz). It is silent on the keyboard, in a pause and while the tab is hidden.
+
 In menus, dialogs, the board, the wardrobe and the casino, the d-pad (or left stick) moves a
 highlight, `A` presses, `B` backs out, `LB`/`RB` switch tabs and the right stick scrolls. Watching
 a Derby race: `A` cheers, `Y` switches camera, the right stick orbits. On the globe map the left

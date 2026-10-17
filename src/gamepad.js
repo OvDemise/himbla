@@ -41,6 +41,7 @@
 //                                               DUCK DERBY
 //                                               left stick / d-pad  pick a duck   A  race · new race
 //                                               LB / RB     lower / raise the bet   B  stand up
+//   (the pad rumbles too: see haptics.js; Settings → Gameplay)
 //   d-pad ↓      the radial menu (tap to open, tap again to close): vehicles, powers, wardrobe, reputation log,
 //                empty the jar (vehicles and powers open their own wheel of the ones you own:
 //                same controls; a power you pick on its wheel is the one RB uses). The right stick picks a wedge (the
@@ -125,6 +126,7 @@ export class Gamepad {
     const pads = navigator.getGamepads ? navigator.getGamepads() : [];
     let gp = null;
     for (const p of pads) if (p && p.connected) { gp = p; if (p.mapping === 'standard') break; }
+    if (this.game.haptics) this.game.haptics.attach(gp);
     if (!gp) return;
     const kind = padKind(gp.id);
     if (kind !== this.kind) { this.kind = kind; if (this.input.padActive) { this.glyphs.set(false); this.glyphs.set(true, kind); } else glyphState.kind = kind; }
@@ -562,7 +564,7 @@ export class Gamepad {
     if (pressed(B.A) && this.focus) {
       const el = this.focus;
       if (el.tagName === 'SELECT') { el.selectedIndex = (el.selectedIndex + 1) % el.options.length; el.dispatchEvent(new Event('change', { bubbles: true })); }
-      else el.click();
+      else { el.click(); g.haptics.play('press'); }
     }
     // (settings close back to whatever opened them: resuming from under them would leave them up)
     const setOpen = g.settings && g.settings.open;
@@ -655,6 +657,7 @@ export class Gamepad {
     el.dispatchEvent(new MouseEvent('mouseover', { bubbles: true, clientX: r.left + r.width / 2, clientY: r.top + r.height / 2 }));
     el.dispatchEvent(new MouseEvent('mouseenter', { bubbles: false }));
     if (this.game.audio && this.game.audio.tone) this.game.audio.tone(900, 0.03, 'square', 0.06);
+    this.game.haptics.play('tick');
   }
 
   clearFocus() { if (this.focus) { this.focus.classList.remove('pad-focus'); this.focus = null; } }
