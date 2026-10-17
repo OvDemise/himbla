@@ -104,7 +104,6 @@ of code into `prize.glb`; the shared kit is the same in B):
 | `hall_floor` | the whole floor as one mesh with the carpet's border and the runner inlaid (no overlay planes) |
 | `hall_door` | the grand doors: gilded frame, a pediment with the four suits, lamp brackets |
 | `hall_bar` | the Chip Bar: plum island, eight suit panels, a leather rail on studs, a brass back-bar ring, a gilded halo with six pendant lamps, a spinning `chip` pivot above |
-| `hall_cage` | the cashier's cage: grille, till shelf, lamp |
 | `prize_counter` | today's primitives, rebuilt in Blender with the same parts and a proper cabinet; the 15 prize models stay code-made or move as a pivot list |
 | `facade_bay`, `facade_portico`, `facade_parapet`, `facade_clerestory`, `facade_dome` | see below |
 
@@ -128,7 +127,7 @@ only works if the Plinko is the brightest thing in it. The wings' ceilings have 
 ![Layout B](casino-layout-b.svg)
 
 **The idea.** A cruciform building round a domed rotunda, so every game has a room of its own and the casino reads from
-outside as a landmark rather than a box. The doors open into a grand foyer (the prize counter on one side, the chip cage on the
+outside as a landmark rather than a box. The doors open into a grand foyer (the prize counter on one side, [the chip cage, dropped since: chips are exchanged at the counter] on the
 other); beyond it is the rotunda under the dome and the Chip Bar; the north arm ends in the Plinko cabinet; the east wing is
 the Duck Derby; the west wing is the claw, the card room and the arcade. Rooms have different heights, so the rotunda is
 the tallest and the wings are the most intimate.
@@ -140,7 +139,7 @@ wings **22 wide x 45 long** (x 10 to 55 either side), 16 m high throughout (the 
 | Piece | Position (x, z) | Size / facing | Note |
 |---|---|---|---|
 | Prize counter | x 4.4..9.0, z 1.0..9.2 | foyer's east wall, facing -x (as now) | station (3.2, 5.1) |
-| Chip cage (new) | x -9.0..-5.5, z 3.0..7.0 | foyer's west wall | |
+| ~~Chip cage (new)~~ | | dropped after the build: chips are exchanged at the prize counter | |
 | Chip Bar (new) | centre (0, -13), r 4.7 | the rotunda's middle | under the dome; four piers at r 13.6 on the diagonals |
 | Plinko | frame x -8.0..8.0, z -44.0..-41.3; booth (0, -36) | the north arm's end wall | lens corridor z -41.3..-24.8: the lens itself hangs at the rotunda's north edge, 17 m from the board |
 | Duck Derby | basin x 18.6..47.0, z -23.1..-15.3 | east wing, along x on its north wall: **the orientation the code already has** | kiosk (32.8, -11.4); the odds board is 17.2 m of the wing's 42 m north wall; the lenses' z margin is the reason the wing is 22 m wide (at 20 m the kiosk's lens went through the south wall) |
@@ -154,7 +153,7 @@ prize counter to the nearest rotunda pier 3.4 m; every pair of different games i
 
 **Built in Blender** (`build_hall.py`, 17 models): `hall_bay0..3` (a bay with half a gold pilaster each side, a lacquered wainscot with
 a framed suit panel, a tall arched panel with a cyan line), `hall_filler`, `hall_coffer`, `hall_medallion` (a compass star with the
-four suits), `hall_bar`, `hall_cage`, `hall_sofa`, `hall_table`, `hall_gate`, `facade_panel0..3` and `facade_crown` (the drum, the
+four suits), `hall_bar`, `hall_sofa`, `hall_table`, `hall_gate`, `facade_panel0..3` and `facade_crown` (the drum, the
 ribbed dome and the lantern). What differs from the study: the long horizontal pieces (skirting, girdle, cornice, the damask
 field, the outside's plinth, belt and cornice) are rings made in the game from the outline, not parts of a bay, so they meet at the
 corners with a mitre and never share a plane; the prize counter stays as it was (code-built, it is the look the rest follows).

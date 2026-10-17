@@ -1,4 +1,4 @@
-# Casino hall kit for Blender (4.2+ / 5.x): the Lucky Crater Casino's walls, ceiling, floor inlay, bar, cage, lounge, doors and roof, in the plum lacquer, gold, brass and cream suit
+# Casino hall kit for Blender (4.2+ / 5.x): the Lucky Crater Casino's walls, ceiling, floor inlay, bar, lounge, doors and roof, in the plum lacquer, gold, brass and cream suit
 # panels of the Duck Derby, the blackjack table and the Plinko cabinet. One file, src/assets/hall.glb, in three.js axes (x right, y up, +z forward) like the other builders.
 # The game is casinoWorld.js (it tiles the wall pieces along the plan's outline, casinoPlan.js) and models.js reads the file (makeHallPart).
 #
@@ -17,8 +17,6 @@
 #                   arms and the four suits between its points.
 #   hall_bar        the Chip Bar, r 4.65 with its stools: a plum 16-sided island with a cream suit panel on each face between gold posts, a pink top in a gold rim, a padded leather rail,
 #                   a back-bar counter, a gold pillar with a gilded halo and pendant lamps, and eight stools. Pivot `bar_spin` (at the top of the pillar) carries the casino's chip, which turns.
-#   hall_cage       the cashier's cage, 4 m wide and 1.7 m deep, its back on a wall: a plum counter with four suit panels, a gold top, a brass grille with two windows, a roof and a sign
-#                   backing. Pivot `cage_face` (extras w, h) is where the game puts the neon text plane.
 #   hall_sofa       a lounge banquette 3.6 m long, its back on the wall: plum body, red velvet cushions, gold feet.  hall_table: a small round table, gold pedestal, pink top.
 #   hall_gate       the grand doors' frame, on the outside of the front wall (its back on the wall's outer face, z 0, front toward +z), the doors' opening 12 m wide and 10 m tall: gold piers,
 #                   an architrave, a frieze of five suit panels and a pediment with a gold chip, lamps either side.
@@ -309,44 +307,6 @@ for i in range(8):
 for g in suit_geos(1, 0.62, 0.02):                                               # a heart on each face
     for z in (0.125, -0.125):
         chip_cream.add(g[:2], (0, 0, z), (0, 0 if z > 0 else PI, 0))
-
-# =====================================================================================================
-# the cashier's cage
-# =====================================================================================================
-root = pivot("hall_cage", (0, 0, 0))
-plum = Acc("hall_cage_plum", "plum", root, 0.02)
-plum2 = Acc("hall_cage_plum2", "plum2", root, 0.012)
-gold = Acc("hall_cage_gold", "gold", root, 0.02)
-brass = Acc("hall_cage_brass", "brass", root, 0.012)
-dark = Acc("hall_cage_dark", "dark", root, 0.0)
-red = Acc("hall_cage_suitred", "suitred", root, 0.0)
-cream = Acc("hall_cage_suitcream", "suitcream", root, 0.0)
-lamp = Acc("hall_cage_lamp", "lamp", root, 0.0)
-cyan = Acc("hall_cage_cyan", "glowcyan", root, 0.0)
-plum.box(-1.95, 1.95, 0.1, 1.05, 0.55, 1.6)                                     # the counter
-gold.box(-2.0, 2.0, 1.05, 1.13, 0.5, 1.7)                                       # its top
-for i, x in enumerate((-1.35, -0.45, 0.45, 1.35)):
-    suit_panel(brass, dark, red, cream, i, (x, 0.6, 1.6), 0, 0.8, 0.7, 0.5)
-cyan.box(-1.8, 1.8, 0.2, 0.23, 1.6, 1.62)
-dark.box(-1.9, 1.9, 1.2, 2.95, 0.0, 0.05)                                       # the dark behind the grille
-for i in range(33):                                                              # the grille's bars, but not at the two windows
-    x = -1.92 + i * 0.12
-    if (0.5 < abs(x) < 1.1) and True:
-        continue
-    brass.cylc(x, 2.075, 0.9, 0.014, 1.75, 5)
-brass.box(-1.92, 1.92, 2.95, 3.03, 0.85, 0.95)                                  # top and middle rails
-brass.box(-1.92, 1.92, 1.9, 1.95, 0.87, 0.93)
-brass.box(-1.92, 1.92, 1.13, 1.18, 0.85, 0.95)
-for s in (-1, 1):
-    brass.box(*sorted((s * 1.92, s * 1.98)), 1.13, 3.03, 0.85, 0.95)
-    brass.box(s * 0.5 - 0.02, s * 0.5 + 0.02, 1.18, 1.90, 0.85, 0.95)         # the windows' frames
-    brass.box(s * 1.1 - 0.02, s * 1.1 + 0.02, 1.18, 1.90, 0.85, 0.95)
-plum.box(-2.1, 2.1, 3.03, 3.28, 0.0, 1.3)                                       # the roof, and the sign backing on its front
-brass.box(-1.7, 1.7, 3.28, 3.95, 1.2, 1.3)
-plum2.box(-1.64, 1.64, 3.34, 3.89, 1.3, 1.33)
-lamp.ball(-1.7, 1.25, 1.35, 0.12, 8, 6)
-lamp.ball(1.7, 1.25, 1.35, 0.12, 8, 6)
-pivot("cage_face", (0, 3.615, 1.345), root, role="face", w=3.1, h=0.5)
 
 # =====================================================================================================
 # the lounge: a banquette and a small table

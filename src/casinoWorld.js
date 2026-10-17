@@ -667,7 +667,6 @@ export function buildCasino(w, loc) {
     const bc = [[-3.8, -2], [3.8, -2], [-3.8, 4.7], [3.8, 4.7]].map(([a, b]) => bjPt(a, 0, b));
     R(Math.min(...bc.map((c) => c[0])) - 0.3, Math.max(...bc.map((c) => c[0])) + 0.3, Math.min(...bc.map((c) => c[2])) - 0.3, Math.max(...bc.map((c) => c[2])) + 0.3);
     R(PRIZE.wallX - 4.8, PRIZE.wallX + 0.2, PRIZE.z - 4.3, PRIZE.z + 4.3);
-    R(-HALL.ARM - 0.2, -HALL.ARM + 2.0, 2.8, 7.2);
     R((DUCK.x0 + DUCK.x1) / 2 - 8.7, (DUCK.x0 + DUCK.x1) / 2 + 8.7, DUCK.wallZ - 0.2, DUCK.wallZ + 1.0);
     const cx = CLASSIC.xs.reduce((a, b) => a + b) / CLASSIC.xs.length;
     R(cx - 6.5, cx + 6.5, CLASSIC.wallZ - 0.5, CLASSIC.wallZ + 0.2);
@@ -718,15 +717,6 @@ export function buildCasino(w, loc) {
   put(bar, HCX, CZ, 0.05);
   put(barSpin, HCX, CZ, 0.05 + barSpin.position.y, 0, true);
   col({ type: 'cyl', x: HCX, z: CZ, y0: -1, y1: 4.4, r: 4.7 });
-  // the cashier's cage on the foyer's west wall: the chips' counter, its sign painted by the game
-  {
-    const cage = makeHallPart('hall_cage'), cf = cage.getObjectByName('cage_face');
-    const sign = new THREE.Mesh(new THREE.PlaneGeometry(cf.userData.w, cf.userData.h), new THREE.MeshBasicMaterial({ map: neonTex('CHIP CAGE', { w: 512, h: 96, color: '#ffd23f', edge: '#2ee6ff' }) }));
-    sign.position.copy(cf.position); sign.position.z += 0.012;
-    cage.add(sign);
-    put(cage, -HALL.ARM + 0.02, 5, 0, Math.PI / 2);
-    col({ type: 'box', x: -HALL.ARM + 0.85, y: 1.9, z: 5, hx: 0.85, hy: 1.9, hz: 2.05 });
-  }
   // two lounges at the wings' far ends: banquettes against the wall and a small table
   const lounge = (sofas, table) => {
     for (const [x, z, yaw] of sofas) {

@@ -450,7 +450,7 @@ function blackjack() {
 }
 
 // ---- the casino's hall kit (hall.glb, tools/blender/build_hall.py; casinoWorld.js tiles it round the plan): the four wall bays (spade, heart, diamond, club) and the filler, a coffer tile
-// (hung 7 m up), the floor medallion, the Chip Bar (its chip turns), the cashier's cage, a lounge banquette with its table, the doors' frame, the four facade panels and the roof's crown ----
+// (hung 7 m up), the floor medallion, the Chip Bar (its chip turns), a lounge banquette with its table, the doors' frame, the four facade panels and the roof's crown ----
 function casinoHall() {
   const movers = [];
   const part = (name, w, d, f) => { const o = makeHallPart(name); if (f) f(o); const g = new THREE.Group(); g.add(o); return { root: g, w, d }; };
@@ -460,7 +460,6 @@ function casinoHall() {
   parts.push(part('hall_coffer', 4.5, 4.5, (o) => { o.position.y = 7; }));
   parts.push(part('hall_medallion', 17.2, 17.2));
   parts.push(part('hall_bar', 9.4, 9.4, (o) => { const spin = o.getObjectByName('bar_spin'); movers.push((dt) => { spin.rotation.y += dt * 0.9; }); }));
-  parts.push(part('hall_cage', 4.2, 1.8));
   const lounge = new THREE.Group();
   lounge.add(makeHallPart('hall_sofa'));
   const table = makeHallPart('hall_table');
@@ -590,7 +589,7 @@ export default {
     { id: 'prop.duck-derby', label: 'DUCK DERBY TRACK · RACERS · KIOSK · BOARD', w: 31, d: 21, make: duckDerby },
     { id: 'prop.blackjack', label: 'BLACKJACK TABLE · CHIPS', w: 14.4, d: 7, make: blackjack },
     { id: 'prop.casino-lot', label: 'CASINO FORECOURT KIT: CARD WALL · POSTS · CHIP BOLLARD · P PYLON · BAY STUD', w: 24, d: 8, make: casinoLot },
-    { id: 'prop.casino-hall', label: 'CASINO HALL KIT: BAYS · CEILING TILE · MEDALLION · BAR · CAGE · LOUNGE · GATE · FACADE · CROWN', w: 165, d: 36, big: true, make: casinoHall },
+    { id: 'prop.casino-hall', label: 'CASINO HALL KIT: BAYS · CEILING TILE · MEDALLION · BAR · LOUNGE · GATE · FACADE · CROWN', w: 165, d: 36, big: true, make: casinoHall },
     { id: 'prop.claw-machine', label: 'ZERO-G CLAW MACHINE', w: 17, d: 8, make: clawMachine },
     { id: 'prop.claw-things', label: 'CLAW TANK: THINGS · CLAW', w: 41, d: 3, make: clawThings },
     { id: 'prop.slot-machines', label: 'SLOT MACHINES', w: 7 * 2.5 + 6 * 0.9, d: 1.8, make: slotMachines },
