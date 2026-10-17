@@ -29,7 +29,6 @@ const current = () => {
     L.items.push(circ('Chip stack', s * 14, FRONT_OUT + 5, 1.7, 'ext'), circ('Chip stack', s * 27, s < 0 ? 44 : 46, 1.7, 'ext'));
     for (let i = 0; i < 3; i++) L.lamps.push({ x: s * 8.5, z: 50 + i * 11, sc: 0.92, kind: 'post' });
   }
-  L.items.push(rect('Pylon sign', 18, 33, 117.2, 118.8, 'prop'));
   L.carpet = { x0: -3, x1: 3, z0: FRONT_OUT, z1: FRONT_OUT + 36 };
   L.notes = ['The boulevard is asphalt the whole way, 65 m of it, to the fountain.', 'Two lots stand 22 m clear of it at x 30..74, edged in hedge.', 'Lot lamps are the old thin poles; the boulevard ones are the neon posts.'];
   return L;
@@ -64,7 +63,6 @@ const proposed = () => {
   L.crossing = { x0: -AV, x1: AV, z0: W1 - 2, z1: W1 };
   for (const s of [-1, 1]) for (let z = W1 + 2; z < FZ - PR; z += 3) L.bollards.push({ x: s * 5.6, z });
   L.items.push(circ('Fountain', 0, FZ, 5.5, 'game'));
-  L.items.push(rect('Pylon sign', 18, 33, 117.2, 118.8, 'prop'));
   L.carpet = { x0: -3, x1: 3, z0: FRONT_OUT, z1: FZ - PR + 1 };
   L.notes = [
     'The asphalt ends halfway: the central court runs from the doors to z 58.4 (the fountain is at 98, the doors at 16.4: the middle is 57).',

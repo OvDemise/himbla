@@ -401,8 +401,8 @@ yours if you swear in with Rustmoon). Lose him by getting 1.5 km away. Not while
 ## Lucky Crater Casino
 
 A walk-in hall about 1 km from the ILMB, with a ring road round its grounds like a town's: plum lacquer and gold, a cross-shaped
-building (the Crater Cross) under a ribbed dome, with a rotating sign on its mast. Out front, two slot carousels (seven cabinets
-round a glowing pillar under a bulb-lit canopy) flank the red carpet, and punters wander from game to game: playing the slots
+building (the Crater Cross) under a ribbed dome. Out front, two slot carousels (seven cabinets
+round a glowing pillar under a bulb-lit canopy) flank the red carpet, and punters wander from game to game (by a way round everything that stands in the way, through the doors when the next game is inside): playing the slots
 (yanking the handle while the cabinet lights up), gawping at the giant die and the roulette wheel in the pocket courts either side of
 the foyer, admiring the chip towers, chatting by the doors. Walk through the grand doors into the foyer (the prize counter and the
 cashier's cage), on to the crossing (the Chip Bar under its halo, on a compass-star inlay) and press `F` at a station

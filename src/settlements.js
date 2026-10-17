@@ -2474,7 +2474,7 @@ export function jobTerminal(world, loc, x, z, yaw = 0, color = 0xffd23f) {
 
 // =============================================================================================
 // The Lucky Crater Casino's forecourt (the hall itself is casinoWorld.js): a neon boulevard from
-// the doors to a fountain plaza, a pylon sign out by the road, and a car park either side full
+// the doors to a fountain plaza and a car park either side full
 // of parked hover-cars, so the hall doesn't sit alone in an empty crater.
 // =============================================================================================
 export function dressCasinoLot(world, loc, makeCar) {
@@ -2554,28 +2554,6 @@ export function dressCasinoLot(world, loc, makeCar) {
     }
     keep(0, FZ, PR + 2);
     keep(0, 40, 22);
-    // ---- the pylon sign out by the road: twin posts, a tall marquee, chasing bulbs ----
-    {
-      const px = 26, pz = 118;
-      k.at(px, pz, -0.35);
-      for (const s of [-1, 1]) {
-        k.box(1.2, 23, 1.2, T(PURP), s * 6.6, 0, 0, { outline: 0.08 });
-        k.solid(0.6, 11.5, 0.6, s * 6.6, 0);
-      }
-      // the marquee: LUCKY over CRATER, each on its own line with room between
-      k.box(12, 7.6, 1.4, T(0x120a1e), 0, 13.6, 0, { outline: 0.1 });
-      for (const y of [13.3, 21.2]) k.box(12.4, 0.4, 1.6, T(GOLD), 0, y, 0, { outline: 0.04 });
-      k.text('LUCKY', 0, 19.25, 0, 0, 7, { fg: '#ffd23f', bg: '#120a1e', stroke: '#ff2e88', off: 0.72 });
-      k.text('CRATER', 0, 15.65, 0, 0, 8.2, { fg: '#ff7ad9', bg: '#120a1e', stroke: '#2ee6ff', off: 0.72 });
-      for (let i = 0; i < 12; i++) for (const y of [13.5, 21.4]) k.ball(0.2, G(i % 2 ? GOLD : 0xfff6a8), -5.5 + i, y, 0.82, { outline: 0 });
-      // the reader board under it
-      k.box(10, 2.6, 1, T(PINK), 0, 10.2, 0, { outline: 0.06 });
-      k.text('CASINO · OPEN 25/8', 0, 11.5, 0, 0, 8.8, { fg: '#fff6a8', bg: '#8a1030', stroke: '#120a1e', off: 0.52 });
-      k.add(new THREE.OctahedronGeometry(1.6, 0), G(GOLD), 0, 23.4, 0, { outline: 0.06 });
-      k.solid(6.2, 5.6, 0.7, 0, 0, 0, 10.2);
-      k.at();
-      keep(px, pz, 9);
-    }
     // ---- the walkway: from the court's edge to the plaza, paved, gold lines either side of the carpet's strip, a chip inlay every 6 m, chip-stack bollards along both sides ----
     k.box(10.4, 0.1, b1 - W1, T(0x6a5a8a), 0, 0, (W1 + b1) / 2, { outline: 0 });
     for (const s of [-1, 1]) {
