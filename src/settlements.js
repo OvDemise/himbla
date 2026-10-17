@@ -1007,26 +1007,6 @@ function inkShell() {
   return _inkShell;
 }
 
-// Inflatable bounce dome: alternating coloured gores, a puffy base tube, tethers and a valve.
-export function bounceDome(world, loc, k, x, z, r, c1, c2) {
-  k.at(x, z);
-  const n = 10;
-  for (let i = 0; i < n; i++) k.add(new THREE.SphereGeometry(r, 4, 10, (i / n) * TAU, TAU / n, 0, Math.PI / 2), T(i % 2 ? c1 : c2), 0, -0.4, 0, { outline: 0 });
-  k.add(new THREE.SphereGeometry(r * 1.003, 20, 10, 0, TAU, 0, Math.PI / 2), inkShell(), 0, -0.4, 0, { outline: 0.25 });
-  k.add(new THREE.TorusGeometry(r * 0.98, Math.max(0.6, r * 0.06), 8, 28), T(c2), 0, 0.3, 0, { rx: Math.PI / 2, outline: 0.08 });
-  k.ring(r * 0.72, r * 0.05, T(WHITE), 0, r * 0.66, 0);
-  k.cyl(r * 0.08, r * 0.1, r * 0.08, 10, T(WHITE), 0, r - 0.6, 0, { outline: 0.04 });
-  k.ball(r * 0.05, G(YEL), 0, r - 0.4 + r * 0.08, 0, { outline: 0 });
-  for (let i = 0; i < 6; i++) {
-    const a = (i / 6) * TAU + 0.3;
-    const stake = [Math.cos(a) * (r + 3), 0, Math.sin(a) * (r + 3)];
-    k.beam([Math.cos(a) * r * 0.7, r * 0.7, Math.sin(a) * r * 0.7], stake, 0.05, T(DARK), { outline: 0 });
-    k.cyl(0.18, 0.12, 0.7, 5, T(YEL), stake[0], 0, stake[2], { outline: 0.02 });
-  }
-  k.at();
-  world.col(loc, { type: 'sphere', x, y: -0.5, z, r }).bouncy = true;
-}
-
 // =============================================================================================
 // Bounce Dome Funpark: the inflatables, now joined by a skate park (a volcano bowl you drop into,
 // a kicker line ending in a big launch off the plateau, a big half-pipe and a pyramid funbox), a ferris wheel, a carousel, trampolines and an entrance arch strung with lights.
@@ -1035,7 +1015,6 @@ export function buildFunpark(world, loc) {
   const cols = [0xff2e88, 0xffd23f, 0x2ee6ff, 0x7dff6a, 0xff9f1c, 0xc77dff];
   settle(world, loc, 5507, (k) => {
     // ---- the inflatables ----
-    [[0, 0, 26], [-50, 30, 18], [20, -60, 20], [-40, -50, 14], [-80, -10, 12]].forEach(([x, z, r], i) => bounceDome(world, loc, k, x, z, r, cols[i % 6], cols[(i + 2) % 6]));
     // bouncy castle: puffy walls, four turrets, crenellations and an arched way in
     k.at(0, 70);
     k.box(24, 1.2, 24, T(0x2ee6ff), 0, 0, 0, { outline: 0.12 });
@@ -1259,28 +1238,13 @@ export function buildFunpark(world, loc) {
       },
     });
 
-    // ---- entrance: a banner arch spanning the Derby track, ticket booth, strings of lights ----
+    // ---- the ticket booth (the arch that stood over it, its banner and the strings of lights and lamp posts round the park are gone) ----
     k.at(Math.cos(Math.PI / 4) * 99, Math.sin(Math.PI / 4) * 99, Math.PI / 4);
-    for (const s of [-1, 1]) {
-      k.cyl(1.6, 2, 12, 10, T(0xff2e88), s * 17, 0, 0, { outline: 0.08 });
-      k.add(new THREE.ConeGeometry(2.2, 3, 10), T(YEL), s * 17, 13.5, 0, { outline: 0.06 });
-      k.column(2, 12, s * 17, 0);
-    }
-    k.add(new THREE.TorusGeometry(17, 0.8, 8, 32, Math.PI), T(0x2ee6ff), 0, 9, 0, { outline: 0.1 });
-    for (let i = 0; i <= 16; i++) { const a = (i / 16) * Math.PI; k.ball(0.4, G(cols[i % 6]), Math.cos(a) * 17, 9 + Math.sin(a) * 17, -0.9, { outline: 0 }); }
-    // the banner hangs on two cables inside the arch, clear of the hoop
-    const bh = k.text('BOUNCE DOME FUNPARK', 0, 15.5, 0, 0, 15, { fg: '#ffd23f', bg: '#ff2e88' });
-    k.box(15.6, bh + 0.6, 0.2, T(0xff2e88), 0, 15.5 - bh / 2 - 0.3, 0, { outline: 0.04 });
-    for (const s of [-1, 1]) k.beam([s * 6.5, 15.5 + bh / 2 + 0.3, 0], [s * 6.5, 9 + Math.sqrt(16.2 * 16.2 - 6.5 * 6.5), 0], 0.06, T(DARK), { outline: 0 });
     k.box(3.4, 3, 2.6, T(YEL), -12, 0, -5, { outline: 0.06 });
     k.box(3.6, 0.4, 2.8, T(0xff2e88), -12, 3, -5, { outline: 0.04 });
     k.box(2.2, 1, 0.1, G(WARM), -12, 1.6, -6.32, { outline: 0 });
     k.solid(1.8, 1.7, 1.4, -12, -5);
     k.at();
-    lightString(k, [[-31, 6, 50], [-4, 6, 55], [14, 6, 52]], cols, 10, 1.2);
-    lightString(k, [[118, 6, -40], [140, 6, -40], [162, 6, -38]], cols, 10, 1.2);
-    for (const [x, z] of [[-31, 50], [-4, 55], [14, 52], [118, -40], [140, -40], [162, -38]]) k.cyl(0.15, 0.2, 6, 6, T(DARK), x, 0, z, { outline: 0.03 });
-    for (const [x, z] of [[-20, -20], [30, 20], [-4, 36], [40, -30], [-62, 48], [-66, 10], [116, 0], [96, 53]]) k.lamp(x, z, 7, 0xff7ad9);
   });
 }
 

@@ -664,8 +664,8 @@ crowd-noise bed for now (the cheering is due a rework), and the race countdown b
   cheers** for a short surge that burns stamina (a dim creature may get spooked instead). Chaos as ever: stumbles,
   zooms, wrong-way runs, giant hops, and the occasional explosion and reassembly.
 - **The Monolith:** touch it (90 s cooldown) and it casts one of three spells, never the same twice running: **Time Dilation** (20 s with pirates, their shots, traffic and meteors at 40 % speed while you keep full speed), **Echo Followers** (one or two holograms of you that retrace your every move a moment late, mid-air jumps and all, for up to ten minutes or until one takes a shot for you; anyone shooting at you picks one of you at random) or **Teleport** (a random spot on the Moon, on flat safe ground away from settlements and lakes, where you land at a standstill one time in four and otherwise running at a random 1–300 km/h; you keep your health and fuel, and a launch comes with a few seconds of Soft Landing so the arrival can't wipe you out).
-- **Bounce Dome Funpark:** inflatable domes, a turreted bouncy castle and a row of trampolines that throw you back
-  up harder than you landed, plus a **skate park**: a volcano bowl (ride up the outside and drop in, or hit it fast and
+- **Bounce Dome Funpark:** a turreted bouncy castle and a row of trampolines that throw you back
+  up harder than you landed (the bounce domes, the entrance arch and the stray lamp posts and light strings are gone; `docs/funpark-layouts.md` proposes two layouts that blend the bouncy and skate parts and add grind rails), plus a **skate park**: a volcano bowl (ride up the outside and drop in, or hit it fast and
   fly clean over), a kicker line with a big launch off the plateau edge, a big **half-pipe** (two matching ~7 m walls
   facing each other across a flat bottom, with decks and stairs) and a pyramid funbox, spread out on the east side. The big ferris wheel (twelve open gondolas, ~50 m tall) and the carousel are **rideable**: `F`
   beside one pops you into the nearest gondola or onto the nearest horse, `F` hops you off (from the top of the
