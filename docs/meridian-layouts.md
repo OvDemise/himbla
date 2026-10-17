@@ -1,7 +1,8 @@
 # Meridian Exchange: two layouts
 
 Two alternative building layouts for the Meridian HQ (`src/settlements.js` `buildMeridian`), drawn against the
-constraints the rest of the game puts on the site. Neither is built; this is the study. The plans are
+constraints the rest of the game puts on the site. **Layout A is built** (it is what `buildMeridian` lays out now);
+B stays a proposal. The "current" plan below is the layout as it was before A. The plans are
 `docs/meridian-layout-current.svg`, `-a.svg` and `-b.svg`, drawn and clearance-checked by
 `tools/meridian-layouts.mjs` (the footprints are the data at the top of that script; `node tools/meridian-layouts.mjs`
 checks them, `node tools/meridian-layouts.mjs docs` redraws the plans).
@@ -30,7 +31,7 @@ masts, 30 m jibs), the plaza fountain, floodmasts, lamps. Today's two small gara
 SE diagonals) are dropped by both layouts: the main garage is the motor pool, and the sheds only cluttered the
 plaza's corners.
 
-## Current layout
+## The layout before A
 
 ![Current layout](meridian-layout-current.svg)
 
