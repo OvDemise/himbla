@@ -614,7 +614,7 @@ export class GlobeMap {
     }
     const pct = Math.round((sum / this.explored.length) * 100);
     c.font = pixelFont(11); c.textAlign = 'left'; c.fillStyle = '#ffd23f';
-    c.fillText(`CHARTED ${pct}% · ${this.discovered.size} LOCATIONS`, 14, 24);
+    c.fillText(`CHARTED ${pct}% · ${this.game.locations.filter((l) => l.discovered).length} LOCATIONS`, 14, 24);
     const sweep = g.town && g.town.radio;
     if (sweep && sweep.on) { c.fillStyle = '#7dffd4'; c.fillText(`RADIO SWEEP ${Math.round(sweep.frac * 100)}%`, 14, 42); }
     c.textAlign = 'right'; c.fillStyle = '#c9c3d9';
@@ -760,7 +760,6 @@ const SPECIAL = {
   ilmb: 'Repair-bay upgrades',
   meridian: 'Skate finishes',
   antimatter: 'Containment jars · reactor · splice pod · holding pen',
-  bounce: 'Skate park · trampolines · bounce domes',
   downs: 'Chimera races · betting · race card',
   casino: 'Blackjack · Duck Derby · Plinko · prize counter',
   monolith: 'Touch it',

@@ -45,7 +45,7 @@ const RIVALS = [
 ];
 const RACE_NAMES = {
   SPRINT: ['Tycho Dash', 'Regolith Sprint', 'Crater Rim Scurry', 'Pulse Spinner Sprint', 'Short Fuse Stakes'],
-  MILE: ['Copernicus Mile', 'Kepler Cup', 'Mare Imbrium Mile', 'Bounce Dome Handicap', 'Tranquility Trot'],
+  MILE: ['Copernicus Mile', 'Kepler Cup', 'Mare Imbrium Mile', 'Crater Handicap', 'Tranquility Trot'],
   STAKES: ['Antimatter Classic', 'Zbornak Invitational', 'Lucky Crater Stakes', 'Meridian Gold Cup', 'Vostok Grand Prix'],
   MARATHON: ['Dark Side Marathon', 'Long Night Endurance', 'Terminator Trek', 'Grand Lunar Marathon', 'Earthrise Ultra'],
 };

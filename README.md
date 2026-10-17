@@ -401,11 +401,10 @@ yours if you swear in with Rustmoon). Lose him by getting 1.5 km away. Not while
 ## Lucky Crater Casino
 
 A walk-in hall about 1 km from the ILMB, with a ring road round its grounds like a town's: plum lacquer and gold, a cross-shaped
-building (the Crater Cross) under a ribbed dome, with a rotating sign on its mast. Out front, two slot carousels (seven cabinets
-round a glowing pillar under a bulb-lit canopy) flank the red carpet, and punters wander from game to game: playing the slots
+building (the Crater Cross) under a ribbed dome. Out front, two slot carousels (seven cabinets
+round a glowing pillar under a bulb-lit canopy) flank the red carpet, and punters wander from game to game (by a way round everything that stands in the way, through the doors when the next game is inside): playing the slots
 (yanking the handle while the cabinet lights up), gawping at the giant die and the roulette wheel in the pocket courts either side of
-the foyer, admiring the chip towers, chatting by the doors. Walk through the grand doors into the foyer (the prize counter and the
-cashier's cage), on to the crossing (the Chip Bar under its halo, on a compass-star inlay) and press `F` at a station
+the foyer, admiring the chip towers, chatting by the doors. Walk through the grand doors into the foyer (the prize counter), on to the crossing (the Chip Bar under its halo, on a compass-star inlay) and press `F` at a station
 (Esc stands you back up). The Plinko stands at the end of the north arm, the Duck Derby fills the east wing, and the west wing
 holds the claw, the classic slots and the blackjack table:
 - **Blackjack table:** real 3D cards from a 6-deck shoe, dealer stands on 17, blackjack pays 3:2.
@@ -647,7 +646,7 @@ crowd-noise bed for now (the cheering is due a rework), and the race countdown b
   Void Skin (water/void-touched, see in the dark and harder to hit), Stone Hide (rock, +40 hull, more drag),
   Burrower Claws (dirt/mud, painless boot landings), Pirate Blood (pirate, hunting squads mostly ignore you).
   Each shows on your runner. Dr. Zbornak cures them for ₵200 each.
-- **Chimera Downs** (the racecourse, a short hop from the Funpark): a four-lane dirt oval with a grandstand full of
+- **Chimera Downs** (the racecourse): a four-lane dirt oval with a grandstand full of
   cheering fans, a jumbotron with live standings, a finish gantry, distance poles, a winner's circle and a golden
   chimera statue. The **race office** window (`F`) posts races over time, **up to three on the card**, each with
   its own **distance** (450 m sprints, miles, 2–2.8 km stakes and 3–3.6 km marathons), **class** (C, B, A or S
@@ -665,13 +664,6 @@ crowd-noise bed for now (the cheering is due a rework), and the race countdown b
   cheers** for a short surge that burns stamina (a dim creature may get spooked instead). Chaos as ever: stumbles,
   zooms, wrong-way runs, giant hops, and the occasional explosion and reassembly.
 - **The Monolith:** touch it (90 s cooldown) and it casts one of three spells, never the same twice running: **Time Dilation** (20 s with pirates, their shots, traffic and meteors at 40 % speed while you keep full speed), **Echo Followers** (one or two holograms of you that retrace your every move a moment late, mid-air jumps and all, for up to ten minutes or until one takes a shot for you; anyone shooting at you picks one of you at random) or **Teleport** (a random spot on the Moon, on flat safe ground away from settlements and lakes, where you land at a standstill one time in four and otherwise running at a random 1–300 km/h; you keep your health and fuel, and a launch comes with a few seconds of Soft Landing so the arrival can't wipe you out).
-- **Bounce Dome Funpark:** inflatable domes, a turreted bouncy castle and a row of trampolines that throw you back
-  up harder than you landed, plus a **skate park**: a volcano bowl (ride up the outside and drop in, or hit it fast and
-  fly clean over), a kicker line with a big launch off the plateau edge, a big **half-pipe** (two matching ~7 m walls
-  facing each other across a flat bottom, with decks and stairs) and a pyramid funbox, spread out on the east side. The big ferris wheel (twelve open gondolas, ~50 m tall) and the carousel are **rideable**: `F`
-  beside one pops you into the nearest gondola or onto the nearest horse, `F` hops you off (from the top of the
-  wheel, too, if you're brave). While you sit in one the HUD steps aside: just the picture and the hop-off prompt.
-  (The chimera races moved to Chimera Downs.)
 
 ## Locations
 
@@ -750,7 +742,7 @@ src/
   pixelIcons.js  the classic-games overlay's pixel-art sprites (slot symbols, the pit boss, chips, cards' suits…) as plain rows of palette letters
   cosmetics.js   outfits, skate finishes, laser colours, wardrobe
   race.js        Chimera Downs: racecourse, race card, betting, locked race camera, chaos racing
-  rides.js       hop-in rides: free transit-ship rides and the Funpark's ferris wheel and carousel
+  rides.js       hop-in rides: free transit-ship rides, and the fairground's ferris wheel and carousel (built by `settlements.js` `ferrisWheel` / `carousel`, kept in the Asset Row but not placed anywhere until Chimera Downs' rework)
   rocks.js       shaped rocks (ramps, arches, hoodoos, snake rails) and their colliders
   rails.js       grinding the snake rocks' crests and crater rims (the Asset Row's flat world has rails too)
   meteors.js     meteor showers: the warning zone, falling rocks (colliders), chunks and scorch marks
@@ -761,7 +753,7 @@ src/
   enemies.js     pirates (skaters/rovers), military bases, turrets, artillery, theft/recovery
   missions.js    contract generation, pickup/delivery, integrity, payouts
   world.js       sky, settlement layout, colliders, ambient life
-  settlements.js detailed settlements, HQs and landmarks built with the outpost kit (moving parts, skate park)
+  settlements.js detailed settlements, HQs and landmarks built with the outpost kit (moving parts)
   market.js      the Meridian Exchange's stocks: a random-walk market refreshed every 15 s, read by the tower's ticker
   traffic.js     landing pads, ship/bus flights and passengers, roads, land-trains, cars, buggies
   landingPad.js  the landing pad itself (deck on its closed base, railing, stairs, colliders and the walkers' waypoints), for every size and slope
@@ -773,7 +765,7 @@ src/
   fx.js, hud.js, audio.js, input.js, toon.js, locations.js, rng.js
   assets/runner.glb  the Moon-runner model (player, pirate skaters, story leaders)
   assets/idles.json  the runner's five idle animations (10 poses a second per pivot, keyed in Blender)
-  assets/ships.glb   the shuttle-bus and freighter, with folding gear, ramps and thruster flames
+  assets/ships.glb   the shuttle-bus (with a route board that names its destination) and freighter, with folding gear, ramps and thruster flames
   assets/skimmer.glb the Daedalus Phase Skimmer (hover-racer with spinning phase coils)
   assets/warrig.glb  the Rustmoon pirate war-rig (patchwork mad-max rover with a spiked ram plow)
   assets/apc.glb     the Vostok BTR-M Moon APC (eight wheels, a turret that yaws and a barrel that elevates)
@@ -784,7 +776,7 @@ src/
   assets/slots.glb   the casino's slot-machine cabinet: a pixel-arcade video slot with a tilted screen under a marquee, speakers, LED chases, arcade buttons, a ticket printer, a coin cup and a lever (the game paints its colour, marquee, side art and reels)
   assets/casino.glb  the casino's lamp post, plaza fountain (basin, pedestal, bowl, spigots, a spinning chip or, for the Meridian Exchange's plaza, a spinning dollar sign, the water as pivots the game gives ripple, curtain and jet shaders), buff alien bouncer, hall chandelier and the welcome and blackjack signs' frames
   assets/claw.glb    the casino's Zero-G claw: the 16 m glass-tank machine (plum base, brass mullions, marquee box, console, ten shuffle jets, the drop hole), the energy claw, a chain link and each kind of thing in the tank (the salvaged engine and the credits case are the game's own models)
-  assets/hall.glb    the casino's hall kit: the wall bay (half a gold pilaster each side, a lacquer wainscot with a framed suit panel, a tall arched panel with a cyan line) in four suits, a coffer ceiling tile, the compass-star floor medallion, the Chip Bar with its turning chip and halo, the cashier's cage, a banquette and table, the grand doors' frame, the outside's suit panels and the drum, dome and lantern
+  assets/hall.glb    the casino's hall kit: the wall bay (half a gold pilaster each side, a lacquer wainscot with a framed suit panel, a tall arched panel with a cyan line) in four suits, a coffer ceiling tile, the compass-star floor medallion, the Chip Bar with its turning chip and halo, a banquette and table, the grand doors' frame, the outside's suit panels and the drum, dome and lantern
   assets/lot.glb     the casino forecourt's kit: the card wall (giant cards dominoed on a plum and gold kerb), its posts, the walkway's chip bollard, the P pylon and a bay stud
   assets/duck.glb    the casino's Duck Derby: the four racers (a cap, hat, fez or bubble helmet each, a numbered wing disc) and the gilded track: basin with lane floats, start gate and grille, finish arch, odds-board frame, bookmaker's kiosk, brass rail post and velvet rope
   assets/blackjack.glb  the casino's gilded blackjack table (plum lacquer, gold, cream suit panels, a leather rail, a chip rack, shoe and discard well, the dealer's back counter) and its chip
@@ -797,7 +789,7 @@ tools/
   blender/audit_outline.py lists the courier's parts that stick out of another part with no outline of their own (headless: `python3 tools/blender/audit_outline.py`)
   blender/build_idles.py   keys the runner's seven idles on its pivots (elbows included) -> src/assets/idles.json (headless: `pip install bpy`, then `python3 tools/blender/build_idles.py`; `MOONRUNNER_IDLES_BLEND=idles.blend` also saves the keyed scene)
   optimize-glb.mjs         compresses the models in src/assets (quantized and meshopt-coded: about a quarter of the size); `npm run optimize:glb`, run after re-exporting a model from Blender
-  blender/build_ships.py   builds both transit ships in Blender and exports src/assets/ships.glb (the freighter's bays use cargo.py: the land-train's cargo units, mirrored from build_landtrain.py; FREIGHTER_VARIANT=atlas|compact builds the one-crate-high and the smaller-hull studies instead of the shipped two-high freighter)
+  blender/build_ships.py   builds both transit ships in Blender and exports src/assets/ships.glb (the freighter's bays use cargo.py: the land-train's cargo units, mirrored from build_landtrain.py; FREIGHTER_VARIANT=atlas|compact builds the one-crate-high and the smaller-hull studies instead of the shipped two-high freighter; SHIPS_OUT=<file> sets where the file goes; the shuttle-bus's nose, route board, tail and engines: docs/shuttle-design.md)
   blender/cargo.py         the land-train's box container, Helium-3 tanker and explosives magazine, without their flatbed, for other models to carry
   blender/proposals/       the freighter design study: freighter_b.py (the open-truss "Girder" alternative to the chosen Atlas) and preview.py / preview_ships.py, which render a ship in the game's palette with Cycles on the CPU
   blender/build_skimmer.py builds the Daedalus skimmer -> src/assets/skimmer.glb
@@ -821,7 +813,7 @@ tools/
   check-claw.mjs           dev-only: plays the claw sim with four bots (novice to expert) and prints what each takes home against the ₵200 entry (`node tools/check-claw.mjs 300 [novice|average|skilled|expert]`)
   blender/suits.py        the casino's card-suit trim as geometry (the prize counter's panels), exec'd by the blackjack, claw and duck builders
   blender/build_duck.py    builds the Duck Derby's racers and track -> src/assets/duck.glb (also runs headless)
-  blender/build_hall.py    builds the casino's hall kit (wall bays, ceiling tiles, the floor medallion, the Chip Bar, the cage, a banquette, the doors' frame, the facade's panels, the crown) -> src/assets/hall.glb (also runs headless; the build stops if two faces of one model share a plane: `audit_coplanar` in kit.py)
+  blender/build_hall.py    builds the casino's hall kit (wall bays, ceiling tiles, the floor medallion, the Chip Bar, a banquette, the doors' frame, the facade's panels, the crown) -> src/assets/hall.glb (also runs headless; the build stops if two faces of one model share a plane: `audit_coplanar` in kit.py)
   blender/build_lot.py     builds the forecourt kit (card wall, post, chip bollard, P pylon, bay stud) -> src/assets/lot.glb (runs `audit_coplanar` too)
   blender/build_blackjack.py  builds the blackjack table and chip -> src/assets/blackjack.glb (also runs headless; the build stops if anything stands in the places cards, chips and the felt's lettering go)
   blender/build_dish.py    builds the cryo receiver, the gantry station, the field dish and the light dish head -> src/assets/dish.glb (also runs headless)
@@ -830,9 +822,10 @@ tools/
   blender/dishkit.py       the dish geometry build_dish.py and build_outposts.py share (the reflector and its parts, the trunnion mount, the light dish head); exec'd by them after kit.py, builds nothing itself
   blender/decals.py        flat lettering, emblems, hazard stripes and safety signs (no textures) the land-train builder execs after kit.py
   blender/kit.py           shared geometry/material/export helpers every Blender builder execs (the runner and ships keep their own variants of a few)
-  viewer.html              dev-only model viewer (npm run dev, then /tools/viewer.html?m=shuttle|freighter|apc|landtrain|crane|gantry|cargobox|garage|slots|dish|outpost|mite|lineup…; slots takes &n=<cabinets in a row>&ring=<cabinets round a pillar>&idx=<first colour and name>&play=1 (works them like a patron); casino takes &part=lamp|fountain|bouncer|chandelier|welcome|wall|blackjack|claw|clawthings|duckderby (&accent=<hex>&n=<lamps> for lamp); freighter takes &faction=spacecom|vostok|kepler|meridian (the cargo's livery); dish takes &kind=cryo|gantry|field|head&faction=…&no=01..04&size=30&tilt=<rad>&sweep=1; apc takes &turret=<rad>&barrel=<rad>; landtrain takes &type=moonliner|prospector&faction=spacecom|vostok|kepler|meridian&cars=pax,tank,cargo,blast&unit=<n>)
+  viewer.html              dev-only model viewer (npm run dev, then /tools/viewer.html?m=shuttle|freighter|apc|landtrain|crane|gantry|cargobox|garage|slots|dish|outpost|mite|lineup…; slots takes &n=<cabinets in a row>&ring=<cabinets round a pillar>&idx=<first colour and name>&play=1 (works them like a patron); casino takes &part=lamp|fountain|bouncer|chandelier|welcome|wall|blackjack|claw|clawthings|duckderby (&accent=<hex>&n=<lamps> for lamp); shuttle takes &sign=<route board text>&ships=<a ships .glb to load instead of ships.glb> (docs/shuttle-design.md); freighter takes &faction=spacecom|vostok|kepler|meridian (the cargo's livery); dish takes &kind=cryo|gantry|field|head&faction=…&no=01..04&size=30&tilt=<rad>&sweep=1; apc takes &turret=<rad>&barrel=<rad>; landtrain takes &type=moonliner|prospector&faction=spacecom|vostok|kepler|meridian&cars=pax,tank,cargo,blast&unit=<n>)
+  downs-layouts.mjs        dev-only: the Chimera Downs overhaul study (docs/downs-layouts.md): today's course and two proposed layouts, a clearance check against the oval and the plateau, and the plan drawings in docs/ (`node tools/downs-layouts.mjs docs`)
   meridian-layouts.mjs     the Meridian Exchange layout study (docs/meridian-layouts.md): the footprints of the site as built and of two proposed layouts, a clearance check, and the plan drawings in docs/
-  winch-sign-repro.mjs     dev-only headless repro for the winch cable round the Lucky Crater Casino sign post (see docs/winch-handoff.md: what was found, what is open)
+  winch-ride.mjs           dev-only headless test of the Hitch-Line winch with the real player and the real winch: rides toward the casino fountain past the Lucky Crater Casino's old sign posts (the harness stands their colliders in: coasting, running at them, circling a post, skating the ring road), and judges flings, snapped lines, posts the cable gave up on and cable inside a post; `--gate ring` is the check to run after touching `src/winch.js` (see docs/winch-handoff.md)
 ```
 
 **Editing the runner:** run `tools/blender/build_runner.py` in Blender (Scripting tab, or

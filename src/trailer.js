@@ -1225,35 +1225,6 @@ const SHOTS = [
     },
     cards: [MORE()],
   },
-
-  // 15 · ...and round the Bounce Dome Funpark's ferris wheel, Earth hanging over the top.
-  {
-    name: 'ferris wheel',
-    dur: 1.7,
-    setup(T) {
-      T.music('casino');
-      const g = T.g;
-      const r = g.world.rides.find((x) => x.name === 'FERRIS WHEEL');
-      T.place(T.at('bounce', -10, 0, 70), T.at('bounce', 0, 0, 1).sub(T.at('bounce', 0, 0, 0)));
-      // the gondola nearest the top
-      let best = null, by = -1e9;
-      for (const st of r.seats) {
-        st.obj.updateMatrixWorld(true);
-        const p = st.obj.localToWorld(st.local.clone());
-        const y = loc_y(T, 'bounce', p);
-        if (y > by) { by = y; best = st; }
-      }
-      g.rides.board({ kind: 'fun', ride: r, seat: best });
-      g.player.setCargo(CRATE);
-    },
-    cam(T, t) {
-      // from the ground under the wheel, looking up past it to Earth and the sun
-      T.at('bounce', lerp(-29, -30.5, t / 1.7), lerp(2.5, 3.2, t / 1.7), lerp(24, 30, t / 1.7), T.eye);
-      T.at('bounce', -43, 32, 62, T.look);
-      T.fov = 66;
-    },
-    cards: [MORE()],
-  },
 ];
 
 // 17 · The tease: down the ramp into the Whispering Fissure, along the corridor and into the
@@ -1413,7 +1384,6 @@ const SCOOP = {
 };
 
 // height of a world point in a location's frame
-function loc_y(T, id, p) { return p.clone().applyMatrix4(T.loc(id).group.matrixWorld.clone().invert()).y; }
 
 // a pirate, already riding alongside: kind, offset (right, forward) from the runner's frame F
 function pirate(T, F, kind, x, z, fireIn = 0.5) {
@@ -1487,6 +1457,6 @@ function railPoint(r, s) {
 export { SHOTS };
 
 SHOTS.push(FISSURE, HERO);
-// running order tweak: the casino and the funpark follow the Downs, then Dr. Zbornak's lab
+// running order tweak: the casino follows the Downs, then Dr. Zbornak's lab
 const LAB = SHOTS.splice(SHOTS.findIndex((x) => x.name === 'lab'), 1)[0];
-SHOTS.splice(SHOTS.findIndex((x) => x.name === 'ferris wheel') + 1, 0, SCOOP, LAB);
+SHOTS.splice(SHOTS.findIndex((x) => x.name === 'casino hall') + 1, 0, SCOOP, LAB);

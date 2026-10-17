@@ -317,13 +317,14 @@ def gate_A():
     A.flush()
     A = Acc("gShaft", "cream", o, 0.03)
     for s in (-1, 1):
-        A.cylc(0, 1.7, s * PZ, 0.26, 2.0, 12)
+        A.cylc(0, 1.575, s * PZ, 0.26, 1.75, 12)                                                   # (the shaft stops under the capital: the header rests on it instead of running through it)
     A.flush()
     A = Acc("gGold", "gold", o, 0.03)
     for s in (-1, 1):
         A.boxc(0, 0.72, s * PZ, 0.92, 0.08, 0.92)
-        A.cylc(0, 0.76, s * PZ, 0.34, 0.12, 12); A.cylc(0, 2.74, s * PZ, 0.34, 0.12, 12); A.cylc(0, 2.84, s * PZ, 0.28, 0.1, 12, rt=0.2)
-        A.ball(0, 3.05, s * PZ, 0.16, 8, 6)
+        A.cylc(0, 2.44, s * PZ, 0.34, 0.12, 12)                                                    # a collar under the capital plate the header sits on
+        A.boxc(0, 2.55, s * PZ, 0.74, 0.1, 0.74)
+        A.ball(0, 3.18, s * PZ, 0.16, 8, 6)                                                        # a finial on the cap beam, sitting on it (not skewered by it)
     A.boxc(0, 3.0, 0, 0.36, 0.08, 2 * PZ + 0.6)
     A.flush()
     A = Acc("gHeader", "plum", o, 0.04)
@@ -378,19 +379,19 @@ def finish_A():
     A.flush()
     A = Acc("fShaft", "cream", o, 0.03)
     for s in (-1, 1):
-        A.cylc(0, 3.2, s * PZ, 0.3, 4.6, 14)
+        A.cylc(0, 3.2, s * PZ, 0.34, 4.6, 14)                                                      # (wide enough that the beams' corners end inside it)
     A.flush()
     A = Acc("fGold", "gold", o, 0.03)
     for s in (-1, 1):
         A.boxc(0, 0.84, s * PZ, 1.0, 0.08, 1.0)
         for y in (1.1, 2.2, 3.5, 4.6):
-            A.cylc(0, y, s * PZ, 0.36, 0.1, 14)
-        A.lath([(0, 5.5), (0.42, 5.5), (0.34, 5.62), (0.24, 5.7), (0, 5.7)], (0, 0, s * PZ), (0, 0, 0), (1, 1, 1), 12)
+            A.cylc(0, y, s * PZ, 0.40, 0.1, 14)
+        A.lath([(0, 5.5), (0.46, 5.5), (0.38, 5.62), (0.28, 5.7), (0, 5.7)], (0, 0, s * PZ), (0, 0, 0), (1, 1, 1), 12)
         A.ball(0, 5.9, s * PZ, 0.2, 10, 8)
-    A.boxc(0, 5.19, 0, 0.7, 0.16, 2 * PZ + 0.6)      # (its top stands 2 cm above the beam's: they used to share a plane)
+    A.boxc(0, 5.19, 0, 0.66, 0.16, 2 * PZ)      # (its top stands 2 cm above the beam's: they used to share a plane; it ends at the pillars' middle, inside the shaft)
     A.flush()
     A = Acc("fBeam", "plum", o, 0.04)
-    A.boxc(0, 5.0, 0, 0.62, 0.5, 2 * PZ - 0.2)
+    A.boxc(0, 5.0, 0, 0.62, 0.5, 2 * PZ - 0.1)
     A.flush()
     A = Acc("fFrame", "brass", o, 0.0); P = Acc("fPanel", "plum2", o, 0.0); R = Acc("fSuitRed", "suitred", o, 0.012); K = Acc("fSuitCream", "suitcream", o, 0.012)
     for k, z in enumerate((-3.6, -1.8, 0.0, 1.8, 3.6)):

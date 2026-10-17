@@ -118,7 +118,7 @@ export class Player {
     this.body.vel.set(0, 0, 0);
     this.body.platform = null; // never keep riding a deck (or satellite) you've been teleported off
     this.body.velFrame = null;
-    this.seat = null; // ...or a ship or funpark ride (rides.js lets go too)
+    this.seat = null; // ...or a ship or fairground ride (rides.js lets go too)
     if (this.game.grind) this.game.grind.active = null; // ...or a grind rail
     upAt(pos, this.body.up);
     this.body.groundN.copy(this.body.up);

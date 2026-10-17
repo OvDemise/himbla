@@ -2,8 +2,8 @@ import * as THREE from 'three';
 
 // Things you can sit in and be carried by: the transit ships (free: hop into a landed shuttle-bus or
 // freighter with F, ride it wherever it goes, hop out with F any time, on the pad or mid-flight)
-// and the Funpark's carousel and ferris wheel (pop onto the nearest horse or gondola).
-// While seated, player.js lets the seat carry you (player.seat) and skips the physics. The funpark's
+// and the fairground's carousel and ferris wheel (pop onto the nearest horse or gondola; settlements.js keeps both for Chimera Downs' rework).
+// While seated, player.js lets the seat carry you (player.seat) and skips the physics. A fairground ride's
 // seats are for sightseeing, so the HUD steps aside while you sit in one (style.css body.on-ride).
 
 const _a = new THREE.Vector3(), _b = new THREE.Vector3(), _c = new THREE.Vector3();

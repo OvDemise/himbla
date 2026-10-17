@@ -1590,7 +1590,7 @@ class Game {
     const nearPen = lab && z === lab.loc && P.pos.distanceTo(lab.penTerm) < 5;
     const nearBooth = this.race.near(P.pos);
     if (this.rides.interact()) {
-      // aboard a ship or a funpark ride (or next to one you could hop on)
+      // aboard a ship or a fairground ride (or next to one you could hop on)
     } else if (this.events.interact()) {
       // an event's start prop
     } else if (this.secrets.interact()) {

@@ -7,7 +7,7 @@ import { FACTIONS } from './locations.js';
 import { SUN, frameQuat, arcDist, dirFromAngles, tangent } from './geo.js';
 import { buildCasino } from './casinoWorld.js'; // casino
 import { Traffic } from './traffic.js';
-import { buildHelium, buildMeridian, buildFunpark, dressLab, dressLabInside, dressMonolith, buildTown, dressIlmb, dressBase, dressArray, ARRAY_DISHES, buildDen, buildPirateCamp, buildRuin, dressScrap, jobTerminal, part as kitPart, dressCasinoLot } from './settlements.js';
+import { buildHelium, buildMeridian, dressLab, dressLabInside, dressMonolith, buildTown, dressIlmb, dressBase, dressArray, ARRAY_DISHES, buildDen, buildPirateCamp, buildRuin, dressScrap, jobTerminal, part as kitPart, dressCasinoLot } from './settlements.js';
 import { makeProp } from './storyAssets.js';
 import { buildHomeTown } from './hometown.js';
 import { spindleGeometry } from './spindle.js';
@@ -171,7 +171,7 @@ export class World {
     this.zoneWalls = [];
     this.walkers = []; // foot traffic inside the ILMB skywalks
     this.anims = []; // moving parts of kit-built settlements (settlements.js): { loc, list, seed }
-    this.rides = []; // rideable funpark rides (rides.js): { loc, name, seats: [{ obj, local, face }], camDist, exitDir(p, out) }
+    this.rides = []; // rideable fairground rides (rides.js; the ferris wheel and carousel are kept in settlements.js for Chimera Downs): { loc, name, seats: [{ obj, local, face }], camDist, exitDir(p, out) }
     this._mats = new Map();
     this.rand = mulberry32(42);
 
@@ -910,7 +910,6 @@ export class World {
       case 'pirate': loc.camp ? this.buildCamp(loc) : this.buildGulch(loc); break;
       case 'lab': this.buildLab(loc); break;
       case 'monolith': this.buildMonolith(loc); break;
-      case 'funpark': this.buildFunpark(loc); break;
       case 'casino': this.casino = buildCasino(this, loc); dressCasinoLot(this, loc, makeHoverCar); break; // casino
       case 'ruin': buildRuin(this, loc); break;
       case 'hometown': buildHomeTown(this, loc); this.addFigures(loc, 10, { kind: 'worker', look: (i) => ({ suit: [0xff9f1c, 0x7dff6a, 0x2ec4ff, 0xff7ad9][i % 4] }) }); break;
@@ -1883,14 +1882,6 @@ export class World {
     dressMonolith(this, loc);
     // the transit pad goes out past the dig's berm, and clear of where Meridian builds its launch complex
     (loc.keep ||= []).push({ x: 0, z: 0, r: 42 }, { x: loc.r * 1.25, z: 0, r: 34 });
-  }
-
-  // Bounce Dome Funpark (settlements.js): inflatables, skate park, rides.
-  buildFunpark(loc) {
-    buildFunpark(this, loc);
-    const cols = [0xff2e88, 0xffd23f, 0x2ee6ff, 0x7dff6a, 0xff9f1c, 0xc77dff];
-    this.addFigures(loc, 8, { kind: 'kid', look: (i) => ({ suit: cols[i % cols.length], scale: 0.55 }) });
-    this.addFigures(loc, 3, { kind: 'worker', look: (i) => ({ suit: cols[(i + 3) % cols.length] }) });
   }
 
   // Glowing crystal rock samples scattered across the sunlit side, for the jar.
