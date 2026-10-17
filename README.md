@@ -783,6 +783,7 @@ tools/
   blender/dishkit.py       the dish geometry build_dish.py and build_outposts.py share (the reflector and its parts, the trunnion mount, the light dish head); exec'd by them after kit.py, builds nothing itself
   blender/decals.py        flat lettering, emblems, hazard stripes and safety signs (no textures) the land-train builder execs after kit.py
   blender/kit.py           shared geometry/material/export helpers every Blender builder execs (the runner and ships keep their own variants of a few)
+  winch-sign-repro.mjs     dev-only headless repro for the winch cable round the Lucky Crater Casino sign post (see docs/winch-handoff.md: what was found, what is open)
   viewer.html              dev-only model viewer (npm run dev, then /tools/viewer.html?m=shuttle|freighter|apc|landtrain|crane|garage|slots|dish|outpost|mite|lineup…; slots takes &n=<cabinets in a row>&ring=<cabinets round a pillar>&idx=<first colour and name>&play=1 (works them like a patron); freighter takes &faction=spacecom|vostok|kepler|meridian (the cargo's livery); dish takes &kind=cryo|gantry|field|head&faction=…&no=01..04&size=30&tilt=<rad>&sweep=1; apc takes &turret=<rad>&barrel=<rad>; landtrain takes &type=moonliner|prospector&faction=spacecom|vostok|kepler|meridian&cars=pax,tank,cargo,blast&unit=<n>)
 ```
 
