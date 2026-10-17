@@ -1480,7 +1480,7 @@ export async function loadShipParts({ ships } = {}) {
     if (!root) throw new Error('duck.glb has no ' + name);
     SHIP_PARTS[name] = bakeShip(root);
   }
-  // the casino's hall kit: wall bays, ceiling tiles, floor inlay, the bar, the cage, the lounge, the doors' frame and the roof's crown (tools/blender/build_hall.py)
+  // the casino's hall kit: wall bays, ceiling tiles, floor inlay, the bar, the lounge, the doors' frame and the roof's crown (tools/blender/build_hall.py)
   for (const name of HALL_PROPS) {
     const root = hl.scene.getObjectByName(name);
     if (!root) throw new Error('hall.glb has no ' + name);
@@ -2504,10 +2504,10 @@ export const makeDerbyPart = (name) => ddGroup(SHIP_PARTS[name]);
 
 // ---- The casino's hall kit (built in Blender, see build_hall.py) ----
 // The wall bays (`hall_bay0..3`: spade, heart, diamond, club; 4.5 m wide, 16 m tall, the back on the wall, the front toward +z), `hall_filler`, the ceiling tile `hall_coffer`, the floor
-// inlay `hall_medallion`, the Chip Bar `hall_bar` (pivot `bar_spin` carries the chip that turns), the cashier's cage `hall_cage` (pivot `cage_face`), `hall_sofa` and `hall_table`, the
+// inlay `hall_medallion`, the Chip Bar `hall_bar` (pivot `bar_spin` carries the chip that turns), `hall_sofa` and `hall_table`, the
 // doors' frame `hall_gate`, the outside's suit panels `facade_panel0..3` and the roof's drum, dome and lantern `facade_crown`. makeHallPart(name) gives a piece as a Group, its pivots as
 // named children (role and extras in userData); the slots are the palette below, and the game never recolours them.
-export const HALL_PROPS = ['hall_bay0', 'hall_bay1', 'hall_bay2', 'hall_bay3', 'hall_filler', 'hall_coffer', 'hall_medallion', 'hall_bar', 'hall_cage', 'hall_sofa', 'hall_table', 'hall_gate', 'facade_panel0', 'facade_panel1', 'facade_panel2', 'facade_panel3', 'facade_crown'];
+export const HALL_PROPS = ['hall_bay0', 'hall_bay1', 'hall_bay2', 'hall_bay3', 'hall_filler', 'hall_coffer', 'hall_medallion', 'hall_bar', 'hall_sofa', 'hall_table', 'hall_gate', 'facade_panel0', 'facade_panel1', 'facade_panel2', 'facade_panel3', 'facade_crown'];
 const HALL_TOON = { plum: 0x4a1766, plum2: 0x6a2a8f, gold: 0xffd23f, brass: 0xc79a1f, cream: 0xfff4e0, dark: 0x1a1030, velvet: 0xb3123a, red: 0xd7263d, pink: 0xff2e88 };
 const HALL_GLOW = { suitred: 0xff2a4a, suitcream: 0xfff4e0, lamp: 0xfff6a8, glowcyan: 0x2ee6ff, glowpink: 0xff2e88 };
 export const makeHallPart = (name) => ddGroup(SHIP_PARTS[name], null, HALL_TOON, HALL_GLOW);

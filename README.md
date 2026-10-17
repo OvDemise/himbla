@@ -404,8 +404,7 @@ A walk-in hall about 1 km from the ILMB, with a ring road round its grounds like
 building (the Crater Cross) under a ribbed dome. Out front, two slot carousels (seven cabinets
 round a glowing pillar under a bulb-lit canopy) flank the red carpet, and punters wander from game to game (by a way round everything that stands in the way, through the doors when the next game is inside): playing the slots
 (yanking the handle while the cabinet lights up), gawping at the giant die and the roulette wheel in the pocket courts either side of
-the foyer, admiring the chip towers, chatting by the doors. Walk through the grand doors into the foyer (the prize counter and the
-cashier's cage), on to the crossing (the Chip Bar under its halo, on a compass-star inlay) and press `F` at a station
+the foyer, admiring the chip towers, chatting by the doors. Walk through the grand doors into the foyer (the prize counter), on to the crossing (the Chip Bar under its halo, on a compass-star inlay) and press `F` at a station
 (Esc stands you back up). The Plinko stands at the end of the north arm, the Duck Derby fills the east wing, and the west wing
 holds the claw, the classic slots and the blackjack table:
 - **Blackjack table:** real 3D cards from a 6-deck shoe, dealer stands on 17, blackjack pays 3:2.
@@ -783,7 +782,7 @@ src/
   assets/slots.glb   the casino's slot-machine cabinet: a pixel-arcade video slot with a tilted screen under a marquee, speakers, LED chases, arcade buttons, a ticket printer, a coin cup and a lever (the game paints its colour, marquee, side art and reels)
   assets/casino.glb  the casino's lamp post, plaza fountain (basin, pedestal, bowl, spigots, a spinning chip or, for the Meridian Exchange's plaza, a spinning dollar sign, the water as pivots the game gives ripple, curtain and jet shaders), buff alien bouncer, hall chandelier and the welcome and blackjack signs' frames
   assets/claw.glb    the casino's Zero-G claw: the 16 m glass-tank machine (plum base, brass mullions, marquee box, console, ten shuffle jets, the drop hole), the energy claw, a chain link and each kind of thing in the tank (the salvaged engine and the credits case are the game's own models)
-  assets/hall.glb    the casino's hall kit: the wall bay (half a gold pilaster each side, a lacquer wainscot with a framed suit panel, a tall arched panel with a cyan line) in four suits, a coffer ceiling tile, the compass-star floor medallion, the Chip Bar with its turning chip and halo, the cashier's cage, a banquette and table, the grand doors' frame, the outside's suit panels and the drum, dome and lantern
+  assets/hall.glb    the casino's hall kit: the wall bay (half a gold pilaster each side, a lacquer wainscot with a framed suit panel, a tall arched panel with a cyan line) in four suits, a coffer ceiling tile, the compass-star floor medallion, the Chip Bar with its turning chip and halo, a banquette and table, the grand doors' frame, the outside's suit panels and the drum, dome and lantern
   assets/lot.glb     the casino forecourt's kit: the card wall (giant cards dominoed on a plum and gold kerb), its posts, the walkway's chip bollard, the P pylon and a bay stud
   assets/duck.glb    the casino's Duck Derby: the four racers (a cap, hat, fez or bubble helmet each, a numbered wing disc) and the gilded track: basin with lane floats, start gate and grille, finish arch, odds-board frame, bookmaker's kiosk, brass rail post and velvet rope
   assets/blackjack.glb  the casino's gilded blackjack table (plum lacquer, gold, cream suit panels, a leather rail, a chip rack, shoe and discard well, the dealer's back counter) and its chip
@@ -820,7 +819,7 @@ tools/
   check-claw.mjs           dev-only: plays the claw sim with four bots (novice to expert) and prints what each takes home against the ₵200 entry (`node tools/check-claw.mjs 300 [novice|average|skilled|expert]`)
   blender/suits.py        the casino's card-suit trim as geometry (the prize counter's panels), exec'd by the blackjack, claw and duck builders
   blender/build_duck.py    builds the Duck Derby's racers and track -> src/assets/duck.glb (also runs headless)
-  blender/build_hall.py    builds the casino's hall kit (wall bays, ceiling tiles, the floor medallion, the Chip Bar, the cage, a banquette, the doors' frame, the facade's panels, the crown) -> src/assets/hall.glb (also runs headless; the build stops if two faces of one model share a plane: `audit_coplanar` in kit.py)
+  blender/build_hall.py    builds the casino's hall kit (wall bays, ceiling tiles, the floor medallion, the Chip Bar, a banquette, the doors' frame, the facade's panels, the crown) -> src/assets/hall.glb (also runs headless; the build stops if two faces of one model share a plane: `audit_coplanar` in kit.py)
   blender/build_lot.py     builds the forecourt kit (card wall, post, chip bollard, P pylon, bay stud) -> src/assets/lot.glb (runs `audit_coplanar` too)
   blender/build_blackjack.py  builds the blackjack table and chip -> src/assets/blackjack.glb (also runs headless; the build stops if anything stands in the places cards, chips and the felt's lettering go)
   blender/build_dish.py    builds the cryo receiver, the gantry station, the field dish and the light dish head -> src/assets/dish.glb (also runs headless)

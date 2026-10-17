@@ -27,7 +27,7 @@ export const bjPt = (lx, y, lz) => { const c = Math.cos(BJ.yaw), s = Math.sin(BJ
 export const CLAW = { x: -26.65, z: -2.02, yaw: Math.PI };
 export const clawPt = (lx, y, lz) => [CLAW.x - lx, y, CLAW.z - lz];
 // The Duck Derby runs along x on the east wing's north wall, its viewers on +z: the lanes' z (lane 0 nearest the viewers), the gate at x0 and the finish arch at x1.
-export const DUCK = { x0: 20.8, x1: 44.8, lanes: [-16.8, -18.4, -20, -21.6], water: 0.86, kiosk: [32.8, -11.4], wallZ: -24 };
+export const DUCK = { x0: 20.8, x1: 44.8, lanes: [-15.8, -17.4, -19, -20.6], water: 0.86, kiosk: [32.8, -10.4], wallZ: -24 };
 export const PLK = { x: 0, y: 1.2, z: -42, wallZ: -44 };   // the Plinko board's plane (2 m off the arm's end wall)
 // The classic games' four slot cabinets stand in a row along the west wing's south wall facing -z, 3.2 m apart, 1.75 m off the wall.
 export const CLASSIC = { z: -2.78, xs: [-52.4, -49.2, -46, -42.8], yaw: Math.PI, station: [-47.6, -6.6], wallZ: -2 };
