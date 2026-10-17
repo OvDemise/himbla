@@ -133,7 +133,7 @@ def euler_xyz(rx, ry, rz):
 
 
 def dish_geo(r):
-    """A shallow dish facing local +z (dishGeo in outpostModels.js)."""
+    """A shallow dish facing local +z (the old dishGeo of outpostModels.js: the game's Kit-built mast now carries dish heads, see models.js Kit.dishHead)."""
     return place(sphere(r, 14, 6, 0.75), Matrix.Translation((0, 0, r * 0.85)) @ Matrix.Rotation(-math.pi / 2, 4, "X"))
 
 

@@ -114,7 +114,7 @@ function signalPylon() {
 function dishes() {
   const ds = [];
   const parts = [8, 12, 18, 26, 34].map((size, i) => {
-    const d = makeDish(size, i === 1 || i === 2 ? 0xb0b0c0 : 0xf5f5f5);
+    const d = makeDish(size, ['spacecom', 'vostok', 'kepler', 'meridian', 'daedalus'][i]); // (one in each faction's paint)
     ds.push({ ...d, speed: 0.6, ph: i });
     return seat(d.root);
   });

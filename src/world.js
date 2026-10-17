@@ -975,7 +975,7 @@ export class World {
     this.pad(loc, 95, -60, 16);
     this.pad(loc, -120, 40, 16, 0x2ec4ff);
     this.solarField(loc, 150, 60, 4, 6, 0.4);
-    const dish = makeDish(14);
+    const dish = makeDish(14, 'spacecom');
     this.put(dish.root, loc, -150, -40);
     this.addDish(dish, 0.2, loc);
     for (const c of dish.cols) this.col(loc, { ...c, x: -150 + c.x, z: -40 + c.z });
@@ -1353,7 +1353,7 @@ export class World {
     for (const [x, z, s] of [[-4, -5, 2.6], [-4, 5, 2.6], [4, -1, 3.4]]) {
       w.add(new THREE.CylinderGeometry(0.3, 0.4, 2, 6), toon(0x3a3550), x, deck + 1, z, { outline: 0.04 });
       // a dish head (the field dish's reflector, trunnions and feed, without its tower) on the post, opening up and towards +z
-      const head = makeDishHead(s * Math.sin(1.0), 0xd8d4e8);
+      const head = makeDishHead(s * Math.sin(1.0), 'daedalus');
       head.yaw.rotation.y = Math.PI;
       head.tilt.rotation.x = -0.5;
       w.obj(head.root, x, z, deck + 2);
@@ -1368,7 +1368,7 @@ export class World {
     this.blinkers.push({ mat: bm, base: new THREE.Color(0xff2a4a), phase: 1.3, loc });
     w.cyl(mx, mz, deck - 1, deck + mh, 1);
     // big tracking dish beside the bunker
-    const dish = makeDish(12, 0xd8d4e8);
+    const dish = makeDish(12, 'daedalus');
     w.obj(dish.root, 6, -19);
     this.addDish(dish, 0.12, loc);
     for (const c of dish.cols) { if (c.type === 'cyl') w.cyl(6 + c.x, -19 + c.z, c.y0, c.y1, c.r); else w.box(6 + c.x, c.y, -19 + c.z, c.hx, c.hy, c.hz); }
@@ -1567,7 +1567,7 @@ export class World {
       this.mount(loc, Math.cos(a) * r, Math.sin(a) * r, 0, { ground: true });
     }
     dressBase(this, loc); // command bunker, barracks, searchlight tower, traps, fuel
-    const dish = makeDish(small ? 8 : 12, 0xb0b0c0);
+    const dish = makeDish(small ? 8 : 12, loc.faction);
     this.put(dish.root, loc, 30, 30);
     this.addDish(dish, 0.6, loc);
     for (const c of dish.cols) this.col(loc, { ...c, x: 30 + c.x, z: 30 + c.z });

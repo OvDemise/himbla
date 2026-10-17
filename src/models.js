@@ -46,6 +46,7 @@ const loadGlb = async (name) => {
   return gltf;
 };
 import { Kit, T as KT, G as KG, D as KD, crate } from './outpostModels.js';
+import { FACTIONS } from './locations.js';
 
 function part(geo, mat, x = 0, y = 0, z = 0, outline = 0.05) {
   const m = new THREE.Mesh(geo, mat);
@@ -1421,7 +1422,7 @@ export async function loadShipParts() {
   if (!slot) throw new Error('slots.glb has no slot');
   SHIP_PARTS.slot = bakeShip(slot);
   // the radio-dish array stations and the field dish (tools/blender/build_dish.py)
-  for (const kind of [...DISH_KINDS, DISH_FIELD]) {
+  for (const kind of [...DISH_KINDS, DISH_FIELD, DISH_HEAD]) {
     const station = di.scene.getObjectByName('dish_' + kind);
     if (!station) throw new Error('dish.glb has no dish_' + kind);
     SHIP_PARTS['dish_' + kind] = bakeShip(station);
@@ -2126,14 +2127,25 @@ export function makeSlotCabinet(color) {
 export const DISH_SIZE = 30;
 export const DISH_KINDS = ['cryo', 'gantry'];
 const DISH_FIELD = 'field'; // the small bases' dish (makeDish): not one of the array's two
+const DISH_HEAD = 'head'; // the field dish's head alone, lightly built, for the small dishes on masts and roofs (makeDishHead, Kit.dishHead)
 const DISH_TOON = { dark: 0x2a2540, steel: 0x55607a, metal: 0x8a87a0, concrete: 0x8a8698, white: 0xf3eee4, dish: 0xfff4e0, seam: 0x8a87a0, tank: 0xc6d6ea, hazard: 0xffd23f, brand: 0x14a3b8, redsafe: 0xc9202e, blue: 0x1d63d6 };
 const DISH_GLOW = { glass: 0x9be7ff, window: 0xfff6a8, lamp: 0xfff6a8, tail: 0xff2a4a, green: 0x7dff6a, hot: 0xff9f1c };
 
-// The colour of a station slot, and whether it glows: body, stripe, accent and label are the faction's livery colours (as on the land-trains);
-// `paint` (the field dish only) is whatever colour the site asks for.
-export function dishSlot(slot, faction = 'meridian', paint = 0xf5f5f5) {
-  if (slot === 'paint') return { color: paint, glow: false };
-  const pal = LAND_TRAIN_FACTIONS[faction] || LAND_TRAIN_FACTIONS.meridian;
+// The dishes' liveries: the land-trains' four, and the other three who hold ground. Daedalus (the dark-side purple and cream) has a mark
+// and a name on the field dish's plates; the Rustmoon clans (rust and their green) and an unclaimed site are paint only.
+const DISH_FACTIONS = {
+  ...LAND_TRAIN_FACTIONS,
+  daedalus: { body: 0xc77dff, stripe: 0xf3eee4, accent: 0x4a4660, label: 0x2a2540 },
+  rustmoon: { body: 0x6a5a48, stripe: 0x7dff3a, accent: 0x2a2540, label: 0xf3eee4 },
+  none: { body: 0xc9c3d9, stripe: 0xfff4e0, accent: 0x55607a, label: 0x2a2540 },
+};
+const FACTION_OF_COLOR = new Map(Object.entries(FACTIONS).map(([key, f]) => [new THREE.Color(f.color).getHex(), key]));
+// A faction key, from the key itself or from its colour (what the outposts and the founded bases are built with): 'none' for anything else.
+const dishFaction = (f) => (typeof f === 'string' ? (DISH_FACTIONS[f] ? f : 'none') : FACTION_OF_COLOR.get(f) || 'none');
+
+// The colour of a station slot, and whether it glows: body, stripe, accent and label are the faction's livery colours (as on the land-trains).
+export function dishSlot(slot, faction = 'meridian') {
+  const pal = DISH_FACTIONS[faction] || DISH_FACTIONS.meridian;
   if (slot in pal) return { color: pal[slot], glow: false };
   if (slot in DISH_GLOW) return { color: DISH_GLOW[slot], glow: true };
   return { color: DISH_TOON[slot] ?? 0xff00ff, glow: false };
@@ -2145,18 +2157,18 @@ export function dishModel(kind, faction = 'meridian', no = '01') {
   if (!root) throw new Error('no dish station ' + kind);
   const find = (n, role) => n.kids.find((k) => k.role === role);
   const yaw = find(root, 'yaw'), tilt = find(yaw, 'tilt');
-  const fac = LAND_TRAIN_FACTIONS[faction] ? faction : 'meridian';
+  const fac = DISH_FACTIONS[faction] ? faction : 'meridian';
   const fixed = [root, ...root.kids.filter((k) => (k.role === 'livery' && k.data.faction === fac) || (k.role === 'number' && k.data.no === no))];
   return { root, fixed, yaw, tilt, blinkers: root.kids.filter((k) => k.role === 'blinker'), tiltBlinkers: tilt.kids.filter((k) => k.role === 'blinker'), size: root.data.size || DISH_SIZE, radius: root.data.radius };
 }
 
 // A whole station as plain meshes (the model viewer's, and the field dish's): returns the root group, the pivots to drive and the aircraft
 // lamps (they blink: userData.blink). The array sites bake the same parts into their own kit instead (settlements.js dishStation).
-export function makeDishStation({ kind = 'cryo', faction = 'meridian', no = '01', size = DISH_SIZE, paint, head = false } = {}) {
+export function makeDishStation({ kind = 'cryo', faction = 'meridian', no = '01', size = DISH_SIZE, head = false } = {}) {
   const D = dishModel(kind, faction, no);
   const mats = new Map();
   const matFor = (slot) => {
-    if (!mats.has(slot)) { const c = dishSlot(slot, faction, paint); mats.set(slot, c.glow ? glow(c.color) : toon(c.color)); }
+    if (!mats.has(slot)) { const c = dishSlot(slot, faction); mats.set(slot, c.glow ? glow(c.color) : toon(c.color)); }
     return mats.get(slot);
   };
   const dress = (node, g) => {
@@ -2562,27 +2574,50 @@ export function makeCrate(color = 0xffd23f, size = 0.9) {
   return g;
 }
 
-// A dish head alone, for a roof or a post: the field dish's reflector, trunnions, turning neck and feed without the tower (no lamps, no
-// colliders), its rim `rim` m from the axis and painted `paint`. Its origin is the foot of the neck, so it stands on whatever the neck is set on;
-// the pivots are returned to aim it (yaw turns about the vertical; at tilt -0.5 and yaw 0 it opens up and towards -z).
-const DISH_RIM = 14.1, DISH_NECK = 21.2; // the field dish's rim radius, and the height of the neck's foot above its ground, at size 30
-export function makeDishHead(rim, paint = 0xf5f5f5) {
+// A dish head alone, for a roof or a post: the field dish's reflector, trunnions, turning neck and feed without the tower, lightly built (no
+// lamps, no colliders), its rim `rim` m from the axis, in `faction`'s paint. Its origin is the foot of the neck, so it stands on whatever the neck
+// is set on; the pivots are returned to aim it (yaw turns about the vertical; at tilt -0.5 and yaw 0 it opens up and towards -z).
+const DISH_RIM = 14.1, DISH_NECK = 21.2, DISH_PIVOT = 28.5; // the field dish's rim radius, the height of the neck's foot and of the pivot, at size 30
+export function makeDishHead(rim, faction = 'none') {
   const k = rim / DISH_RIM;
-  const d = makeDishStation({ kind: DISH_FIELD, size: DISH_SIZE * k, paint, head: true });
+  const d = makeDishStation({ kind: DISH_HEAD, faction, size: DISH_SIZE * k, head: true });
   d.root.position.y = -DISH_NECK * k;
   const root = new THREE.Group();
   root.add(d.root);
   return { root, yaw: d.yaw, tilt: d.tilt };
 }
 
+// The same head baked into a kit (the outposts', the settlements', the founded bases'): its neck's foot at (x, y, z) in the current frame,
+// `faction` a key or a faction's colour. It turns `az` about the vertical (0: it opens up and towards -z, PI: towards +z) and nods `el`
+// (-0.5: up a little over 45 degrees; -1.4: nearly sideways). With `spin` (rad/s) it is a moving piece instead, turning about the vertical
+// through (x, y, z) on a boom `arm` m long (the head stands at its end, facing out for az PI), and the piece is returned.
+Kit.prototype.dishHead = function (x, y, z, rim, faction, { az = 0, el = -0.5, spin = 0, arm = 0 } = {}) {
+  const f = dishFaction(faction), D = dishModel(DISH_HEAD, f), k = rim / DISH_RIM;
+  const mat = (slot) => { const c = dishSlot(slot, f); return c.glow ? KG(c.color) : KT(c.color); };
+  const turn = new THREE.Matrix4().makeRotationY(az), nod = new THREE.Matrix4().makeRotationX(el), S = new THREE.Matrix4().makeScale(k, k, k);
+  const yawM = turn.clone().multiply(S), tiltM = turn.clone().multiply(nod).multiply(S);
+  const rise = (DISH_PIVOT - DISH_NECK) * k; // how far the pivot stands over the neck's foot
+  const bake = (kit, at) => { kit.baked(D.yaw, mat, at.clone().multiply(yawM)); kit.baked(D.tilt, mat, at.clone().multiply(tiltM)); };
+  if (!spin) {
+    bake(this, new THREE.Matrix4().makeTranslation(x, y + rise, z));
+    return null;
+  }
+  const q = new Kit(this.c, 1, false);
+  bake(q, new THREE.Matrix4().makeTranslation(0, rise, arm));
+  if (arm) q.beam([0, 0, 0], [0, 0, arm], 1.2 * k, KT(0x3a3550));
+  const piece = q.finish().root;
+  piece.userData.spin = spin;
+  return this.dyn(piece, x, y, z);
+};
+
 // The small bases' dish (ILMB, the Daedalus relay, the Vostok and Daedalus posts, the Asset Row): the field dish of build_dish.py, an
 // eight-sided tower with a gallery and a caged ladder over an equipment-room container, under the same truss-backed reflector as the
-// array's gantry station. `size` is the old dish's (the tower is 0.7 x size tall, the rim 0.47 x size out); `color` paints the
-// dish, the tower's cowl and the equipment room. Returns { root, yaw, tilt, lamps, cols }: the pivots to drive (yaw turns about the
+// array's gantry station, in `faction`'s paint with its mark on the tower and the room. `size` is the old dish's (the tower is 0.7 x
+// size tall, the rim 0.47 x size out). Returns { root, yaw, tilt, lamps, cols }: the pivots to drive (yaw turns about the
 // vertical, tilt nods; the lamps blink) and what is solid, in the dish's own frame (the caller adds where it stands).
-export function makeDish(size = 10, color = 0xf5f5f5) {
+export function makeDish(size = 10, faction = 'none') {
   const k = size / DISH_SIZE;
-  const d = makeDishStation({ kind: DISH_FIELD, size, paint: color });
+  const d = makeDishStation({ kind: DISH_FIELD, faction, size });
   d.tilt.rotation.x = -0.7;
   const cols = [{ type: 'cyl', x: 0, z: 0, y0: -2, y1: DISH_NECK * k, r: 5.2 * k }, { type: 'box', x: 7 * k, y: 1.6 * k, z: 0, hx: 1.4 * k, hy: 1.45 * k, hz: 3.15 * k }];
   return { ...d, cols };

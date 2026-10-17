@@ -228,6 +228,11 @@ def emblem(d, faction, cu, cv, r, layer=0):
         d.ring(cu, cv, r * 0.58, r * 0.7, "stripe", g, 28, sy=0.5)
         d.disc(cu + r * 0.64, cv, r * 0.13, "stripe", g, 10)
         d.disc(cu, cv, r * 0.18, "stripe", g, 10)
+    elif faction == "daedalus":
+        # a delta (a hollow triangle) with an eye in it
+        d.poly([(cu, cv + r * 0.74), (cu - r * 0.7, cv - r * 0.46), (cu + r * 0.7, cv - r * 0.46)], "stripe", g)
+        d.poly([(cu, cv + r * 0.34), (cu - r * 0.38, cv - r * 0.28), (cu + r * 0.38, cv - r * 0.28)], "dark", g + 1)
+        d.disc(cu, cv - r * 0.08, r * 0.1, "stripe", g + 2, 10)
     elif faction == "meridian":
         # a globe: a ring, an equator and a meridian line
         d.ring(cu, cv, r * 0.62, r * 0.74, "stripe", g, 28)
@@ -298,8 +303,9 @@ def nfpa(d, cu, cv, half, health, flam, react, special, layer=0):
 
 # ---------------- the factions the vehicles and the cargo are painted for ----------------
 FACTIONS = ("spacecom", "vostok", "kepler", "meridian")
-NAMES = {"spacecom": "SPACECOM", "vostok": "VOSTOK", "kepler": "KEPLER", "meridian": "MERIDIAN"}
-CODES = {"spacecom": "SPC", "vostok": "VOS", "kepler": "KPL", "meridian": "MRD"}
+NAMES = {"spacecom": "SPACECOM", "vostok": "VOSTOK", "kepler": "KEPLER", "meridian": "MERIDIAN", "daedalus": "DAEDALUS"}
+CODES = {"spacecom": "SPC", "vostok": "VOS", "kepler": "KPL", "meridian": "MRD", "daedalus": "DDL"}
+MARKED = FACTIONS + ("daedalus",)              # what the field dish's plates are made for (the vehicles and cargo have no Daedalus paint)
 
 
 def side_dec(side, x, y=0.0, z=0.0, lift=0.01):

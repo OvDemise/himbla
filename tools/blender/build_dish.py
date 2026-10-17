@@ -12,8 +12,12 @@
 #                 carried on radial lattice trusses.
 #   dish_field    FIELD DISH, the small bases' dish (ILMB, the Daedalus relay, the Vostok and Daedalus posts, the Asset Row): an eight-sided
 #                 tower in three stages with a caged ladder, a cable duct and a service gallery, over an equipment room (a cargo container
-#                 with an air-handler and warning signs); the same truss-backed reflector as the gantry station. It has no faction paint or
-#                 number: the game paints the `paint` slot (the dish, the tower's cowl and the equipment room) whatever colour the site asks for.
+#                 with an air-handler and warning signs); the same truss-backed reflector as the gantry station, painted in the same slots
+#                 (body: the cowl, flanges, gallery, room, trusses and quadpod; stripe: half the rim blocks and the feed band). It has no
+#                 station number, and its livery pivots (the faction's mark and name on the tower and the room) cover Daedalus as well.
+#   dish_head     DISH HEAD, the field dish's reflector, trunnions, turning neck and feed with no tower and built lightly (about a fifth of the
+#                 triangles), for the small dishes on masts, roofs and posts, where a rim under 3 m shows none of the full reflector's detail. It has
+#                 only the yaw and tilt pivots, with the neck's foot at y = 21.2 (the game sets it on whatever carries it) and the same body and stripe slots.
 #
 # Each station is its own root, built at the size of the old dish (a 30 m mount: the reflector's rim is 14.1 m out and 6.8 m deep, the
 # tilt pivot 28.5 m up) with the ground at y = 0 in the middle of the base and +z the front (the panel, the cabinet, the containers' doors).
@@ -59,7 +63,7 @@ SLOT_COLORS = {
     "white": (0.95, 0.93, 0.89), "dish": (1.0, 0.96, 0.88), "seam": (0.54, 0.53, 0.63), "tank": (0.78, 0.84, 0.92),
     "glass": (0.61, 0.9, 1.0), "window": (1.0, 0.96, 0.65), "lamp": (1.0, 0.96, 0.66), "tail": (1.0, 0.16, 0.29),
     "green": (0.49, 1.0, 0.42), "hot": (1.0, 0.62, 0.11), "hazard": (1.0, 0.82, 0.25), "brand": (0.08, 0.64, 0.72),
-    "redsafe": (0.79, 0.13, 0.18), "blue": (0.11, 0.39, 0.84), "paint": (0.96, 0.96, 0.96),
+    "redsafe": (0.79, 0.13, 0.18), "blue": (0.11, 0.39, 0.84),
 }
 
 # geometry and scene helpers shared with the other build scripts, then the flat lettering / emblem / signage kit
@@ -162,9 +166,9 @@ def Y(geo):
     return xf(geo, t=(0, -YP, 0))
 
 
-def liveries(root):
+def liveries(root, factions=FACTIONS):
     """One livery pivot per faction (role livery); the game keeps only the matching one."""
-    return {f: PV(f"livery_{f}", (0, 0, 0), root, role="livery", faction=f) for f in FACTIONS}
+    return {f: PV(f"livery_{f}", (0, 0, 0), root, role="livery", faction=f) for f in factions}
 
 
 def numbers(root):
@@ -645,14 +649,14 @@ def build_field():
     face = lambda y: next(r for y0, y1, r in SEC if y <= y1) * FACE
     M("tower", join([prism8([(0.0, y0), (r, y0), (r, y1), (0.0, y1)]) for y0, y1, r in SEC]), "tank", root, 0.16)
     M("corners", join([B((r * math.sin(OCT + PI * i / 4), y0 + 0.1, r * math.cos(OCT + PI * i / 4)), (r * math.sin(OCT + PI * i / 4), y1 - 0.1, r * math.cos(OCT + PI * i / 4)), 0.11, 4, True) for y0, y1, r in SEC for i in range(8)]), "steel", root, 0)
-    M("flanges", join([tube(ring8(r + 0.05, y), [0.22] * 9, 4, True) for y, r in ((1.95, 3.8), (8.0, 3.8), (14.2, 3.3))]), "steel", root, 0)
-    M("cowl", prism8([(0.0, 19.4), (3.0, 19.4), (3.0, 20.4), (0.0, 20.4)]), "paint", root, 0.1)
+    M("flanges", join([tube(ring8(r + 0.05, y), [0.22] * 9, 4, True) for y, r in ((1.95, 3.8), (8.0, 3.8), (14.2, 3.3))]), "body", root, 0)
+    M("cowl", prism8([(0.0, 19.4), (3.0, 19.4), (3.0, 20.4), (0.0, 20.4)]), "body", root, 0.1)
     GY = 17.6                                                    # the gallery: a deck with a rail all round but the ladder's side
     M("deck", prism8([(0.0, GY - 0.12), (4.6, GY - 0.12), (4.6, GY + 0.08), (0.0, GY + 0.08)]), "dark", root, 0.08)
     M("deckBeams", join([beam((face(GY - 2.4) * math.sin(a), GY - 2.4, face(GY - 2.4) * math.cos(a)), (3.9 * math.sin(a), GY - 0.12, 3.9 * math.cos(a)), 0.12, 4) for a in [k * PI / 4 for k in range(8)]]), "steel", root, 0)
     cn = ring8(4.6, GY)
-    M("deckPosts", join([B((x, GY, z), (x, GY + 1.2, z), 0.08, 4, True) for x, _, z in cn[:8]]), "metal", root, 0)
-    M("deckRails", join([B((cn[i][0], GY + hh, cn[i][2]), (cn[i + 1][0], GY + hh, cn[i + 1][2]), 0.07, 4, True) for hh in (0.6, 1.2) for i in range(8) if i != 3]), "metal", root, 0)
+    M("deckPosts", join([B((x, GY, z), (x, GY + 1.2, z), 0.08, 4, True) for x, _, z in cn[:8]]), "body", root, 0)
+    M("deckRails", join([B((cn[i][0], GY + hh, cn[i][2]), (cn[i + 1][0], GY + hh, cn[i + 1][2]), 0.07, 4, True) for hh in (0.6, 1.2) for i in range(8) if i != 3]), "body", root, 0)
     M("deckToe", tube(ring8(4.6, GY + 0.15), [0.06] * 9, 4, True), "hazard", root, 0)
     for k, a in enumerate((PI / 3, -PI / 3)):                    # floodlights on the rail, facing out and down
         g = xf(lathe([(0.0, 0), (0.34, 0), (0.42, 0.3), (0.0, 0.3)], 10), r=(PI / 2 - 0.2, 0, 0))
@@ -679,7 +683,7 @@ def build_field():
 
     # ---- the equipment room: a smooth cargo container on the pad, a cable bridge to the tower, a roof air-handler ----
     CX, CZ, L, W, H = 7.0, 0.0, 6.1, 2.6, 2.7
-    container(root, "room", CX, CZ, PAD, "paint", False, L, W, H)
+    container(root, "room", CX, CZ, PAD, "body", False, L, W, H)
     M("bridge", tube([(f1 + 0.2, 3.2, 0.0), (5.95, 3.2, 0.0), (5.95, PAD + H + 0.1, 0.0)], [0.17] * 3, 6, True), "dark", root, 0)
     rb("airHandler", 0.8, 0.28, 0.6, (CX, PAD + H + 0.32, -1.5), "metal", root, 0.06, 0.08)
     M("airFan", xf(lathe([(0.0, 0), (0.44, 0), (0.44, 0.06), (0.0, 0.06)], 14), (CX, PAD + H + 0.62, -1.5)), "dark", root, 0)
@@ -690,9 +694,9 @@ def build_field():
     d.rect(-0.2, PAD + 0.9, -0.12, PAD + 1.7, "metal", 2)
     d.rect(0.12, PAD + 0.9, 0.2, PAD + 1.7, "metal", 2)
     d.build(f"{PFX}roomDoor", root)
-    d = page("+x", (CX + W / 2 + 0.03, 0, CZ))
-    warn_sign(d, -2.4, PAD + 0.5, 2.3, 1.7, 0, "WARNING", ("RF RADIATION", "KEEP CLEAR"))
-    nfpa(d, 1.5, PAD + 1.45, 0.55, 2, 1, 0, "RF", 0)
+    d = page("+x", (CX + W / 2 + 0.03, 0, CZ))      # (the +x flank's u runs along -z: the plate takes the -z end, the signs the +z end)
+    warn_sign(d, 0.1, PAD + 0.7, 1.75, 1.3, 0, "WARNING", ("RF RADIATION", "KEEP CLEAR"))
+    nfpa(d, 2.5, PAD + 1.35, 0.45, 2, 1, 0, "RF", 0)
     d.build(f"{PFX}roomSigns", root)
     d = page("+z", (0, 0, face(3.0) + 0.0))
     d.hazard(-1.3, 2.2, 1.3, 2.9, "dark", "hazard", 0, 0.24)
@@ -706,13 +710,15 @@ def build_field():
     mount(root, yaw, tilt, 21.2, 25.4, 1.75)
     M("neckBands", Y(join([xf(torus(1.81, 0.12, 14, 4), (0, y, 0)) for y in (21.9, 23.2, 24.5)])), "metal", yaw, 0)
 
-    # ---- the dish: one paint inside and out, a dark collar with hazard blocks, radial trusses behind, a quadpod and a Cassegrain feed ----
+    # ---- the dish: a white shell and cream face, a dark collar with stripe-and-body blocks, radial trusses behind in the body colour, a quadpod and a Cassegrain feed ----
     M("hub", hub_cone(APEX), "steel", tilt, 0.12)
-    M("bowl", bowl(APEX, SHELL, 0.0, 9, 32), "paint", tilt, 0.14)
+    M("bowl", bowl(APEX, SHELL, 0.0, 9, 32), "white", tilt, 0.14)
+    M("face", bowl(APEX, 0.12, 0.12, 9, 32), "dish", tilt, 0)
     M("seams", face_seams(APEX, 12, (5.0, 9.6), 1.5, 0.08), "seam", tilt, 0)
     M("collar", rim_collar(APEX, 0.35, 0.7, 0.4), "dark", tilt, 0.1)
     nb = 28
-    M("rimBlocks", join([tube(arc_pts(RIM + 0.46, APEX + par(RIM) - 0.15, 2 * PI * k / nb + 0.01, 2 * PI * (k + 1) / nb - 0.01, 2), [0.55] * 3, 4, True) for k in range(0, nb, 2)]), "hazard", tilt, 0)
+    for slot, parity in (("stripe", 0), ("body", 1)):
+        M("rimBlocks_" + slot, join([tube(arc_pts(RIM + 0.46, APEX + par(RIM) - 0.15, 2 * PI * k / nb + 0.01, 2 * PI * (k + 1) / nb - 0.01, 2), [0.55] * 3, 4, True) for k in range(nb) if k % 2 == parity]), slot, tilt, 0)
     NT, R0, nbay = 10, 5.0, 4
     ch, dg = [], []
     for k in range(NT):
@@ -724,9 +730,9 @@ def build_field():
         ch += [tube([P(*t) for t in tops], [0.17] * len(rs), 4, True), tube([P(*b) for b in bots], [0.2] * len(rs), 4, True)]
         dg += [B(P(*tops[i]), P(*bots[i]), 0.1, 4, True) for i in range(nbay + 1)]
         dg += [B(P(*tops[i]), P(*bots[i + 1]), 0.1, 4, True) if i % 2 else B(P(*bots[i]), P(*tops[i + 1]), 0.1, 4, True) for i in range(nbay)]
-    M("trussChords", join(ch), "steel", tilt, 0.05)
-    M("trussWeb", join(dg), "metal", tilt, 0)
-    M("hoops", hoops((8.0, 12.2), lambda r: rib_bottom(APEX, r) - 0.05, 0.24, 40, 4), "steel", tilt, 0.04)
+    M("trussChords", join(ch), "body", tilt, 0.05)
+    M("trussWeb", join(dg), "steel", tilt, 0)
+    M("hoops", hoops((8.0, 12.2), lambda r: rib_bottom(APEX, r) - 0.05, 0.24, 40, 4), "body", tilt, 0.04)
     FEED_Y = 14.2
     legs = []
     for k in range(4):
@@ -738,10 +744,10 @@ def build_field():
         for t in (0.35, 0.65):
             c = tuple(p0[i] + (p1[i] - p0[i]) * t for i in range(3))
             legs.append(B((c[0] + s2[0] * 0.7, c[1] - 0.25, c[2] + s2[2] * 0.7), (c[0] - s2[0] * 0.7, c[1] - 0.25, c[2] - s2[2] * 0.7), 0.08, 4, True))
-    M("quadpod", join(legs), "steel", tilt, 0.05)
+    M("quadpod", join(legs), "body", tilt, 0.05)
     M("feedRing", hoop(1.4, FEED_Y - 0.6, 0.2, 20, 4), "dark", tilt, 0)
-    rb("feedCab", 1.4, 0.9, 1.4, (0, FEED_Y + 0.35, 0), "dark", tilt, 0.1, 0.1)
-    bx("feedBand", 1.44, 0.13, 1.44, (0, FEED_Y + 0.35, 0), "hazard", tilt)
+    rb("feedCab", 1.4, 0.9, 1.4, (0, FEED_Y + 0.35, 0), "body", tilt, 0.1, 0.1)
+    bx("feedBand", 1.44, 0.13, 1.44, (0, FEED_Y + 0.35, 0), "stripe", tilt)
     bx("feedWin", 0.65, 0.3, 0.06, (0, FEED_Y + 0.55, 1.4), "window", tilt)
     M("subStruts", join([B((0.5 * math.sin(2 * PI * k / 3 + 0.5), FEED_Y - 0.5, 0.5 * math.cos(2 * PI * k / 3 + 0.5)), (1.0 * math.sin(2 * PI * k / 3 + 0.5), APEX + FOC + 1.0, 1.0 * math.cos(2 * PI * k / 3 + 0.5)), 0.07, 4, True) for k in range(3)]), "steel", tilt, 0)
     M("subRefl", lathe([(0.0, APEX + FOC + 0.55), (1.0, APEX + FOC + 0.95), (1.0, APEX + FOC + 1.1), (0.0, APEX + FOC + 0.8)], 16), "white", tilt, 0.04)
@@ -749,19 +755,77 @@ def build_field():
     M("feedLens", lathe([(0.0, APEX + FOC + 0.5), (0.4, APEX + FOC + 0.55), (0.0, APEX + FOC + 0.8)], 12), "green", tilt, 0)
     bm("feedBeacon", (0, FEED_Y + 1.25, 0), (0, FEED_Y + 2.8, 0), 0.1, "dark", tilt)
     PV("blinkFeed", (0, FEED_Y + 3.0, 0), tilt, role="blinker", radius=0.45)
+
+    # ---- liveries: the faction's mark and name on a plate on the tower's second stage (facing +z) and along the room's flank ----
+    f2 = face(10.0)
+    for f, piv in liveries(root, MARKED).items():
+        s_ = NAMES[f]
+        d = page("+z", (0, 0, f2))
+        d.rect(-1.15, 9.45, 1.15, 11.35, "stripe", 0)
+        d.rect(-1.09, 9.51, 1.09, 11.29, "dark", 1)
+        emblem(d, f, 0.0, 10.6, 0.5, 2)
+        d.text(s_, 0.0, 9.75, 0.04, "stripe", 2, "c")
+        d.build(f"{PFX}towerPlate_{f}", piv)
+        d = page("+x", (CX + W / 2 + 0.03, 0, CZ))
+        d.rect(-2.95, PAD + 0.75, -0.2, PAD + 2.15, "stripe", 0)
+        d.rect(-2.89, PAD + 0.81, -0.26, PAD + 2.09, "dark", 1)
+        emblem(d, f, -2.89 + 0.62, PAD + 1.45, 0.48, 2)
+        tx = -2.89 + 1.2
+        ps = min(0.05, (-0.26 - tx - 0.1) / text_width(s_, 1.0))
+        d.text(s_, tx, PAD + 1.45 + 0.05, ps, "stripe", 2)
+        d.text("COMMS RELAY", tx, PAD + 1.45 - 0.5, 0.032, "white", 2)
+        d.build(f"{PFX}roomPlate_{f}", piv)
+    return root
+
+
+# =====================================================================================================
+# DISH HEAD  (the field dish's reflector, trunnions, turning neck and feed with no tower, lightly built, for the small dishes)
+# =====================================================================================================
+def build_head():
+    root, yaw, tilt = unit("dish_head")
+    mount(root, yaw, tilt, 21.2, 25.4, 1.75)
+    M("hub", hub_cone(APEX), "steel", tilt, 0.12)
+    M("bowl", bowl(APEX, SHELL, 0.0, 5, 20), "white", tilt, 0.14)
+    M("face", bowl(APEX, 0.12, 0.12, 5, 20), "dish", tilt, 0)
+    M("collar", rim_collar(APEX, 0.35, 0.7, 0.4), "dark", tilt, 0.1)
+    nb = 16
+    for slot, parity in (("stripe", 0), ("body", 1)):
+        M("rimBlocks_" + slot, join([tube(arc_pts(RIM + 0.46, APEX + par(RIM) - 0.15, 2 * PI * k / nb + 0.01, 2 * PI * (k + 1) / nb - 0.01, 2), [0.55] * 3, 4, True) for k in range(nb) if k % 2 == parity]), slot, tilt, 0)
+    NT, R0, nbay = 6, 5.0, 2
+    ch, dg = [], []
+    for k in range(NT):
+        a = 2 * PI * (k + 0.5) / NT
+        P = lambda r, y: (r * math.sin(a), y, r * math.cos(a))
+        rs = [R0 + (RIM - 0.3 - R0) * i / nbay for i in range(nbay + 1)]
+        tops = [(r, APEX + par(r) - SHELL - 0.05) for r in rs]
+        bots = [(r, rib_bottom(APEX, r)) for r in rs]
+        ch += [tube([P(*t) for t in tops], [0.17] * len(rs), 4, True), tube([P(*b) for b in bots], [0.2] * len(rs), 4, True)]
+        dg += [B(P(*tops[i]), P(*bots[i]), 0.1, 4, True) for i in range(nbay + 1)]
+    M("trussChords", join(ch), "body", tilt, 0.05)
+    M("trussWeb", join(dg), "steel", tilt, 0)
+    FEED_Y = 14.2
+    M("quadpod", join([B((RIM * 0.97 * math.sin(a), APEX + par(RIM) + 0.1, RIM * 0.97 * math.cos(a)), (1.3 * math.sin(a), FEED_Y - 0.6, 1.3 * math.cos(a)), 0.2, 6, True) for a in [2 * PI * (k + 0.5) / 4 for k in range(4)]]), "body", tilt, 0.05)
+    rb("feedCab", 1.4, 0.9, 1.4, (0, FEED_Y + 0.35, 0), "body", tilt, 0.1, 0.1)
+    bx("feedBand", 1.44, 0.13, 1.44, (0, FEED_Y + 0.35, 0), "stripe", tilt)
+    M("subRefl", lathe([(0.0, APEX + FOC + 0.55), (1.0, APEX + FOC + 0.95), (1.0, APEX + FOC + 1.1), (0.0, APEX + FOC + 0.8)], 12), "white", tilt, 0.04)
+    M("feedStem", tube([(0, FEED_Y - 0.6, 0), (0, APEX + FOC + 0.95, 0)], [0.26, 0.26], 6), "steel", tilt, 0)
+    M("feedLens", lathe([(0.0, APEX + FOC + 0.5), (0.4, APEX + FOC + 0.55), (0.0, APEX + FOC + 0.8)], 10), "green", tilt, 0)
     return root
 
 
 # ---------------------------------------------------------------------------------------------------------------
-ROOTS = (build_cryo(), build_gantry(), build_field())
+ROOTS = (build_cryo(), build_gantry(), build_field(), build_head())
 
 # every root must have kept its exact name (Blender renames a clash to "name.001", and the game looks them up by name), and its pivots
+NEED = {   # the pivots each root must have: (number, livery, blinker); the field dish has no number and a livery for Daedalus too, the head neither
+    "dish_cryo": (len(NUMBERS), len(FACTIONS), 2), "dish_gantry": (len(NUMBERS), len(FACTIONS), 2),
+    "dish_field": (0, len(MARKED), 2), "dish_head": (0, 0, 0),
+}
 for r in ROOTS:
-    if r.name not in ("dish_cryo", "dish_gantry", "dish_field") or r.parent is not None or r.type != "EMPTY":
+    if r.name not in NEED or r.parent is not None or r.type != "EMPTY":
         raise RuntimeError(f"root {r.name!r} was renamed: some part of another station already uses that name")
     roles = sorted(o["role"] for o in C.objects if o.type == "EMPTY" and "role" in o and o.name.startswith(r.name + "_"))
-    field = r.name == "dish_field"      # (the field dish is unmarked: no faction paint, no number)
-    for need, n in (("yaw", 1), ("tilt", 1), ("number", 0 if field else len(NUMBERS)), ("livery", 0 if field else len(FACTIONS)), ("blinker", 2)):
+    for need, n in zip(("yaw", "tilt", "number", "livery", "blinker"), (1, 1) + NEED[r.name]):
         if roles.count(need) < n:
             raise RuntimeError(f"{r.name}: expected {n} {need} pivots, found {roles.count(need)}")
 bad = [o.name for o in C.objects if "." in o.name and o.name.rsplit(".", 1)[1].isdigit()]
