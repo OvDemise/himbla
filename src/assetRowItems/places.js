@@ -19,13 +19,13 @@ const towns = [
   P('kepler', 'KEPLER CIVIC CENTER', 231, 231, { loc: 'kepler' }),
   P('twilight', 'TWILIGHT WAYSTATION', 187, 183, { loc: 'twilight' }),
   P('hertz', 'HERTZSPRUNG REFUGE', 216, 207, { loc: 'hertz' }),
-  P('hometown', 'HOMETOWN (8 BUILDINGS)', 202, 191, { base: HOMETOWN, over: { slots: ['housing', 'market', 'clinic', 'farm', 'motorpool', 'barracks', 'school', 'radio'] } }),
+  P('hometown', 'HOMETOWN (8 BUILDINGS)', 202, 191, { base: HOMETOWN, over: { slots: ['housing', 'market', 'clinic', 'farm', 'motorpool', 'barracks', 'roads', 'radio'] } }),
   P('hometown.new', 'HOMETOWN (EMPTY PLOTS)', 202, 189, { base: HOMETOWN, over: { slots: [] } }),
 ];
 const hq = [
   P('ilmb', 'INTERNATIONAL MOON BASE', 502, 502, { loc: 'ilmb' }),
   P('ilmb.lawless', 'ILMB (RUSTMOON TAKEOVER)', 502, 502, { loc: 'ilmb', over: { lawless: true } }),
-  P('meridian', 'MERIDIAN EXCHANGE', 251, 257, { loc: 'meridian' }),
+  P('meridian', 'MERIDIAN EXCHANGE', 251, 280, { loc: 'meridian' }),
 ];
 const science = [
   P('shackleton', 'SHACKLETON RADAR ARRAY', 225, 229, { loc: 'shackleton' }),

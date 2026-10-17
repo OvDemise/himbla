@@ -25,6 +25,7 @@
 //                                               left stick  move the cursor   right stick  zoom
 //                                               RT, hold    grab the globe and drag it round
 //                                               LB / RB, hold  turn the map round
+//                                               A  send a sweep, X  stop / resume it (from the Radio Tower)
 //                                               B / View    close
 //                                               PLINKO
 //                                               left stick / d-pad ←/→  aim the chute
@@ -40,6 +41,7 @@
 //                                               DUCK DERBY
 //                                               left stick / d-pad  pick a duck   A  race · new race
 //                                               LB / RB     lower / raise the bet   B  stand up
+//   (the pad rumbles too, and a PlayStation pad lights up and gets adaptive triggers: see haptics.js, sonyout.js)
 //   d-pad ↓      the radial menu (tap to open, tap again to close): vehicles, powers, wardrobe, reputation log,
 //                empty the jar (vehicles and powers open their own wheel of the ones you own:
 //                same controls; a power you pick on its wheel is the one RB uses). The right stick picks a wedge (the
@@ -48,6 +50,7 @@
 import { WEAPONS, weaponUnlocked } from './weapons.js';
 import { Glyphs, glyphState, glyphHtml } from './glyphs.js';
 import { GyroPad } from './gyro.js';
+import { SonyOut } from './sonyout.js';
 import { DEV_TOOLS } from './devtools.js';
 
 const DEAD = 0.18; // stick deadzone (radial)
@@ -95,6 +98,7 @@ export class Gamepad {
     this.gyro = new GyroPad();
     this.gyroOn = false;
     this.gyro.init();
+    this.fx = new SonyOut(this.gyro); // ...and, over the same link, the pad's rumble, lightbar and adaptive triggers (haptics.js)
     window.addEventListener('gamepadconnected', (e) => {
       this.game.hud.toast(`Controller connected: ${(e.gamepad.id || 'gamepad').replace(/\(.*\)/, '').trim().slice(0, 40)}`, 2.5);
     });
@@ -124,6 +128,7 @@ export class Gamepad {
     const pads = navigator.getGamepads ? navigator.getGamepads() : [];
     let gp = null;
     for (const p of pads) if (p && p.connected) { gp = p; if (p.mapping === 'standard') break; }
+    if (this.game.haptics) this.game.haptics.attach(gp);
     if (!gp) return;
     const kind = padKind(gp.id);
     if (kind !== this.kind) { this.kind = kind; if (this.input.padActive) { this.glyphs.set(false); this.glyphs.set(true, kind); } else glyphState.kind = kind; }
@@ -163,6 +168,7 @@ export class Gamepad {
     else if (roul) this.roulette(btn, pressed, trig, lx, ly, dt);
     else if (st === 'casino' && g.casino.mode) this.seated(g.casino.mode, btn, pressed, trig, lx, ly, dt);
     else if (st === 'dead') { this.releaseAll(); if (pressed(B.A) || pressed(B.START)) document.getElementById('death').click(); }
+    else if (st === 'cutscene') { this.releaseAll(); if (pressed(B.A) || pressed(B.B) || pressed(B.START)) this.tap('Space'); } // (the cutscenes skip on Space: the recall shuttle, the med-evac and the council's vote)
     else this.ui(btn, pressed, lx, ly, ry, dt);
     this.prev = btn;
   }
@@ -433,7 +439,8 @@ export class Gamepad {
     this.game.globe.padUpdate(lx, ly, trig(B.RT) > 0.35, ry, (btn[B.RB] ? 1 : 0) - (btn[B.LB] ? 1 : 0), dt);
     // (View closes on the release, so letting go of it can't be read as the tap that opens the map)
     if (pressed(B.B) || pressed(B.START)) this.key('Escape');
-    else if (pressed(B.A)) this.game.globe.padClick(); // (the dev menu's click-to-teleport)
+    else if (pressed(B.A)) this.game.globe.padClick(); // (the Radio Tower's sweep, or the dev menu's click-to-teleport)
+    else if (pressed(B.X) && this.game.globe.mode === 'radio') this.game.globe.radioToggle(); // (stop / resume the sweep)
     else if (released(B.VIEW)) this.tap('KeyM');
   }
 
@@ -450,6 +457,12 @@ export class Gamepad {
     if (mode === 'plinko') {
       games.padAim(lx || (btn[B.RIGHT] ? 1 : 0) - (btn[B.LEFT] ? 1 : 0), dt);
       this.set('Space', btn[B.A] || trig(B.RT) > 0.35);
+    } else if (mode === 'claw') {
+      // the claw: the left stick flies it (across and in and out), LB / RB lower and raise it, A or RT is the beam (held)
+      games.claw.padClaw(lx || (btn[B.RIGHT] ? 1 : 0) - (btn[B.LEFT] ? 1 : 0), ly || (btn[B.DOWN] ? 1 : 0) - (btn[B.UP] ? 1 : 0), (btn[B.RB] ? 1 : 0) - (btn[B.LB] ? 1 : 0));
+      this.set('Space', btn[B.A] || trig(B.RT) > 0.35);
+      if (pressed(B.B) || pressed(B.START)) { this.set('Space', false); this.key('Escape'); }
+      return;
     } else if (mode === 'duck') {
       this.set('Space', false);
       // (the ducks sit two by two on the bar: the highlight moves the way they're laid out)
@@ -559,7 +572,7 @@ export class Gamepad {
     if (pressed(B.A) && this.focus) {
       const el = this.focus;
       if (el.tagName === 'SELECT') { el.selectedIndex = (el.selectedIndex + 1) % el.options.length; el.dispatchEvent(new Event('change', { bubbles: true })); }
-      else el.click();
+      else { el.click(); g.haptics.play('press'); }
     }
     // (settings close back to whatever opened them: resuming from under them would leave them up)
     const setOpen = g.settings && g.settings.open;
@@ -652,6 +665,7 @@ export class Gamepad {
     el.dispatchEvent(new MouseEvent('mouseover', { bubbles: true, clientX: r.left + r.width / 2, clientY: r.top + r.height / 2 }));
     el.dispatchEvent(new MouseEvent('mouseenter', { bubbles: false }));
     if (this.game.audio && this.game.audio.tone) this.game.audio.tone(900, 0.03, 'square', 0.06);
+    this.game.haptics.play('tick');
   }
 
   clearFocus() { if (this.focus) { this.focus.classList.remove('pad-focus'); this.focus = null; } }

@@ -48,10 +48,10 @@ if not os.path.isdir(os.path.dirname(OUT)):
     raise RuntimeError(f"No src/assets in {REPO}; set MOONRUNNER_REPO to the himbla checkout")
 # The shuttle's nose and route board come in three builds: "current" (what shipped), and the
 # two proposals "A" and "B" (see docs/shuttle-proposals.md). SHUTTLE_VARIANT picks one.
-VARIANT = os.environ.get("SHUTTLE_VARIANT", "current")
-if VARIANT not in ("current", "A", "B"):
-    raise RuntimeError(f"SHUTTLE_VARIANT must be current, A or B (got {VARIANT!r})")
-print("Ships export ->", OUT, "| shuttle variant:", VARIANT)
+SHUTTLE_VARIANT = os.environ.get("SHUTTLE_VARIANT", "current")
+if SHUTTLE_VARIANT not in ("current", "A", "B"):
+    raise RuntimeError(f"SHUTTLE_VARIANT must be current, A or B (got {SHUTTLE_VARIANT!r})")
+print("Ships export ->", OUT, "| shuttle variant:", SHUTTLE_VARIANT)
 COLL = "MoonShips"
 
 # preview colours only: the game replaces every slot with its own material
@@ -64,9 +64,16 @@ SLOT_COLORS = {
     "green": (0.49, 1.0, 0.42), "white": (1.0, 1.0, 1.0), "sign": (1.0, 0.82, 0.25),
     "plume": (1.0, 0.55, 0.15), "plumeCore": (1.0, 0.95, 0.8), "lift": (0.55, 0.85, 1.0),
     "cargo0": (1.0, 0.82, 0.25), "cargo1": (0.18, 0.77, 1.0), "cargo2": (1.0, 0.23, 0.36), "cargo3": (0.49, 1.0, 0.42),
+    # (the land-train cargo units in the bays: under a "cargo" pivot the game uses its land-train palette for every slot)
+    "accent": (0.42, 0.56, 0.23), "label": (0.16, 0.14, 0.25), "tire": (0.1, 0.09, 0.14), "lamp": (1.0, 0.96, 0.66), "tail": (1.0, 0.16, 0.29),
+    "hot": (1.0, 0.62, 0.11), "tank": (0.78, 0.84, 0.92), "brand": (0.08, 0.64, 0.72), "redsafe": (0.79, 0.13, 0.18),
+    "orange": (1.0, 0.48, 0.1), "blue": (0.11, 0.39, 0.84),
+    "beacon": (1.0, 0.3, 0.25),
 }
 
 exec(open(os.path.join(REPO, "tools", "blender", "kit.py"), encoding="utf-8").read(), globals())
+exec(open(os.path.join(REPO, "tools", "blender", "decals.py"), encoding="utf-8").read(), globals())
+exec(open(os.path.join(REPO, "tools", "blender", "cargo.py"), encoding="utf-8").read(), globals())
 
 
 # ---------------- geometry helpers (three.js axes, return (verts, faces)) ----------------
@@ -521,7 +528,7 @@ def build_nose(v):
         hor = 0.15
     vv = lambda p: p[1] - 0.8 * p[0]
     streak = lambda p: max(min(vv(p) - a, b - vv(p)) for a, b in bands)
-    hi = clipf(glass, lambda p: min(streak(p), 2.35 - abs(p[0]), 0.0 - 1e-9 + 1.0))
+    hi = clipf(glass, lambda p: min(streak(p), 2.35 - abs(p[0])))
     rest = clipf(glass, lambda p: -min(streak(p), 2.35 - abs(p[0])))
     mesh("s_windHi", hi, "glassHi", SH, 0)
     mesh("s_windDeep", clipf(rest, lambda p: hor - p[1]), "glassDeep", SH, 0)
@@ -601,10 +608,10 @@ SHUTTLE_SECS = [
     {"z": 10.05, "w": 0.6, "t": 0.35, "b": 0.6, "eT": 2.0, "eB": 2.2, "yc": -0.55},
 ]
 # (the reworked builds round the nose off: the same sections, re-cut every 0.4 m along smooth curves)
-HS = SHUTTLE_SECS if VARIANT == "current" else smooth_sections(SHUTTLE_SECS, 2.0, 0.4)
-hull_geo = loft(HS, 40 if VARIANT == "current" else 56)
+HS = SHUTTLE_SECS if SHUTTLE_VARIANT == "current" else smooth_sections(SHUTTLE_SECS, 2.0, 0.4)
+hull_geo = loft(HS, 40 if SHUTTLE_VARIANT == "current" else 56)
 mesh("s_hull", hull_geo, "body", SH, 0.13)
-if VARIANT == "current":
+if SHUTTLE_VARIANT == "current":
     # wraparound windscreen: the front of the hull, grown a hair, between two heights
     # (the screen sweeps back along the flanks a little, lower edge dipping toward the nose)
     mesh("s_windscreen", band(SHUTTLE_SECS, 0.035, lambda c: c[2] > 5.4 and 0.1 - (c[2] - 5.4) * 0.12 < c[1] < 2.0 and (c[2] > 6.9 or abs(c[0]) > 2.2)), "glass", SH, 0)
@@ -621,7 +628,7 @@ for i in range(7):
         x = surf_x(sec, 0.75) + 0.02
         mesh(f"s_win{i}{side}", xf(superquad(0.12, 0.55, 0.48, 0.5, 0.5, 12, 6), (side * x, 0.75, z), (0, 0, side * -0.12)), "window", SH, 0)
         mesh(f"s_winRim{i}{side}", xf(superquad(0.1, 0.68, 0.6, 0.5, 0.5, 12, 6), (side * (x - 0.04), 0.75, z), (0, 0, side * -0.12)), "trim", SH, 0.02)
-if VARIANT == "current":
+if SHUTTLE_VARIANT == "current":
     mesh("s_chin", xf(rbox(2.0, 0.22, 0.5, 0.25), (0, -1.75, 9.1)), "dark", SH, 0.04)
     # nose: headlights
     for side in (-1, 1):
@@ -632,7 +639,7 @@ if VARIANT == "current":
     mesh("s_boardLit", xf(rbox(1.45, 0.3, 0.17, 0.12), (0, 3.55, 0.8)), "sign", SH, 0)
     mesh("s_blister", xf(superquad(0.55, 0.32, 0.55, 0.6, 0.6, 12, 6), (0, 2.82, 4.6)), "trim", SH, 0.03)
 else:
-    build_nose(VARIANT)
+    build_nose(SHUTTLE_VARIANT)
 mesh("s_whip", beam((0.9, 2.7, -2.4), (1.05, 4.4, -2.9), 0.04, 5), "dark", SH, 0)
 mesh("s_whipTip", xf(superquad(0.1, 0.1, 0.1, 1, 1, 8, 5), (1.05, 4.45, -2.9)), "red", SH, 0)
 # V-tail: two canted, swept fins at the back (hull-coloured, thin, raked back), each capped in the
@@ -714,163 +721,526 @@ SR["padR"] = 11.0
 
 
 # =============================================================================================
-# FREIGHTER: a ~66 m deep-haul "hammerhead": a long flat-topped cargo spine you can ride, a tall
-# bridge tower at the bow with a wraparound glass band, container racks clamped down both
-# flanks, V-swept radiator wings, a four-bell engine cluster at the stern, four folding legs
-# and a belly ramp. Origin = hull centre; deck top y = +5, belly y = -5.
+# FREIGHTER ("Atlas"): a ~66 m armoured deep-haul hammerhead. A squared, plated hull with a raked bridge tower that runs down into
+# the bow and carries a lofted pilot house, a dorsal landing deck you can ride (kerb, tie-down rails, a big pad, approach lights),
+# a gantry cage round each side's four cargo bays (portal frames with gussets, a header truss, a crane rail with a trolley, status
+# lamps, roller cradles) holding the land-train's own cargo units (corrugated box, Helium-3 tanker, explosives magazine; cargo.py)
+# painted for the faction it serves, short bolted radiator wings, a four-bell armoured stern block, four folding legs and a belly
+# ramp. Origin = hull centre; deck top y = +5, belly y = -5.
+#
+# FREIGHTER_VARIANT (environment) picks the build: "stacked" (the one in the game: the full size, every bay two crates high, the Helium-3
+# tankers in ISO frames so they stack like boxes), "atlas" (one crate high, the first Atlas) or "compact" (three bays a side and a hull
+# 15% smaller, so the same crates fill more of the ship). The last two are studies.
 # =============================================================================================
+VARIANT = os.environ.get("FREIGHTER_VARIANT", "stacked")
+NB, K, STACK = {"atlas": (4, 1.0, 1), "compact": (3, 0.85, 1), "stacked": (4, 1.0, 2)}[VARIANT]
+PITCH = 9.0                      # a bay's length (the crates are 8.3 m)
+ZF = (NB - 4) * PITCH            # everything forward of the bays moves back for each bay left out
+
+
+def zf(z):
+    return z + ZF
+
+
 GEAR_F = 10.0
 BELLY_F = -5.0
 F = ship_root("freighter")
 FR, FH = F["root"], F["_hull"]
+_before_freighter = set(C.objects)
 
-FREIGHT_SECS = [
-    {"z": -27.0, "w": 6.8, "t": 4.4, "b": 4.4, "eT": 5, "eB": 5},
-    {"z": -25.5, "w": 7.5, "t": 5.0, "b": 5.0, "eT": 6, "eB": 10},
-    {"z": 21.0, "w": 7.5, "t": 5.0, "b": 5.0, "eT": 6, "eB": 10},
-    {"z": 26.0, "w": 7.0, "t": 4.6, "b": 5.0, "eT": 5, "eB": 8},
-    {"z": 29.5, "w": 5.8, "t": 3.2, "b": 4.4, "eT": 3.5, "eB": 5},
-    {"z": 32.0, "w": 3.8, "t": 1.6, "b": 3.2, "eT": 2.6, "eB": 3.5},
-    {"z": 33.4, "w": 1.6, "t": 0.4, "b": 1.8, "eT": 2.2, "eB": 2.5},
-    {"z": 33.8, "w": 0.4, "t": -0.4, "b": 0.6, "eT": 2.0, "eB": 2.0},
+
+def FM(name, geo, slot, parent=None, ink=0.06):
+    return mesh("f_" + name, geo, slot, parent or FH, ink)
+
+
+def FRB(name, h, pos, slot, parent=None, ink=0.05, e=0.12, rot=(0, 0, 0), nu=8, nv=4):
+    """A rounded box (half extents h) placed at pos."""
+    return FM(name, xf(rbox(h[0], h[1], h[2], e, nu, nv), pos, rot), slot, parent, ink)
+
+
+# ---- the hull: squared and plated, a blunt chisel bow (closed properly at the tip) ----
+FSECS = [
+    {"z": -28.4, "w": 7.2, "t": 4.6, "b": 4.6, "eT": 9, "eB": 9},
+    {"z": -27.2, "w": 8.0, "t": 5.0, "b": 5.0, "eT": 10, "eB": 12},
+    {"z": zf(18.0), "w": 8.0, "t": 5.0, "b": 5.0, "eT": 10, "eB": 12},
+    {"z": zf(23.0), "w": 7.7, "t": 4.7, "b": 5.0, "eT": 8, "eB": 11},
+    {"z": zf(27.5), "w": 6.4, "t": 3.5, "b": 4.5, "eT": 6, "eB": 8},
+    {"z": zf(31.0), "w": 4.2, "t": 1.9, "b": 3.5, "eT": 4, "eB": 5},
+    {"z": zf(33.0), "w": 2.3, "t": 1.0, "b": 2.2, "eT": 3, "eB": 3.5},
+    {"z": zf(33.8), "w": 1.0, "t": 0.6, "b": 1.0, "eT": 2.4, "eB": 2.4},
 ]
-mesh("f_hull", loft(FREIGHT_SECS, 44), "body", FH, 0.28)
-# deck plating (a slightly raised flat top) with hazard edges and a landing circle
-mesh("f_deck", xf(rbox(6.6, 0.12, 22.5, 0.08, 16, 4), (0, 5.0, -3.2)), "deck", FH, 0.06)
+FM("hull", loft(FSECS, 48), "body", FH, 0.28)
+# livery: a broad belt with a trim pinstripe above it and a hazard sill below, running right round the bow
+FM("belt", cband(FSECS, 0.05, 0.4, 2.0, zlo=-26.5, zhi=zf(31.0), step=0.5, n=170), "stripe", FH, 0)
+FM("pin", cband(FSECS, 0.055, 2.3, 2.55, zlo=-26.5, zhi=zf(30.6), step=0.5, n=170), "trim", FH, 0)
+FM("sill", cband(FSECS, 0.05, -3.7, -3.35, zlo=-26.5, zhi=zf(29.0), step=0.5, n=170), "hazard", FH, 0)
+# frame ribs, down the whole hull and onto the bow (chunkier than the old straps)
+RIBS = [z for z in (-24, -18, -12, -6, 0, 6, 12, 18) if z <= zf(18)]
+RIBS += [z for z in (zf(24), zf(29)) if z - RIBS[-1] > 2.5]
+for k, z in enumerate(RIBS):
+    # (each rib takes the hull's own section at both of its edges, so it lies flat on the tapering bow instead of standing off it)
+    FM(f"rib{k}", keep(loft(grow([lerp_sec(FSECS, z - 0.5), lerp_sec(FSECS, z + 0.5)], 0.08), 48, False, False), lambda c: c[1] < 4.6), "trim", FH, 0.05)
+# bolted armour panels along the flanks, in the hull's own colour with trim edges (no black plates), above the cargo gantry
+PLATE_Y, PLATE_H = (3.1, 0.75) if STACK == 1 else (4.05, 0.55)
 for side in (-1, 1):
-    mesh(f"f_deckEdge{side}", xf(rbox(0.18, 0.15, 22.4, 0.3, 8, 4), (side * 6.5, 5.1, -3.2)), "hazard", FH, 0)
-    for k in range(9):
-        mesh(f"f_bollard{side}{k}", xf(lathe([(0, 0), (0.22, 0), (0.18, 0.5), (0.28, 0.55), (0.28, 0.7), (0, 0.7)], 10), (side * 6.9, 5.0, -24 + k * 5.4)), "steel", FH, 0.02)
-mesh("f_padRing", xf(torus(4.2, 0.18, 32, 4), (0, 5.14, -8)), "hazard", FH, 0)
-mesh("f_padH", merge(xf(rbox(0.25, 0.05, 1.6, 0.3, 6, 4), (-1.0, 5.14, -8)), xf(rbox(0.25, 0.05, 1.6, 0.3, 6, 4), (1.0, 5.14, -8)), xf(rbox(1.0, 0.05, 0.22, 0.3, 6, 4), (0, 5.14, -8))), "hazard", FH, 0)
+    for k, z in enumerate(range(-21, int(zf(18)), 6)):
+        sec = lerp_sec(FSECS, z)
+        x = surf_x(sec, PLATE_Y) + 0.05
+        FM(f"plate{side}{k}", xf(rbox(0.07, PLATE_H, 1.9, 0.2, 6, 3), (side * x, PLATE_Y, z)), "trim", FH, 0.03)
+        for dz in (-1.5, 1.5):
+            FM(f"bolt{side}{k}{dz}", xf(superquad(0.12, 0.12, 0.12, 1, 1, 6, 4), (side * (x + 0.08), PLATE_Y, z + dz)), "steel", FH, 0)
+
+# ---- the dorsal landing deck: a plated roof, a kerb with lights, a tie-down grid, a big pad with approach lights ----
+DK0, DK1 = -25.6, zf(19.6)
+DZC, DZH = (DK0 + DK1) / 2, (DK1 - DK0) / 2
+FM("deck", xf(rbox(6.9, 0.14, DZH, 0.08, 16, 4), (0, 5.0, DZC)), "deck", FH, 0.06)
+for side in (-1, 1):
+    FM(f"kerb{side}", xf(rbox(0.22, 0.2, DZH - 0.1, 0.3, 8, 4), (side * 6.75, 5.12, DZC)), "hazard", FH, 0)
+    for k in range(int((DK1 - 1.5 + 23.5) / 4.9) + 1):
+        z = -23.5 + k * 4.9
+        FM(f"kerbLamp{side}{k}", xf(superquad(0.2, 0.2, 0.2, 1, 1, 8, 4), (side * 6.75, 5.45, z)), "window", FH, 0)
+        FM(f"kerbPost{side}{k}", xf(lathe([(0, 0), (0.3, 0), (0.22, 0.25), (0.22, 0.3), (0, 0.3)], 8), (side * 6.75, 5.2, z)), "steel", FH, 0.02)
+PAD_Z = -7.0
+PAD_CLEAR = 6.2                 # the tie-down rails stop this far from the pad's middle
+RAIL_A, RAIL_B = DZC - (DZH - 2.6), DZC + (DZH - 2.6)
+for xi in (-3.6, 3.6):          # tie-down rails with eyelets, flush with the roof, in two lengths either side of the pad
+    for n, (za, zb) in enumerate(((RAIL_A, PAD_Z - PAD_CLEAR), (PAD_Z + PAD_CLEAR, RAIL_B))):
+        FM(f"tieRail{xi}{n}", xf(rbox(0.12, 0.05, (zb - za) / 2, 0.3, 6, 3), (xi, 5.12, (za + zb) / 2)), "dark", FH, 0)
+        for k in range(int((zb - za - 1.0) / 4.5) + 1):
+            FM(f"tie{xi}{n}{k}", xf(torus(0.22, 0.05, 10, 4), (xi, 5.17, za + 0.5 + k * 4.5)), "steel", FH, 0)
+# the pad: a dark disc raised clear of the deck (its top is 0.055 above the deck's), the painted rings and the H standing on it
+PD = 5.14 + 0.005               # the deck's top is 5.14
+FM("padDisc", xf(lathe([(0, 0), (5.3, 0), (5.3, 0.05), (0, 0.05)], 48), (0, PD, PAD_Z)), "dark", FH, 0)
+FM("padRing", xf(lathe([(4.5, 0), (4.9, 0), (4.9, 0.05), (4.5, 0.05)], 48), (0, PD + 0.05, PAD_Z)), "hazard", FH, 0)
+FM("padRing2", xf(lathe([(2.85, 0), (3.1, 0), (3.1, 0.05), (2.85, 0.05)], 40), (0, PD + 0.05, PAD_Z)), "hazard", FH, 0)
+H_OUT = [(-1.15, -1.9), (-0.55, -1.9), (-0.55, -0.28), (0.55, -0.28), (0.55, -1.9), (1.15, -1.9), (1.15, 1.9), (0.55, 1.9), (0.55, 0.28), (-0.55, 0.28), (-0.55, 1.9), (-1.15, 1.9)]
+FM("padH", xf(extrude(H_OUT, 0.05, "y"), (0, PD + 0.075, PAD_Z)), "hazard", FH, 0)
+for k in range(8):               # lights set into the pad's rim
+    a = k * math.pi / 4
+    FM(f"padLamp{k}", xf(superquad(0.22, 0.1, 0.22, 1, 1, 8, 4), (math.sin(a) * 5.4, 5.14, PAD_Z + math.cos(a) * 5.4)), "cabin", FH, 0)
+for k in range(5):               # approach lights toward the bow, and chevrons
+    if 1.0 + k * 2.4 < zf(11.0):
+        FM(f"approach{k}", xf(superquad(0.2, 0.08, 0.2, 1, 1, 8, 4), (0, 5.14, 1.0 + k * 2.4)), "cabin" if k % 2 else "window", FH, 0)
 for k in range(3):
-    mesh(f"f_chevron{k}", xf(extrude([(0, 0), (1.4, -1.2), (1.4, -1.9), (0, -0.7), (-1.4, -1.9), (-1.4, -1.2)], 0.1, "y"), (0, 5.15, -19.5 - k * 1.6)), "hazard", FH, 0)
-# livery belt down the flanks, and rib bands
-mesh("f_belt", cband(FREIGHT_SECS, 0.05, 0.6, 2.4, zhi=27, step=0.5, n=160), "stripe", FH, 0)
-for k, z in enumerate(range(-22, 21, 6)):
-    sec = lerp_sec(FREIGHT_SECS, z)
-    mesh(f"f_rib{k}", keep(loft(grow([{**sec, "z": z - 0.35}, {**sec, "z": z + 0.35}], 0.09), 44, False, False), lambda c: c[1] < 4.6), "trim", FH, 0.05)
-# bridge tower at the bow: a raked superstructure with a wraparound glass band
+    FM(f"chevron{k}", xf(extrude([(0, 0), (1.5, -1.2), (1.5, -1.9), (0, -0.7), (-1.5, -1.9), (-1.5, -1.2)], 0.1, "y"), (0, 5.12, -19.0 - k * 1.7)), "hazard", FH, 0)
+
+# ---- the bridge: a raked tower lofted from the deck down onto the bow (no step, no gap) ----
 BRIDGE = [
-    {"z": 12.5, "w": 4.6, "t": 0.6, "b": 0.6, "eT": 6, "eB": 6, "yc": 5.2},
-    {"z": 13.2, "w": 5.0, "t": 2.6, "b": 0.6, "eT": 6, "eB": 6, "yc": 5.6},
-    {"z": 15.0, "w": 5.4, "t": 4.2, "b": 0.6, "eT": 5, "eB": 6, "yc": 5.6},
-    {"z": 22.0, "w": 5.6, "t": 4.6, "b": 0.6, "eT": 4.5, "eB": 6, "yc": 5.6},
-    {"z": 25.5, "w": 5.4, "t": 3.8, "b": 0.6, "eT": 3.5, "eB": 6, "yc": 5.4},
-    {"z": 27.6, "w": 4.6, "t": 2.0, "b": 0.6, "eT": 2.8, "eB": 6, "yc": 5.0},
-    {"z": 28.6, "w": 3.0, "t": 0.6, "b": 0.6, "eT": 2.2, "eB": 6, "yc": 4.6},
+    {"z": zf(12.0), "w": 5.4, "t": 4.6, "b": 4.0, "eT": 8, "eB": 12, "yc": 5.0},
+    {"z": zf(23.0), "w": 5.4, "t": 4.6, "b": 4.0, "eT": 8, "eB": 12, "yc": 5.0},
+    {"z": zf(26.5), "w": 5.2, "t": 3.4, "b": 3.8, "eT": 6, "eB": 12, "yc": 4.9},
+    {"z": zf(29.0), "w": 4.4, "t": 1.6, "b": 3.2, "eT": 4, "eB": 8, "yc": 4.0},
+    {"z": zf(31.0), "w": 3.2, "t": 0.5, "b": 2.4, "eT": 3, "eB": 5, "yc": 2.0},
 ]
-mesh("f_bridge", loft(BRIDGE, 36), "trim", FH, 0.2)
-mesh("f_bridgeGlass", cband(BRIDGE, 0.06, 7.6, 9.0, zlo=14.0, step=0.2, n=180), "glass", FH, 0)
-mesh("f_bridgeStripe", cband(BRIDGE, 0.05, 6.4, 7.0, step=0.3, n=180), "stripe", FH, 0)
-mesh("f_bridgeRoof", xf(rbox(3.2, 0.3, 4.0, 0.2), (0, 10.25, 19.5)), "dark", FH, 0.06)
-mesh("f_mast", beam((1.6, 10.4, 17.5), (1.6, 15.5, 17.0), 0.14), "dark", FH, 0.03)
-mesh("f_mastLight", xf(superquad(0.3, 0.3, 0.3, 1, 1, 10, 6), (1.6, 15.6, 17.0)), "white", FH, 0)
-mesh("f_dish", xf(lathe([(0, 0.0), (0.9, 0.12), (1.5, 0.45), (1.55, 0.5), (0, 0.18)], 18), (-1.8, 11.2, 21.0), (0.6, 0, 0.3)), "white", FH, 0.04)
-mesh("f_dishPost", beam((-1.8, 10.4, 21.0), (-1.8, 11.2, 21.0), 0.18), "dark", FH, 0)
-# nose: running lights and a chin bumper
+FM("bridgeLo", loft(BRIDGE, 40), "trim", FH, 0.2)
+FM("bridgeBelt", cband(BRIDGE, 0.05, 6.1, 6.8, zlo=zf(12.3), zhi=zf(26.5), step=0.4, n=160), "stripe", FH, 0)
+# the lit sign on the raked face, and windows and vents on the flanks and the back
+FRB("sign", (2.4, 0.5, 0.08), (0, 7.0, zf(27.15)), "dark", ink=0.04, e=0.2, rot=(-0.75, 0, 0))
+FRB("signLit", (2.2, 0.36, 0.1), (0, 7.05, zf(27.2)), "sign", ink=0, e=0.25, rot=(-0.75, 0, 0))
 for side in (-1, 1):
-    mesh(f"f_head{side}", xf(superquad(0.7, 0.32, 0.18, 0.4, 0.5, 12, 6), (side * 2.2, -1.6, 32.6), (0.1, side * 0.5, 0)), "window", FH, 0)
-mesh("f_chin", xf(rbox(4.6, 0.5, 1.6, 0.25), (0, -4.6, 29.5)), "dark", FH, 0.08)
-# container racks clamped down both flanks
-CONT = [(-18.5, 0), (-9.5, 1), (-0.5, 2), (8.5, 3)]
+    for k in range(4):
+        FRB(f"bridgeWin{side}{k}", (0.06, 0.3, 0.7), (side * 5.44, 8.0, zf(14.5 + k * 2.6)), "window", ink=0, e=0.3)
+# the door onto the landing pad (a closed door: no interior): a framed steel leaf with a window and a handle, a hood and lamp over it, grab rails
+# either side, a hazard threshold mat on the deck, and louvres on the wall to each side
+DZ0 = zf(12.0)
+for sx in (-1, 1):
+    FRB(f"doorJamb{sx}", (0.16, 1.62, 0.13), (sx * 1.0, 6.75, DZ0 - 0.06), "dark", ink=0.03, e=0.3)
+    FM(f"doorRail{sx}", beam((sx * 1.55, 5.5, DZ0 - 0.22), (sx * 1.55, 7.6, DZ0 - 0.22), 0.05, 6), "metal", FH, 0.01)
+    for yy in (5.7, 7.4):
+        FM(f"doorRailFoot{sx}{yy}", beam((sx * 1.55, yy, DZ0 - 0.22), (sx * 1.55, yy, DZ0), 0.04, 5), "metal", FH, 0)
+    for k in range(4):
+        FRB(f"bridgeLouvre{sx}{k}", (0.8, 0.07, 0.12), (sx * 3.6, 7.2 + k * 0.34, DZ0 - 0.04), "dark", ink=0, e=0.3)
+FRB("doorHead", (1.16, 0.15, 0.13), (0, 8.38, DZ0 - 0.06), "dark", ink=0.03, e=0.3)
+FRB("doorLeaf", (0.86, 1.5, 0.06), (0, 6.75, DZ0 - 0.06), "steel", ink=0.03, e=0.2)
+FRB("doorWindow", (0.34, 0.3, 0.08), (0, 7.55, DZ0 - 0.1), "window", ink=0, e=0.3)
+for sy in (-1, 1):                   # hazard stripes across the leaf's foot and the window frame
+    FRB(f"doorStripe{sy}", (0.86, 0.07, 0.07), (0, 5.58 + (sy > 0) * 2.0, DZ0 - 0.1), "hazard", ink=0, e=0.3)
+FRB("doorHandle", (0.05, 0.28, 0.07), (0.62, 6.7, DZ0 - 0.13), "metal", ink=0.01, e=0.4)
+FRB("doorHood", (1.5, 0.07, 0.6), (0, 8.7, DZ0 - 0.55), "trim", ink=0.04, e=0.2, rot=(0.12, 0, 0))
+for sx in (-1, 1):
+    FM(f"doorHoodBrace{sx}", beam((sx * 1.3, 8.4, DZ0 - 0.02), (sx * 1.3, 8.68, DZ0 - 0.8), 0.04, 5), "steel", FH, 0.01)
+FM("doorLamp", xf(superquad(0.22, 0.12, 0.22, 1, 1, 8, 4), (0, 8.57, DZ0 - 0.55)), "window", FH, 0)
+FRB("doorMat", (1.1, 0.03, 0.55), (0, 5.12, DZ0 - 0.6), "hazard", ink=0, e=0.3)
+FRB("doorMatCentre", (0.8, 0.035, 0.38), (0, 5.13, DZ0 - 0.6), "dark", ink=0, e=0.3)
+FRB("doorSign", (0.55, 0.16, 0.05), (0, 8.1, DZ0 - 0.14), "sign", ink=0, e=0.3)
+
+# ---- the pilot house: lofted from the tower's own lines (not a box set on top): it rises out of a livery-coloured plinth band,
+# wraps the front in a framed glass belt, carries a roof cap shaped to it, and the dish, mast and lamps stand on mounts of their own ----
+PH = [
+    {"z": zf(15.6), "w": 3.6, "t": 1.9, "b": 1.6, "eT": 6, "eB": 12, "yc": 11.2},
+    {"z": zf(16.4), "w": 3.95, "t": 1.95, "b": 1.7, "eT": 6, "eB": 12, "yc": 11.2},
+    {"z": zf(22.0), "w": 3.95, "t": 1.95, "b": 1.7, "eT": 6, "eB": 12, "yc": 11.2},
+    {"z": zf(24.0), "w": 3.7, "t": 1.5, "b": 2.1, "eT": 5, "eB": 12, "yc": 10.9},
+    {"z": zf(25.6), "w": 2.9, "t": 0.8, "b": 2.2, "eT": 4, "eB": 10, "yc": 10.3},
+]
+FM("pilotHouse", loft(PH, 40), "trim", FH, 0.18)
+FM("pilotPlinth", cband(PH, 0.09, 9.4, 10.05, zlo=zf(15.8), zhi=zf(25.0), step=0.3, n=140), "stripe", FH, 0)
+FM("pilotGlass", cband(PH, 0.07, 10.55, 12.3, zlo=zf(16.8), zhi=zf(26.0), step=0.2, n=180), "glass", FH, 0)
+FM("pilotFrameTop", cband(PH, 0.075, 12.3, 12.55, zlo=zf(16.8), zhi=zf(26.0), step=0.2, n=180), "dark", FH, 0)
+FM("pilotFrameLow", cband(PH, 0.075, 10.3, 10.55, zlo=zf(16.8), zhi=zf(26.0), step=0.2, n=180), "dark", FH, 0)
+FM("pilotRoof", cband(PH, 0.06, 12.85, 13.6, zlo=zf(15.5), zhi=zf(24.6), step=0.25, n=160), "dark", FH, 0.05)
+for k, (z, x) in enumerate(((zf(22.4), 3.97), (zf(19.4), 4.0), (zf(17.4), 4.0))):    # window posts on the flanks
+    for side in (-1, 1):
+        FRB(f"pilotPost{side}{k}", (0.1, 0.9, 0.12), (side * x, 11.4, z), "dark", ink=0.02, e=0.3)
+# the dish: a pedestal and a yoke on the roof, a tilted dish on it
+FM("dishPed", xf(lathe([(0, 0), (0.7, 0), (0.6, 0.15), (0.38, 0.6), (0.3, 1.0), (0, 1.0)], 16), (-1.5, 13.15, zf(19.7))), "steel", FH, 0.04)
+for s in (-1, 1):
+    FM(f"dishYoke{s}", beam((-1.5 + s * 0.35, 14.1, zf(19.7)), (-1.5 + s * 0.8, 14.7, zf(19.7)), 0.07, 6), "dark", FH, 0.02)
+FM("dish", xf(lathe([(0, 0.0), (1.4, 0.15), (2.1, 0.58), (2.15, 0.65), (0, 0.22)], 22), (-1.5, 14.75, zf(19.7)), (0.45, 0, 0.2)), "white", FH, 0.05)
+FM("dishFeed", beam((-1.5, 14.95, zf(19.7)), (-1.35, 15.75, zf(19.4)), 0.05, 5), "dark", FH, 0)
+# the mast: on a plinth with stays, a light on the top
+FM("mastPlinth", xf(lathe([(0, 0), (0.55, 0), (0.5, 0.12), (0.3, 0.3), (0, 0.3)], 8), (1.8, 13.15, zf(17.4))), "steel", FH, 0.03)
+FM("mast", beam((1.8, 13.4, zf(17.4)), (1.8, 19.4, zf(17.0)), 0.12, 6), "dark", FH, 0.03)
+for z0 in (-1.6, 1.6):
+    FM(f"stay{z0}", beam((1.8, 17.2, zf(17.1)), (1.8 + 0.5 * (1 if z0 > 0 else -1), 13.3, zf(17.4) + z0), 0.025, 4), "dark", FH, 0)
+BEACON = pivot("f_beacon", (1.8, 19.6, zf(17.0)), FH, role="blinker", phase=0.0)   # (the game flashes it: models.js setThrust)
+FM("beaconLamp", superquad(0.34, 0.34, 0.34, 1, 1, 10, 6), "red", BEACON, 0)
+FM("beaconHalo", superquad(1.0, 1.0, 1.0, 1, 1, 10, 6), "beacon", BEACON, 0)
+FM("beaconMount", xf(lathe([(0, 0), (0.22, 0), (0.18, 0.2), (0, 0.2)], 8), (1.8, 19.4, zf(17.0))), "dark", FH, 0.01)
+# the searchlights: recessed housings in the raked front shoulders, lenses flush
 for side in (-1, 1):
-    X = side * 10.6
-    for z, ci in CONT:
-        mesh(f"f_box{side}{ci}", xf(rbox(2.6, 2.5, 4.0, 0.08, 16, 6), (X, -1.6, z)), f"cargo{ci}", FH, 0.12)
-        for k in (-1, 1):
-            mesh(f"f_boxRib{side}{ci}{k}", xf(rbox(2.68, 2.58, 0.18, 0.15, 10, 4), (X, -1.6, z + k * 3.6)), "trim", FH, 0)
-        mesh(f"f_boxDoor{side}{ci}", xf(rbox(0.06, 2.0, 2.8, 0.2, 8, 4), (X + side * 2.62, -1.6, z)), "dark", FH, 0)
-    # rack frame: top and bottom rails, struts back to the hull
-    for y in (1.2, -4.4):
-        mesh(f"f_rail{side}{y}", xf(rbox(0.32, 0.32, 18.6, 0.3, 8, 4), (side * 8.0, y, -5.0)), "steel", FH, 0.05)
-        mesh(f"f_railO{side}{y}", xf(rbox(0.22, 0.22, 18.6, 0.3, 8, 4), (side * 13.3, y, -5.0)), "steel", FH, 0.04)
-    for z in (-23.0, -14.0, -5.0, 4.0, 13.0):
-        mesh(f"f_clampT{side}{z}", beam((side * 7.4, 1.2, z), (side * 13.3, 1.2, z), 0.22), "steel", FH, 0.03)
-        mesh(f"f_clampB{side}{z}", beam((side * 7.4, -4.4, z), (side * 13.3, -4.4, z), 0.22), "steel", FH, 0.03)
-        mesh(f"f_post{side}{z}", beam((side * 13.3, -4.4, z), (side * 13.3, 1.2, z), 0.2), "steel", FH, 0.03)
-# swept radiator wings: broad panels angled up off the aft shoulders, fins striped in the livery
+    FRB(f"search{side}", (0.55, 0.42, 0.6), (side * 2.55, 11.8, zf(24.2)), "dark", ink=0.04, e=0.3, rot=(-0.55, 0, 0))
+    FRB(f"searchLens{side}", (0.38, 0.3, 0.06), (side * 2.55, 11.95, zf(24.75)), "window", ink=0, e=0.4, rot=(-0.55, 0, 0))
+for side in (-1, 1):
+    FM(f"head{side}", xf(superquad(0.75, 0.32, 0.18, 0.4, 0.5, 12, 6), (side * 2.4, -1.7, zf(32.2)), (0.1, side * 0.5, 0)), "window", FH, 0)
+    FM(f"towLug{side}", xf(torus(0.5, 0.12, 12, 5), (side * 3.0, -3.3, zf(30.4)), (0, 0, math.pi / 2)), "steel", FH, 0.03)
+
+# ---- radiator wings: shorter, swept, with a bolted frame and striped fins (up on the shoulder when the bays are two high) ----
 RAD_DIH = 0.2
+WY = 3.8 if STACK == 1 else 4.7
+
+
 def wing_pt(span, up, chord, side):
     p = Vector((span, up, -chord))
     p.rotate(Euler((0, 0, RAD_DIH)))
-    return (side * (p.x + 7.0), p.y + 3.8, p.z - 6.0)
+    return (side * (p.x + 7.6), p.y + WY, p.z - 6.0)
+
+
 for side in (-1, 1):
-    wing = [(0.0, 0.0), (7.0, 0.0), (17.0, 3.4), (17.0, 7.6), (6.0, 9.4), (0.0, 9.4)]  # (span, chord)
-    verts, faces = extrude(wing, 0.5, "y")
+    wing = [(0.0, 0.0), (6.0, 0.0), (13.0, 3.0), (13.0, 7.2), (5.5, 9.2), (0.0, 9.2)]
+    verts, faces = extrude(wing, 0.55, "y")
     out = [wing_pt(vx, vy, vz, side) for vx, vy, vz in verts]
-    mesh(f"f_rad{side}", (out, [tuple(reversed(f)) for f in faces] if side < 0 else faces), "steel", FH, 0.12)
+    FM(f"rad{side}", (out, [tuple(reversed(f)) for f in faces] if side < 0 else faces), "steel", FH, 0.12)
+    for k in range(6):
+        sp = 1.6 + k * 2.0
+        lead = 3.0 * max(0.0, sp - 6.0) / 7.0 + 0.5
+        trail = 9.0 if sp < 5.5 else 9.0 - (sp - 5.5) * (1.8 / 7.5)
+        FM(f"radFin{side}{k}", beam(wing_pt(sp, 0.34, lead, side), wing_pt(sp, 0.34, trail, side), 0.14, 4), "stripe", FH, 0)
+    FM(f"radEdge{side}", beam(wing_pt(6.0, 0.0, 0.0, side), wing_pt(13.0, 0.0, 3.0, side), 0.32, 6), "trim", FH, 0.04)
+    FM(f"radRoot{side}", xf(rbox(1.5, 1.1, 5.0, 0.2), (side * 8.0, WY - 0.1, -10.2), (0, 0, side * 0.15)), "steel", FH, 0.06)
+    FM(f"navLight{side}", xf(superquad(0.5, 0.5, 0.5, 1, 1, 10, 6), wing_pt(13.2, 0.0, 5.0, side)), "green" if side > 0 else "red", FH, 0)
+
+# ---- pipe runs and junction boxes down the upper shoulders (outside the walkable roof) ----
+PIPE_Y = (4.0, 3.4) if STACK == 1 else (4.55, 4.0)
+for side in (-1, 1):
+    for yy, rr in zip(PIPE_Y, (0.22, 0.16)):
+        x = surf_x(lerp_sec(FSECS, 0.0), yy) + 0.28
+        FM(f"pipe{side}{yy}", beam((side * x, yy, -26.0), (side * x, yy, zf(12.0)), rr, 8), "steel", FH, 0.04)
     for k in range(7):
-        sp = 1.8 + k * 2.2
-        lead = 3.4 * max(0.0, sp - 7.0) / 10.0 + 0.5
-        trail = 9.0 if sp < 6.0 else 9.0 - (sp - 6.0) * (1.8 / 11.0)
-        mesh(f"f_radFin{side}{k}", beam(wing_pt(sp, 0.32, lead, side), wing_pt(sp, 0.32, trail, side), 0.12, 4), "stripe", FH, 0)
-    mesh(f"f_radEdge{side}", beam(wing_pt(7.0, 0.0, 0.0, side), wing_pt(17.0, 0.0, 3.4, side), 0.3, 6), "trim", FH, 0.04)
-    mesh(f"f_navLight{side}", xf(superquad(0.5, 0.5, 0.5, 1, 1, 10, 6), wing_pt(17.2, 0.0, 5.5, side)), "green" if side > 0 else "red", FH, 0)
-# stern engine cluster: a thrust frame and four bells, plume pivots at the bell mouths
-mesh("f_thrustFrame", loft([
-    {"z": -31.5, "w": 7.6, "t": 5.0, "b": 5.0, "eT": 4, "eB": 4},
-    {"z": -30.8, "w": 8.4, "t": 5.6, "b": 5.6, "eT": 4, "eB": 4},
-    {"z": -27.6, "w": 8.4, "t": 5.6, "b": 5.6, "eT": 4, "eB": 4},
-    {"z": -26.4, "w": 7.2, "t": 4.6, "b": 4.6, "eT": 4, "eB": 4},
-], 32), "steel", FH, 0.2)
-mesh("f_frameBand", keep(loft(grow([{"z": -30.6, "w": 8.4, "t": 5.6, "b": 5.6, "eT": 4, "eB": 4}, {"z": -29.4, "w": 8.4, "t": 5.6, "b": 5.6, "eT": 4, "eB": 4}], 0.06), 32, False, False), lambda c: True), "stripe", FH, 0)
-# a heat-shield plate over the frame's back face, then four engines mounted on it: a pump housing
-# and gimbal ring bolted to the plate, the bell's narrow throat on that, flaring out to the mouth
-mesh("f_heatShield", xf(rbox(7.6, 5.0, 0.25, 0.12, 16, 6), (0, 0, -31.6)), "dark", FH, 0.06)
-THROAT_Z, BELL_L = -33.0, 5.0
-bell = [(1.15, 0.0), (1.2, 0.5), (1.45, 1.8), (1.8, 3.2), (2.15, 4.4), (2.3, 4.85), (2.3, BELL_L)]
-for i, (x, y) in enumerate([(-4.0, 2.6), (4.0, 2.6), (-4.0, -2.6), (4.0, -2.6)]):
-    # pump housing + gimbal ring between the plate and the throat
-    mesh(f"f_pump{i}", xf(lathe([(r, -h) for r, h in [(0, 0), (1.7, 0), (1.75, 0.3), (1.6, 1.0), (1.3, 1.25), (1.2, 1.5), (0, 1.5)]], 20), (x, y, -31.7), (math.pi / 2, 0, 0)), "steel", FH, 0.06)
-    mesh(f"f_gimbal{i}", xf(torus(1.35, 0.22, 20, 6), (x, y, THROAT_Z + 0.15), (math.pi / 2, 0, 0)), "stripe", FH, 0.02)
-    for k in range(3):
+        z = -24.0 + k * 5.6
+        if z > zf(10.0):
+            continue
+        x = surf_x(lerp_sec(FSECS, z), PIPE_Y[0] - 0.3) + 0.28
+        FM(f"clip{side}{k}", xf(rbox(0.16, 0.6, 0.18, 0.3, 6, 3), (side * x, PIPE_Y[0] - 0.3, z)), "dark", FH, 0.02)
+    JY = PIPE_Y[0] - 0.3
+    FRB(f"junc{side}", (0.5, 0.55, 0.9), (side * (surf_x(lerp_sec(FSECS, -3.0), JY) + 0.5), JY, -3.0), "hazard", ink=0.05, e=0.25)
+    FRB(f"juncCap{side}", (0.52, 0.12, 0.92), (side * (surf_x(lerp_sec(FSECS, -3.0), JY) + 0.5), JY + 0.6, -3.0), "dark", ink=0.03, e=0.3)
+
+# ---- the stern: an armoured thrust block, a manifold, four bells ----
+FM("thrustFrame", loft([
+    {"z": -31.8, "w": 8.0, "t": 5.2, "b": 5.2, "eT": 7, "eB": 7},
+    {"z": -31.0, "w": 8.8, "t": 5.8, "b": 5.8, "eT": 7, "eB": 7},
+    {"z": -27.4, "w": 8.8, "t": 5.8, "b": 5.8, "eT": 7, "eB": 7},
+    {"z": -26.2, "w": 7.6, "t": 4.8, "b": 4.8, "eT": 7, "eB": 7},
+], 32), "steel", FH, 0.22)
+FM("frameBand", keep(loft(grow([{"z": -30.6, "w": 8.8, "t": 5.8, "b": 5.8, "eT": 7, "eB": 7}, {"z": -29.2, "w": 8.8, "t": 5.8, "b": 5.8, "eT": 7, "eB": 7}], 0.07), 32, False, False), lambda c: True), "hazard", FH, 0)
+for k in range(5):               # cooling ribs on the block
+    FM(f"blockRib{k}", xf(rbox(8.95, 5.9, 0.16, 0.12, 12, 4), (0, 0, -27.8 - k * 0.5)), "dark", FH, 0.02)
+FM("heatShield", xf(rbox(8.0, 5.2, 0.28, 0.12, 16, 6), (0, 0, -32.0)), "dark", FH, 0.06)
+THROAT_Z, BELL_L = -33.4, 5.0
+bell = [(1.2, 0.0), (1.25, 0.5), (1.5, 1.8), (1.85, 3.2), (2.2, 4.4), (2.35, 4.85), (2.35, BELL_L)]
+for i, (x, y) in enumerate([(-4.2, 2.6), (4.2, 2.6), (-4.2, -2.6), (4.2, -2.6)]):
+    FM(f"pump{i}", xf(lathe([(r, -h) for r, h in [(0, 0), (1.8, 0), (1.85, 0.3), (1.7, 1.0), (1.4, 1.25), (1.25, 1.5), (0, 1.5)]], 20), (x, y, -32.1), (math.pi / 2, 0, 0)), "steel", FH, 0.06)
+    FM(f"gimbal{i}", xf(torus(1.4, 0.24, 20, 6), (x, y, THROAT_Z + 0.15), (math.pi / 2, 0, 0)), "stripe", FH, 0.02)
+    for k in range(3):           # hydraulic actuators
         a = k * 2 * math.pi / 3 + 0.5
-        mesh(f"f_strut{i}{k}", beam((x + math.cos(a) * 1.55, y + math.sin(a) * 1.55, -31.8), (x + math.cos(a) * 1.75, y + math.sin(a) * 1.75, THROAT_Z - 1.8), 0.1, 5), "steel", FH, 0.02)
-    mesh(f"f_bell{i}", xf(lathe([(r, -h) for r, h in bell], 24), (x, y, THROAT_Z), (math.pi / 2, 0, 0)), "dark", FH, 0.1)
-    mesh(f"f_bellRing{i}", xf(torus(2.3, 0.14, 24, 6), (x, y, THROAT_Z - BELL_L), (math.pi / 2, 0, 0)), "stripe", FH, 0)
-    # the glow deep in the bell, at the throat
-    mesh(f"f_bellGlow{i}", xf(lathe([(0, 0), (1.25, 0), (1.25, 0.06), (0, 0.06)], 20), (x, y, THROAT_Z - 0.4), (math.pi / 2, 0, 0)), "engine", FH, 0)
-    mesh(f"f_bellCore{i}", xf(lathe([(0, 0), (0.7, 0), (0.7, 0.08), (0, 0.08)], 16), (x, y, THROAT_Z - 0.5), (math.pi / 2, 0, 0)), "core", FH, 0)
+        FM(f"act{i}{k}", beam((x + math.cos(a) * 1.7, y + math.sin(a) * 1.7, -32.2), (x + math.cos(a) * 1.95, y + math.sin(a) * 1.95, THROAT_Z - 1.6), 0.13, 6), "metal", FH, 0.02)
+    FM(f"bell{i}", xf(lathe([(r, -h) for r, h in bell], 24), (x, y, THROAT_Z), (math.pi / 2, 0, 0)), "dark", FH, 0.1)
+    FM(f"bellRing{i}", xf(torus(2.35, 0.15, 24, 6), (x, y, THROAT_Z - BELL_L), (math.pi / 2, 0, 0)), "stripe", FH, 0)
+    FM(f"bellGlow{i}", xf(lathe([(0, 0), (1.3, 0), (1.3, 0.06), (0, 0.06)], 20), (x, y, THROAT_Z - 0.4), (math.pi / 2, 0, 0)), "engine", FH, 0)
+    FM(f"bellCore{i}", xf(lathe([(0, 0), (0.7, 0), (0.7, 0.08), (0, 0.08)], 16), (x, y, THROAT_Z - 0.5), (math.pi / 2, 0, 0)), "core", FH, 0)
     plume(FR, f"f_plume{i}", (x, y, THROAT_Z - BELL_L - 0.05), 2.0, 13.0)
-mesh("f_tailLight", xf(superquad(0.35, 0.35, 0.35, 1, 1, 10, 6), (0, 5.9, -30.0)), "white", FH, 0)
-# belly: lift-jet grilles (and their flames), skid keels
-for i, (x, z) in enumerate([(-3.6, 9.0), (3.6, 9.0), (-3.6, -21.5), (3.6, -21.5)]):
-    mesh(f"f_grille{i}", xf(rbox(1.25, 0.08, 1.25, 0.2, 10, 4), (x, BELLY_F - 0.04, z)), "dark", FH, 0.03)
-    mesh(f"f_grilleLit{i}", xf(rbox(1.0, 0.08, 1.0, 0.2, 10, 4), (x, BELLY_F - 0.08, z)), "engine", FH, 0)
+for side in (-1, 1):             # the exhaust manifold: pipes from the block's shoulders to the outer bells
+    FM(f"manifold{side}", beam((side * 8.6, 0.0, -29.0), (side * 8.6, 2.6, -31.0), 0.4, 8), "steel", FH, 0.04)
+FM("tailLight", xf(superquad(0.35, 0.35, 0.35, 1, 1, 10, 6), (0, 6.2, -30.2)), "white", FH, 0)
+
+# ---- belly: lift-jet grilles, skid keels, four hydraulic legs, the ramp ----
+for i, (x, z) in enumerate([(-3.6, zf(9.0)), (3.6, zf(9.0)), (-3.6, -21.5), (3.6, -21.5)]):
+    FM(f"grille{i}", xf(rbox(1.3, 0.08, 1.3, 0.2, 10, 4), (x, BELLY_F - 0.04, z)), "dark", FH, 0.03)
+    FM(f"grilleLit{i}", xf(rbox(1.05, 0.08, 1.05, 0.2, 10, 4), (x, BELLY_F - 0.08, z)), "engine", FH, 0)
     plume(FR, f"f_lift{i}", (x, BELLY_F - 0.12, z), 1.0, 6.5, axis="y")
 for side in (-1, 1):
-    mesh(f"f_keel{side}", xf(rbox(0.25, 0.3, 14.0, 0.3), (side * 6.6, BELLY_F + 0.1, 3.0)), "dark", FH, 0.05)
-# landing gear: four legs, each folding back into its own bay
+    FM(f"keel{side}", xf(rbox(0.28, 0.32, 14.0, 0.3), (side * 6.8, BELLY_F + 0.1, 3.0 + ZF / 2)), "dark", FH, 0.05)
 HF = BELLY_F + 0.7
 leg_f = (GEAR_F + BELLY_F) + 0.7
-for name, (x, z) in (("f_legFL", (-5.0, 17.0)), ("f_legFR", (5.0, 17.0)), ("f_legRL", (-5.0, -13.0)), ("f_legRR", (5.0, -13.0))):
-    landing_leg(FR, name, (x, HF, z), leg_f, 1.57, r=0.5, pad=1.5, ink=0.08, scale=2.2)
-    gear_bay(F, name + "Bay", x, BELLY_F, z + 0.9, z - leg_f - 1.6, 2.6, ink=0.05)
+for name, (x, z) in (("f_legFL", (-5.0, zf(17.0))), ("f_legFR", (5.0, zf(17.0))), ("f_legRL", (-5.0, -13.0)), ("f_legRR", (5.0, -13.0))):
+    landing_leg(FR, name, (x, HF, z), leg_f, 1.57, r=0.55, pad=1.7, ink=0.08, scale=2.2)
+    gear_bay(F, name + "Bay", x, BELLY_F, z + 0.9, z - leg_f - 1.6, 2.8, ink=0.05)
 # belly ramp: hinged at its front edge, closed flush with the belly
 F_RAMP_H = (0, BELLY_F - 0.05, -4.0)
 F_RAMP_L = 11.0
 f_drop = GEAR_F + BELLY_F - 0.15
 f_open = -math.asin(min(1.0, f_drop / F_RAMP_L))
 FRamp = pivot("f_ramp", F_RAMP_H, FR, role="ramp", closed=0.0, opened=f_open)
-mesh("f_rampPlate", xf(rbox(2.3, 0.16, F_RAMP_L / 2, 0.1, 12, 4), (0, 0, -F_RAMP_L / 2)), "trim", FRamp, 0.07)
+FM("rampPlate", xf(rbox(2.3, 0.16, F_RAMP_L / 2, 0.1, 12, 4), (0, 0, -F_RAMP_L / 2)), "trim", FRamp, 0.07)
 for k in range(9):
-    mesh(f"f_rampRib{k}", xf(rbox(2.0, 0.06, 0.1, 0.4, 6, 4), (0, 0.17, -0.8 - k * 1.2)), "dark", FRamp, 0)
+    FM(f"rampRib{k}", xf(rbox(2.0, 0.06, 0.1, 0.4, 6, 4), (0, 0.17, -0.8 - k * 1.2)), "dark", FRamp, 0)
 for side in (-1, 1):
-    mesh(f"f_rampEdge{side}", xf(rbox(0.12, 0.08, F_RAMP_L / 2 - 0.15, 0.4, 6, 4), (side * 2.15, 0.18, -F_RAMP_L / 2)), "hazard", FRamp, 0)
-mesh("f_rampBay", xf(rbox(2.45, 0.06, F_RAMP_L / 2 + 0.1, 0.1, 12, 4), (0, BELLY_F + 0.04, -4.0 - F_RAMP_L / 2)), "bay", FH, 0)
+    FM(f"rampEdge{side}", xf(rbox(0.12, 0.08, F_RAMP_L / 2 - 0.15, 0.4, 6, 4), (side * 2.15, 0.18, -F_RAMP_L / 2)), "hazard", FRamp, 0)
+FM("rampBay", xf(rbox(2.45, 0.06, F_RAMP_L / 2 + 0.1, 0.1, 12, 4), (0, BELLY_F + 0.04, -4.0 - F_RAMP_L / 2)), "bay", FH, 0)
 FHatch = pivot("f_hatch", (0, BELLY_F + 0.08, -4.0 - F_RAMP_L / 2), FR, role="hatch")
-mesh("f_hatchLight", rbox(2.2, 0.03, F_RAMP_L / 2 - 0.2, 0.2, 10, 4), "cabin", FHatch, 0)
+FM("hatchLight", rbox(2.2, 0.03, F_RAMP_L / 2 - 0.2, 0.2, 10, 4), "cabin", FHatch, 0)
 
-FR["gearH"] = GEAR_F
-FR["deck"] = [6.9, 2.6, 22.6]
-FR["deckY"] = 2.5   # top = 5.1
-FR["deckZ"] = -3.2
-FR["inside"] = [0, -4.6, -1.5]
-FR["rampTop"] = [0, -5.0, -4.4]
-FR["rampBottom"] = [0, BELLY_F - 0.05 - F_RAMP_L * math.sin(-f_open), -4.0 - F_RAMP_L * math.cos(f_open) - 0.6]
-FR["radius"] = 26.0
-FR["padR"] = 21.0
+# ---- a smaller hull: everything above scaled about the middle (the cargo gantry below is built afterwards, at the crates' own size) ----
+if K != 1.0:
+    _S = Matrix.Scale(K, 4)
+    for o in C.objects:
+        if o in _before_freighter:
+            continue
+        if o.type == "MESH":
+            o.data.transform(_S)
+        else:
+            o.location = o.location * K
+
+# ---- the cargo gantry: bays down each flank in a portal-frame cage; absolute sizes (the crates are 8.3 m long whatever the ship) ----
+HW = 8.0 * K                 # the hull's flank
+RX = HW + 4.9                # the cage's outer posts and rails
+UX = HW + 2.3                # a crate's centre (x)
+UY = -4.05 * K               # the floor of a bay
+UNIT_H = 3.487               # one crate, rack to roof: the next stands on it
+BAY_H = 7.5 if STACK == 2 else 5.3
+BAY_TOP = UY + BAY_H
+FOOT_Y = UY - 0.45           # the posts' feet
+ZC0 = K * (-4.6 + ZF / 2) - 0.4
+SLOT_Z = [ZC0 + (i - (NB - 1) / 2) * PITCH for i in range(NB)]
+FRAME_Z = [ZC0 + (i - NB / 2) * PITCH for i in range(NB + 1)]
+ZLC, ZLH = (FRAME_Z[0] + FRAME_Z[-1]) / 2, (FRAME_Z[-1] - FRAME_Z[0]) / 2 + 0.35
+CARGO = {                    # what each bay holds, bottom to top: land-train units ('box', 'tank', 'blast'); [] = an empty bay
+    "atlas": {(-1, 0): ["tank"], (-1, 1): ["box"], (-1, 2): [], (-1, 3): ["blast"],
+              (1, 0): ["box"], (1, 1): ["tank"], (1, 2): ["box"], (1, 3): []},
+    "compact": {(-1, 0): ["tank"], (-1, 1): ["box"], (-1, 2): ["blast"],
+                (1, 0): ["box"], (1, 1): ["tank"], (1, 2): []},
+    # (an H3 bay a side, two tank containers high: port at the stern end, starboard one in from it; and a tank on top of a box besides)
+    "stacked": {(-1, 0): ["tank", "tank"], (-1, 1): ["blast", "box"], (-1, 2): [], (-1, 3): ["box", "tank"],
+                (1, 0): ["box", "box"], (1, 1): ["tank", "tank"], (1, 2): ["blast"], (1, 3): []},
+}[VARIANT]
+
+
+def empty_slot(side, k, z):
+    n = f"e{side}{k}"
+    for sz in (-1, 1):           # guide posts at the crate's outer corners, with angled lead-ins
+        FRB(f"{n}g{sz}", (0.16, BAY_H / 2 - 0.5, 0.16), (side * (UX + 2.1), UY + BAY_H / 2 - 0.4, z + sz * 3.9), "steel", ink=0.03, e=0.3)
+        FM(f"{n}lead{sz}", xf(extrude([(0, 0), (0.6, 0.5), (0.6, 0.0)], 0.3, "x"), (side * (UX + 2.1) - 0.15, UY + BAY_H - 0.9, z + sz * 3.9 - 0.1)), "hazard", FH, 0)
+    # the backing plate: a steel wall a hand's width off the hull, in a trim frame, with stiffeners, cable trays on bolted brackets,
+    # a hazard toe-board and a status panel (no flat black slab: it is a piece of the ship)
+    y0, y1 = UY - 0.1, UY + BAY_H - 0.55
+    cy, hh = (y0 + y1) / 2, (y1 - y0) / 2
+    px = side * (HW + 0.11)
+    o = lambda d: px + side * d     # (outward from the plate)
+    FRB(n + "plate", (0.06, hh, 3.95), (px, cy, z), "steel", ink=0.03, e=0.15)
+    for sy in (-1, 1):
+        FRB(f"{n}frameH{sy}", (0.09, 0.1, 3.95), (o(0.03), cy + sy * (hh - 0.1), z), "trim", ink=0.02, e=0.3)
+    for sz in (-1, 1):
+        FRB(f"{n}frameV{sz}", (0.09, hh, 0.1), (o(0.03), cy, z + sz * 3.85), "trim", ink=0.02, e=0.3)
+    for kk in (-2.2, 0.0, 2.2):
+        FRB(f"{n}stiff{kk}", (0.07, hh - 0.3, 0.1), (o(0.08), cy, z + kk), "metal", ink=0.02, e=0.3)
+    for j in range(1, 4):
+        y = y0 + (y1 - y0) * j / 4
+        FRB(f"{n}tray{j}", (0.1, 0.1, 3.7), (o(0.12), y, z), "dark", ink=0.02, e=0.3)
+        for bz in (-3.4, -1.1, 1.1, 3.4):
+            FM(f"{n}bolt{j}{bz}", xf(superquad(0.09, 0.09, 0.09, 1, 1, 6, 4), (o(0.24), y, z + bz)), "steel", FH, 0)
+    FRB(f"{n}toe", (0.13, 0.16, 3.95), (o(0.05), y0 + 0.2, z), "hazard", ink=0.02, e=0.3)
+    FRB(f"{n}panel", (0.1, 0.45, 0.6), (o(0.16), cy + 0.5, z - 1.0), "dark", ink=0.03, e=0.3)
+    FM(f"{n}lamp", xf(superquad(0.12, 0.12, 0.12, 1, 1, 8, 4), (o(0.28), cy + 0.7, z - 1.0)), "red", FH, 0)
+    FM(f"{n}lampOk", xf(superquad(0.12, 0.12, 0.12, 1, 1, 8, 4), (o(0.28), cy + 0.35, z - 1.0)), "green", FH, 0)
+
+
+for side in (-1, 1):
+    # the long members: a top beam with a hazard cap and a crane rail, a lower rail, a runner along the hull under the crates
+    FRB(f"railTop{side}", (0.4, 0.3, ZLH), (side * RX, BAY_TOP, ZLC), "trim", ink=0.06, e=0.3)
+    FRB(f"railTopH{side}", (0.42, 0.05, ZLH), (side * RX, BAY_TOP + 0.33, ZLC), "hazard", ink=0, e=0.4)
+    FRB(f"craneRail{side}", (0.12, 0.1, ZLH - 0.3), (side * RX, BAY_TOP + 0.5, ZLC), "dark", ink=0.02, e=0.4)
+    FRB(f"railLow{side}", (0.34, 0.28, ZLH), (side * RX, FOOT_Y + 0.12, ZLC), "steel", ink=0.05, e=0.3)
+    FRB(f"railIn{side}", (0.3, 0.26, ZLH - 0.2), (side * (HW + 0.3), UY - 0.32, ZLC), "steel", ink=0.05, e=0.3)
+    for zi, z in enumerate(FRAME_Z):
+        # a portal frame between each pair of bays: a box post with foot and cap plates, ties to the hull top and bottom (with gussets)
+        ph = (BAY_TOP + 0.2 - FOOT_Y) / 2
+        FRB(f"post{side}{zi}", (0.28, ph, 0.28), (side * RX, FOOT_Y + ph, z), "steel", ink=0.06, e=0.25)
+        FRB(f"postFoot{side}{zi}", (0.5, 0.06, 0.5), (side * RX, FOOT_Y - 0.02, z), "dark", ink=0.03, e=0.2)
+        FRB(f"postCap{side}{zi}", (0.45, 0.06, 0.45), (side * RX, BAY_TOP + 0.24, z), "dark", ink=0.03, e=0.2)
+        for name, y in (("T", BAY_TOP - 0.05), ("B", UY - 0.32)):
+            FRB(f"tie{name}{side}{zi}", ((RX - HW) / 2, 0.2, 0.18), (side * (RX + HW) / 2, y, z), "steel", ink=0.04, e=0.25)
+        FM(f"gussetT{side}{zi}", xf(extrude([(0, 0), (1.5, 0), (0, -1.5)], 0.16, "z"), (side * (RX - 0.28), BAY_TOP - 0.25, z), (0, 0, 0), (-side, 1, 1)), "trim", FH, 0.02)
+        FM(f"gussetB{side}{zi}", xf(extrude([(0, 0), (1.5, 0), (0, 1.5)], 0.16, "z"), (side * (RX - 0.28), UY - 0.12, z), (0, 0, 0), (-side, 1, 1)), "trim", FH, 0.02)
+        if STACK == 2:           # a tie at the stack's middle: where one crate stands on the next
+            FRB(f"tieM{side}{zi}", ((RX - HW) / 2, 0.16, 0.14), (side * (RX + HW) / 2, UY + UNIT_H + 0.05, z), "steel", ink=0.03, e=0.25)
+    for k, z in enumerate(SLOT_Z):
+        z0, z1 = FRAME_Z[k], FRAME_Z[k + 1]
+        # the header: a bar under the top beam with a V of braces, so the top reads as a truss over each bay
+        yb = BAY_TOP - 0.85
+        FRB(f"hdrBar{side}{k}", (0.1, 0.08, (z1 - z0) / 2 - 0.35), (side * RX, yb, z), "steel", ink=0.02, e=0.3)
+        FM(f"hdrV1{side}{k}", beam((side * RX, BAY_TOP - 0.15, z0 + 0.35), (side * RX, yb, z), 0.07, 5), "steel", FH, 0.01)
+        FM(f"hdrV2{side}{k}", beam((side * RX, BAY_TOP - 0.15, z1 - 0.35), (side * RX, yb, z), 0.07, 5), "steel", FH, 0.01)
+        # the cradle: two skids along the floor under the crate, with a bed of rollers across them
+        for sx in (-1, 1):
+            FRB(f"skid{side}{k}{sx}", (0.2, 0.1, 4.0), (side * UX + sx * 1.5, UY - 0.13, z), "steel", ink=0.03, e=0.3)
+        for dz in (-2.6, 0.0, 2.6):
+            FM(f"roller{side}{k}{dz}", beam((side * UX - 1.95, UY - 0.3, z + dz), (side * UX + 1.95, UY - 0.3, z + dz), 0.1, 8), "metal", FH, 0.02)
+        # the floor lip: a low toe-board along the bay's outer edge, loaded or not; the clamps sit on it (a block with a hold-down arm that
+        # reaches in over the crate's rack edge), so nothing hangs in the air in an empty bay
+        FRB(f"lip{side}{k}", (0.14, 0.32, 4.15), (side * (UX + 2.12), UY + 0.1, z), "steel", ink=0.04, e=0.25)
+        FRB(f"lipCap{side}{k}", (0.16, 0.04, 4.17), (side * (UX + 2.12), UY + 0.44, z), "hazard", ink=0, e=0.3)
+        for dz in (-2.4, 2.4):
+            FRB(f"clamp{side}{k}{dz}", (0.2, 0.22, 0.4), (side * (UX + 2.12), UY + 0.66, z + dz), "hazard", ink=0.03, e=0.3)
+            FRB(f"clampArm{side}{k}{dz}", (0.18, 0.08, 0.18), (side * (UX + 1.92), UY + 0.58, z + dz), "metal", ink=0.02, e=0.3)
+            FM(f"clampBolt{side}{k}{dz}", xf(lathe([(0, 0), (0.13, 0), (0.13, 0.12), (0, 0.12)], 8), (side * (UX + 2.12), UY + 0.88, z + dz)), "steel", FH, 0.01)
+        stack = CARGO[(side, k)]
+        FM(f"lamp{side}{k}", xf(superquad(0.2, 0.2, 0.2, 1, 1, 8, 5), (side * (RX + 0.46), BAY_TOP + 0.02, z - 3.2)), "red" if not stack else "green", FH, 0)
+        FRB(f"slotNo{side}{k}", (0.07, 0.3, 0.7), (side * (RX + 0.4), BAY_TOP, z), "dark", ink=0, e=0.3)
+        FRB(f"slotNoLit{side}{k}", (0.08, 0.2, 0.5), (side * (RX + 0.44), BAY_TOP, z), "sign", ink=0, e=0.3)
+        if not stack:
+            empty_slot(side, k, z)
+        for j, kind in enumerate(stack):
+            cargo_unit(kind, f"f_cargo{'P' if side > 0 else 'S'}{k}{'ab'[j]}", FH, (side * UX, UY + j * UNIT_H, z), 1.1, low=(STACK == 2))
+# A gantry crane on each side's rail: a chassis on four flanged wheels astride the rail, a cab, a boom reaching in over the bays with a stay to
+# the cab's roof, a sheave bar at its tip with two cables down to a spreader. The game moves the `trolley` pivot along z while the ship is docked
+# (its extras: travelMin / travelMax, in metres from where it is built, over the first empty bay; `home` that spot; `dropMax` how far the
+# spreader can be lowered into a bay), scales the `cable` pivots' y to the length of cable paid out, and lowers the `hoist` pivot (the spreader).
+RAIL_TOP = BAY_TOP + 0.6
+WING_STOP = -6.5 * K + 2.3          # (it works only as far aft as the radiator wing's leading edge)
+for side in (-1, 1):
+    tk = next((k for k in range(NB) if not CARGO[(side, k)]), None)
+    if tk is None:
+        continue
+    TZ = SLOT_Z[tk]
+    zmin, zmax = max(FRAME_Z[0] + 1.9, WING_STOP), FRAME_Z[-1] - 1.9
+    inn = -side                      # (inboard, over the bays)
+    reach = RX - UX                  # the boom's reach: out to the crate column
+    DROP = RAIL_TOP + 0.7 - 0.98 - (UY + 0.9)
+    T = pivot(f"f_crane{side}", (side * RX, RAIL_TOP, TZ), FH, role="trolley", side=side, travelMin=round(zmin - TZ, 3), travelMax=round(zmax - TZ, 3), dropMax=round(DROP, 3))
+    for sx in (-1, 1):               # four flanged wheels astride the rail, on axles
+        for sz in (-1, 1):
+            FM(f"craneWheel{side}{sx}{sz}", xf(lathe([(0, -0.09), (0.3, -0.09), (0.3, 0.09), (0, 0.09)], 14), (sx * 0.3, 0.3, sz * 1.1), (0, 0, math.pi / 2)), "dark", T, 0.02)
+            FM(f"craneFlange{side}{sx}{sz}", xf(lathe([(0, 0.09), (0.36, 0.09), (0.36, 0.13), (0, 0.13)], 14), (sx * 0.3, 0.3, sz * 1.1), (0, 0, math.pi / 2 * sx)), "steel", T, 0)
+    for sz in (-1, 1):
+        FM(f"craneAxle{side}{sz}", beam((-0.4, 0.3, sz * 1.1), (0.4, 0.3, sz * 1.1), 0.07, 6), "steel", T, 0.01)
+    FM(f"craneChassis{side}", xf(rbox(0.8, 0.2, 1.55, 0.25, 8, 4), (0, 0.78, 0)), "hazard", T, 0.07)
+    for sz in (-1, 1):               # end bumpers and the chassis skirts
+        FM(f"craneBumper{side}{sz}", xf(rbox(0.8, 0.14, 0.12, 0.3, 6, 3), (0, 0.62, sz * 1.68)), "dark", T, 0.03)
+    for sx in (-1, 1):
+        FM(f"craneSkirt{side}{sx}", xf(rbox(0.05, 0.16, 1.5, 0.3, 4, 3), (sx * 0.84, 0.66, 0)), "dark", T, 0.02)
+    FM(f"craneCab{side}", xf(rbox(0.62, 0.52, 0.72, 0.2, 8, 4), (-inn * 0.12, 1.5, 0.6)), "trim", T, 0.06)
+    FM(f"craneCabGlass{side}", xf(rbox(0.05, 0.28, 0.5, 0.3, 6, 3), (inn * 0.55, 1.62, 0.6)), "glass", T, 0)
+    FM(f"craneCabRoof{side}", xf(rbox(0.7, 0.07, 0.8, 0.3, 6, 3), (-inn * 0.12, 2.06, 0.6)), "dark", T, 0.03)
+    FM(f"craneCabLamp{side}", xf(superquad(0.1, 0.1, 0.1, 1, 1, 8, 4), (-inn * 0.12, 2.2, 0.6)), "window", T, 0)
+    for sz in (-1, 1):               # a hand-rail round the chassis deck: posts and a rail
+        FM(f"craneRailPost{side}{sz}", beam((-inn * 0.7, 0.95, sz * 1.45), (-inn * 0.7, 1.55, sz * 1.45), 0.035, 5), "metal", T, 0)
+    FM(f"craneHandRail{side}", beam((-inn * 0.7, 1.55, -1.45), (-inn * 0.7, 1.55, 1.45), 0.035, 5), "metal", T, 0)
+    # the boom: a box beam from the chassis over the bays, braced underneath, stayed from the cab's roof, a sheave bar across its tip
+    FM(f"craneBoom{side}", xf(rbox(reach / 2 - 0.2, 0.15, 0.28, 0.3, 8, 4), (inn * (0.7 + (reach - 0.7) / 2), 0.9, 0)), "steel", T, 0.05)
+    FM(f"craneBoomBrace{side}", beam((inn * 0.8, 0.62, 0), (inn * (reach - 0.2), 0.84, 0), 0.07, 6), "metal", T, 0.02)
+    FM(f"craneBoomStay{side}", beam((-inn * 0.12, 2.06, 0.0), (inn * (reach - 0.05), 0.98, 0.0), 0.035, 5), "dark", T, 0)
+    FM(f"craneSheave{side}", xf(rbox(0.18, 0.13, 1.5, 0.3, 6, 3), (inn * reach, 0.76, 0)), "steel", T, 0.04)
+    for sz in (-1, 1):
+        FM(f"craneStripe{side}{sz}", xf(rbox(0.19, 0.14, 0.18, 0.3, 4, 3), (inn * reach, 0.76, sz * 1.38)), "hazard", T, 0)
+    for sz in (-1, 1):               # the two cable falls: a metre of cable the game stretches to the length paid out
+        C_ = pivot(f"f_craneCable{side}{sz}", (inn * reach, 0.7, sz * 1.2), T, role="cable", side=side)
+        FM(f"craneFall{side}{sz}", beam((0, 0, 0), (0, -1, 0), 0.05, 5), "dark", C_, 0)
+    H_ = pivot(f"f_craneHoist{side}", (inn * reach, 0.7, 0), T, role="hoist", side=side)
+    # An ISO spreader frame as long and wide as the crates' corner castings (x +-1.65, z +-3.9): two side beams, two end beams, a spine the cables
+    # come down to, a locking head and pin at each corner, and a flipper plate beside each head that hangs down round the crate's top edge.
+    for sx in (-1, 1):
+        FM(f"spreaderSide{side}{sx}", xf(rbox(0.17, 0.14, 4.0, 0.3, 8, 4), (sx * 1.65, -0.42, 0)), "steel", H_, 0.05)
+    for sz in (-1, 1):
+        FM(f"spreaderEnd{side}{sz}", xf(rbox(1.82, 0.14, 0.2, 0.3, 8, 4), (0, -0.42, sz * 3.9)), "steel", H_, 0.05)
+        FM(f"spreaderCross{side}{sz}", xf(rbox(1.65, 0.1, 0.14, 0.3, 6, 3), (0, -0.3, sz * 1.2)), "metal", H_, 0.02)
+        FM(f"spreaderSocket{side}{sz}", xf(rbox(0.22, 0.1, 0.22, 0.3, 6, 3), (0, -0.14, sz * 1.2)), "hazard", H_, 0.01)
+    FM(f"spreaderSpine{side}", xf(rbox(0.22, 0.12, 3.7, 0.3, 8, 4), (0, -0.3, 0)), "metal", H_, 0.03)
+    for sx in (-1, 1):
+        for sz in (-1, 1):
+            FM(f"spreaderHead{side}{sx}{sz}", xf(rbox(0.3, 0.2, 0.32, 0.3, 6, 3), (sx * 1.65, -0.5, sz * 3.9)), "dark", H_, 0.03)
+            FM(f"spreaderPin{side}{sx}{sz}", xf(lathe([(0, 0), (0.15, 0), (0.1, -0.3), (0, -0.34)], 8), (sx * 1.65, -0.64, sz * 3.9)), "hazard", H_, 0.01)
+            FM(f"spreaderFlipper{side}{sx}{sz}", xf(rbox(0.05, 0.42, 0.42, 0.3, 4, 3), (sx * 2.0, -0.78, sz * 3.9)), "hazard", H_, 0.02)
+            FM(f"spreaderHinge{side}{sx}{sz}", xf(rbox(0.2, 0.06, 0.3, 0.3, 4, 3), (sx * 1.85, -0.38, sz * 3.9)), "steel", H_, 0.01)
+
+# ---- the collision: solid boxes in the ship's own frame (hx, hy, hz, x, y, z) that the game keeps in the world while the ship is near, so the
+# hull, tower, nose, bells, wings, the cages and the crates are solid and their tops can be stood on ----
+_solid = []
+
+
+def solid(hx, hy, hz, x, y, z, k=1.0, roll=0.0):
+    """One box: half sizes and centre, scaled by k; `roll` (rad) tips it about the ship's z axis, for a slab on a slope."""
+    _solid.append([round(v * k, 3) for v in (hx, hy, hz, x, y, z)] + [round(roll, 4)])
+
+
+_c = lambda lo, hi: ((lo + hi) / 2, (hi - lo) / 2)      # (centre, half) of a span
+zc_, zh_ = _c(-27.2, zf(18.0))
+solid(7.9, 2.62, zh_, 0, 2.52, zc_, K)                   # the deck slab and the upper hull: top = the deck plate (5.14)
+solid(7.9, 2.45, zh_, 0, -2.55, zc_, K)                  # the lower hull, belly and all: the ramp is shut flush with the belly and is no door a player can walk through
+
+
+def slabs(secs, z0, z1, step, y_lo=None):
+    """Boxes cut from a lofted part's own cross-sections, one per `step` m of its length, each as wide and tall as the section at its middle (the
+    section's rounded corners are why the width is a hair under it), so a tapering nose or a raked tower is followed instead of stepped round."""
+    n = max(1, int(round((z1 - z0) / step)))
+    for i in range(n):
+        za, zb = z0 + (z1 - z0) * i / n, z0 + (z1 - z0) * (i + 1) / n
+        sec = lerp_sec(secs, (za + zb) / 2)
+        yc = sec.get("yc", 0.0)
+        lo, hi = yc - sec["b"], yc + sec["t"]
+        if y_lo is not None:
+            lo = max(lo, y_lo)
+        if hi - lo < 0.2:
+            continue
+        zc, zh = _c(za, zb)
+        yc_, yh = _c(lo, hi)
+        solid(sec["w"] * 0.98, yh, zh, 0, yc_, zc, K)
+
+
+slabs(FSECS, zf(18.0), zf(33.8), 1.6)                    # the bow, down its taper (the nose rounds off, it is not a stack of steps)
+slabs(BRIDGE, zf(12.0), zf(31.0), 1.6, y_lo=4.5)         # the bridge tower and its raked face
+slabs(PH, zf(15.6), zf(25.6), 1.7)                       # the pilot house
+solid(8.8, 5.8, 2.8, 0, 0, -29.0, K)                     # the stern block
+for bx, by in ((-4.2, 2.6), (4.2, 2.6), (-4.2, -2.6), (4.2, -2.6)):
+    solid(2.1, 2.1, 2.55, bx, by, -35.9, K)              # the four engine bells
+for sx in (-1, 1):                                       # the radiator wings: each a few slabs tipped to the wing's own dihedral, so the plate is a smooth ramp to walk up
+    for s0, s1, lo_, hi_ in ((0.0, 6.0, 0.0, 9.2), (6.0, 9.5, 1.3, 8.3), (9.5, 13.0, 2.5, 7.5)):
+        sp_ = (s0 + s1) / 2
+        solid((s1 - s0) / 2, 0.42, (hi_ - lo_) / 2, sx * (7.6 + sp_ * math.cos(RAD_DIH)), WY + sp_ * math.sin(RAD_DIH), -6.0 - (lo_ + hi_) / 2, K, sx * RAD_DIH)
+# the cargo cages (absolute sizes): posts, the two long rails, each bay's floor, and a block for every stack of crates
+for side in (-1, 1):
+    ph_ = (BAY_TOP + 0.2 - FOOT_Y) / 2
+    for z in FRAME_Z:
+        solid(0.3, ph_, 0.3, side * RX, FOOT_Y + ph_, z)
+    solid(0.42, 0.3, ZLH, side * RX, BAY_TOP, ZLC)
+    solid(0.36, 0.3, ZLH, side * RX, FOOT_Y + 0.12, ZLC)
+    for k, z in enumerate(SLOT_Z):
+        solid((RX - HW) / 2, 0.18, 4.1, side * (HW + RX) / 2, UY - 0.2, z)
+        n_ = len(CARGO[(side, k)])
+        if n_:
+            solid(1.95, n_ * UNIT_H / 2, 4.2, side * UX, UY + n_ * UNIT_H / 2, z)
+FR["collide"] = [v for b_ in _solid for v in b_]
+print("freighter collision boxes:", len(_solid))
+
+FR["gearH"] = GEAR_F * K
+FR["deck"] = [6.9 * K, 2.6 * K, DZH * K]
+FR["deckY"] = 2.5 * K   # top = 5.1
+FR["deckZ"] = DZC * K
+FR["inside"] = [0, -4.6 * K, -1.5 * K]
+FR["rampTop"] = [0, -5.0 * K, -4.4 * K]
+FR["rampBottom"] = [0, (BELLY_F - 0.05 - F_RAMP_L * math.sin(-f_open)) * K, (-4.0 - F_RAMP_L * math.cos(f_open) - 0.6) * K]
+FR["radius"] = 26.0 * K
+FR["padR"] = 21.0 * K
 
 # side by side for previewing
 FR.location = tb((40, 0, 0))
