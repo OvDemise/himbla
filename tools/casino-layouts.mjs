@@ -305,3 +305,7 @@ if (process.argv[2] === 'dump') {
   const f = (s) => (s.k === 'r' ? `x ${s.x0.toFixed(1)}..${s.x1.toFixed(1)}, z ${s.z0.toFixed(1)}..${s.z1.toFixed(1)}` : `centre (${s.x.toFixed(1)}, ${s.z.toFixed(1)}) r ${s.r}`);
   for (const L of [nave, cross]) { console.log('\n== ' + L.name); for (const it of L.items.filter((i) => !i.struct)) console.log(`${it.id.padEnd(18)} ${f(it.s)}  h ${it.h}`); for (const st of L.stations) console.log(`  station ${st.of.padEnd(16)} ${f(st.s)}`); for (const c of L.corridors) console.log(`  lens ${c.label.padEnd(18)} ${f(c.s)} y ${c.y}`); }
 }
+if (process.argv[2] === 'json') {
+  const pick = (L) => ({ name: L.name, floor: L.floor, doors: L.doors, items: L.items.map(({ id, s, h, cls, struct, grp }) => ({ id, s, h, cls, struct: !!struct, grp })), stations: L.stations.map(({ of, s }) => ({ of, s })), corridors: L.corridors.map(({ of, s, y, label }) => ({ of, s, y, label })), outside: L.outside.map(({ id, s, cls }) => ({ id, s, cls })), note: L.note });
+  console.log(JSON.stringify({ current: pick(current), a: pick(nave), b: pick(cross) }));
+}
