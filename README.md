@@ -472,7 +472,7 @@ nearest town, and a replacement turns up a few minutes later.
 
 Freighters and shuttle-buses fly real routes: they lift off vertically on their belly jets, cruise over everything
 with their main thrusters pulsing, slow down and land on a pad at the edge of each settlement. A **landing pad** is a round deck 3 m up on
-steel legs (14.3 m across the radius for a shuttle-bus, so its ramp comes down on the deck, 21 m for a freighter), with a hazard band round its
+a closed base of ribbed panels that nothing can get in under (14.3 m across the radius for a shuttle-bus, so its ramp comes down on the deck, 21 m for a freighter), with a hazard band round its
 edge, a lamp-lit safety railing all the way round, and one flight of stairs down to the ground with handrails both sides; the
 waiting shelter stands beside the stairs' foot, and the passengers walk round the ship to the stairs and down them. On a slope the deck still
 stands 3 m over the highest ground under it, and its stairs come down on the uphill side. The landing legs fold
@@ -762,7 +762,7 @@ src/
   settlements.js detailed settlements, HQs and landmarks built with the outpost kit (moving parts, skate park)
   market.js      the Meridian Exchange's stocks: a random-walk market refreshed every 15 s, read by the tower's ticker
   traffic.js     landing pads, ship/bus flights and passengers, roads, land-trains, cars, buggies
-  landingPad.js  the landing pad itself (deck on legs, railing, stairs, colliders and the walkers' waypoints), for every size and slope
+  landingPad.js  the landing pad itself (deck on its closed base, railing, stairs, colliders and the walkers' waypoints), for every size and slope
   roadplan.js    where a road runs: a least-cost search over the terrain (slope, craters, rims, rock, rilles) between two town gates
   wardrobe.js    wardrobe screen with live 3D preview
   trailer.js     trailer director mode (?trailer): the official trailer, shot by shot, from live gameplay
