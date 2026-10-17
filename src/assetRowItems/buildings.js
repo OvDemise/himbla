@@ -290,7 +290,8 @@ const hometown = {
   id: 'buildings.hometown',
   title: '10 · HOMETOWN',
   items: [
-    ...HOME.map(([type, label]) => item(`hometown.${type}`, label, 27, 27, () => {
+    // (the Shuttle Pad's deck is 28.6 m across and its stairs run 6 m further toward the hall)
+    ...HOME.map(([type, label]) => item(`hometown.${type}`, label, type === 'pad' ? 31 : 27, type === 'pad' ? 37 : 27, () => {
       const slot = slotAt(0);
       return viaWorld((world, loc) => addBuilding(world, loc, 0, type), { faction: 'kepler', frame: slot });
     })),

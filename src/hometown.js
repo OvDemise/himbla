@@ -17,6 +17,7 @@ import { VEHICLES } from './vehicles.js';
 import { terminalPage, wireTerminal, stepSel, keepScroll } from './terminalUI.js';
 import { glyphHtml } from './glyphs.js';
 import { RadioSweep, SWEEP } from './radio.js';
+import { padPlan, padKit, padCols, padStairs } from './landingPad.js';
 
 const DK = 0x3a3550, LT = 0xd8d4e8, CONC = 0x8a8698, CREAM = 0xfff4e0, WARM = 0xfff6a8, KEP = 0xff9f1c, GRN = 0x7dff6a;
 export const SLOT_R = 64, SLOTS = 8;
@@ -29,7 +30,9 @@ export const plotPoint = (i, x, z) => { const p = slotAt(i), c = Math.cos(p.face
 // of the quonset's door where a vehicle is set down, nose to the plaza (+z)
 export const SPOTS = { farm: { x: 0, z: 12.8 }, motorpool: { x: -3, z: 9.8 }, radio: { x: 0, z: 6.5 }, clinic: { x: 0, z: 7.5 } };
 export const BAY = { x: -3, z: 15.5 };
-const PAD_R = 11.5, PAD_TOP = 0.78; // the shuttle pad's disc and the height of its deck (the kit's marking lines) over the plot's ground
+// the shuttle pad (landingPad.js): its deck is big enough for the shuttle's ramp to come down inside the railing, and its stairs run
+// toward the hall (the plot's +z)
+const PAD_R = 14.3, PAD_PLAN = padPlan(PAD_R);
 
 export const BANK_CAP = 1500; // what the town bank holds (₵); a full bank stops earning until you collect
 
@@ -242,12 +245,8 @@ function buildingKit(type) {
         spotRing(k, 'radio');
         break;
       case 'pad':
-        k.cyl(11, 11.5, 0.4, 32, T(0x5b5870), 0, 0.3, 0, { outline: 0.04 });
-        k.ring(10.5, 0.2, G(KEP), 0, 0.72, 0);
-        k.box(1.2, 0.06, 7, T(CREAM), -2, 0.72, 0, { outline: 0 });
-        k.box(1.2, 0.06, 7, T(CREAM), 2, 0.72, 0, { outline: 0 });
-        k.box(3, 0.06, 1.2, T(CREAM), 0, 0.72, 0, { outline: 0 });
-        for (let i = 0; i < 8; i++) { const a = (i / 8) * Math.PI * 2; k.ball(0.25, G(WARM), Math.cos(a) * 11.2, 0.8, Math.sin(a) * 11.2, { outline: 0 }); }
+        padKit(k, PAD_PLAN, KEP);
+        for (const c of padCols(PAD_PLAN)) k.cols.push(c);
         break;
       default: break;
     }
@@ -308,7 +307,7 @@ export function addBuilding(world, loc, i, type) {
   }
   // the shuttle pad is a real pad: traffic lands on this record and never drops it. One record per pad plot, however often it is built
   // (a rebuilt town gets its old records back: world.rebuildLocation)
-  if (type === 'pad' && !(loc.pads || []).some((q) => q.plot === i)) (loc.pads ||= []).push({ x: p.x, z: p.z, r: PAD_R, spare: false, mesh: null, plot: i, top: PAD_TOP });
+  if (type === 'pad' && !(loc.pads || []).some((q) => q.plot === i)) (loc.pads ||= []).push({ x: p.x, z: p.z, r: PAD_R, spare: false, mesh: null, plot: i, top: PAD_PLAN.top, stairs: padStairs(p.x, p.z, p.face, PAD_PLAN) });
   // the barracks' guns and the motor pool's Mule are proper models
   if (type === 'barracks') for (const sx of [-1, 1]) {
     const t = makeTurret({ color: KEP });

@@ -12,6 +12,7 @@ import { makeProp } from './storyAssets.js';
 import { buildHomeTown } from './hometown.js';
 import { spindleGeometry } from './spindle.js';
 import { T as KT, G as KG } from './outpostModels.js';
+import { padPlan, padKit, padCols, padToFrame, colToFrame, padStairs } from './landingPad.js';
 
 function mesh(geo, mat, outline = 0.15) {
   const m = new THREE.Mesh(geo, mat);
@@ -490,6 +491,7 @@ export class World {
 
   col(loc, spec) {
     const c = this.colAdd(loc, spec);
+    if (spec.stick) c.stick = true; // (a landing pad's deck and stairs: physics keeps walkers on them)
     (loc._cols ||= []).push(c); // (so a rebuild can take them down again)
     return c;
   }
@@ -721,22 +723,59 @@ export class World {
     return g;
   }
 
-  // spare: a decorative pad that only stays if transit ends up using it (traffic.js dropSparePads)
-  pad(loc, dx, dz, r, color = 0xffd23f, spare = false) {
+  // A landing pad for shuttles and freighters (landingPad.js): a deck up on legs with a railing round it, and a flight of stairs
+  // down on the side facing `opts.face` (an angle in the settlement's x-z plane, as Math.atan2(z, x); by default toward the
+  // settlement's middle). spare: a pad that only stays if transit ends up using it (traffic.js dropSparePads). opts.r is not
+  // needed; opts.flat: the old flat disc on the ground (the ILMB's rocket pad, which no shuttle uses). Returns the pad's record
+  // in loc.pads ({ x, z, r, top, stairs, mesh, cols, keep }), or null for a spare that was dropped before.
+  pad(loc, dx, dz, r, color = 0xffd23f, spare = false, opts = {}) {
     if (spare && (loc.droppedPads || []).some((p) => Math.hypot(p.x - dx, p.z - dz) < 1)) return null;
-    const g = new THREE.Group();
-    g.add(mesh(new THREE.CylinderGeometry(r, r * 1.05, 0.5, 32), toon(0x4a4660), 0.08));
-    const ring = new THREE.Mesh(new THREE.RingGeometry(r * 0.65, r * 0.8, 32), toon(color));
-    ring.rotation.x = -Math.PI / 2;
-    ring.position.y = 0.27;
-    g.add(ring);
-    const bar = new THREE.Mesh(new THREE.PlaneGeometry(r * 0.15, r * 0.9), toon(color));
-    bar.rotation.x = -Math.PI / 2;
-    bar.position.y = 0.28;
-    g.add(bar);
-    this.put(g, loc, dx, dz, 0);
-    (loc.pads ||= []).push({ x: dx, z: dz, r, spare, mesh: g }); // traffic reuses / avoids these
-    return g;
+    if (opts.flat) {
+      const g = new THREE.Group();
+      g.add(mesh(new THREE.CylinderGeometry(r, r * 1.05, 0.5, 32), toon(0x4a4660), 0.08));
+      const ring = new THREE.Mesh(new THREE.RingGeometry(r * 0.65, r * 0.8, 32), toon(color));
+      ring.rotation.x = -Math.PI / 2;
+      ring.position.y = 0.27;
+      g.add(ring);
+      const bar = new THREE.Mesh(new THREE.PlaneGeometry(r * 0.15, r * 0.9), toon(color));
+      bar.rotation.x = -Math.PI / 2;
+      bar.position.y = 0.28;
+      g.add(bar);
+      this.put(g, loc, dx, dz, 0);
+      const rec = { x: dx, z: dz, r, spare, mesh: g, top: 0.27, cols: [], keep: null, flat: true };
+      (loc.pads ||= []).push(rec);
+      return rec;
+    }
+    const face = opts.face ?? Math.atan2(-dz, -dx);
+    const yaw = Math.PI / 2 - face; // (the stairs run along the pad's +z, which a turn by yaw points along (sin yaw, cos yaw))
+    const ground = opts.ground || ((x, z) => {
+      if (!this.planet) return 0;
+      const p = padToFrame(dx, dz, yaw, x, z);
+      const v = this.toWorld(loc, p.x, 0, p.z, new THREE.Vector3());
+      this.planet.ground(v, v);
+      return loc.group.worldToLocal(v).y;
+    });
+    const plan = padPlan(r, ground, opts.top ?? null);
+    const g = kitPart(color, (k) => padKit(k, plan, color));
+    this.put(g, loc, dx, dz, 0, yaw);
+    const cols = padCols(plan).map((c) => this.col(loc, colToFrame(dx, dz, yaw, c)));
+    // the flight's footprint and the ground at its foot are kept clear too (roads, other pads, a waiting shelter)
+    const sm = padToFrame(dx, dz, yaw, 0, r + plan.stairs.run * 0.6), keep = { x: sm.x, z: sm.z, r: plan.stairs.run * 0.6 + 2.5 };
+    (loc.keep ||= []).push(keep);
+    const rec = { x: dx, z: dz, r, spare, mesh: g, top: plan.top, cols, keep, yaw, stairs: padStairs(dx, dz, yaw, plan) };
+    (loc.pads ||= []).push(rec); // traffic reuses / avoids these
+    return rec;
+  }
+
+  // a pad and everything it brought (its colliders, the ground it kept): a spare no line used, or one a bigger pad replaces
+  dropPad(loc, rec) {
+    if (rec.mesh) rec.mesh.removeFromParent();
+    for (const c of rec.cols || []) {
+      this.colliders.remove(c);
+      if (loc._cols) { const i = loc._cols.indexOf(c); if (i >= 0) loc._cols.splice(i, 1); }
+    }
+    if (rec.keep && loc.keep) loc.keep = loc.keep.filter((k) => k !== rec.keep);
+    if (loc.pads) loc.pads = loc.pads.filter((p) => p !== rec);
   }
 
   flag(loc, dx, dz, colors, h = 14) {
@@ -982,7 +1021,7 @@ export class World {
 
     // Launch complex: where most new arrivals touch down on the Moon
     const lp = { x: 20, z: -185 };
-    this.pad(loc, lp.x, lp.z, 30, 0xff4f2e);
+    this.pad(loc, lp.x, lp.z, 30, 0xff4f2e, false, { flat: true }); // (the rocket's: flat, no shuttle uses it)
     // (the gantry and fuel spheres are in settlements.dressIlmb)
     const ls = textSprite('ARRIVALS', { color: '#ff4f2e', size: 70, scale: 0.6 });
     ls.position.set(lp.x, 30, lp.z + 20);

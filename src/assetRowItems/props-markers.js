@@ -237,15 +237,16 @@ const stubLoc = (faction = 'meridian') => ({ group: new THREE.Group(), faction, 
 // (World.prototype.pad needs its own `this.put`; bound here)
 const padFn = (w, ...a) => World.prototype.pad.call(w, ...a);
 
+// the shuttle's pad (a 14.2 m deck: its ramp comes down inside the railing) and the freighter's (21 m), stairs toward you
 function landingPads() {
   const w = stubWorld(), loc = stubLoc();
   let x = 0;
-  for (const [r, c] of [[12, 0xffd23f], [16, 0x2ec4ff], [13, 0x7dff6a]]) { x += r; padFn(w, loc, x, 0, r, c); x += r + 4; }
+  for (const [r, c] of [[14.2, 0x2ec4ff], [21, 0xff9f1c]]) { x += r; padFn(w, loc, x, 0, r, c, false, { face: Math.PI / 2 }); x += r + 5; }
   return { root: seat(loc.group, { lift: false }).root };
 }
 function rocketPad() {
   const w = stubWorld(), loc = stubLoc();
-  padFn(w, loc, 0, 0, 30, 0xff4f2e); // world.js:973, the launch pad under the ILMB's rocket
+  padFn(w, loc, 0, 0, 30, 0xff4f2e, false, { flat: true }); // world.js, the launch pad under the ILMB's rocket
   return { root: seat(loc.group, { lift: false }).root };
 }
 
@@ -524,7 +525,7 @@ export default {
     { id: 'prop.dish', label: 'DISHES', w: 110, d: 30, make: dishes },
     { id: 'prop.turret', label: 'TURRETS', w: 26, d: 9, make: turrets },
     { id: 'prop.rocket', label: 'ILMB ROCKET', w: 11, d: 11, make: rocket },
-    { id: 'prop.landing-pads', label: 'LANDING PADS', w: 90, d: 33, solid: false, make: landingPads },
+    { id: 'prop.landing-pads', label: 'LANDING PADS', w: 76, d: 49, solid: false, make: landingPads },
     { id: 'prop.rocket-pad', label: 'ROCKET PAD', w: 62, d: 62, solid: false, make: rocketPad },
     { id: 'prop.solar-field', label: 'SOLAR FIELD', w: 52, d: 16, make: solarField },
     { id: 'prop.site-furniture', label: 'FLAGS · LAMPS · TOWER · PYLON · STOP', w: 124, d: 40, make: furniture },
