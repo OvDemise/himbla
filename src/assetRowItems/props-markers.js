@@ -119,7 +119,7 @@ function dishes() {
     return seat(d.root);
   });
   const root = lineUp(parts, 4).root;
-  return { root, update: (dt, t) => { for (const d of ds) { d.yaw.rotation.y += d.speed * dt; d.tilt.rotation.x = -0.6 + Math.sin(t * d.speed * 2 + d.ph) * 0.25; } } }; // (world.js update)
+  return { root, update: (dt, t) => { for (const d of ds) { d.yaw.rotation.y += d.speed * dt; d.tilt.rotation.x = -0.6 + Math.sin(t * d.speed * 2 + d.ph) * 0.25; for (const l of d.lamps) l.visible = Math.sin(t * 4 + l.userData.seed) > -0.3; } } }; // (world.js update)
 }
 
 function turrets() {

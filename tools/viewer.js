@@ -178,9 +178,10 @@ if (m === 'shuttle' || m === 'freighter') {
     if (t > nextPull) nextPull = t + 3.2;
   };
 } else if (m === 'dish') {
-  // &kind=cryo|gantry  &faction=kepler|meridian|spacecom|vostok  &no=01..04 (the dish's number)  &size=30 (the old dish's size: a 30 m mount scales to it)
+  // &kind=cryo|gantry|field  &faction=kepler|meridian|spacecom|vostok  &no=01..04 (the dish's number)  &size=30 (the old dish's size: a 30 m mount scales to it)
+  // &color=rrggbb paints the field dish (makeDish: the small bases' dish; cryo and gantry take the faction's paint)
   // &tilt=rad (the dish's elevation, as the game sweeps it: -0.35 to -0.85)  &az=rad (its azimuth)  &sweep=1 turns and nods it like the game; the lamps blink
-  const st = makeDishStation({ kind: Q.get('kind') || 'cryo', faction: Q.get('faction') || 'meridian', no: Q.get('no') || '01', size: num('size', DISH_SIZE) });
+  const st = makeDishStation({ kind: Q.get('kind') || 'cryo', faction: Q.get('faction') || 'meridian', no: Q.get('no') || '01', size: num('size', DISH_SIZE), paint: Q.has('color') ? parseInt(Q.get('color'), 16) : undefined });
   st.tilt.rotation.x = num('tilt', -0.6);
   st.yaw.rotation.y = num('az', 0);
   model = st.root;
