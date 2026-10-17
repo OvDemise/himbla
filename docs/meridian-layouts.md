@@ -62,7 +62,7 @@ seat of government from the gate and as a port from the ring road behind.
 | Container yard | (0, -97) | 70 × 30, gantry travel ±28 | was (-5, -100), 62 × 30 |
 | Tower cranes | (-54, -72), (62, -78) | jibs over the yard | were (-78, 6), (78, -6) |
 | Main garage | fixed | | |
-| Pads (spare) | shuttle (-96, 96) r 14; the other (96, -96) r 14, its mirror through the centre | | were (94, 98) r 12, (-100, -60) r 16 |
+| Pads (spare) | shuttle (-96, 96) r 14; the other (96, 96) r 14, its mirror across the avenue | | were (94, 98) r 12, (-100, -60) r 16 |
 | Floodmasts | (40, -124), (-44, -118) | | over the yard |
 
 **What it does for play.** The avenue is a long straight you can take at speed from the gate to the plaza, and its
@@ -86,7 +86,7 @@ the avenue (no collider). Nothing new stands near the garage's forecourt.
 **The idea.** A 240 m paved freight spine runs east–west across the site at z -12 and splits it in two. South of
 the spine is the port: a container yard half as big again as today's, the gantry running its full length over a
 lane between two rows of stacks, both tower cranes over it, the main garage at the end. North of the spine is the campus: the tower stands to the west on its own with its portico facing east
-onto the plaza, the lab dome closes the north-east, the leader's forum lies between them. The Exchange reads as a
+onto the plaza, the lab dome closes the east, the leader's forum lies between them, the pads fill the two north corners. The Exchange reads as a
 working port from the ring road's whole south half, with a head office looking over it.
 
 | Piece | Position (x, z) | Size / facing | Note |
@@ -94,12 +94,12 @@ working port from the ring road's whole south half, with a head office looking o
 | Trading tower | (-66, 40) | door toward +x (the plaza) | the entrance block needs a yaw of its own (see Code) |
 | Plaza and fountain | (0, 36) | r 12 | the tower's portico opens onto it |
 | The spine (new) | x ±120, z -19 → -5 | 14 wide, paved, kerbed, lane stripes | lamps every 24 m along the north kerb; a flat slab, no collider |
-| Lab dome | (72, 72) | r 22, door toward the plaza | was (0, 60) |
-| Leader's podium | (38, 67) | `findSpot`'s first candidate | 11 m from the dome's shell (the 8 m halo holds, but not by much: nudge the dome, not the podium) |
+| Lab dome | (70, 52) | r 22, door toward the plaza | was (0, 60); in from the corner so the pad at (96, 96) fits beside it |
+| Leader's podium | (38, 67) | `findSpot`'s first candidate | 12 m from the dome's shell (the 8 m halo holds, but not by much: nudge the dome, not the podium) |
 | Container yard | (0, -62) | 96 × 34, gantry travel ±40 | two rows of stacks, a 6 m lane between them; was 62 × 30 |
 | Tower cranes | (-28, -100), (64, -60) | | the west one's jib passes over the garage roof (5.4 m) at 34 m |
 | Main garage | fixed | | the yard's corner is 9 m from its hall |
-| Pads (spare) | shuttle (-96, 96) r 14; the other (96, -96) r 14, its mirror through the centre | | |
+| Pads (spare) | shuttle (-96, 96) r 14; the other (96, 96) r 14, its mirror across the site's axis | | the dome stands 14 m off it |
 | Gate sign, flag | (0, 120), (0, 110) | as today | |
 | Floodmasts | (-58, -62), (74, -86) | | |
 
@@ -117,7 +117,7 @@ with it), the two small garages dropped, and the moves in the table. `traffic.js
 
 **Risks.** The bigger yard and the garage's forecourt both want the south-west: the yard's corner is 9 m from the
 garage's hall by the checker, which is enough but leaves no room to grow the yard westward. The dome
-is close to the podium's halo (11 m, against a limit of 8 m). More new geometry than A.
+is close to the podium's halo (12 m, against a limit of 8 m). More new geometry than A.
 
 ## Side by side
 
@@ -127,7 +127,7 @@ is close to the podium's halo (11 m, against a limit of 8 m). More new geometry 
 | Seen from the gate | the tower, head-on, at the end of the avenue | the plaza and the dome; the tower to the left |
 | Seen from the ring road (south) | yard, cranes | the whole port: yard, cranes, garage |
 | Skate line | one 118 m straight with kerbs | a 240 m straight plus container terraces |
-| Leader's spot | beside the avenue, 16 m clear | between plaza and dome, 11 m clear |
+| Leader's spot | beside the avenue, 17 m clear | between plaza and dome, 12 m clear |
 | New pieces | avenue, arch, hall | spine, bigger yard; the tower's entrance turned |
 | Code that changes | `buildMeridian` only | `buildMeridian`, plus a tower helper with a yaw |
 | `traffic.js` | untouched | untouched |
