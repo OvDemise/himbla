@@ -397,8 +397,11 @@ export class Story {
       if (!loc) continue;
       const m = makeRunner({ ...L.look, pirate: f === 'rustmoon' });
       if (f === 'rustmoon') this.addRifle(m, true);
-      const spot = this.findSpot(loc);
-      g.world.put(m.root, loc, spot.x, spot.z, 0, Math.atan2(-spot.x, -spot.z), true);
+      // where they stand: the spot the HQ's builder pinned (loc.leaderSpot: x, z and the yaw they face; Meridian's chairwoman at the
+      // foot of the exchange's steps), else an open spot found here, facing the HQ's middle
+      const spot = loc.leaderSpot || this.findSpot(loc);
+      const yaw = spot.yaw ?? Math.atan2(-spot.x, -spot.z);
+      g.world.put(m.root, loc, spot.x, spot.z, 0, yaw, true);
       m.root.scale.setScalar(1.15);
       // a little podium + name plate
       const pod = new THREE.Mesh(new THREE.CylinderGeometry(1.6, 1.9, 0.4, 16), toon(new THREE.Color(FACTIONS[f].color).getHex()));
@@ -417,7 +420,7 @@ export class Story {
       g.world.put(beam, loc, spot.x, spot.z, 0, 0, true);
       loc.group.updateMatrixWorld(true);
       for (const o of [m.root, sign, pod, ring, beam]) o.userData.keep = true; // (world.rebuildLocation)
-      this.leaders[f] = { f, loc, model: m, sign, pod, ring, beam, pos: g.world.toWorld(loc, spot.x, 1, spot.z), t: Math.random() * 5 };
+      this.leaders[f] = { f, loc, model: m, sign, pod, ring, beam, pos: g.world.toWorld(loc, spot.x, 1, spot.z), front: g.world.toWorld(loc, spot.x + Math.sin(yaw) * 2, 1, spot.z + Math.cos(yaw) * 2), t: Math.random() * 5 };
       // a leader whose faction the story has ended (conquered, dismantled, fallen) isn't there at all
       m.root.visible = sign.visible = ring.visible = beam.visible = pod.visible = this.leaderVisible(f);
     }
@@ -560,9 +563,10 @@ export class Story {
       return { pos: g.planet.ground(d, new THREE.Vector3()) };
     }
     if (sel.leader) {
-      // a stand 5.5 m in front of a faction's leader, towards the middle of their HQ: clear of the podium (1.9 m) and ring (3.2 m)
+      // a stand 5.5 m in front of a faction's leader, the way they face (towards the middle of their HQ, unless the HQ's builder
+      // turned them): clear of the podium (1.9 m) and ring (3.2 m)
       const Ld = this.leaders[sel.leader];
-      if (Ld) return { pos: g.planet.ground(greatCircle(Ld.pos.clone().normalize(), Ld.loc.pos.clone().sub(Ld.pos), 5.5), new THREE.Vector3()), loc: Ld.loc };
+      if (Ld) return { pos: g.planet.ground(greatCircle(Ld.pos.clone().normalize(), Ld.front.clone().sub(Ld.pos), 5.5), new THREE.Vector3()), loc: Ld.loc };
       return this.resolve({ locOpen: FACTIONS[sel.leader].hq }, step);
     }
     if (sel.locOpen) { const l = locOf(sel.locOpen); const sp = this.findSpot(l); return { pos: g.planet.ground(g.world.toWorld(l, sp.x, 0, sp.z), new THREE.Vector3()), loc: l }; }

@@ -655,17 +655,49 @@ export function buildHelium(world, loc) {
   });
 }
 
+// Sawtooth trade hall (the Exchange's bonded market, layout A of docs/meridian-layouts.md): a plinth, white walls with a
+// faction band, a sawtooth roof whose vertical faces are glass and face -x (the avenue), three glass doors on that side
+// and three loading doors on the back, the name over the doors. w across x, d along z.
+function tradeHall(k, x, z, w, d, trim, name = 'TRADE HALL') {
+  const H = 7, teeth = 4, tw = w / teeth, rise = 3.2;
+  k.at(x, z);
+  k.box(w + 1.2, 0.6, d + 1.2, T(CONC), 0, 0, 0, { outline: 0.08 });
+  k.box(w, H, d, T(WHITE), 0, 0.6, 0, { outline: 0.14 });
+  k.box(w + 0.12, 0.6, d + 0.12, T(trim), 0, 5.4, 0, { outline: 0.03 });
+  // the roof: a sawtooth profile across x, extruded along z
+  const pts = [new THREE.Vector2(-w / 2, 0)];
+  for (let i = 0; i < teeth; i++) { const x0 = -w / 2 + i * tw; pts.push(new THREE.Vector2(x0, rise), new THREE.Vector2(x0 + tw, 0)); }
+  k.add(new THREE.ExtrudeGeometry(new THREE.Shape(pts), { depth: d, bevelEnabled: false }).translate(0, 0, -d / 2), T(0xd8d4e8), 0, 0.6 + H, 0, { outline: 0.1 });
+  for (let i = 0; i < teeth; i++) k.box(0.16, rise - 0.7, d - 2, G(0xbfe9ff), -w / 2 + i * tw + 0.1, 0.6 + H + 0.35, 0, { outline: 0 });
+  // the avenue side (-x): three glass doors in bronze frames under the name; the back (+x): three loading doors
+  for (const dz of [-d / 4, 0, d / 4]) {
+    k.box(0.4, 5.2, 5.2, T(0x8a5a3a), -w / 2 - 0.1, 0.6, dz, { outline: 0.04 });
+    k.box(0.2, 4.4, 4.4, G(0xbfe9ff), -w / 2 - 0.3, 1.0, dz, { outline: 0 });
+    k.box(0.4, 4.6, 6, T(0x4e4a60), w / 2 + 0.1, 0.6, dz, { outline: 0.04 });
+    for (let j = 0; j < 3; j++) k.box(0.1, 0.25, 6, T(YEL), w / 2 + 0.36, 1.2 + j * 1.5, dz, { outline: 0 });
+    k.box(0.4, 0.5, 6.4, T(trim), w / 2 + 0.1, 5.2, dz, { outline: 0.02 });
+  }
+  k.text(name, -w / 2 - 0.35, 0.6 + H - 0.9, 0, -Math.PI / 2, 14, { fg: '#2ec4ff', bg: '#0d1a33', back: false, off: 0.03 });
+  k.solid(w / 2 + 0.6, (0.6 + H + rise) / 2, d / 2 + 0.6, 0, 0);
+  k.at();
+}
+
 // =============================================================================================
-// Meridian Exchange: the trade HQ. A stepped glass trading tower wearing a price ticker, four
-// sawtooth warehouses with docks, a container yard under a travelling gantry crane, two tower
-// cranes, the lab dome and the pads.
+// Meridian Exchange: the trade HQ, laid out on one axis (docs/meridian-layouts.md, layout A): a gate
+// arch on the +z side, a 118 m avenue down to the plaza and the portico of the stepped glass trading
+// tower (which wears the price ticker), the lab dome and a sawtooth trade hall facing each other
+// across the avenue; behind the tower the port (a container yard under a travelling gantry crane,
+// two tower cranes, the motor-pool garage out by the ring road) and, in the north corners, the pads.
 // =============================================================================================
 export function buildMeridian(world, loc) {
   settle(world, loc, 4409, (k, ctx) => {
     const blue = 0x2ec4ff, cols = [0x2ec4ff, 0xff9f1c, 0x7dff6a, 0xff3b5c, 0xffd23f, 0xc77dff];
-    // layout: plaza at the centre, the trading tower south of it, the lab dome north, warehouses
-    // out on the four corners (docks along the ring, not at each other), cranes in the gaps
-    const TZ = -42;
+    // layout: the tower 24 m south of the origin (the name and HQ sprites hang over the origin at
+    // y 50 and 62, which would be inside the tower's cone), its portico facing +z onto the plaza at
+    // (0, 20); the avenue runs from the plaza north to the gate arch at (0, 140); the dome west of
+    // the avenue and the hall east of it; the chairwoman at the foot of the steps; the yard, the
+    // cranes and the garage south of the tower
+    const TZ = -24;
     // the trading tower: three stepped octagonal tiers of glass and white bands (1.5x the old one,
     // set further back off the plaza)
     k.at(0, TZ, Math.PI / 8);
@@ -737,6 +769,8 @@ export function buildMeridian(world, loc) {
       k.at();
       k.lamp(-11, TZ + fz + 10.5, 6); k.lamp(11, TZ + fz + 10.5, 6);
     }
+    // the chairwoman (story.buildLeaders) stands at the foot of the portico's steps, off the doors' line, facing the plaza
+    loc.leaderSpot = { x: 8, z: 6, yaw: Math.atan2(-8, 14) };
     const crown = part(blue, (q) => {
       for (let i = 0; i < 4; i++) {
         const a = (i / 4) * TAU;
@@ -747,22 +781,18 @@ export function buildMeridian(world, loc) {
     crown.userData.spin = 0.4;
     crown.scale.setScalar(1.5);
     k.dyn(crown, 0, y + 3.6, TZ);
-    // the motor pool: one main garage out by the south-west stretch of the ring road, its bays turned out to face it (a service road
-    // runs from its right-hand bay to the ring, traffic.js), and two small sheds on the plaza's north-west and south-east corners,
-    // their bays turned in to face the tower
+    // the motor pool: the main garage out by the south-west stretch of the ring road, its bays turned out to face it (a service road
+    // runs from its right-hand bay to the ring, traffic.js)
     const GA = GARAGE_AT;
     garage(k, GA.x, GA.z, GA.yaw, [true, false, true], 'main');
-    for (const [sx, sz, open] of [[-60.8, 60.8, [false, true]], [60.8, -60.8, [true, true]]]) {
-      garage(k, sx, sz, Math.atan2(-sx, -sz), open, 'small');
-    }
     loc.garage = { ...GA, bay: 2 }; // (the bay the rovers come out of: it is open and has nothing in the way)
-    // container yard under a travelling gantry crane
-    const yx = -5, yz = -100;
+    // container yard under a travelling gantry crane: 70 x 30, three rows of seven stacks
+    const yx = 0, yz = -97;
     k.at(yx, yz);
-    k.box(62, 0.3, 30, T(0x6b6880), 0, 0, 0, { outline: 0.04 });
-    for (const s of [-1, 1]) k.box(64, 0.3, 0.6, T(STEEL), 0, 0.3, s * 15, { outline: 0 });
-    for (let i = 0; i < 18; i++) {
-      const cx = -25 + (i % 6) * 10, cz = -6 + Math.floor(i / 6) * 6;
+    k.box(70, 0.3, 30, T(0x6b6880), 0, 0, 0, { outline: 0.04 });
+    for (const s of [-1, 1]) k.box(72, 0.3, 0.6, T(STEEL), 0, 0.3, s * 15, { outline: 0 });
+    for (let i = 0; i < 21; i++) {
+      const cx = -30 + (i % 7) * 10, cz = -6 + Math.floor(i / 7) * 6;
       const hgt = 1 + ((i * 7) % 3);
       for (let j = 0; j < hgt; j++) container(k, cx, 0.3 + j * 2.62, cz, cols[(i + j) % cols.length], Math.PI / 2);
       k.solid(3.2, (hgt * 2.62) / 2, 1.4, cx, cz, 0, 0.3);
@@ -790,36 +820,69 @@ export function buildMeridian(world, loc) {
     trolley.add(cab, spreader);
     gantry.add(trolley);
     gantry.userData.tick = (o, dt, t) => {
-      o.position.x = yx + Math.sin(t * 0.07) * 24;
+      o.position.x = yx + Math.sin(t * 0.07) * 28;
       trolley.position.set(0, 15, Math.sin(t * 0.21) * 10);
       const drop = 3 + 6 * (0.5 + 0.5 * Math.sin(t * 0.33));
       cab.scale.y = drop; spreader.position.y = -drop;
     };
     k.dyn(gantry, yx, 0.3, yz);
-    // two tower cranes (the old ones, now lattice and slewing)
-    towerCrane(k, -78, 6, 34, 30, YEL, { speed: 0.09, phase: 0 });
-    towerCrane(k, 78, -6, 34, 30, YEL, { speed: 0.11, phase: 2.2 });
-    // the lab dome, a plaza with benches and lamps, signage
-    habDome(k, 0, 60, 22, 0x9be7ff, { door: Math.PI, trim: blue });
-    k.at(0, 6);
-    k.cyl(10, 10.4, 0.25, 32, T(0xd8d4e8), 0, 0, 0, { outline: 0.04 });
-    k.ring(10.2, 0.15, T(blue), 0, 0.25, 0);
+    // the yard's slab, the plaza and the avenue have no colliders to say they are taken: keep the traffic's pads, the ring's stop and
+    // the defence pylons off them (traffic.js keepouts, world.js defensePylons); the yard's is sized so the turret at (25, -122) stays put
+    (loc.keep ||= []).push({ x: yx, z: yz, r: 30 }, { x: 0, z: 20, r: 14 }, ...[45, 75, 105, 135].map((z) => ({ x: 0, z, r: 20 })));
+    // two tower cranes over the yard
+    towerCrane(k, -54, -72, 34, 30, YEL, { speed: 0.09, phase: 0 });
+    towerCrane(k, 62, -78, 34, 30, YEL, { speed: 0.11, phase: 2.2 });
+    // the lab dome west of the avenue, its airlock facing it; the trade hall east of it, its doors facing it
+    habDome(k, -58, 40, 22, 0x9be7ff, { door: Math.PI / 2, trim: blue });
+    tradeHall(k, 64, 24, 24, 56, blue);
+    // the plaza between the portico and the avenue: paving, a lit beacon, benches, lamps
+    k.at(0, 20);
+    k.cyl(12, 12.4, 0.25, 32, T(0xd8d4e8), 0, 0, 0, { outline: 0.04 });
+    k.ring(12.2, 0.15, T(blue), 0, 0.25, 0);
     k.cyl(1.6, 2, 3.2, 10, T(blue), 0, 0, 0, { outline: 0.05 });
     k.ball(1.4, G(0xbfe9ff), 0, 4.2, 0, { outline: 0 });
     k.column(2, 3.4, 0, 0);
     for (let i = 0; i < 6; i++) {
       const a = (i / 6) * TAU + 0.3;
-      k.box(2.6, 0.5, 0.8, T(0x8a5a3a), Math.cos(a) * 7.5, 0.5, Math.sin(a) * 7.5, { ry: -a + Math.PI / 2, outline: 0.03 });
+      k.box(2.6, 0.5, 0.8, T(0x8a5a3a), Math.cos(a) * 9, 0.5, Math.sin(a) * 9, { ry: -a + Math.PI / 2, outline: 0.03 });
     }
     k.at();
-    k.sign('MERIDIAN EXCHANGE', 0, 120, { w: 18, y: 6, fg: '#2ec4ff', ry: Math.PI });
-    k.lamp(14, 16, 8); k.lamp(-14, 16, 8); k.lamp(16, -4, 8); k.lamp(-16, -4, 8);
-    floodMast(k, 30, -84, 14); floodMast(k, -40, -84, 14);
-    // the landing pads: a spare one for a shuttle out beyond the dome (the freighter's is laid out by the traffic, which keeps the
-    // pads of two flights clear of each other, so it lands out past the crane), and one on the opposite diagonal
-    world.pad(loc, 94, 98, 12, 0x2ec4ff, true);
-    world.pad(loc, -100, -60, 16, 0x2ec4ff, true);
-    world.flag(loc, 0, 110, [0x2ec4ff, 0xffffff, 0x2ec4ff], 20);
+    k.lamp(16, 20, 8); k.lamp(-16, 20, 8);
+    // the avenue: 28 m of paving from the plaza to the gate, kerbed, a cream band every 20 m and a line of
+    // inset lights down the middle; lamps and banners in pairs along it (the flags between them are the world's)
+    {
+      const z0 = 32, z1 = 150, zc = (z0 + z1) / 2;
+      k.box(28, 0.3, z1 - z0, T(0x6b6880), 0, 0, zc, { outline: 0.04 });
+      for (const s of [-1, 1]) k.box(0.7, 0.35, z1 - z0, T(0xd8d4e8), s * 14, 0.3, zc, { outline: 0.02 });
+      for (let z = 50; z < z1; z += 20) k.box(28, 0.32, 1.2, T(0xd8d4e8), 0, 0, z, { outline: 0 });
+      for (let z = z0 + 4; z < z1 - 2; z += 6) k.box(0.5, 0.06, 1.4, G(blue), 0, 0.3, z, { outline: 0 });
+      for (const z of [50, 90, 130]) { k.lamp(20, z, 8); k.lamp(-20, z, 8); }
+      for (const z of [70, 130]) for (const sx of [-1, 1]) {
+        k.cyl(0.12, 0.14, 12, 6, T(DARK), sx * 20, 0, z + 4, { outline: 0.02 });
+        k.box(0.1, 6, 2.2, T(blue), sx * 20, 5.4, z + 4 + 1.15, { outline: 0.03 });
+        k.box(0.12, 0.6, 2.2, T(YEL), sx * 20, 6.4, z + 4 + 1.15, { outline: 0 });
+      }
+    }
+    // the gate arch at the avenue's head: two pylons and a beam carrying the exchange's name, read from either side
+    {
+      const az = 140;
+      for (const sx of [-1, 1]) {
+        k.box(2.4, 11, 2.4, T(WHITE), sx * 14.5, 0, az, { outline: 0.1 });
+        k.box(2.8, 0.5, 2.8, T(blue), sx * 14.5, 11, az, { outline: 0.03 });
+        k.solid(1.3, 5.75, 1.3, sx * 14.5, az);
+      }
+      k.box(32, 2.2, 2.6, T(WHITE), 0, 11.5, az, { outline: 0.1 });
+      k.box(32.2, 0.4, 2.8, T(blue), 0, 13.7, az, { outline: 0.03 });
+      k.text('MERIDIAN EXCHANGE', 0, 12.6, az + 1.33, 0, 20, { fg: '#2ec4ff', bg: '#0d1a33', back: false, off: 0.03 });
+      k.text('MERIDIAN EXCHANGE', 0, 12.6, az - 1.33, Math.PI, 20, { fg: '#2ec4ff', bg: '#0d1a33', back: false, off: 0.03 });
+      k.blinker(0, 14.4, az, 0xff2a4a, 0.4);
+    }
+    floodMast(k, 40, -124, 14); floodMast(k, -44, -118, 14);
+    // the landing pads, in the north corners either side of the avenue (spares: the traffic keeps the ones its flights use and lays
+    // the freighter's own, clear of the buildings and of the other flight)
+    world.pad(loc, -96, 96, 14, 0x2ec4ff, true);
+    world.pad(loc, 96, 96, 14, 0x2ec4ff, true);
+    for (const sx of [-1, 1]) world.flag(loc, sx * 18, 110, [0x2ec4ff, 0xffffff, 0x2ec4ff], 20);
   });
 }
 

@@ -25,7 +25,7 @@ const towns = [
 const hq = [
   P('ilmb', 'INTERNATIONAL MOON BASE', 502, 502, { loc: 'ilmb' }),
   P('ilmb.lawless', 'ILMB (RUSTMOON TAKEOVER)', 502, 502, { loc: 'ilmb', over: { lawless: true } }),
-  P('meridian', 'MERIDIAN EXCHANGE', 251, 257, { loc: 'meridian' }),
+  P('meridian', 'MERIDIAN EXCHANGE', 251, 280, { loc: 'meridian' }),
 ];
 const science = [
   P('shackleton', 'SHACKLETON RADAR ARRAY', 225, 229, { loc: 'shackleton' }),

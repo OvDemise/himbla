@@ -912,7 +912,7 @@ export class World {
     for (const k of ['spinners', 'blinkers', 'dishes', 'figures', 'zoneWalls', 'walkers', 'rides', 'anims']) this[k] = this[k].filter(mine);
     const pads = loc.pads; // (traffic already routes to these)
     loc.merged = false; // (the rebuilt place merges again, the next time it's drawn)
-    for (const k of ['turretMounts', 'keep', 'pads', 'sign', 'launchBuilt']) delete loc[k];
+    for (const k of ['turretMounts', 'keep', 'pads', 'sign', 'launchBuilt', 'leaderSpot']) delete loc[k];
     this.buildLocation(loc);
     if (pads) loc.pads = pads;
     for (const o of keep) loc.group.add(o);
