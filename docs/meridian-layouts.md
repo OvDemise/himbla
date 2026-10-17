@@ -54,8 +54,8 @@ seat of government from the gate and as a port from the ring road behind.
 | Piece | Position (x, z) | Size / facing | Note |
 |---|---|---|---|
 | Trading tower | (0, -24) | door toward +z | `TZ` -42 → -24; portico and steps end at z ≈ 3 |
-| Plaza and fountain | (0, 20) | r 12 | between the portico and the avenue |
-| The avenue (new) | x ±14, z 32 → 150 | 28 wide, paved, kerbed | lamp and banner pairs every 20 m at x ±20; a flat slab, no collider, so the ring road is unaffected |
+| Plaza and fountain | (0, 34) | r 12 | between the portico and the avenue, 21 m out from the steps (the casino's fountain needs the room) |
+| The avenue (new) | x ±7, z 44 → 150 | the traffic's own road surface (`loc.paved`) | lamp and banner pairs along it at x ±20; a ground decal, no collider, so the ring road is unaffected |
 | Gate arch and sign (new) | (0, 140) | across the avenue | the `k.sign` moves from (0, 120) onto the arch; flags at (±18, 110) |
 | Lab dome | (-58, 40) | r 22, door toward the avenue | was (0, 60) |
 | Trade hall (new) | (64, 24) | 24 × 56, long side on the avenue | a sawtooth-roofed hall (the roof an `ExtrudeGeometry` profile like the portico's pediment), loading doors on its back |

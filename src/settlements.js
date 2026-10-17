@@ -789,7 +789,7 @@ export function buildMeridian(world, loc) {
     const blue = 0x2ec4ff, cols = [0x2ec4ff, 0xff9f1c, 0x7dff6a, 0xff3b5c, 0xffd23f, 0xc77dff];
     // layout: the tower 24 m south of the origin (the name and HQ sprites hang over the origin at
     // y 50 and 62, which would be inside the tower's cone), its portico facing +z onto the plaza at
-    // (0, 20); the avenue runs from the plaza north to the gate arch at (0, 140); the dome west of
+    // (0, 34); the avenue runs from the plaza north to the gate arch at (0, 140); the dome west of
     // the avenue and the hall east of it; the chairwoman at the foot of the steps; the yard, the
     // cranes and the garage south of the tower
     const TZ = -24;
@@ -905,16 +905,16 @@ export function buildMeridian(world, loc) {
     gantryCrane(k, yx, yz, YEL, { speed: 1 / 70, phase: 0.3, travel: 24, lane: 10, faction: 'meridian' });
     // the yard's slab, the plaza and the avenue have no colliders to say they are taken: keep the traffic's pads, the ring's stop and
     // the defence pylons off them (traffic.js keepouts, world.js defensePylons); the yard's is sized so the turret at (25, -122) stays put
-    (loc.keep ||= []).push({ x: yx, z: yz, r: 30 }, { x: 0, z: 20, r: 14 }, ...[45, 75, 105, 135].map((z) => ({ x: 0, z, r: 20 })));
+    (loc.keep ||= []).push({ x: yx, z: yz, r: 30 }, { x: 0, z: 34, r: 14 }, ...[56, 82, 108, 134].map((z) => ({ x: 0, z, r: 16 })));
     // two tower cranes over the yard
     towerCrane(k, -54, -72, 34, 30, YEL, { speed: 0.09, phase: 0 });
     towerCrane(k, 62, -78, 34, 30, YEL, { speed: 0.11, phase: 2.2 });
     // the lab dome west of the avenue, its airlock facing it; the trade hall east of it, its doors facing it
     habDome(k, -58, 40, 22, 0x9be7ff, { door: Math.PI / 2, trim: blue });
     tradeHall(k, 64, 24, 24, 56, blue);
-    // the plaza between the portico and the avenue: paving, the fountain (the casino's, with a dollar sign in Meridian
-    // blue turning on top), benches round the basin, lamps
-    k.at(0, 20);
+    // the plaza between the portico and the avenue, a good way out from the steps so the fountain has room: paving, the
+    // fountain (the casino's, with a dollar sign in Meridian blue turning on top), benches round the basin, lamps
+    k.at(0, 34);
     k.cyl(12, 12.4, 0.25, 32, T(0xd8d4e8), 0, 0, 0, { outline: 0.04 });
     k.ring(12.2, 0.15, T(blue), 0, 0.25, 0);
     for (let i = 0; i < 6; i++) {
@@ -922,16 +922,13 @@ export function buildMeridian(world, loc) {
       k.box(2.6, 0.5, 0.8, T(0x8a5a3a), Math.cos(a) * 11, 0.5, Math.sin(a) * 11, { ry: -a + Math.PI / 2, outline: 0.03 });
     }
     k.at();
-    fountain(k, 0, 20, { top: 'dollar', accent: blue });
-    k.lamp(16, 20, 8); k.lamp(-16, 20, 8);
-    // the avenue: 28 m of paving from the plaza to the gate, kerbed, a cream band every 20 m and a line of
-    // inset lights down the middle; lamps and banners in pairs along it (the flags between them are the world's)
+    fountain(k, 0, 34, { top: 'dollar', accent: blue });
+    k.lamp(16, 34, 8); k.lamp(-16, 34, 8);
+    // the avenue: a road from the plaza's edge to the gate, the traffic's own (traffic.js pavedStrip lays its bed, ruts and
+    // berms with the road network, melting in under the plaza's paving and out past the arch); lamps and banners in pairs
+    // along it (the flags between them are the world's)
     {
-      const z0 = 32, z1 = 150, zc = (z0 + z1) / 2;
-      k.box(28, 0.3, z1 - z0, T(0x6b6880), 0, 0, zc, { outline: 0.04 });
-      for (const s of [-1, 1]) k.box(0.7, 0.35, z1 - z0, T(0xd8d4e8), s * 14, 0.3, zc, { outline: 0.02 });
-      for (let z = 50; z < z1; z += 20) k.box(28, 0.32, 1.2, T(0xd8d4e8), 0, 0, z, { outline: 0 });
-      for (let z = z0 + 4; z < z1 - 2; z += 6) k.box(0.5, 0.06, 1.4, G(blue), 0, 0.3, z, { outline: 0 });
+      loc.paved = [{ x0: 0, z0: 44, x1: 0, z1: 150 }];
       for (const z of [50, 90, 130]) { k.lamp(20, z, 8); k.lamp(-20, z, 8); }
       for (const z of [70, 130]) for (const sx of [-1, 1]) {
         k.cyl(0.12, 0.14, 12, 6, T(DARK), sx * 20, 0, z + 4, { outline: 0.02 });

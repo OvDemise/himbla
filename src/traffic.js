@@ -712,6 +712,7 @@ export class Traffic {
       else console.warn('[traffic] no road to put a T on for', t.from);
     }
     for (const [loc, R] of this.rings) this.buildRing(loc, R);
+    for (const loc of this.w.locations) for (const s of loc.paved || []) this.pavedStrip(loc, s);
     this.pieces.forEach((pc, i) => { pc.id = i; this.finishPiece(pc); });
     for (const R of this.rings.values()) this.ringStop(R);
     for (const R of this.rings.values()) this.garageLink(R);
@@ -1439,6 +1440,22 @@ export class Traffic {
     // (the ring's own berm makes way where the forecourt flares into it: a ring point's place in the garage's frame)
     const toGarage = (wp) => { const q = this.local(loc, wp, _a), dx = q.x - G.x, dz = q.z - G.z; return { lx: dx * c - dz * sn, lz: dx * sn + dz * c }; };
     return { i0, j, Q, raw, fc, toGarage, lead: Math.ceil(11 / step), trail: m + Math.ceil(14 / step), polyLen: lenOf(raw, 0, raw.length - 1), hallLen: lenOf(raw, 0, 0) + A.distanceTo(L2W(bx, H.hz)), plinthAt: A.distanceTo(L2W(bx, LZ0)), piece: null };
+  }
+
+  // A straight road a settlement asked for inside its own grounds (`loc.paved`: { x0, z0, x1, z1 } in the settlement's frame; the
+  // Meridian Exchange's avenue, from its plaza to its gate arch): the road's own bed, ruts and berms, melting into the ground at both
+  // ends. Laid with the network, after the rings; nothing drives on it.
+  pavedStrip(loc, { x0, z0, x1, z1 }) {
+    const n = Math.max(2, Math.ceil(Math.hypot(x1 - x0, z1 - z0) / 4));
+    const g = [];
+    for (let i = 0; i <= n; i++) g.push(this.P.ground(this.w.toWorld(loc, x0 + ((x1 - x0) * i) / n, 0, z0 + ((z1 - z0) * i) / n), new THREE.Vector3()));
+    const { side, cum } = this.frames(g), total = cum[n];
+    const base = this.roadGeo.pos.length / 3;
+    for (let i = 0; i <= n; i++) {
+      const s = cum[i];
+      this.stripPush(g[i], side[i], s, 1, smooth(s / 8) * smooth((total - s) / 8), smooth((s - 6) / 10) * smooth((total - s - 6) / 10), 1, 1, 0);
+    }
+    this.stripIdx(base, n + 1);
   }
 
   // After the ring's pieces are finished: link the garage piece onto the lane arc it meets, and set the rover's height over the garage
