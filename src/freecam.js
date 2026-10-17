@@ -11,6 +11,8 @@ import { glyphHtml, glyphState } from './glyphs.js';
 //   mouse look · W A S D fly along the view · E / Space up · Q / C down · Shift fast · wheel changes the speed
 //   (the keys are the game's own bindings, so a remapped W is the forward key)
 //   controller: right stick look · left stick fly · LB up · RB down · LT fast · d-pad ↑ / ↓ change the speed (held: it keeps going)
+//   · d-pad → hides the HUD (all of #hud: the panels, the speedometer and hull, the prompts, the popups, the cracked visor; the menus
+//   and dialogs are not in it) and shows it again; switching free cam off always brings it back
 //   (gamepad.js hands the pad's buttons over in `pad` each frame; the keys the pad also sends are not read, so A, B and L3 do nothing)
 
 const SPEED_MIN = 2, SPEED_MAX = 3000, SPEED_START = 40; // m/s (the Moon is 3.6 km in radius)
@@ -36,7 +38,8 @@ export class FreeCam {
     this.speed = SPEED_START;
     this.lent = null; // the real input state, while the game has the blank one (between takeInput and giveBack)
     this.blank = { keys: new Set(), justPressed: new Set(), mouse: [false, false, false], padMove: { x: 0, y: 0, on: false } };
-    this.pad = null; // { rise, fast, speed }: the controller's buttons this frame (gamepad.js play() sets it while this is on and the pad is in use)
+    this.pad = null; // { rise, fast, speed, hud }: the controller's buttons this frame (gamepad.js play() sets it while this is on and the pad is in use)
+    this.hudOff = false;
     this.hint = null;
     this.hintSpeed = 0;
     this.hintKind = '';
@@ -62,7 +65,14 @@ export class FreeCam {
   stop() {
     this.on = false;
     this.giveBack();
+    this.setHud(false);
     if (this.hint) { this.hint.remove(); this.hint = null; }
+  }
+
+  // style.css: body.hud-off hides #hud (and this hint)
+  setHud(off) {
+    this.hudOff = off;
+    document.body.classList.toggle('hud-off', off);
   }
 
   // keep the heading along the ground under the camera (the ground turns away as you go round the sphere)
@@ -83,6 +93,7 @@ export class FreeCam {
     if (!this.on || g.state !== 'play') return;
     const I = g.input;
     const sv = g.settings ? g.settings.v : null;
+    if (pd && pd.hud) this.setHud(!this.hudOff);
 
     const [mx, my] = I.consumeMouse();
     const sens = 0.0022 * (sv ? sv.sensitivity : 1);
@@ -152,7 +163,7 @@ export class FreeCam {
     this.hintKind = glyphState.kind; // (an Xbox, PlayStation or Switch pad: the buttons are drawn to match)
     const s = this.speed;
     const kb = '<b>WASD</b> fly · <b>E</b>/<b>Space</b> up · <b>Q</b>/<b>C</b> down · <b>Shift</b> fast · <b>wheel</b> speed';
-    const pad = glyphHtml(['LS', '#fly', 'RS', '#look', 'LB', '#up', 'RB', '#down', 'LT', '#fast', 'DU', 'DD', '#speed']);
+    const pad = glyphHtml(['LS', '#fly', 'RS', '#look', 'LB', '#up', 'RB', '#down', 'LT', '#fast', 'DU', 'DD', '#speed', 'DR', '#hud']);
     this.hint.innerHTML = `FREE CAM · <span class="fc-kb">${kb}</span><span class="fc-pad">${pad}</span> · ${s < 10 ? s.toFixed(1) : Math.round(s)} m/s`;
   }
 }

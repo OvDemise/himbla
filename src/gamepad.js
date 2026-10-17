@@ -42,7 +42,7 @@
 //                                               left stick / d-pad  pick a duck   A  race · new race
 //                                               LB / RB     lower / raise the bet   B  stand up
 //   (the pad rumbles too, and a PlayStation pad lights up and gets adaptive triggers: see haptics.js, sonyout.js)
-//   (with the dev free cam on: LB / RB are its up / down, LT is fast, d-pad ↑ / ↓ change its speed: freecam.js)
+//   (with the dev free cam on: LB / RB are its up / down, LT is fast, d-pad ↑ / ↓ change its speed, d-pad → hides the HUD: freecam.js)
 //   d-pad ↓      the radial menu (tap to open, tap again to close): vehicles, powers, wardrobe, reputation log,
 //                empty the jar (vehicles and powers open their own wheel of the ones you own:
 //                same controls; a power you pick on its wheel is the one RB uses). The right stick picks a wedge (the
@@ -236,10 +236,10 @@ export class Gamepad {
     for (const [i, code] of Object.entries(HOLD)) this.set(code, btn[i] && !((hold || wheelOpen) && (i == B.A || i == B.B)) && !((hold || gwSticky) && i == B.Y));
     I.mouse[0] = trig(B.RT) > 0.35;
     I.mouse[2] = trig(B.LT) > 0.35;
-    // the dev free cam (freecam.js) has the buttons while it is on: LB up, RB down, LT fast, d-pad ↑ / ↓ its speed (so the d-pad is
-    // not the weapon and power switch, nor the radial menu below)
+    // the dev free cam (freecam.js) has the buttons while it is on: LB up, RB down, LT fast, d-pad ↑ / ↓ its speed, d-pad → the HUD on
+    // and off (so the d-pad is not the weapon and power switch, nor the radial menu below)
     const fc = g.cheats.freeCam;
-    if (fc.on) fc.pad = { rise: (btn[B.LB] ? 1 : 0) - (btn[B.RB] ? 1 : 0), fast: trig(B.LT) > 0.35, speed: (btn[B.UP] ? 1 : 0) - (btn[B.DOWN] ? 1 : 0) };
+    if (fc.on) fc.pad = { rise: (btn[B.LB] ? 1 : 0) - (btn[B.RB] ? 1 : 0), fast: trig(B.LT) > 0.35, speed: (btn[B.UP] ? 1 : 0) - (btn[B.DOWN] ? 1 : 0), hud: pressed(B.RIGHT) };
     // (not while the wheel is open or d-pad down is down: a diagonal press on the way to ↓ isn't a weapon swap)
     else if (!this.radial && !gw && !pw && !btn[B.DOWN]) {
       if (pressed(B.LEFT)) this.cycleWeapon(-1);
