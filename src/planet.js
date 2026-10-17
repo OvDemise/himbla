@@ -3,6 +3,7 @@ import { PLANET } from './config.js';
 import { mulberry32, smoothstep, clamp } from './rng.js';
 import { gradientMap } from './toon.js';
 import { shapedRocks } from './rocks.js';
+import { railOf } from './rails.js';
 import { rayCollider } from './physics.js';
 import { TerrainField, faceDir, dirToGrid, N, CH, CPF, N1, R, MAX_LOD } from './terrainField.js';
 
@@ -412,15 +413,7 @@ diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.93, 0.9, 0.86), rimChip * rimCor
 
   // Grind rails (the crests of snake rocks): polyline, arc lengths and a bounding sphere.
   addRail(r) {
-    const pts = r.pts;
-    const cum = [0];
-    for (let i = 1; i < pts.length; i++) cum.push(cum[i - 1] + pts[i].distanceTo(pts[i - 1]));
-    const c = new THREE.Vector3();
-    for (const p of pts) c.add(p);
-    c.divideScalar(pts.length);
-    let rad = 0;
-    for (const p of pts) rad = Math.max(rad, p.distanceTo(c));
-    (this.rails ||= []).push({ pts, cum, len: cum[cum.length - 1], c, rad });
+    (this.rails ||= []).push(railOf(r.pts));
   }
 
   // Crater lips: the ink line and the grind rail are the same thing. A crater's lip counts if it
