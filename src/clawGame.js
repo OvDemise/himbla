@@ -9,6 +9,7 @@ import { canvasTex, FONT, clawPt } from './casinoWorld.js';
 const MOOD_TEXT = ['CALM TANK', 'THICK AIR: THINGS STAY PUT', 'STORM: EVERYTHING KEEPS MOVING', 'SURGE: GRAVITY WILL HICCUP'];
 const fmt = (n) => Math.floor(n).toLocaleString('en-US');
 const _v = new THREE.Vector3();
+const CLAW_EARSHOT = 40; // metres from the machine within which its sounds, pop-ups and shakes play when nobody is seated
 // the machine's frame (build_claw.py): the front glass, and the part of the tank the camera frames (the frame's width, the floor to the roof)
 const GLASS_Z = 3.62, TANK_HALF_W = 8.55, TANK_MID_Y = 3.95, TANK_H = 5.5;
 
@@ -133,10 +134,21 @@ export class ClawGame {
     return { mx: Math.max(-1, Math.min(1, (ex - c.vx) / 5)), my: Math.max(-1, Math.min(1, (ey - c.vy) / 4)), mz: Math.max(-1, Math.min(1, (ez - c.vz) / 5)), beam: false };
   }
 
+  // Whether what happens in the tank is for the player: seated at the machine, or within earshot of it. The tank runs its sim
+  // whenever the casino is active (world.js: within 2.6 km of the player), and an idle tank's magnets keep catching things that
+  // drift by, so without this its clicks, thuds and pop-ups played for the whole Moon.
+  near() {
+    const G = this.G;
+    if (G.mode === 'claw') return true;
+    const P = G.g.player;
+    return !!P && P.pos.distanceToSquared(G.cw.toWorld(...clawPt(0, 3, 4), _v)) < CLAW_EARSHOT * CLAW_EARSHOT;
+  }
+
   // ---------- what the sim says happened ----------
   event(e) {
     const G = this.G, A = G.audio;
     const at = (x, y, z) => clawPt(x, y, z);
+    if (e.type !== 'end' && !this.near()) return; // (a round only runs seated; its end settles the bank regardless)
     switch (e.type) {
       case 'bank': {
         const v = e.value, label = e.tags.length ? e.tags.join(' ') : '';

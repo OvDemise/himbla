@@ -1,22 +1,25 @@
 import * as THREE from 'three';
 import { T, G } from './outpostModels.js';
 
-// The landing pad that shuttles and freighters set down on: a round deck up on steel legs, a safety railing all the way round
-// it, and one straight flight of stairs down to the ground for the people walking to and from the ships.
+// The landing pad that shuttles and freighters set down on: a round deck 3 m up on a clad base, a safety railing all the way
+// round it, and one straight flight of stairs down to the ground for the people walking to and from the ships. The base is
+// closed all round (panels and ribs, a door at the back) and solid to physics, and so is the space under the stairs: nobody
+// skates in under the deck, where the camera would follow them into the underside of whatever ship stands on it.
 //
 // Built in the pad's own frame: the deck's centre on (0, 0), y in the frame of whatever it stands in (a settlement's, or a
 // plot's), the stairs running out along local +z from the deck's edge. One builder for every size (the shuttle's deck is
 // about 14 m round, the freighter's 21) and any ground under it: `ground(x, z)` gives the height of the ground at a point
-// of the pad's frame, so the legs reach down to it and the stairs end on it. traffic.js lays the pads its lines use,
+// of the pad's frame, so the base reaches down to it and the stairs end on it. traffic.js lays the pads its lines use,
 // world.js the ones a settlement is built with (World.pad), hometown.js the Shuttle Pad on your town's plot.
 
 export const PAD_H = 3;      // the deck stands this far above the highest ground under it
 const DECK_T = 0.7;          // deck slab thickness
 const RAIL_H = 1.15;         // the railing's height over the deck
 const RAIL_IN = 0.35;        // ...and how far in from the deck's edge it stands
+const SKIRT_IN = 0.45;       // the base's panels stand this far in from the deck's edge
 const STAIR_W = 2.6;         // the flight's width (between its handrails)
 const RISE = 0.25, RUN = 0.34; // one step: about 36 degrees, gentle enough for physics to count the flight as ground
-const STEEL = 0x55607a, DARK = 0x3a3550, DECK = 0x5b5870, TOP = 0x4a4660, YEL = 0xffd23f, CONC = 0x8a8698, LIGHT = 0xd8d4e8;
+const STEEL = 0x55607a, DARK = 0x3a3550, DECK = 0x5b5870, TOP = 0x4a4660, YEL = 0xffd23f, CONC = 0x8a8698, LIGHT = 0xd8d4e8, PANEL = 0x6a6680;
 
 // Where everything goes, before anything is drawn (the builder, the colliders and the walkers all read it).
 // r: the deck's radius. top: the deck's height (or null: PAD_H over the highest ground under it).
@@ -36,16 +39,9 @@ export function padPlan(r, ground = () => 0, top = null) {
     footY = ground(0, r + run);
   }
   const rise = (top - footY) / n;
-  // the legs: a ring at 0.7 r (and a second at 0.35 r on a freighter's deck), each down to its own ground
-  const legs = [];
-  const ring = (rad, count, off) => {
-    for (let i = 0; i < count; i++) {
-      const a = off + (i / count) * Math.PI * 2, x = Math.cos(a) * rad, z = Math.sin(a) * rad;
-      legs.push({ x, z, y0: ground(x, z) - 1.2 });
-    }
-  };
-  ring(r * 0.72, Math.max(6, Math.round((Math.PI * 2 * r * 0.72) / 7.5)), Math.PI / 8);
-  if (r > 17) ring(r * 0.36, 6, 0);
+  // the base: a drum of panels just inside the deck's edge, down to a little below the lowest ground round it
+  let lo = Infinity;
+  for (let i = 0; i < 16; i++) { const a = (i / 16) * Math.PI * 2; lo = Math.min(lo, ground(Math.cos(a) * (r - SKIRT_IN), Math.sin(a) * (r - SKIRT_IN))); }
   // the railing's posts: every ~2.4 m round the edge, leaving the gap the stairs come up into
   const rr = r - RAIL_IN, gap = (STAIR_W / 2 + 0.25) / rr; // (half the gap's angle, either side of +z)
   const nPost = Math.max(16, Math.round((Math.PI * 2 * rr) / 2.4));
@@ -56,8 +52,8 @@ export function padPlan(r, ground = () => 0, top = null) {
     posts.push({ x: Math.cos(a) * rr, z: Math.sin(a) * rr });
   }
   return {
-    r, top, hi, legs, posts,
-    stairs: { w: STAIR_W, n, rise, run, z0: r, z1: r + run, footY },
+    r, top, hi, posts, baseY: lo - 1.2, doorY: ground(0, -(r - SKIRT_IN)),
+    stairs: { w: STAIR_W, n, rise, run, z0: r, z1: r + run, footY, headY: ground(0, r) },
     // where a walker steps onto the deck, and off the flight onto the ground (pad frame)
     deckEdge: { x: 0, y: top, z: r - 0.9 },
     foot: { x: 0, y: footY, z: r + run + 0.9 },
@@ -66,7 +62,7 @@ export function padPlan(r, ground = () => 0, top = null) {
 
 // Draw the pad into a Kit (outpostModels.js), in the frame the Kit is at. color: the markings and the lamps.
 export function padKit(k, plan, color = YEL) {
-  const { r, top, legs, posts, stairs: S } = plan;
+  const { r, top, posts, baseY, stairs: S } = plan;
   const bot = top - DECK_T;
   const seg = Math.max(32, Math.round(r * 3));
   // deck: the slab, a darker landing surface, a hazard band round the edge and the markings
@@ -84,19 +80,21 @@ export function padKit(k, plan, color = YEL) {
   for (const s of [-1, 1]) k.box(bw, 0.05, h, T(LIGHT), s * h * 0.36, top + 0.02, 0, { outline: 0 });
   k.box(h * 0.72, 0.05, bw, T(LIGHT), 0, top + 0.02, 0, { outline: 0 });
   for (const s of [-1, 1]) k.box(0.35, 0.05, 1.6, T(YEL), s * 0.55, top + 0.02, r - 2.2, { ry: s * 0.6, outline: 0 });
-  // underneath: a ring girder over the legs, the legs on footings, and knee braces up to the slab
-  for (const L of legs) {
-    const len = bot - L.y0;
-    k.box(0.6, len, 0.6, T(STEEL), L.x, L.y0, L.z, { outline: 0.05 });
-    k.box(1.5, 0.35, 1.5, T(CONC), L.x, L.y0 + 1.0, L.z, { outline: 0.04 }); // (the footing, where the leg meets the ground)
-    const d = Math.hypot(L.x, L.z) || 1, tx = -L.z / d, tz = L.x / d;
-    for (const s of [-1, 1]) k.beam([L.x, bot - 1.1, L.z], [L.x + tx * s * 1.3, bot - 0.05, L.z + tz * s * 1.3], 0.09, T(DARK), { outline: 0.02 });
+  // the base: a drum of panels under the deck, a concrete course round its foot, ribs every ~2.8 m, a glowing strip under the
+  // deck's lip, and a service door at the back (opposite the stairs)
+  const rs = r - SKIRT_IN, hb = bot - baseY;
+  k.add(new THREE.CylinderGeometry(rs, rs, hb, seg, 1, true), T(PANEL), 0, baseY + hb / 2, 0, { outline: 0.06 });
+  k.add(new THREE.CylinderGeometry(rs + 0.15, rs + 0.2, 1.75, seg, 1, true), T(CONC), 0, baseY + 0.875, 0, { outline: 0.04 });
+  const ribs = Math.max(12, Math.round((Math.PI * 2 * rs) / 2.8));
+  for (let i = 0; i < ribs; i++) {
+    const a = ((i + 0.5) / ribs) * Math.PI * 2;
+    k.box(0.32, hb, 0.2, T(DARK), Math.cos(a) * (rs + 0.08), baseY, Math.sin(a) * (rs + 0.08), { ry: -a, outline: 0.02 });
   }
-  const outer = legs.filter((L) => Math.hypot(L.x, L.z) > r * 0.5);
-  for (let i = 0; i < outer.length; i++) {
-    const a = outer[i], b = outer[(i + 1) % outer.length];
-    k.beam([a.x, bot - 0.2, a.z], [b.x, bot - 0.2, b.z], 0.18, T(DARK), { outline: 0.03 });
-  }
+  k.ring(rs + 0.06, 0.05, G(color), 0, bot - 0.3, 0);
+  const dy = plan.doorY;
+  k.box(1.9, 2.5, 0.16, T(YEL), 0, dy, -rs - 0.04, { outline: 0.03 });
+  k.box(1.5, 2.25, 0.2, T(DARK), 0, dy, -rs - 0.06, { outline: 0 });
+  k.ball(0.14, G(color), 0, dy + 2.75, -rs - 0.15, { outline: 0 });
   // the railing: posts, a top rail and a knee rail, and a lamp on every third post
   const pTop = top + RAIL_H;
   posts.forEach((p, i) => {
@@ -127,6 +125,10 @@ export function padKit(k, plan, color = YEL) {
       k.cyl(0.07, 0.07, 0.95, 6, T(STEEL), s * (hw + 0.07), y, z, { outline: 0.02 });
     }
   }
+  // the space under the flight is closed too: a panel each side, from the ground up to the stringer
+  const under = new THREE.Shape([new THREE.Vector2(z0 - SKIRT_IN, S.headY - 0.4), new THREE.Vector2(z0 - SKIRT_IN, top - 0.55), new THREE.Vector2(z0 + run, footY - 0.25), new THREE.Vector2(z0 + run, footY - 0.4)]);
+  const ug = new THREE.ExtrudeGeometry(under, { depth: 0.08, bevelEnabled: false }).rotateY(-Math.PI / 2);
+  for (const s of [-1, 1]) k.add(ug.clone(), T(PANEL), s * (hw + 0.07) + 0.04, 0, 0, { outline: 0.03 });
   k.box(w + 1.2, 0.18, 1.8, T(CONC), 0, footY - 0.08, z0 + run + 0.8, { outline: 0.04 });
   // a lamp each side of the stairs' head, so the way down reads at night
   for (const s of [-1, 1]) {
@@ -135,13 +137,13 @@ export function padKit(k, plan, color = YEL) {
   }
 }
 
-// The colliders, in the pad's frame (the same specs world.col takes): the deck, the legs, the railing, the flight as a slope
+// The colliders, in the pad's frame (the same specs world.col takes): the deck and its base as one solid drum from below the
+// ground up to the deck (nothing gets in under it), the railing, the flight as a slope deep enough to fill the space under it,
 // and its handrails.
 export function padCols(plan) {
-  const { r, top, legs, posts, stairs: S } = plan;
+  const { r, top, posts, baseY, stairs: S } = plan;
   // (the deck and the flight are `stick`: physics keeps a walker on them over the stairs' head; see physics.js)
-  const cols = [{ type: 'cyl', x: 0, z: 0, y0: top - DECK_T, y1: top, r, stick: true }];
-  for (const L of legs) cols.push({ type: 'cyl', x: L.x, z: L.z, y0: L.y0, y1: top - DECK_T, r: 0.42 });
+  const cols = [{ type: 'cyl', x: 0, z: 0, y0: baseY, y1: top, r, stick: true }];
   for (let i = 0; i + 1 < posts.length; i++) {
     const p = posts[i], q = posts[i + 1];
     cols.push({ type: 'box', x: (p.x + q.x) / 2, y: top + 0.6, z: (p.z + q.z) / 2, hx: Math.hypot(q.x - p.x, q.z - p.z) / 2 + 0.05, hy: 0.6, hz: 0.1, yaw: -Math.atan2(q.z - p.z, q.x - p.x) });
@@ -149,7 +151,10 @@ export function padCols(plan) {
   // the flight: a slab whose top face runs from the foot up to the deck (settlements.js slope(), as the skate park's ramps)
   // (its top edge meets the deck's rim exactly, so there is no lip to stub a toe on: past the rim its face would stand above the deck)
   const A = [0, S.footY - 0.3 * (S.rise / RUN), S.z1 + 0.3], B = [0, top, S.z0];
-  cols.push({ ...slab(A, B, S.w + 0.2, 0.5), stick: true });
+  // (deep enough, square to the slope, to reach the ground under the stairs' head: a slab only half a metre deep left a pocket under
+  // the flight to skate into)
+  const pitch = Math.atan2(top - S.footY, S.run);
+  cols.push({ ...slab(A, B, S.w + 0.2, Math.max(0.5, ((top - S.headY) * Math.cos(pitch) + 0.6) / 2)), stick: true });
   for (const s of [-1, 1]) cols.push(slab([s * (S.w / 2 + 0.1), S.footY + 1.1, S.z1 + 0.2], [s * (S.w / 2 + 0.1), top + 1.1, S.z0 - 0.4], 0.16, 0.55));
   return cols;
 }

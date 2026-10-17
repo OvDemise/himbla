@@ -490,7 +490,6 @@ export function stepSkater(b, input, dt, planet, colliders, params = PHYS, impac
       }
       if (hp > 0) {
         b.pos.addScaledVector(up, -d + hp / _tmp.dot(up)); // (straight down onto it: no sliding back down a flight)
-        b.snaps = (b.snaps || 0) + 1;
         v.addScaledVector(_tmp, -v.dot(_tmp));
         b.grounded = true; b.groundN.copy(_tmp); b.altitude = 0; b.onStruct = true; b.stuck = true;
         break;
