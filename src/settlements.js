@@ -695,8 +695,8 @@ export function buildMeridian(world, loc) {
     // layout: the tower 24 m south of the origin (the name and HQ sprites hang over the origin at
     // y 50 and 62, which would be inside the tower's cone), its portico facing +z onto the plaza at
     // (0, 20); the avenue runs from the plaza north to the gate arch at (0, 140); the dome west of
-    // the avenue and the hall east of it, both leaving the leader's spot (story.findSpot, about
-    // (38, 67)) clear; the yard, the cranes and the garage south of the tower
+    // the avenue and the hall east of it; the chairwoman at the foot of the steps; the yard, the
+    // cranes and the garage south of the tower
     const TZ = -24;
     // the trading tower: three stepped octagonal tiers of glass and white bands (1.5x the old one,
     // set further back off the plaza)
@@ -769,6 +769,8 @@ export function buildMeridian(world, loc) {
       k.at();
       k.lamp(-11, TZ + fz + 10.5, 6); k.lamp(11, TZ + fz + 10.5, 6);
     }
+    // the chairwoman (story.buildLeaders) stands at the foot of the portico's steps, off the doors' line, facing the plaza
+    loc.leaderSpot = { x: 8, z: 6, yaw: Math.atan2(-8, 14) };
     const crown = part(blue, (q) => {
       for (let i = 0; i < 4; i++) {
         const a = (i / 4) * TAU;

@@ -59,7 +59,7 @@ seat of government from the gate and as a port from the ring road behind.
 | Gate arch and sign (new) | (0, 140) | across the avenue | the `k.sign` moves from (0, 120) onto the arch; flags at (±18, 110) |
 | Lab dome | (-58, 40) | r 22, door toward the avenue | was (0, 60) |
 | Trade hall (new) | (64, 24) | 24 × 56, long side on the avenue | a sawtooth-roofed hall (the roof an `ExtrudeGeometry` profile like the portico's pediment), loading doors on its back |
-| Leader's podium | (38, 67) | `findSpot`'s first candidate | 17 m from the hall's corner, beside the avenue |
+| Leader's podium | (8, 6) | pinned (`loc.leaderSpot`), facing the plaza | at the foot of the portico's steps, off the doors' line (the study had it at `findSpot`'s (38, 67), beside the avenue) |
 | Container yard | (0, -97) | 70 × 30, gantry travel ±28 | was (-5, -100), 62 × 30 |
 | Tower cranes | (-54, -72), (62, -78) | jibs over the yard | were (-78, 6), (78, -6) |
 | Main garage | fixed | | |
@@ -67,8 +67,8 @@ seat of government from the gate and as a port from the ring road behind.
 | Floodmasts | (40, -124), (-44, -118) | | over the yard |
 
 **What it does for play.** The avenue is a long straight you can take at speed from the gate to the plaza, and its
-kerbs are a natural grind line if they are registered as rails. The leader stands beside the avenue, so the Charter
-finale's visit is a ride up the axis to the podium. From the ring road's south stretch the yard and both cranes
+kerbs are a natural grind line if they are registered as rails. The leader stands at the foot of the steps facing the
+plaza, so the Charter finale's visit is a ride up the axis to the podium. From the ring road's south stretch the yard and both cranes
 front the road, so the port is still the thing the traffic sees.
 
 **Code.** All in `buildMeridian`: move `TZ`, the plaza, the dome, the yard (and its gantry's travel), the cranes,
@@ -77,8 +77,8 @@ pairs), the arch and the hall (one new helper). `traffic.js` is untouched: the g
 are spares and the traffic lays its own.
 
 **Risks.** The tower at (0, -24) stands 24 m off the origin, so the two sprites over (0, 0) clear its third tier
-(r 10.5) and its cone; they would not clear it at (0, 0). The podium's 8 m halo is honoured by the hall (17 m) and
-the avenue (no collider). Nothing new stands near the garage's forecourt.
+(r 10.5) and its cone; they would not clear it at (0, 0). The podium is pinned, so `findSpot`'s 8 m rule does not
+apply to it; it keeps 4 m off the portico's lamps. Nothing new stands near the garage's forecourt.
 
 ## Layout B: Freeport (industrial, split by a spine)
 
@@ -128,7 +128,7 @@ is close to the podium's halo (12 m, against a limit of 8 m). More new geometry 
 | Seen from the gate | the tower, head-on, at the end of the avenue | the plaza and the dome; the tower to the left |
 | Seen from the ring road (south) | yard, cranes | the whole port: yard, cranes, garage |
 | Skate line | one 118 m straight with kerbs | a 240 m straight plus container terraces |
-| Leader's spot | beside the avenue, 17 m clear | between plaza and dome, 12 m clear |
+| Leader's spot | at the foot of the steps, pinned | between plaza and dome, 12 m clear |
 | New pieces | avenue, arch, hall | spine, bigger yard; the tower's entrance turned |
 | Code that changes | `buildMeridian` only | `buildMeridian`, plus a tower helper with a yaw |
 | `traffic.js` | untouched | untouched |
