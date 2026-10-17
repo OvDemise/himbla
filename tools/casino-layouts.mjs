@@ -74,7 +74,7 @@ const blackjack = (x0, z0, yaw) => {
 //            off lane 0 at the middle, its station 2.0 m further out (r 2.8); the arches (gate, finish) are 1.2 thick and 6.5 tall. The odds board (17.2 x 6.8, y 5 to 11.8) hangs on the wall behind.
 //            Two lenses: the kiosk's (9 m up, 7.5 m out) and the race's (6.2 m up, 7.5 m off lane 0, following the lead along the whole track)
 //            `f(u, v)` maps track coordinates (u along, v toward the viewers from the far wall) to the hall's (x, z).
-const duck = (f, u0, farRail, ko = 5.4) => {
+const duck = (f, u0, farRail, ko = 5.4, pillars = false) => {   // pillars: the gate's and the arch's piers stand 1 m in from the wall's face (centre) and are 0.8 wide, 9.6 m apart
   const lane0 = farRail + 6.3, mid = u0 + 14.2;
   const box = (ua, ub, va, vb) => { const a = f(ua, va), b = f(ub, vb); return R(a[0], b[0], a[1], b[1]); };
   const k = f(mid, lane0 + ko), ks = f(mid, lane0 + ko + 2);
@@ -83,8 +83,8 @@ const duck = (f, u0, farRail, ko = 5.4) => {
   return {
     items: [
       { id: 'Duck basin', s: box(u0, u0 + 28.4, farRail, lane0 + 1.5), h: 1.4, cls: 'game', grp: 'duck' },
-      { id: 'Start gate', s: box(u0 + 1.1, u0 + 2.3, farRail, lane0 + 1.5), h: 6.5, cls: 'game', grp: 'duck' },
-      { id: 'Finish arch', s: box(u0 + 26.1, u0 + 27.3, farRail, lane0 + 1.5), h: 6.5, cls: 'game', grp: 'duck' },
+      { id: 'Start gate', s: box(u0 + 1.1, u0 + 2.3, pillars ? farRail - 1.3 : farRail, pillars ? farRail + 9.1 : lane0 + 1.5), h: 6.5, cls: 'game', grp: 'duck' },
+      { id: 'Finish arch', s: box(u0 + 26.1, u0 + 27.3, pillars ? farRail - 1.3 : farRail, pillars ? farRail + 9.1 : lane0 + 1.5), h: 6.5, cls: 'game', grp: 'duck' },
       { id: 'Duck kiosk', s: rc(k[0], k[1], kw, kd), h: 2.4, cls: 'game', free: true },
     ],
     stations: [{ of: 'Duck kiosk', s: C(ks[0], ks[1], 2.8), cls: 'game' }],
@@ -179,12 +179,11 @@ const cross = (() => {
   // everything below comes from src/casinoPlan.js, the numbers the game builds from: a layout that drifts from the game fails here
   const { C, WING } = HALL, CZ = C[1];
   const floor = floorShapes();
-  const eDuck = duck((u, v) => [u, DUCK.wallZ + v], DUCK.x0 - 2.2, 0.9);
-  const lane0 = DUCK.wallZ + 0.9 + 6.3;
+  const eDuck = duck((u, v) => [u, DUCK.wallZ + v], DUCK.x0 - 2.2, 1.9, 5.4, true);
+  const lane0 = DUCK.wallZ + 1.9 + 6.3;
   if (Math.abs(lane0 - DUCK.lanes[0]) > 1e-6 || Math.abs(DUCK.kiosk[1] - (lane0 + 5.4)) > 1e-6) throw new Error('DUCK in casinoPlan.js does not match the checker\'s derby');
   const g = merge(
     prizeAt(PRIZE.wallX, [0, PRIZE.z], 'W'),
-    { items: [prop('Chip cage', R(-HALL.ARM, -HALL.ARM + 1.75, 3, 7), 3.95, 'game', { grp: 'prize' })], stations: [], corridors: [] },
     plinko(PLK.wallZ, PLK.x),
     claw(WING.z1, CLAW.x),
     classic(CLASSIC.wallZ, [CLASSIC.xs.reduce((a, b) => a + b) / CLASSIC.xs.length, 0], 'N'),

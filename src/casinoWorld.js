@@ -35,28 +35,6 @@ export function canvasTex(w, h, draw) {
 // canvas text uses the game's pixel display face (Press Start 2P is wide: scale sizes ~0.6x)
 export const FONT = (px) => pixelFont(px * 0.6);
 
-function signTex() {
-  return canvasTex(1024, 224, (x, w, h) => {
-    x.fillStyle = '#120a1e'; x.fillRect(0, 0, w, h);
-    x.fillStyle = '#5a1a8f'; x.fillRect(10, 10, w - 20, h - 20);
-    // marquee bulbs around the edge
-    for (let i = 0; i < 40; i++) {
-      const t = i / 40;
-      const p = t < 0.5 ? [30 + t * 2 * (w - 60), 26] : [30 + (t - 0.5) * 2 * (w - 60), h - 26];
-      x.fillStyle = i % 2 ? '#fff6a8' : '#ff2e88';
-      x.beginPath(); x.arc(p[0], p[1], 9, 0, Math.PI * 2); x.fill();
-    }
-    fitText(x, 'LUCKY CRATER CASINO', w - 80, 118);
-    x.textAlign = 'center'; x.textBaseline = 'middle';
-    x.lineWidth = 16; x.strokeStyle = '#120a1e'; x.lineJoin = 'round';
-    x.strokeText('LUCKY CRATER CASINO', w / 2, h / 2 + 6);
-    const g = x.createLinearGradient(0, 60, 0, 170);
-    g.addColorStop(0, '#fff6a8'); g.addColorStop(0.5, '#ffd23f'); g.addColorStop(1, '#ff9f1c');
-    x.fillStyle = g;
-    x.fillText('LUCKY CRATER CASINO', w / 2, h / 2 + 6);
-  });
-}
-
 // shrink the font until the text fits
 export function fitText(x, text, maxW, px) {
   let s = px;
@@ -447,7 +425,6 @@ export function buildCasino(w, loc) {
   put(makeHallPart('facade_crown'), HCX, CZ, crown);
   col({ type: 'cyl', x: HCX, z: CZ, y0: crown, y1: crown + 3, r: 16.6 });
   col({ type: 'sphere', x: HCX, y: crown + 3, z: CZ, r: 13 });
-  const domeTop = crown + 20.5;
   const bandMats = [glow(0xff2e88), glow(0x2ee6ff)];       // (the hall's two neon lines, which pulse)
   // the rings round the outline: extruded between two offsets of the plan's outline, so they meet at every corner with a mitre and no two of them lie on one plane
   // (a ring's back is buried in the wall by a different depth each, so nothing shares a face with the wall or another ring). `a` is the buried side, `b` the front: in metres
@@ -547,14 +524,6 @@ export function buildCasino(w, loc) {
     for (let i = 0; i < 4; i++) put(mesh(new THREE.CylinderGeometry(0.15, 0.2, 1.4, 6), toon(0xffd23f), 0.04), sx * 3.6, FRONT_OUT + 3 + i * 5.5, ASPH + 0.7);   // (the first 17 m from the doors, to the carousels' far edge)
     put(new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 16.5, 5).rotateX(Math.PI / 2), toon(0x8a1030)), sx * 3.6, FRONT_OUT + 3 + 8.25, ASPH + 1.1);
   }
-
-  // the giant rotating sign, on a mast over the dome
-  put(mesh(new THREE.CylinderGeometry(0.6, 0.8, 10, 8), toon(0x3a3550), 0.08), HCX, CZ, domeTop + 4);
-  const signMat = new THREE.MeshBasicMaterial({ map: signTex() });
-  const edge = toon(0xffd23f);
-  const sign = new THREE.Mesh(new THREE.BoxGeometry(32, 7, 1.2), [edge, edge, edge, edge, signMat, signMat]);
-  ink(sign, 0.25);
-  put(sign, HCX, CZ, domeTop + 11.5, 0, true);
 
   // a huge tumbling die on a pedestal, in the west court
   put(mesh(new THREE.CylinderGeometry(4, 4.8, 3, 16), toon(0xff2e88), 0.12), -34, 7, 1.5);
@@ -671,13 +640,6 @@ export function buildCasino(w, loc) {
     beams.push(pivot);
   }
 
-  const small = textSprite('THE HOUSE ALWAYS WINS. USUALLY.', { color: '#ff7ad9', size: 50, scale: 0.2, bg: '#120a1e' });
-  small.position.set(0, 12.8, FRONT_OUT + 7.4);
-  loc.group.add(small);
-  const open = textSprite('OPEN 25/8 · WALK RIGHT IN', { color: '#7dff6a', size: 50, scale: 0.3, bg: '#120a1e' });
-  open.position.set(0, 15.2, FRONT_OUT + 7.4);
-  loc.group.add(open);
-
   // ================= INTERIOR =================
   const floorMat = new THREE.MeshToonMaterial({ map: carpetTex(), gradientMap: toon(0).gradientMap });
   const floor = new THREE.Mesh(new THREE.ShapeGeometry(flat2(IN, true), 24).rotateX(-Math.PI / 2), floorMat);
@@ -705,7 +667,6 @@ export function buildCasino(w, loc) {
     const bc = [[-3.8, -2], [3.8, -2], [-3.8, 4.7], [3.8, 4.7]].map(([a, b]) => bjPt(a, 0, b));
     R(Math.min(...bc.map((c) => c[0])) - 0.3, Math.max(...bc.map((c) => c[0])) + 0.3, Math.min(...bc.map((c) => c[2])) - 0.3, Math.max(...bc.map((c) => c[2])) + 0.3);
     R(PRIZE.wallX - 4.8, PRIZE.wallX + 0.2, PRIZE.z - 4.3, PRIZE.z + 4.3);
-    R(-HALL.ARM - 0.2, -HALL.ARM + 2.0, 2.8, 7.2);
     R((DUCK.x0 + DUCK.x1) / 2 - 8.7, (DUCK.x0 + DUCK.x1) / 2 + 8.7, DUCK.wallZ - 0.2, DUCK.wallZ + 1.0);
     const cx = CLASSIC.xs.reduce((a, b) => a + b) / CLASSIC.xs.length;
     R(cx - 6.5, cx + 6.5, CLASSIC.wallZ - 0.5, CLASSIC.wallZ + 0.2);
@@ -756,15 +717,6 @@ export function buildCasino(w, loc) {
   put(bar, HCX, CZ, 0.05);
   put(barSpin, HCX, CZ, 0.05 + barSpin.position.y, 0, true);
   col({ type: 'cyl', x: HCX, z: CZ, y0: -1, y1: 4.4, r: 4.7 });
-  // the cashier's cage on the foyer's west wall: the chips' counter, its sign painted by the game
-  {
-    const cage = makeHallPart('hall_cage'), cf = cage.getObjectByName('cage_face');
-    const sign = new THREE.Mesh(new THREE.PlaneGeometry(cf.userData.w, cf.userData.h), new THREE.MeshBasicMaterial({ map: neonTex('CHIP CAGE', { w: 512, h: 96, color: '#ffd23f', edge: '#2ee6ff' }) }));
-    sign.position.copy(cf.position); sign.position.z += 0.012;
-    cage.add(sign);
-    put(cage, -HALL.ARM + 0.02, 5, 0, Math.PI / 2);
-    col({ type: 'box', x: -HALL.ARM + 0.85, y: 1.9, z: 5, hx: 0.85, hy: 1.9, hz: 2.05 });
-  }
   // two lounges at the wings' far ends: banquettes against the wall and a small table
   const lounge = (sofas, table) => {
     for (const [x, z, yaw] of sofas) {
@@ -786,15 +738,6 @@ export function buildCasino(w, loc) {
     put(ch.spin, x, z, H - 3.3, 0, true);
     chandeliers.push(ch.spin);
   }
-  // a welcome sign hanging inside the door, on chains from the ceiling (the frame is built in Blender)
-  {
-    const sg = makeCasinoSign('welcome_sign');
-    const face = new THREE.Mesh(new THREE.PlaneGeometry(sg.face.w, sg.face.h), new THREE.MeshBasicMaterial({ map: neonTex('BLACKJACK · DUCK DERBY · PLINKO', { color: '#fff6a8', edge: '#2ee6ff' }) }));
-    face.position.copy(sg.face.pos);
-    sg.root.add(face);
-    put(sg.root, 0, 8, 9.6);
-  }
-
   // ---------- BLACKJACK TABLE (build_blackjack.py) ----------
   // `bjStat` is the frozen table (the world merges it); `bj` is the part that moves: the dealer, and the cards and chips the game puts down (casinoGames.js)
   const bj = new THREE.Group();
@@ -1191,18 +1134,107 @@ export function buildCasino(w, loc) {
   const up = new THREE.Vector3(0, 1, 0).applyQuaternion(loc.group.quaternion);
 
   let chase = 0;
-  // Patrons walk from spot to spot via the spots' clear approach points; at a slot machine they
+  // Patrons walk from spot to spot by a way round everything that stands in the way (navPath); at a slot machine they
   // stand and yank the handle every few seconds (the cabinet's lamp flashes, the screen jitters),
   // anywhere else they look at the attraction and shift about
+  // Where a patron can walk: a 1 m grid over the casino and its forecourt, blocked within a patron's width of anything with a collider (the games, the machines, the walls, the cars, the
+  // lamps), read off the world's colliders the first time it is needed (the forecourt's are laid after this function runs). A* over it gives the way from one spot to the next round everything
+  // (through the doors, if the next spot is inside), pulled straight where the way is clear.
+  let nav = null;
+  const NAV = { x0: -72, z0: -48, nx: 144, nz: 160, r: 0.95 };   // (a patron's radius, and half a cell's diagonal for a path that cuts across cells)
+  function buildNav() {
+    const { x0, z0, nx, nz, r } = NAV, blocked = new Uint8Array(nx * nz);
+    const qi = loc.group.quaternion.clone().invert(), tmp = new THREE.Vector3();
+    const mark = (bx0, bx1, bz0, bz1, inside) => {
+      for (let j = Math.max(0, Math.floor(bz0 - z0)); j <= Math.min(nz - 1, Math.floor(bz1 - z0)); j++) for (let i = Math.max(0, Math.floor(bx0 - x0)); i <= Math.min(nx - 1, Math.floor(bx1 - x0)); i++) if (inside(x0 + i + 0.5, z0 + j + 0.5)) blocked[j * nx + i] = 1;
+    };
+    const reach = (lo, hi) => hi > 0.25 && lo < 2.2;   // (what a walker can touch: not a lintel, not a roof)
+    for (const c of loc._cols || []) {
+      const m = loc.group.worldToLocal(c.c.clone());
+      if (c.type === 'sphere') {
+        if (reach(m.y - c.r, m.y + c.r)) mark(m.x - c.r - r, m.x + c.r + r, m.z - c.r - r, m.z + c.r + r, (x, z) => Math.hypot(x - m.x, z - m.z) <= c.r + r);
+      } else if (c.type === 'cyl') {
+        if (tmp.copy(c.axis).applyQuaternion(qi).y < 0.9 || !reach(m.y + c.y0, m.y + c.y1)) continue;
+        mark(m.x - c.r - r, m.x + c.r + r, m.z - c.r - r, m.z + c.r + r, (x, z) => Math.hypot(x - m.x, z - m.z) <= c.r + r);
+      } else if (c.type === 'box') {
+        const ax = c.ax.clone().applyQuaternion(qi), az = c.az.clone().applyQuaternion(qi), ay = c.ay.clone().applyQuaternion(qi);
+        if (Math.abs(ay.y) < 0.9 || !reach(m.y - c.hy, m.y + c.hy)) continue;
+        const ex = Math.abs(ax.x) * c.hx + Math.abs(az.x) * c.hz + r, ez = Math.abs(ax.z) * c.hx + Math.abs(az.z) * c.hz + r;
+        mark(m.x - ex, m.x + ex, m.z - ez, m.z + ez, (x, z) => {
+          const dx = x - m.x, dz = z - m.z;
+          return Math.abs(dx * ax.x + dz * ax.z) <= c.hx + r && Math.abs(dx * az.x + dz * az.z) <= c.hz + r;
+        });
+      }
+    }
+    return { blocked };
+  }
+  function navPath(sx, sz, gx, gz) {
+    nav ||= buildNav();
+    const { x0, z0, nx, nz } = NAV, B = nav.blocked;
+    const cell = (x, z) => [Math.min(nx - 1, Math.max(0, Math.floor(x - x0))), Math.min(nz - 1, Math.max(0, Math.floor(z - z0)))];
+    const free = (i, j) => i >= 0 && j >= 0 && i < nx && j < nz && !B[j * nx + i];
+    const snap = ([i, j]) => {                       // (the nearest open cell, if the spot is on the edge of something)
+      if (free(i, j)) return [i, j];
+      for (let d = 1; d <= 6; d++) for (let b = -d; b <= d; b++) for (const [a, c] of [[b, -d], [b, d], [-d, b], [d, b]]) if (free(i + a, j + c)) return [i + a, j + c];
+      return null;
+    };
+    const s = snap(cell(sx, sz)), g = snap(cell(gx, gz));
+    if (!s || !g) return null;
+    const idx = (i, j) => j * nx + i, G = new Float64Array(nx * nz).fill(Infinity), from = new Int32Array(nx * nz).fill(-1);
+    const heap = [[0, idx(...s)]];
+    const push = (e) => { heap.push(e); let k = heap.length - 1; while (k > 0) { const q = (k - 1) >> 1; if (heap[q][0] <= heap[k][0]) break; [heap[q], heap[k]] = [heap[k], heap[q]]; k = q; } };
+    const pop = () => { const top = heap[0], last = heap.pop(); if (heap.length) { heap[0] = last; let k = 0; for (;;) { let m = k; const l = 2 * k + 1, rr = l + 1; if (l < heap.length && heap[l][0] < heap[m][0]) m = l; if (rr < heap.length && heap[rr][0] < heap[m][0]) m = rr; if (m === k) break; [heap[m], heap[k]] = [heap[k], heap[m]]; k = m; } } return top; };
+    G[idx(...s)] = 0;
+    const goal = idx(...g);
+    const h = (i, j) => { const dx = Math.abs(i - g[0]), dz = Math.abs(j - g[1]); return Math.max(dx, dz) + 0.414 * Math.min(dx, dz); };
+    let found = false;
+    while (heap.length) {
+      const [f, cur] = pop();
+      if (cur === goal) { found = true; break; }
+      const ci = cur % nx, cj = (cur / nx) | 0;
+      if (f > G[cur] + h(ci, cj) + 1e-6) continue;                 // (an entry made stale by a shorter way found since)
+      for (let di = -1; di <= 1; di++) for (let dj = -1; dj <= 1; dj++) {
+        if (!di && !dj) continue;
+        const ni = ci + di, nj = cj + dj;
+        if (!free(ni, nj) || (di && dj && (!free(ci + di, cj) || !free(ci, cj + dj)))) continue;   // (no cutting a corner)
+        const ng = G[cur] + (di && dj ? 1.414 : 1), n = idx(ni, nj);
+        if (ng < G[n]) { G[n] = ng; from[n] = cur; push([ng + h(ni, nj), n]); }
+      }
+    }
+    if (!found || G[goal] > 110) return null;
+    const cells = [];
+    for (let n = goal; n >= 0; n = from[n]) cells.push([x0 + (n % nx) + 0.5, z0 + ((n / nx) | 0) + 0.5]);
+    cells.reverse();
+    cells[0] = [sx, sz];
+    const clear = (a, b) => {                        // (a straight line that stays on open cells)
+      const n = Math.ceil(Math.hypot(b[0] - a[0], b[1] - a[1]) / 0.4);
+      for (let k = 1; k < n; k++) { const f = k / n, [i, j] = cell(a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f); if (!free(i, j)) return false; }
+      return true;
+    };
+    const out = [];
+    let at = 0;
+    while (at < cells.length - 1) {
+      let to = cells.length - 1;
+      while (to > at + 1 && !clear(cells[at], cells[to])) to--;
+      out.push({ x: cells[to][0], z: cells[to][1] });
+      at = to;
+    }
+    out[out.length - 1] = { x: gx, z: gz };
+    return out;
+  }
   function pickSpot(pt) {
-    const free = yardSpots.filter((sp) => !sp.busy && sp !== pt.spot);
-    const sp = free[Math.floor(Math.random() * free.length)];
-    if (!sp) return;
-    pt.spot.busy = false;
-    pt.path = [{ x: pt.spot.ax, z: pt.spot.az }, { x: sp.ax, z: sp.az }, { x: sp.x, z: sp.z }];
-    sp.busy = true;
-    pt.spot = sp;
-    pt.stay = sp.kind === 'slot' ? 8 + Math.random() * 14 : 4 + Math.random() * 8;
+    const cand = yardSpots.filter((sp) => !sp.busy && sp !== pt.spot), p = pt.root.position;
+    for (let tries = 0; tries < 6 && cand.length; tries++) {
+      const sp = cand.splice(Math.floor(Math.random() * cand.length), 1)[0], path = navPath(p.x, p.z, sp.x, sp.z);
+      if (!path) continue;
+      pt.spot.busy = false;
+      pt.path = path;
+      sp.busy = true;
+      pt.spot = sp;
+      pt.stay = sp.kind === 'slot' ? 8 + Math.random() * 14 : 4 + Math.random() * 8;
+      return;
+    }
+    pt.stay = 2;                                     // (nowhere to go just now: look again shortly)
   }
   function updatePatrons(dt, time) {
     for (const c of cabinets) updateSlot(c.userData, dt, time);
@@ -1255,6 +1287,8 @@ export function buildCasino(w, loc) {
     duck: { ducks, gate, lamps, water, oddsCanvas, oddsTex, crowd },
     plinko: { pegs, pegBase, slotMats, aim },
     crowd,
+    navPath,                                                   // (patrons' ways: the checks and the Asset Row read it)
+    navFree: (x, z) => { nav ||= buildNav(); const i = Math.floor(x - NAV.x0), j = Math.floor(z - NAV.z0); return i >= 0 && j >= 0 && i < NAV.nx && j < NAV.nz && !nav.blocked[j * NAV.nx + i]; },
     onUpdate: null, // set by the game logic (casinoGames.js)
     update(dt, time) {
       const gm = globalThis.game;
@@ -1264,7 +1298,6 @@ export function buildCasino(w, loc) {
         s.key = want;
         s.mesh.material.map = s.cache[want] || (s.cache[want] = neonTex(s.text, { ...s.opts, pad: want === 'kb' ? null : want }));
       }
-      sign.rotation.y += dt * 0.45;
       die.rotation.x += dt * 0.7; die.rotation.y += dt * 1.1;
       die.position.y = 10 + Math.sin(time * 1.6) * 0.8;
       wheel.rotation.z -= dt * 1.4;

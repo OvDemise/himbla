@@ -2484,6 +2484,8 @@ export class Traffic {
     const vis = this.seen(v, camPos);
     v.root.visible = vis;
     if (!vis) { this.dropDeck(v); return; }
+    // the route board (a shuttle's destination sign) names where it is bound: the far end while it flies, the other end while it waits
+    M.setSign((v.state === 'park' ? (v.stop === v.stops[0] ? v.stops[1] : v.stops[0]) : (v.dir > 0 ? v.stops[1] : v.stops[0])).loc.short);
     v.root.position.copy(v.pos);
     const up = _u.copy(v.pos).normalize();
     frameQuat(up, v.heading, _q);
