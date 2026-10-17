@@ -41,7 +41,7 @@
 //                                               DUCK DERBY
 //                                               left stick / d-pad  pick a duck   A  race · new race
 //                                               LB / RB     lower / raise the bet   B  stand up
-//   (the pad rumbles too: see haptics.js; Settings → Gameplay)
+//   (the pad rumbles too, and a PlayStation pad lights up and gets adaptive triggers: see haptics.js, sonyout.js)
 //   d-pad ↓      the radial menu (tap to open, tap again to close): vehicles, powers, wardrobe, reputation log,
 //                empty the jar (vehicles and powers open their own wheel of the ones you own:
 //                same controls; a power you pick on its wheel is the one RB uses). The right stick picks a wedge (the
@@ -50,6 +50,7 @@
 import { WEAPONS, weaponUnlocked } from './weapons.js';
 import { Glyphs, glyphState, glyphHtml } from './glyphs.js';
 import { GyroPad } from './gyro.js';
+import { SonyOut } from './sonyout.js';
 import { DEV_TOOLS } from './devtools.js';
 
 const DEAD = 0.18; // stick deadzone (radial)
@@ -97,6 +98,7 @@ export class Gamepad {
     this.gyro = new GyroPad();
     this.gyroOn = false;
     this.gyro.init();
+    this.fx = new SonyOut(this.gyro); // ...and, over the same link, the pad's rumble, lightbar and adaptive triggers (haptics.js)
     window.addEventListener('gamepadconnected', (e) => {
       this.game.hud.toast(`Controller connected: ${(e.gamepad.id || 'gamepad').replace(/\(.*\)/, '').trim().slice(0, 40)}`, 2.5);
     });

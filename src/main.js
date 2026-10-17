@@ -247,7 +247,7 @@ class Game {
     this.grind = new Grinder(this);
     this.pad = new Gamepad(this); // controller support
     this.haptics = new Haptics(this); // ...and its rumble
-    if (this.settings) this.haptics.configure(this.settings.v.rumble, this.settings.v.rumbleLevel);
+    if (this.settings) this.haptics.configure(this.settings.v.rumble, this.settings.v.rumbleLevel, this.settings.v.padLight, this.settings.v.padTriggers);
     this.audio.onSfx = (k) => this.haptics.play(k); // (a pickup or a payout is felt as well as heard)
     this.cosmetics = new Cosmetics(this);
     this.cosmetics.apply();

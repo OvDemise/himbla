@@ -80,6 +80,8 @@ export const SCHEMA = {
     { key: 'gyroInvY', label: 'Gyro: flip forward / back', type: 'toggle', def: false },
     { key: 'rumble', label: 'Controller vibration', type: 'toggle', def: true, hint: 'Jumps, landings, hits, blasts and weapons, and a hum from the skates, thrusters and rails' },
     { key: 'rumbleLevel', label: 'Vibration strength', type: 'range', min: 0.2, max: 1.5, step: 0.1, def: 1, fmt: pct },
+    { key: 'padLight', label: 'Controller lightbar', type: 'toggle', def: true, hint: 'PlayStation pads, through the link below: your skates\' colour, red when hurt, and the player lights count your health' },
+    { key: 'padTriggers', label: 'Adaptive triggers', type: 'toggle', def: true, hint: 'DualSense, through the link below: the weapon\'s click, the thrusters\' spring and buzz' },
   ],
   audio: [
     { key: 'mute', label: 'Mute all audio', type: 'toggle', def: false, hint: 'Silences everything: music, effects, wind, skates and thrusters' },
@@ -298,7 +300,7 @@ export class Settings {
       if (u.lines) u.lines.value = v.speedLines ? 1 : 0;
       if (u.inkK) u.inkK.value = v.ink;
     }
-    if (g.haptics) g.haptics.configure(v.rumble, v.rumbleLevel);
+    if (g.haptics) g.haptics.configure(v.rumble, v.rumbleLevel, v.padLight, v.padTriggers);
     if (g.audio && g.audio.setVolumes) g.audio.setVolumes(v.master, v.music, v.sfx, v.mute);
     if (g.input && g.input.setBindings) g.input.setBindings(v.binds);
     const mm = document.getElementById('minimap');
@@ -475,6 +477,8 @@ export class Settings {
     } else if (act === 'bind') {
       this.rebinding = this.rebinding === t.dataset.code ? null : t.dataset.code;
       this.render();
+    } else if (act === 'fx-test') {
+      if (g && g.haptics) { g.haptics.test(); this.render(); }
     } else if (act === 'gyro-connect') {
       const gy = g && g.pad && g.pad.gyro;
       if (gy) gy.request().then(() => this.render());
@@ -516,7 +520,9 @@ export class Settings {
       if (this.tab === 'gameplay') {
         // the gyro is read straight from the pad (WebHID): it may need a one-time CONNECT
         const gy = this.game && this.game.pad && this.game.pad.gyro;
+        const g_ = this.game && this.game.haptics;
         const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;');
+        if (g_) body += `<div class="set-row"><span class="set-label">Controller feedback<small>${esc(g_.status)}</small></span><span class="set-ctl"><button class="set-btn" data-act="fx-test">TEST</button></span></div>`;
         if (gy) body += `<div class="set-row"><span class="set-label">PlayStation controller link<small>${esc(gy.status)}</small></span><span class="set-ctl">${gyroSupported() ? '<button class="set-btn" data-act="gyro-connect">CONNECT</button>' : ''}</span></div>`;
       }
     }
