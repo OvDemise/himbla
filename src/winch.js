@@ -51,6 +51,7 @@ const EYE_OUT = 1.08;    // the grapple's eye, this far back from its tip along 
 const SLOT = { gold: 0xffd23f, steel: 0x9aa3b2, dark: 0x2a2540, tracer: 0xff9f1c }; // (the Kepler orange tracer strand is in every cable)
 const WRAP_MAX = 5;      // the cable bends round at most this many different structures; it passes through any further ones
 const WRAP_PTS = 40;     // ... and has at most this many bend points in all (a round structure takes a chain of them)
+const BOX_BENDS = 12;    // bend points on one box at once (three laps round a post), then the cable passes through it
 const WRAP_MIN_R = 4;    // (only structures this big, by bounding radius, bend it: boulders and props smaller than that don't)
 const WRAP_EVERY = 0.05; // seconds between wrap checks (20 Hz)
 const WRAP_MARGIN = 0.4; // a wrap point stands this far outside the corner it bends round
@@ -648,11 +649,11 @@ export class Winch {
   // Twenty times a second: let go of any bend the cable has straightened past, and bend it round any structure it has run into (a
   // corner or edge for a box, an arc for a cylinder or sphere). Returns 'changed' or null. A structure it can't bend round (no free place to
   // bend, the cap, still in the way after a bend or two) is given up on: the cable passes through it.
-  tendWraps(o) {
-    try { return this.tendWrapsIn(o); } finally { _ignore = null; }
+  tendWraps(o, el = WRAP_EVERY) {
+    try { return this.tendWrapsIn(o, el); } finally { _ignore = null; }
   }
 
-  tendWrapsIn(o) {
+  tendWrapsIn(o, el) {
     const cols = this.game.colliders, P = this.path, n = o.wraps.length;
     _ignore = o.ignore;
     // letting go: only the ends of a run of bends round one structure can (the middle of an arc is held by the structure itself); with
@@ -661,7 +662,7 @@ export class Winch {
       if (!(k === 0 || k === n - 1 || o.grp[k - 1] !== o.grp[k] || o.grp[k + 1] !== o.grp[k])) continue;
       const fat = Math.min(P[k].distanceTo(P[k + 1]), P[k + 1].distanceTo(P[k + 2])) < 2.5 ? 0.1 : UNWRAP_FAT;
       if (clearFat(cols, P[k], P[k + 2], fat, k === n - 1 ? 3 : 0.35)) { // (the hook end: a shallow line to the hook's own surface grazes it)
-        o.free[k] += WRAP_EVERY;
+        o.free[k] += el; // (the time since the last check: that is every frame while bent)
         if (o.free[k] >= UNWRAP_HOLD) { o.wraps.splice(k, 1); o.free.splice(k, 1); o.grp.splice(k, 1); this.ropeDirty = true; return 'changed'; }
       } else o.free[k] = 0;
     }
@@ -674,8 +675,11 @@ export class Winch {
       if (!hit) continue;
       // (what the cable can't be bent round it passes through, and your own physics and the pull sort the rest out: more structures than
       // the cap, a structure that is still in the way after it has been bent round, no free place to bend)
-      const bends = o.bends.get(hit.c) || 0;
-      if ((!o.grp.includes(hit.c) && new Set(o.grp).size >= WRAP_MAX) || bends >= (hit.c.type === 'box' ? 4 : 2)) { o.ignore.add(hit.c); continue; }
+      // (a box is counted by the bends it holds now, so a post can be wound round for a few laps (four corners a lap) and every bend that
+      // unwinds is room for another; a cylinder or sphere by the arcs laid round it over the whole ride)
+      const box = hit.c.type === 'box';
+      const bends = box ? o.grp.reduce((n, q) => n + (q === hit.c), 0) : o.bends.get(hit.c) || 0;
+      if ((!o.grp.includes(hit.c) && new Set(o.grp).size >= WRAP_MAX) || bends >= (box ? BOX_BENDS : 2)) { o.ignore.add(hit.c); continue; }
       const A = P[i], B = P[i + 1];
       const before = this.pathLen();
       let pts = hit.c.type === 'cyl' || hit.c.type === 'sphere' ? arcPoints(hit.c, A, B) : null;
@@ -745,10 +749,13 @@ export class Winch {
     const T = o.target;
     if (!held || o.t > HOLD || !this.hasHand() || !T.alive()) { this.release(); return; }
     this.buildPath(o, this.hand(_a), this.anchorOf(o, _b));
-    // (the wraps: checked 20 times a second, off the path as it was drawn last frame)
+    // (the wraps: checked 20 times a second while the cable runs straight, and every frame once it has bends round something: dragged round a
+    // post at 15 m/s you cover 0.75 m between 20 Hz checks, and the leg from you to the last bend ran through the post for those frames)
+    o.wDt = (o.wDt || 0) + dt;
     if ((o.wT -= dt) <= 0) {
-      o.wT = WRAP_EVERY;
-      const r = this.tendWraps(o);
+      o.wT = o.wraps.length ? 0 : WRAP_EVERY;
+      const el = o.wDt; o.wDt = 0;
+      const r = this.tendWraps(o, el);
       o.snagged = r === 'snag'; // (kept for the strain rule below; tendWraps gives up on a structure now, and the cable passes through it)
     }
     this.releaseFirst(o);
