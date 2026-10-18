@@ -170,14 +170,14 @@ const parts = {
   id: 'buildings.parts',
   title: '09 · BUILDING PARTS',
   items: [
-    item('part.habdome.family', 'HAB DOMES 6 · 12 · 16 M', 83, 40, () => row([
+    item('part.habdome.family', 'HAB DOMES 6 · 12 · 16 M', 89, 41, () => row([
       kitPart((k) => habDome(k, 0, 0, 6, 0xff7ad9, { trim: 0xff9f1c })),
       kitPart((k) => habDome(k, 0, 0, 12, 0x2ec4ff, { trim: 0xffd23f })),
       kitPart((k) => habDome(k, 0, 0, 16, 0xb8ffb0, { trim: 0xff9f1c, glass: true })),
     ])),
-    item('part.habdome.hub', 'HAB DOME 22 M (TOWN HUB)', 47, 52, () => kitPart((k) => habDome(k, 0, 0, 22, 0xb8ffb0, { trim: 0xff9f1c }))),
-    item('part.habdome.council', 'HAB DOME 30 M (COUNCIL)', 63, 69, () => kitPart((k) => habDome(k, 0, 0, 30, 0xffd23f, { trim: 0xff9f1c }))),
-    item('part.habdome.great', 'HAB DOME 58 M (ILMB GREAT DOME)', 119, 125, () => kitPart((k) => habDome(k, 0, 0, 58, 0x9be7ff, { trim: YEL, cupola: false })), { big: true }),
+    item('part.habdome.hub', 'HAB DOME 22 M (TOWN HUB)', 51, 54, () => kitPart((k) => habDome(k, 0, 0, 22, 0xb8ffb0, { trim: 0xff9f1c }))),
+    item('part.habdome.council', 'HAB DOME 30 M (COUNCIL)', 68, 71, () => kitPart((k) => habDome(k, 0, 0, 30, 0xffd23f, { trim: 0xff9f1c }))),
+    item('part.habdome.great', 'HAB DOME 58 M (ILMB GREAT DOME)', 124, 128, () => kitPart((k) => habDome(k, 0, 0, 58, 0x9be7ff, { trim: YEL, cupola: false })), { big: true }),
     item('part.cabin', 'PREFAB CABINS', 38, 9, () => row([
       kitPart((k) => cabin(k, 0, 0, 10, 8, 4.6, 0xff9f1c, 0, { trim: 0xffd23f })),
       kitPart((k) => cabin(k, 0, 0, 10, 8, 4.6, 0x2ec4ff, 0, { trim: 0xff7ad9, solar: true })),

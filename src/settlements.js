@@ -3,7 +3,8 @@ import * as THREE from 'three';
 import { Kit, T, G, D, GLASS, BEAM, prism, sandbags, container, crate, tank, lightString, junkHeap, PALETTE } from './outpostModels.js';
 import { FACTIONS } from './locations.js';
 import { pixelFont } from './fonts.js';
-import { glow } from './toon.js';
+import { glow, gradientMap } from './toon.js';
+import { patchBermMaterial } from './moonSkins.js';
 import { market, tickerText } from './market.js';
 import { casinoNode, casinoSlot, lotNode, lotSlot } from './models.js';
 import { waterMesh } from './fountainFx.js';
@@ -49,58 +50,244 @@ export function part(color, fn, seed = 1) {
 // shared structures (each sets its own frame with k.at and leaves k at the origin)
 // ---------------------------------------------------------------------------------------------
 
-// Hab dome: plinth, ribbed shell, latitude bands, a ring of lit windows (curved panes laid on the
-// shell between the ribs), a ribbed tunnel out to an airlock (housing, hazard-striped frame, split
-// doors with portholes, cycle lights, keypad and a step; facing local yaw `door`), and a roof cupola
-// with an antenna.
-export function habDome(k, x, z, r, color, { door = 0, trim = 0xffd23f, windows = true, cupola = true, glass = false } = {}) {
+// Hab dome: a pressurised shell on a concrete ring footing, banked with a regolith berm (its
+// radiation cover), which is cut and held back by retaining walls where the airlock goes through
+// (and at `gaps`, local yaws where something else docks into the shell). Over the shell, meridian
+// ribs and latitude rings run up to a compression ring at the crown, with bolted node plates on the
+// big ones, and some panels have been swapped for new or weathered ones. A band of hooded windows,
+// floodlights under the first ring, a maintenance ladder up one flank and a pair of service conduits
+// up the other. On top (r > 9) an observation cupola with an antenna, a small dish and vents. The
+// airlock: a ribbed tunnel out to a lock housing (hazard-striped frame, split doors with portholes,
+// cycle lights, keypad, floodlights) and a grated step with handrails, facing local yaw `door`.
+// With `yard`, a radiator rack and a power cabinet with gas bottles stand beside the airlock. A
+// glass dome shows a planted floor.
+// piled regolith, darker than the ground round it so it reads; with the regolith ground texture on it takes the ground's
+// grain and stones (moonSkins.js patchBermMaterial). One material for every berm, so a place's berms merge into one mesh.
+const REGO = 0x6f6878;
+let bermMat = null;
+const BERM = () => (bermMat ||= patchBermMaterial(new THREE.MeshToonMaterial({ color: REGO, gradientMap: gradientMap() })));
+const angDiff = (p, q) => Math.atan2(Math.sin(p - q), Math.cos(p - q));
+// a smooth lumpiness along an arc (s: metres round it, t: 0 at the foot, 1 at the crest), about -1..1
+function domeWobble(seed) {
+  const p = [1, 2, 3, 4].map((i) => { const s = Math.sin(seed * 9.17 + i * 78.233) * 43758.5453; return (s - Math.floor(s)) * TAU; });
+  return (s, t) => 0.5 * Math.sin(s * 0.8 + p[0] + t * 1.7) + 0.3 * Math.sin(s * 1.9 + p[1] - t * 2.9) + 0.35 * Math.sin(s * 4.1 + p[2] + t * 5.3) * Math.sin(s * 0.37 + p[3]);
+}
+// A berm segment: regolith piled from radius r0 at height h (against the shell) out to r1 on the
+// ground, between azimuths a0 and a1 (0 = +z): bulged and lumpy, calming to a straight slope at
+// each end where a retaining wall holds it.
+function bermGeo(r0, r1, h, a0, a1, seg, wob) {
+  const n = Math.max(3, Math.round(((a1 - a0) / TAU) * seg * 2)), rows = 4, w = r1 - r0;
+  const g = new THREE.CylinderGeometry(r0, r1, h, n, rows, true, a0, a1 - a0), p = g.attributes.position;
+  for (let i = 0; i < p.count; i++) {
+    const u = (i % (n + 1)) / n, t = 1 - Math.floor(i / (n + 1)) / rows; // (rows run crest to foot)
+    if (t === 1) continue; // the crest stays tight against the shell
+    const s = (a0 + u * (a1 - a0)) * (r0 + r1) / 2;
+    const end = Math.min(1, (Math.min(u, 1 - u) * (a1 - a0) * r1) / 2.5);
+    const lump = wob(s, t) * end, rise = Math.sin(Math.PI * t);
+    const dr = (rise * 0.2 * end + lump * 0.16) * w, x = p.getX(i), z = p.getZ(i), q = (Math.hypot(x, z) + dr) / Math.hypot(x, z);
+    p.setXYZ(i, x * q, p.getY(i) + rise * lump * h * 0.18, z * q);
+  }
+  g.translate(0, h / 2, 0);
+  g.computeVertexNormals();
+  return g;
+}
+// a wall along local z, standing on y = 0: hIn tall at its -z end sloping to hOut at +z
+function wedge(th, hIn, hOut, len) {
+  const g = new THREE.BoxGeometry(th, 1, len).translate(0, 0.5, 0), p = g.attributes.position;
+  for (let i = 0; i < p.count; i++) if (p.getY(i) > 0.5) p.setY(i, p.getZ(i) < 0 ? hIn : hOut);
+  g.computeVertexNormals();
+  return g;
+}
+
+export function habDome(k, x, z, r, color, { door = 0, trim = 0xffd23f, windows = true, cupola = true, glass = false, yard = r >= 9, gaps = [] } = {}) {
   k.at(x, z, door);
-  const seg = Math.max(20, Math.min(40, Math.round(r * 2)));
-  k.cyl(r + 0.9, r + 1.4, 1.1, seg, T(PANEL), 0, 0, 0, { outline: 0.12 });
-  k.ring(r + 1.0, 0.22, T(trim), 0, 1.1, 0);
+  const seg = Math.max(24, Math.min(56, Math.round(r * 2)));
+  const wob = domeWobble(x * 0.37 + z * 0.91 + r * 1.7);
+  const hash = (i) => { const s = Math.sin(i * 12.9898 + x * 0.731 + z * 0.417 + r) * 43758.5453; return s - Math.floor(s); };
+  // the shell's centre stands on the footing at height C. on(): a point d out from the shell at
+  // azimuth a (from +z) and elevation el; face(): the turn standing a part's +z out of it there,
+  // its x along the shell sideways; pt(): the same point moved off sideways
+  const C = 1.0;
+  const on = (a, el, d = 0) => { const R = r + d; return [Math.sin(a) * Math.cos(el) * R, C + Math.sin(el) * R, Math.cos(a) * Math.cos(el) * R]; };
+  const face = (a, el) => new THREE.Quaternion().setFromEuler(new THREE.Euler(-el, a, 0, 'YXZ'));
+  const pt = (a, el, d, off) => { const p = on(a, el, d); return [p[0] + Math.cos(a) * off, p[1], p[2] - Math.sin(a) * off]; };
+  const ar = Math.min(2.6, 1.4 + r * 0.06), L = Math.min(5, 2 + r * 0.12), ay = ar + 0.2; // the airlock tunnel
+  const hw = ar * 1.35, hh = ar * 2.3, hz = r + L - 0.4, hd = 1.8; // its housing
+
+  // the footing: a concrete ring wall the shell stands on
+  k.cyl(r + 0.2, r + 0.45, C + 0.05, seg, T(CONC), 0, 0, 0, { outline: 0.08 });
+  // the berm, in segments between the cuts, a retaining wall at each end
+  const bh = Math.min(2.6, 0.9 + r * 0.05), bw = bh * 1.2 + 0.5;
+  const rIn = bh > C ? Math.sqrt(r * r - (bh - C) ** 2) - 0.05 : r + 0.15;
+  const cuts = [[0, ar + 1.1], ...gaps.map((a) => [a, 4.2])]
+    .map(([a, w]) => [((a % TAU) + TAU) % TAU, Math.asin(Math.min(0.9, w / r))]).sort((p, q) => p[0] - q[0]);
+  cuts.forEach(([a, h], i) => {
+    const [b, hb] = cuts[(i + 1) % cuts.length];
+    const a0 = a + h, a1 = b + (i + 1 < cuts.length ? 0 : TAU) - hb;
+    if (a1 - a0 < 0.05) return;
+    k.add(bermGeo(rIn, r + bw, bh, a0, a1, seg, wob), BERM(), 0, 0, 0, { outline: 0.08 });
+    const mid = (rIn + r + bw) / 2, len = r + bw - rIn + 0.6;
+    for (const e of [a0, a1]) k.add(wedge(0.5, bh + 0.25, 0.3, len), T(CONC), Math.sin(e) * mid, 0, Math.cos(e) * mid, { ry: e, outline: 0.05 });
+  });
+
+  // the shell
   const shell = glass ? GLASS(color, 0.28) : T(color);
-  k.add(new THREE.SphereGeometry(r, seg, Math.max(8, Math.round(seg / 3)), 0, TAU, 0, Math.PI / 2), shell, 0, 1.0, 0, { outline: glass ? 0 : Math.min(0.3, 0.1 + r * 0.008) });
-  // ribs over the top and two latitude bands
-  const ribT = Math.max(0.12, r * 0.014);
-  for (let i = 0; i < 4; i++) k.add(new THREE.TorusGeometry(r + ribT * 0.4, ribT, 4, seg, Math.PI), T(WHITE), 0, 1.0, 0, { ry: (i * Math.PI) / 4, outline: 0 });
-  for (const phi of [0.42, 0.85]) k.ring(r * Math.cos(phi) + ribT * 0.3, ribT * 0.9, T(WHITE), 0, 1.0 + r * Math.sin(phi), 0);
-  if (windows) {
-    // curved panes on the shell itself (a flat box stood proud of it and cut through the ribs): in
-    // each 45-degree bay between two ribs, a few panes with a dark frame, clear of the rib either side
-    const el = 0.2; // elevation above the equator
-    const pr = r + 0.06, fr = r + 0.03;
-    const dTheta = Math.min(0.32, 1.0 / r), dTh2 = dTheta * 1.35;
-    const per = Math.max(1, Math.round(((TAU / 8) * r * Math.cos(el)) / 3.6));
-    const gap = (ribT * 2.5 + 0.5) / (r * Math.cos(el)); // keep this far off each rib (radians)
-    const bay = TAU / 8, wA = Math.min((bay - 2 * gap) / per * 0.62, 1.5 / (r * Math.cos(el)));
-    for (let b = 0; b < 8; b++) for (let j = 0; j < per; j++) {
-      const a = b * bay + gap + ((j + 0.5) / per) * (bay - 2 * gap);
-      if (Math.abs(Math.atan2(Math.sin(a), Math.cos(a))) < 0.4) continue; // the airlock side
-      const phi0 = a + Math.PI / 2; // SphereGeometry azimuth for direction (sin a, cos a)
-      k.add(new THREE.SphereGeometry(fr, 4, 2, phi0 - wA * 0.62, wA * 1.24, Math.PI / 2 - el - dTh2 / 2, dTh2), T(DARK), 0, 1.0, 0, { outline: 0 });
-      k.add(new THREE.SphereGeometry(pr, 4, 2, phi0 - wA / 2, wA, Math.PI / 2 - el - dTheta / 2, dTheta), G(WARM), 0, 1.0, 0, { outline: 0 });
+  k.add(new THREE.SphereGeometry(r, seg, Math.max(8, Math.round(seg / 3)), 0, TAU, 0, Math.PI / 2), shell, 0, C, 0, { outline: glass ? 0 : Math.min(0.3, 0.1 + r * 0.008) });
+  // the frame: M meridian ribs (none over the airlock) up to the compression ring at the crown,
+  // latitude rings, and a painted band just over the berm
+  const M = glass ? (r < 12 ? 12 : 16) : r < 8 ? 8 : r < 18 ? 12 : r < 40 ? 16 : 24;
+  const ribT = Math.max(0.12, r * 0.012);
+  const crown = Math.acos(0.24);
+  const rings = glass ? [0.26, 0.52, 0.8, 1.06] : r < 8 ? [0.62] : r < 20 ? [0.42, 0.86] : [0.34, 0.66, 0.98];
+  const ribA = (i) => ((i + 0.5) / M) * TAU;
+  for (let i = 0; i < M; i++) k.add(new THREE.TorusGeometry(r + ribT * 0.4, ribT, 4, Math.max(6, Math.round(seg * 0.25)), crown), T(WHITE), 0, C, 0, { ry: ribA(i) - Math.PI / 2, outline: 0 });
+  // (rings as fine as the shell's own facets, no finer: Kit.ring's would be five a metre round)
+  const ring = (rad, tube, mat, y, outline = 0) => k.add(new THREE.TorusGeometry(rad, tube, 4, Math.min(seg, Math.max(12, Math.round(rad * 5)))).rotateX(Math.PI / 2), mat, 0, y, 0, { outline });
+  for (const el of rings) ring(r * Math.cos(el) + ribT * 0.3, ribT * 0.9, T(WHITE), C + r * Math.sin(el));
+  ring(r * Math.cos(crown) + ribT * 0.3, ribT * 1.6, T(WHITE), C + r * Math.sin(crown), 0.04);
+  const elT = Math.asin(Math.min(0.5, Math.max(0, bh + 0.3 - C) / r));
+  ring(r * Math.cos(elT) + 0.08, Math.max(0.16, r * 0.008), T(trim), C + r * Math.sin(elT));
+  if (!glass && r >= 14) for (let i = 0; i < M; i++) for (const el of rings) {
+    const [px, py, pz] = on(ribA(i), el, ribT * 0.9);
+    k.add(new THREE.BoxGeometry(ribT * 3.2, ribT * 3.2, ribT * 0.8), T(LIGHT), px, py, pz, { q: face(ribA(i), el), outline: 0 });
+  }
+  // swapped panels above the window band: some newer and paler, some weathered darker (each a
+  // patch of sphere finer than the shell's own facets, so it never dips under them)
+  if (!glass) {
+    const edges = [...rings, crown], cA = new THREE.Color(color);
+    const tints = [hex(cA.clone().lerp(new THREE.Color(WHITE), 0.3)), hex(cA.clone().lerp(new THREE.Color(DARK), 0.2))];
+    const hs = Math.max(8, Math.round(seg / 3));
+    for (let j = 0; j + 1 < edges.length; j++) for (let i = 0; i < M; i++) {
+      const h = hash(i * 7 + j * 31);
+      if (h > 0.3) continue;
+      const e0 = edges[j] + (ribT * 1.6) / r, e1 = edges[j + 1] - (ribT * 1.6) / r;
+      const w = TAU / M - (ribT * 3.2) / (r * Math.cos(e1));
+      if (e1 - e0 < 0.04 || w < 0.04) continue;
+      const nW = Math.max(2, Math.ceil((w * seg) / TAU) * 2), nH = Math.max(2, Math.ceil(((e1 - e0) / (Math.PI / 2)) * hs) * 2);
+      k.add(new THREE.SphereGeometry(r + 0.05, nW, nH, (i / M) * TAU + Math.PI / 2 - w / 2, w, Math.PI / 2 - e1, e1 - e0), T(tints[h < 0.15 ? 0 : 1]), 0, C, 0, { outline: 0 });
     }
   }
+  // the ladder runs up beside rib iL, the conduits beside rib iC
+  const iL = Math.round(M / 4), iC = Math.round((3 * M) / 4), aL = ribA(iL), aC = ribA(iC);
+  const el0 = Math.asin(Math.min(0.6, Math.max(0, bh + 0.15 - C) / r)); // just over the berm
+  if (windows && !glass) {
+    // curved panes on the shell (dark frame, lit glass) with a hood over each, in the bays between
+    // the ribs, clear of the ribs, the airlock and the ladder
+    const el = 0.2, pr = r + 0.06, fr = r + 0.03, rc = r * Math.cos(el);
+    const dTheta = Math.min(0.32, 1.0 / r), dTh2 = dTheta * 1.35;
+    const bay = TAU / M, per = Math.max(1, Math.round((bay * rc) / 3.6));
+    const gap = (ribT * 2.5 + 0.5) / rc;
+    const wA = Math.min(((bay - 2 * gap) / per) * 0.62, 1.5 / rc);
+    const ladder = aL + (0.6 + ribT) / rc;
+    for (let b = 0; b < M; b++) for (let j = 0; j < per; j++) {
+      const a = (b - 0.5) * bay + gap + ((j + 0.5) / per) * (bay - 2 * gap);
+      if (Math.abs(angDiff(a, 0)) < Math.max(0.4, (ar + 1.6) / r)) continue; // the airlock side
+      if (Math.abs(angDiff(a, ladder)) * rc < 0.7 + (wA * rc) / 2) continue;
+      const phi0 = a + Math.PI / 2; // SphereGeometry azimuth for direction (sin a, cos a)
+      k.add(new THREE.SphereGeometry(fr, 4, 2, phi0 - wA * 0.62, wA * 1.24, Math.PI / 2 - el - dTh2 / 2, dTh2), T(DARK), 0, C, 0, { outline: 0 });
+      k.add(new THREE.SphereGeometry(pr, 4, 2, phi0 - wA / 2, wA, Math.PI / 2 - el - dTheta / 2, dTheta), G(WARM), 0, C, 0, { outline: 0 });
+      const [px, py, pz] = on(a, el + dTh2 / 2 + 0.01, 0.2);
+      k.add(new THREE.BoxGeometry(wA * 1.3 * rc, 0.08, 0.64), T(PANEL), px, py, pz, { q: face(a, el + dTh2 / 2), outline: 0 });
+    }
+  }
+  // floodlights hung under the first ring on every other rib
+  for (let i = 0; i < M; i += 2) {
+    if (i === iL || i === iC) continue;
+    const a = ribA(i), e = rings[0] - (ribT + 0.35) / r, q = face(a, e), [lx, ly, lz] = on(a, e, ribT + 0.2);
+    k.add(new THREE.BoxGeometry(0.5, 0.24, 0.4), T(DARK), lx, ly, lz, { q, outline: 0.02 });
+    k.add(new THREE.BoxGeometry(0.4, 0.05, 0.3).translate(0, -0.13, 0.02), G(0xfffbe0), lx, ly, lz, { q, outline: 0 });
+  }
+  // the maintenance ladder: two rails on standoffs, outside the rings, from the berm to the crown
+  {
+    const d = 0.4 + ribT * 1.5, top = crown - 0.02, n = Math.max(4, Math.round(((top - el0) * r) / 1.6));
+    const o1 = 0.3 + ribT, o2 = 0.9 + ribT;
+    let prev = null;
+    for (let i = 0; i <= n; i++) {
+      const el = el0 + ((top - el0) * i) / n, cur = [pt(aL, el, d, o1), pt(aL, el, d, o2)];
+      if (prev) for (let s = 0; s < 2; s++) k.beam(prev[s], cur[s], 0.05, T(LIGHT), { outline: 0, seg: 4 });
+      if (i % 3 === 0) for (let s = 0; s < 2; s++) k.beam(pt(aL, el, -0.1, s ? o2 : o1), cur[s], 0.035, T(DARK), { outline: 0, seg: 4 });
+      prev = cur;
+    }
+    const nr = Math.floor(((top - el0) * (r + d)) / 0.6);
+    for (let i = 0; i <= nr; i++) {
+      const el = el0 + ((top - el0) * i) / nr, p = pt(aL, el, d, (o1 + o2) / 2);
+      k.add(new THREE.BoxGeometry(o2 - o1, 0.05, 0.05), T(LIGHT), p[0], p[1], p[2], { q: face(aL, el), outline: 0 });
+    }
+  }
+  // the service conduits: two pipes out of the berm, clamped, up to a junction box under the first ring
+  {
+    const d = 0.2 + ribT * 1.3, elJ = rings[0] - (ribT + 0.9) / r, e0 = el0 - 0.05;
+    const n = Math.max(3, Math.round(((elJ - e0) * r) / 1.6));
+    for (const [off, c, rad] of [[-(0.35 + ribT), LIGHT, 0.09], [-(0.65 + ribT), 0x6b6880, 0.07]]) {
+      let prev = pt(aC, e0, d, off);
+      for (let i = 1; i <= n; i++) { const cur = pt(aC, e0 + ((elJ - e0) * i) / n, d, off); k.beam(prev, cur, rad, T(c), { outline: 0.015, seg: 6 }); prev = cur; }
+    }
+    for (let el = el0 + 0.9 / r; el < elJ - 0.5 / r; el += 1.8 / r) {
+      const p = pt(aC, el, d, -(0.5 + ribT));
+      k.add(new THREE.BoxGeometry(0.62, 0.1, 0.26), T(DARK), p[0], p[1], p[2], { q: face(aC, el), outline: 0 });
+    }
+    const q = face(aC, elJ), p = pt(aC, elJ, d / 2 + 0.1, -(0.5 + ribT));
+    k.add(new THREE.BoxGeometry(1.1, 0.9, d + 0.4), T(PANEL), p[0], p[1] + 0.35, p[2], { q, outline: 0.03 });
+    const f = pt(aC, elJ, d + 0.31, -(0.5 + ribT));
+    k.add(new THREE.BoxGeometry(0.16, 0.16, 0.04), G(0x7dff6a), f[0], f[1] + 0.5, f[2], { q, outline: 0 });
+  }
   if (cupola && r > 9) {
-    const top = 1.0 + r;
-    k.cyl(r * 0.16, r * 0.2, 1.2, 12, T(WHITE), 0, top - 0.6, 0, { outline: 0.06 });
-    k.ring(r * 0.17, 0.12, G(trim), 0, top + 0.2, 0);
-    k.cyl(0.1, 0.14, r * 0.35, 5, T(DARK), r * 0.08, top, 0, { outline: 0.03 });
-    k.blinker(r * 0.08, top + r * 0.35 + 0.3, 0, 0xff2a4a, 0.3);
+    // the observation cupola: a collar on the crown ring, a glazed drum, a cap, an antenna and beacon
+    const y0 = C + r * Math.sin(crown), cr = r * 0.16, cy = y0 + 0.6;
+    k.cyl(r * 0.2, r * 0.235, 1.1, 18, T(PANEL), 0, y0 - 0.5, 0, { outline: 0.06 });
+    k.cyl(cr, cr, 1.3, 16, T(WHITE), 0, cy, 0, { outline: 0.05 });
+    k.cyl(cr + 0.04, cr + 0.04, 0.6, 16, G(0xbfe9ff), 0, cy + 0.45, 0, { outline: 0 });
+    for (let i = 0; i < 8; i++) { const a = (i / 8) * TAU; k.box(0.14, 0.62, 0.14, T(WHITE), Math.sin(a) * (cr + 0.06), cy + 0.44, Math.cos(a) * (cr + 0.06), { outline: 0 }); }
+    k.add(new THREE.SphereGeometry(cr, 16, 5, 0, TAU, 0, Math.PI / 2), T(color), 0, cy + 1.3, 0, { outline: 0.05 });
+    k.ring(cr + 0.05, 0.12, T(trim), 0, cy + 1.3, 0);
+    if (r >= 14) {
+      const rr = r * 0.2 - 0.15; // a railing round the collar's walkway
+      for (let i = 0; i < 12; i++) { const a = (i / 12) * TAU; k.cyl(0.04, 0.04, 0.95, 4, T(DARK), Math.sin(a) * rr, cy, Math.cos(a) * rr, { outline: 0 }); }
+      k.ring(rr, 0.05, T(trim), 0, cy + 0.95, 0);
+    }
+    const capTop = cy + 1.3 + cr;
+    k.cyl(0.08, 0.13, r * 0.3, 5, T(DARK), 0, capTop - 0.2, 0, { outline: 0.03 });
+    k.blinker(0, capTop + r * 0.3, 0, 0xff2a4a, 0.3);
+    // a small dish on a stalk round the back, looking up and out
+    const aD = Math.PI + 0.5, eD = crown - 0.25, ds = 0.5 + r * 0.025;
+    const base = on(aD, eD, 0), tip = on(aD, eD, 0.9 + ds * 0.5);
+    const look = new THREE.Vector3(Math.sin(aD) * 0.6, 1, Math.cos(aD) * 0.6).normalize();
+    k.beam(base, tip, 0.08, T(DARK));
+    k.add(new THREE.ConeGeometry(ds, ds * 0.35, 14, 1, true).rotateX(Math.PI), D(LIGHT), tip[0], tip[1], tip[2], { q: new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), look), outline: 0.03 });
+    k.beam(tip, [tip[0] + look.x * ds * 0.7, tip[1] + look.y * ds * 0.7, tip[2] + look.z * ds * 0.7], 0.04, T(DARK), { outline: 0 });
+    // vents standing up off the upper shell
+    const vEl = (rings[rings.length - 1] + crown) / 2;
+    for (const a of [0.6, 2.5, 5.3]) {
+      const [px, py, pz] = on(a, vEl, 0);
+      k.cyl(0.16 + r * 0.004, 0.16 + r * 0.004, 1.1, 8, T(LIGHT), px, py - 0.5, pz, { outline: 0.03 });
+      k.cyl(0.34 + r * 0.006, 0.26 + r * 0.006, 0.16, 8, T(DARK), px, py + 0.6, pz, { outline: 0.02 });
+    }
+  }
+  if (glass) {
+    // inside: a floor, raised planting beds in rows, and a ring of grow lamps
+    k.cyl(r - 0.2, r - 0.2, 0.12, seg, T(0x6b6880), 0, C - 0.1, 0, { outline: 0 });
+    const pr = r * 0.78;
+    for (let zz = -pr + 1.2; zz < pr - 0.6; zz += 2.6) {
+      const len = 2 * Math.sqrt(pr * pr - zz * zz) - 1;
+      if (len < 2) continue;
+      k.box(len, 0.6, 1.2, T(0x8a5a3a), 0, C, zz, { outline: 0.03 });
+      for (let px = -len / 2 + 0.5; px < len / 2 - 0.3; px += 0.9) k.add(new THREE.SphereGeometry(0.42, 6, 4).scale(1, 0.7, 1), T(hash(px * 3 + zz) < 0.5 ? 0x5fcf5a : 0x8fe36a), px, C + 0.7, zz, { outline: 0 });
+    }
+    k.ring(r * 0.5, 0.08, G(0xff7ad9), 0, C + r * 0.55, 0);
   }
   // airlock: a ribbed tunnel out to +z, flared where it meets the dome, ending in an airlock housing
-  const ar = Math.min(2.6, 1.4 + r * 0.06), L = Math.min(5, 2 + r * 0.12), ay = ar + 0.2;
   k.add(new THREE.CylinderGeometry(ar, ar, L + 1, 16).rotateX(Math.PI / 2), T(WHITE), 0, ay, r - 0.6 + L / 2, { outline: 0.06 });
   // where it meets the dome: a solid collar flaring into the shell, a docking ring and a row of bolts
   k.add(new THREE.CylinderGeometry(ar + 0.3, ar + 1.0, 1.6, 18).rotateX(Math.PI / 2), T(PANEL), 0, ay, r - 0.55, { outline: 0.05 });
   k.add(new THREE.TorusGeometry(ar + 0.34, 0.24, 6, 18), T(trim), 0, ay, r + 0.27, { outline: 0 });
   for (let i = 0; i < 10; i++) { const t = (i / 10) * TAU; k.add(new THREE.SphereGeometry(0.11, 6, 4), T(LIGHT), Math.cos(t) * (ar + 0.62), ay + Math.sin(t) * (ar + 0.62), r - 0.05, { outline: 0 }); }
   for (let i = 1; i <= 3; i++) k.add(new THREE.TorusGeometry(ar + 0.06, 0.13, 4, 16), T(i === 2 ? trim : PANEL), 0, ay, r - 0.4 + (L * i) / 4, { outline: 0 });
-  // the housing: a squared-off lock chamber the tunnel plugs into
-  const hw = ar * 1.35, hh = ar * 2.3, hz = r + L - 0.4, hd = 1.8;
+  // the housing: a squared-off lock chamber the tunnel plugs into, a vent on its roof
   k.box(hw * 2, hh, hd, T(WHITE), 0, 0, hz, { outline: 0.08 });
   k.box(hw * 2 + 0.2, 0.35, hd + 0.2, T(trim), 0, hh, hz, { outline: 0.03 });
   k.box(hw * 2 + 0.1, 0.3, hd + 0.1, T(PANEL), 0, 0, hz, { outline: 0 });
+  k.cyl(0.22, 0.22, 0.7, 8, T(LIGHT), hw * 0.55, hh + 0.3, hz - 0.2, { outline: 0.02 });
+  k.cyl(0.36, 0.3, 0.14, 8, T(DARK), hw * 0.55, hh + 1.0, hz - 0.2, { outline: 0.02 });
   // the doorway: a recessed dark frame ringed with hazard stripes, split doors with portholes
   const dw = ar * 1.0, dh = ar * 1.65, fz = hz + hd / 2;
   k.box(dw * 2 + 0.5, dh + 0.5, 0.12, T(DARK), 0, 0.35, fz + 0.02, { outline: 0 });
@@ -122,8 +309,52 @@ export function habDome(k, x, z, r, color, { door = 0, trim = 0xffd23f, windows 
   k.add(new THREE.SphereGeometry(0.16, 8, 6), G(0xff2a4a), dw + 0.55, 0.35 + dh * 0.85, fz + 0.1, { outline: 0 });
   k.box(0.4, 0.55, 0.12, T(DARK), dw + 0.55, 0.35 + dh * 0.4, fz + 0.06, { outline: 0.02 });
   k.box(0.28, 0.2, 0.05, G(0x2ee6ff), dw + 0.55, 0.35 + dh * 0.4 + 0.25, fz + 0.13, { outline: 0 });
-  // a step plate in front
+  // floodlights on the housing's top corners, looking down at the step
+  for (const sx of [-1, 1]) {
+    k.box(0.5, 0.26, 0.45, T(DARK), sx * (hw - 0.4), hh - 0.05, fz + 0.2, { outline: 0.02 });
+    k.box(0.4, 0.05, 0.36, G(0xfffbe0), sx * (hw - 0.4), hh - 0.09, fz + 0.2, { outline: 0 });
+  }
+  // a step plate in front: a grating, and a handrail either side
   k.box(dw * 2 + 1, 0.22, 1.6, T(CONC), 0, 0, fz + 0.8, { outline: 0.03 });
+  for (let i = -2; i <= 2; i++) k.box(dw * 2 + 0.4, 0.04, 0.12, T(DARK), 0, 0.22, fz + 0.8 + i * 0.28, { outline: 0 });
+  for (const sx of [-1, 1]) {
+    const px = sx * (dw + 0.32);
+    for (const pz of [fz + 0.2, fz + 1.4]) k.cyl(0.05, 0.05, 1.0, 5, T(trim), px, 0.22, pz, { outline: 0.015 });
+    k.beam([px, 1.22, fz + 0.2], [px, 1.22, fz + 1.4], 0.05, T(trim), { outline: 0.015 });
+  }
+  if (yard) {
+    // beside the airlock, clear of the berm: radiator racks (one, two on big domes) to the left,
+    // a power cabinet and a rack of gas bottles to the right, each with its line into the berm
+    const rx = hw + 2.6, rz = Math.max(r + L * 0.45 + 1, Math.sqrt((r + bw) ** 2 - rx * rx) + 1.8);
+    const into = (px, pz) => { const s = (r + bw * 0.4) / Math.hypot(px, pz); return [px * s, 0.3, pz * s]; };
+    const rh = Math.min(4.5, 2.4 + r * 0.04), fh = (rh - 0.5) / 3;
+    // (the racks face out, side by side along x)
+    const rzR = Math.max(r + L * 0.45 + 1, Math.sqrt((r + bw) ** 2 - (hw + 1.4) ** 2) + 1.2);
+    for (let j = 0; j < (r >= 20 ? 2 : 1); j++) {
+      const px = -(hw + 3.2 + j * 3.6);
+      for (const sx of [-1, 1]) k.box(0.18, rh, 0.18, T(STEEL), px + sx * 1.6, 0, rzR, { outline: 0.03 });
+      for (let f = 0; f < 3; f++) {
+        const fy = 0.5 + f * fh;
+        k.box(3.0, fh - 0.15, 0.08, T(WHITE), px, fy, rzR, { outline: 0.03 });
+        for (let c = -2; c <= 2; c++) k.box(0.06, fh - 0.3, 0.14, T(0x6b6880), px + c * 0.6, fy + 0.07, rzR, { outline: 0 });
+      }
+      k.box(3.4, 0.3, 0.3, T(STEEL), px, rh - 0.15, rzR, { outline: 0.03 });
+      k.beam([px, 0.3, rzR - 0.1], into(px, rzR), 0.1, T(LIGHT));
+      k.solid(1.75, rh / 2, 0.3, px, rzR);
+    }
+    k.box(1.6, 1.9, 0.9, T(PANEL), rx, 0, rz, { outline: 0.05 });
+    k.box(1.7, 0.16, 1.0, T(trim), rx, 1.9, rz, { outline: 0.02 });
+    k.box(1.2, 1.2, 0.05, T(0x4a4660), rx, 0.45, rz + 0.46, { outline: 0 });
+    for (let i = 0; i < 3; i++) k.box(0.12, 0.12, 0.05, G(i === 2 ? YEL : 0x7dff6a), rx - 0.3 + i * 0.3, 1.55, rz + 0.47, { outline: 0 });
+    for (let i = 0; i < 3; i++) {
+      const bx = rx + 1.3 + i * 0.55;
+      k.cyl(0.24, 0.24, 1.5, 8, T([0x7dff6a, WHITE, 0x2ec4ff][i]), bx, 0, rz - 0.1, { outline: 0.03 });
+      k.cyl(0.09, 0.09, 0.2, 6, T(DARK), bx, 1.5, rz - 0.1, { outline: 0 });
+    }
+    k.box(1.9, 0.08, 0.08, T(DARK), rx + 1.85, 1.1, rz + 0.16, { outline: 0 });
+    k.beam([rx, 0.3, rz - 0.45], into(rx, rz - 0.45), 0.12, T(DARK));
+    k.solid(1.65, 0.95, 0.55, rx + 0.85, rz);
+  }
   k.sphere(r, 0, 0.6, 0);
   k.solid(ar + 0.2, ar + 0.2, L / 2 + 0.3, 0, r + L / 2 - 0.4);
   k.solid(hw, hh / 2, hd / 2, 0, hz);
@@ -1621,7 +1852,7 @@ export function buildTown(world, loc, { civic = false } = {}) {
   settle(world, loc, 8101 + loc.id.length * 31, (k) => {
     const rr = world.rand;
     const hubR = civic ? 30 : 22;
-    habDome(k, 0, 0, hubR, civic ? 0xffd23f : 0xb8ffb0, { door: Math.PI, trim: 0xff9f1c });
+    habDome(k, 0, 0, hubR, civic ? 0xffd23f : 0xb8ffb0, { door: Math.PI, trim: 0xff9f1c, yard: false }); // (tunnels come in from every side)
     occ.push([0, 0, hubR + 4], [0, -hubR - 4, 4]);
     if (civic) occ.push([0, 52, 20], [-20, 64, 2], [20, 64, 2]);
     const n = loc.id === 'tranq' ? 8 : 6;
@@ -1759,7 +1990,9 @@ export function searchlight(k, x, y, z, reach = 40) {
 // =============================================================================================
 export function dressIlmb(world, loc) {
   settle(world, loc, 9203, (k) => {
-    habDome(k, 0, 0, 58, 0x9be7ff, { door: 0, trim: 0xffd23f, cupola: false });
+    // (the berm is cut where the six wings' skywalks dock, world.js buildIlmbWings: wing angle a runs
+    // out along (cos a, sin a), the dome's azimuth pi/2 - a)
+    habDome(k, 0, 0, 58, 0x9be7ff, { door: 0, trim: 0xffd23f, cupola: false, gaps: [0, 0.62, 2.2, 3.8, 4.5, 5.2].map((a) => Math.PI / 2 - a) });
     // control spire rising through the crown: banded shaft, an observation pod, antenna and beacon
     k.at(0, 0);
     k.cyl(2.6, 4.2, 70, 14, T(WHITE), 0, 0, 0, { outline: 0.12 });

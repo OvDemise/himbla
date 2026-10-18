@@ -527,3 +527,59 @@ vSkW = (modelMatrix * skWp).xyz; vSkC = (modelMatrix * skCp).xyz; vSkS = skSz;`)
   mat.customProgramCacheKey = () => 'rockSkin';
   return mat;
 }
+
+// ---- berms ----
+// The regolith banked round the hab domes (settlements.js habDome) takes the ground's look when the switch is on 1: the
+// same dust grain and mottling, and stones, more of them than on open ground (it is dug-up spoil heaped by a loader), a few
+// of them blocks the size of a fist or two; no craters (nothing has hit it since it was piled). The relief is lit by the real
+// sun in the paint, the normal left alone as the rocks' is (the berm's slopes are steep enough already for a tilted normal to
+// turn whole patches dark). Off, or on another look, it is its plain colour.
+const BERM_FN = /* glsl */`
+float skBerm(vec3 p, float px, out float lum, out float warm) {
+  float h = 0.0;
+  lum = 1.0;
+  float g1 = rimNoise(p * 9.0) - 0.5, g2 = 0.0, g3 = 0.0;
+  if (uSkinQ > 0.5) g2 = rimNoise(p * 29.0 + 3.0) - 0.5;
+  if (uSkinQ > 1.5) g3 = rimNoise(p * 90.0 - 5.0) - 0.5;
+  h += g1 * 0.02 * skFade(0.055, px) + g2 * 0.011 * skFade(0.017, px) + g3 * 0.004 * skFade(0.0055, px);
+  lum *= 1.0 + (g1 * 0.5 * skFade(0.11, px) + g2 * 0.7 * skFade(0.034, px) + g3 * 0.6 * skFade(0.011, px)) * 0.22;
+  // mottling a size down from the ground's (a berm is a few metres across): darker and paler loads of spoil
+  float m = (rimNoise(p * 0.35) - 0.5) * 0.5 * skFade(2.9, px) + (rimNoise(p * 1.1 + 3.0) - 0.5) * 0.35 * skFade(0.9, px);
+  lum *= 1.0 + m * 0.55;
+  warm = m * 0.06;
+  if (uSkinQ > 1.5) skPebbles(p, px, 0.5, 0.08, 0.24, 1.0, 0.95, 0.6, 0.62, 1.1, h, lum);   // chips, 4 to 12 cm
+  skPebbles(p, px, 1.1, 0.1, 0.24, 21.0, 0.8, 0.55, 0.5, 1.25, h, lum);                      // cobbles, 11 to 26 cm, crowded
+  if (uSkinQ > 0.5) skPebbles(p, px, 2.6, 0.08, 0.2, 43.0, 0.35, 0.5, 0.45, 1.15, h, lum);   // blocks, 20 to 50 cm
+  return h;
+}
+`;
+const BERM_COLOR = /* glsl */`
+if (uSkin > 0.5 && uSkin < 1.5) {
+  // (its own colour is darker than the classic ground, so it reads there: on this look it is the dust's, a shade down)
+  diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.34, 0.325, 0.38), 0.8);
+  float bLum, bWarm;
+  skHeight = skBerm(vSkW, skPx, bLum, bWarm);
+  diffuseColor.rgb *= bLum * vec3(1.0 + bWarm, 1.0, 1.0 - bWarm);
+  vec3 nG = normalize(vNormal);
+  vec3 nR = skPerturb(-vViewPosition, nG, vec2(dFdx(skHeight), dFdy(skHeight)), 1.0, 1.0);
+  vec3 sunV = normalize((viewMatrix * vec4(uSunW, 0.0)).xyz);
+  diffuseColor.rgb *= 1.0 + clamp((dot(nR, sunV) - dot(nG, sunV)) * uSkinShade * 1.3, -0.45, 0.35);
+}
+`;
+
+export function patchBermMaterial(mat) {
+  mat.onBeforeCompile = (sh) => {
+    Object.assign(sh.uniforms, SKIN_U);
+    sh.vertexShader = sh.vertexShader
+      .replace('#include <common>', '#include <common>\nvarying vec3 vSkW;')
+      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvSkW = (modelMatrix * vec4(transformed, 1.0)).xyz;');
+    sh.fragmentShader = sh.fragmentShader
+      .replace('#include <common>', `#include <common>\nvarying vec3 vSkW;\n${SK_NOISE}\n${SKIN_COMMON}\n${BERM_FN}`)
+      .replace('void main() {', `void main() {
+  float skPx = length(fwidth(vSkW)); // (metres per pixel on the berm)
+  float skHeight = 0.0;`)
+      .replace('#include <color_fragment>', `#include <color_fragment>\n${BERM_COLOR}`);
+  };
+  mat.customProgramCacheKey = () => 'bermSkin';
+  return mat;
+}
