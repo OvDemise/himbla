@@ -60,8 +60,8 @@ class Acc:
         x0, x1, y0, y1, z0, z1 = min(x0, x1), max(x0, x1), min(y0, y1), max(y0, y1), min(z0, z1), max(z0, z1)
         return self.boxc((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2, x1 - x0, y1 - y0, z1 - z0)
 
-    def rbc(self, cx, cy, cz, w, h, d, e=0.3, rot=(0, 0, 0)):
-        self.geos.append(xf(rbox(w / 2, h / 2, d / 2, e, 14, 8), (cx, cy, cz), rot)); return self
+    def rbc(self, cx, cy, cz, w, h, d, e=0.3, rot=(0, 0, 0), nu=14, nv=8):
+        self.geos.append(xf(rbox(w / 2, h / 2, d / 2, e, nu, nv), (cx, cy, cz), rot)); return self
 
     def cylc(self, cx, cy, cz, r, h, seg=12, rt=None, rot=(0, 0, 0)):
         self.geos.append(xf(cylinder(r if rt is None else rt, r, h, seg)[:2], (cx, cy, cz), rot)); return self

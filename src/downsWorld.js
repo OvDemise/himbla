@@ -1,30 +1,16 @@
 import * as THREE from 'three';
 import { settle } from './settlements.js';
+import { ferrisWheel, carousel } from './downsFair.js';
 import { T, G } from './outpostModels.js';
-import { downsNode, downsSlot } from './models.js';
+import { PAL, MINT2, MONEY2, SADDLE2, BLACK2, CONC, CONC2, FG, BG, tw, bake } from './downsKit.js';
 import {
-  LAP, SEGS, RAIL_IN, RAIL_OUT, DIRT, FINISH_U, FINISH_X, STAND, FAR, CLUB, ENTRIES, ARCADE, WEDGE, STALLS, STALL_ORDER, CROSSINGS, CROSS_GAP, FORECOURT, oval, lapLen,
+  LAP, SEGS, RAIL_IN, RAIL_OUT, DIRT, FINISH_U, FINISH_X, STAND, FAR, CLUB, ENTRIES, ARCADE, WEDGE, STALLS, STALL_ORDER, CROSSINGS, CROSS_GAP, FORECOURT, DRUM, PODIUMS, RING, PAVILION, LAWN, STABLES, ANNEX, oval, lapLen,
 } from './downsPlan.js';
 
 // Chimera Downs' scenery, built from the Blender kits (tools/blender/build_downs_*.py) and a few code-made surfaces. race.js builds the racecourse itself (the live screens, the
 // gate, the crowd) and calls buildDowns for everything that stands still. The layout is docs/downs-layouts.md, Layout B: The Horseshoe.
-//
-// The palette: Gold Gleam, Saddle Brown, Black, Money, Barn Red, Touch of Mint (a darker tint of each for shading).
-export const PAL = { gold: 0xcfb352, saddle: 0xb07c57, black: 0x3b393a, money: 0x7b9a6e, barn: 0x8b4044, mint: 0xf8fff8 };
-const MINT2 = 0xdfe8dd, MONEY2 = 0x5b7a52, SADDLE2 = 0x8c5f3f, BLACK2 = 0x5a5760, CONC = 0xc6d1c4, CONC2 = 0xb2bfb0;
-export const FG = { gold: '#cfb352', mint: '#f8fff8' }, BG = { black: '#3b393a', money: '#5b7a52', barn: '#6a2e33' };
-// width of a Kit.text sign for a given letter height (the pixel font is ~square per character)
-export const tw = (str, h) => h * (0.347 * str.length + 0.667);
-
+export { PAL, FG, BG, tw, bake };
 const _o = {};
-const _M = new THREE.Matrix4(), _P = new THREE.Vector3(), _Q = new THREE.Quaternion(), _S = new THREE.Vector3(), _Y = new THREE.Vector3(0, 1, 0);
-const matFor = (slot, over) => { const c = downsSlot(slot, over); return c.glow ? G(c.color) : T(c.color); };
-
-// Bake a kit part into `k` in its current frame: at (x, y, z) turned `ry` about y, scaled (sx, sy, sz); `over` maps a slot to the colour it should wear instead.
-export function bake(k, name, x = 0, y = 0, z = 0, { ry = 0, sx = 1, sy = 1, sz = 1, over } = {}) {
-  _M.compose(_P.set(x, y, z), _Q.setFromAxisAngle(_Y, ry), _S.set(sx, sy, sz));
-  k.baked(downsNode(name), (slot) => matFor(slot, over), _M);
-}
 
 // A flat band round the oval between radii r0 and r1 (track surface, lane lines, turf stripes).
 function ovalStrip(r0, r1, y, perCurve = 48) {
@@ -317,6 +303,158 @@ function forecourt(k) {
   k.at();
 }
 
+// ---- the screen drum in the middle of the infield and the three sets of winners' podiums in front of it ----
+function drum(k) {
+  k.at(DRUM.x, DRUM.z, 0);
+  bake(k, 'dn_drum');
+  k.solid(5.4, 9, 5.4, 0, 0);
+  k.at();
+}
+
+function podiums(k) {
+  const medals = [['1', 0, 1.4, '#cfb352', '#3b393a'], ['2', -6.5, 1.0, '#f8fff8', '#3b393a'], ['3', 6.5, 0.7, '#b07c57', '#f8fff8']];
+  for (const px of PODIUMS.xs) {
+    k.at(px, PODIUMS.z, 0);
+    bake(k, 'dn_podium');
+    for (const [n, x, h, bg, fg] of medals) {
+      const th = Math.min(1.0, (h - 0.25) * 0.8);
+      k.text(n, x, 0.25 + (h - 0.25) * 0.5, 2.045, 0, th * 1.5, { fg, bg, back: false, off: 0.0 });
+      k.solid(3, h / 2, 1.75, x, 0.25);
+    }
+    k.solid(9, 0.15, 2.5, 0, 0);
+    k.solid(8.1, 3.1, 0.2, 0, -2.35);
+    k.at();
+  }
+}
+
+// ---- the stable yard behind the far stand: four blocks of six boxes round a lane, the hay barn between the back two, bales about ----
+function stables(k) {
+  for (const [x, z, yaw] of STABLES.blocks) {
+    k.at(x, z, yaw);
+    bake(k, 'dn_stable_block');
+    k.solid(15.2, 3.7, 4.6, 0, -4.4);
+    for (let i = 0; i < 7; i++) k.column(0.3, 4.2, -15 + i * 5, 2.18);
+    k.at();
+  }
+  const [bx, bz] = STABLES.barn;
+  k.at(bx, bz, 0);
+  bake(k, 'dn_hay_barn');
+  k.solid(12.2, 6.2, 7.2, 0, -7);
+  k.at();
+  const hay = [[-22, -120.5], [-18, -120.2], [-20, -120.4], [18, -119.6], [22, -120], [-8, -124.6], [8, -124.3], [0, -124.8]];
+  hay.forEach(([x, z], i) => { k.at(x, z, (i * 0.7) % 3); bake(k, 'dn_hay', 0, i % 3 === 2 ? 0.6 : 0); k.at(); });
+  k.box(112, 0.1, 32, T(SADDLE2), 0, 0, -120, { outline: 0 });                                        // the yard's trodden earth
+}
+
+// ---- the parade ring and the weighing room in the infield, the picnic lawn on the east side ----
+function paddock(k) {
+  const { x: rx, z: rz, rx: a, rz: b } = RING;
+  const g = new THREE.CircleGeometry(1, 56).rotateX(-Math.PI / 2).scale(a - 0.6, 1, b - 0.6);
+  k.add(g, T(SADDLE2), rx, 0.08, rz, { outline: 0 });                                                  // the ring's tan bark
+  const per = Math.PI * (3 * (a + b) - Math.sqrt((3 * a + b) * (a + 3 * b)));
+  const n = Math.round(per / 5);
+  const at = (t) => [rx + Math.cos(t) * a, rz + Math.sin(t) * b];
+  let [px, pz] = at(0);
+  for (let i = 1; i <= n; i++) {
+    const [qx, qz] = at((i / n) * Math.PI * 2);
+    const dx = qx - px, dz = qz - pz, l = Math.hypot(dx, dz);
+    const mx = (px + qx) / 2, mz = (pz + qz) / 2;
+    if (!(Math.hypot(mx - (rx + a), mz - rz) < 3.2)) {                                                  // (a gap on the east end for the gate)
+      k.at(px, pz, Math.atan2(-dz, dx));
+      bake(k, 'dn_rail', 0, 0, 0, { sx: l / 5, sy: 1.1 });
+      k.at();
+      k.solid(0.15, 0.55, l / 2, mx, mz, Math.atan2(dx, dz));
+    }
+    px = qx; pz = qz;
+  }
+  k.at(rx + a, rz, Math.PI / 2);
+  bake(k, 'dn_ring_gate');
+  k.at();
+  for (const [lx, lz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {                                          // lamps round the outside
+    const px2 = rx + lx * (a + 3) * 0.72, pz2 = rz + lz * (b + 3) * 0.72;
+    k.at(px2, pz2, 0);
+    bake(k, 'dn_lamp');
+    k.at();
+    k.column(0.4, 6.5, px2, pz2);
+  }
+  // the weighing room: its porch toward the ring
+  k.at(PAVILION.x, PAVILION.z, -Math.PI / 2);
+  bake(k, 'dn_pavilion');
+  k.text('WEIGHING ROOM', 0, 4.48, 3.27, 0, Math.min(8.6, tw('WEIGHING ROOM', 0.3)), { fg: FG.gold, bg: BG.black, back: false, off: 0.0 });
+  k.solid(9.2, 2.5, 5.0, 0, -5);
+  for (const x of [-8.4, -2.8, 2.8, 8.4]) k.column(0.3, 4.3, x, 2.8);
+  k.at();
+  // the lawn: picnic tables under sunshades
+  const SHADES = [PAL.barn, PAL.gold, PAL.money, PAL.saddle, PAL.barn, PAL.money];
+  for (const [x, z, i] of LAWN.tables) {
+    k.at(x, z, i * 1.1);
+    bake(k, 'dn_picnic', 0, 0, 0, { over: { accent: SHADES[i % 6] } });
+    k.at();
+    k.solid(1.3, 0.5, 1.1, x, z, i * 1.1);
+  }
+}
+
+// ---- the fairground annex: a plaza behind a striped fence with a gate toward the forecourt, a ticket hall, the wheel and the carousel, two stalls and queue posts ----
+function annex(w, loc, k) {
+  const A = ANNEX, zc = (A.z0 + A.z1) / 2, xc = (A.x0 + A.x1) / 2;
+  k.box(A.x1 - A.x0, 0.12, A.z1 - A.z0, T(PAL.money), xc, 0, zc, { outline: 0 });                      // the plaza's turf
+  const path = (a, b, wd = 5) => k.strip(a, b, wd, 0.14, T(SADDLE2), 0.0, { outline: 0 });
+  path([A.gate[0], A.gate[1]], [A.wheel[0] - 18, A.wheel[1] - 14]);
+  path([A.gate[0], A.gate[1]], [A.carousel[0] + 2, A.carousel[1] + 10]);
+  path([A.wheel[0] - 18, A.wheel[1] - 14], [A.ticket[0], A.ticket[1] + 6]);
+  // the fence all round, with the gate's gap on the west side
+  const edge = (x0, z0, x1, z1) => {
+    const len = Math.hypot(x1 - x0, z1 - z0), n = Math.round(len / 4), yaw = Math.atan2(-(z1 - z0), x1 - x0);
+    for (let i = 0; i < n; i++) {
+      const sx = x0 + ((x1 - x0) * i) / n, sz = z0 + ((z1 - z0) * i) / n;
+      if (Math.abs(sx - A.gate[0]) < 0.5 && Math.abs(sz + 2 - A.gate[1]) < 7) continue;
+      k.at(sx, sz, yaw * 1);
+      bake(k, 'dn_fence', 0, 0, 0, { sx: len / n / 4 });
+      k.at();
+    }
+    k.solid(0.1, 0.65, len / 2, (x0 + x1) / 2, (z0 + z1) / 2, Math.atan2(x1 - x0, z1 - z0));
+  };
+  edge(A.x0, A.z0, A.x1, A.z0); edge(A.x1, A.z0, A.x1, A.z1); edge(A.x1, A.z1, A.x0, A.z1); edge(A.x0, A.z1, A.x0, A.z0);
+  // the gate
+  k.at(A.gate[0], A.gate[1], -Math.PI / 2);
+  bake(k, 'dn_fair_gate');
+  k.text('THE FAIRGROUND', 0, 7.4, 0.46, 0, tw('THE FAIRGROUND', 0.8), { fg: FG.gold, bg: BG.black, back: false, off: 0.0 });
+  k.text('THE FAIRGROUND', 0, 7.4, -0.46, Math.PI, tw('THE FAIRGROUND', 0.8), { fg: FG.gold, bg: BG.black, back: false, off: 0.0 });
+  k.solid(1.0, 4.5, 1.0, -5.2, 0);
+  k.solid(1.0, 4.5, 1.0, 5.2, 0);
+  k.at();
+  // the ticket hall, its front toward the plaza
+  k.at(A.ticket[0], A.ticket[1], 0);
+  bake(k, 'dn_ticket_hall');
+  k.text('TICKETS', 0, 4.8, -7.38, 0, tw('TICKETS', 1.6), { fg: FG.gold, bg: BG.black, back: false, off: 0.0 });
+  k.solid(11, 1.8, 4, 0, -4);
+  k.at();
+  // two stalls
+  for (const [sx, sz, d] of A.kiosks) {
+    k.at(sx, sz, 0);
+    bake(k, `dn_stall_${d}`, 0, 0, 0, { over: { accent: d === 6 ? PAL.money : PAL.barn } });
+    const nm = d === 6 ? 'SPACE SLUSH' : 'DERBY DONUTS';
+    k.text(nm, 0, 4.65, -0.5, 0, Math.min(7.6, tw(nm, 0.9)), { fg: FG.gold, bg: BG.black, back: false, off: 0.01 });
+    k.solid(4.4, 1.9, 3.5, 0, -3.9);
+    k.at();
+  }
+  // queue posts: a snake of ropes in front of the wheel's boarding steps and the carousel's
+  const post = (x, z, yaw) => { k.at(x, z, yaw); bake(k, 'dn_stanchion'); k.at(); };
+  for (let i = 0; i < 4; i++) post(A.wheel[0] - 8 + i * 3, A.wheel[1] + 10.5, 0);
+  for (let i = 0; i < 4; i++) post(A.wheel[0] + 1 + i * 3, A.wheel[1] + 12.5, 0);
+  for (let i = 0; i < 3; i++) post(A.carousel[0] - 5 + i * 3, A.carousel[1] + 12, 0);
+  // the rides: the wheel (its plane along x) and the carousel
+  ferrisWheel(w, loc, k, A.wheel[0], A.wheel[1]);
+  carousel(w, loc, k, A.carousel[0], A.carousel[1]);
+  // lamps and a bench or two
+  for (const [lx, lz] of [[132, 112], [200, 112], [200, 162], [132, 162], [165, 140]]) {
+    k.at(lx, lz, 0); bake(k, 'dn_lamp'); k.at(); k.column(0.4, 6.5, lx, lz);
+  }
+  // a way from the forecourt to the gate
+  k.strip([70, 158], [100, 150], 4, 0.14, T(SADDLE2), 0, { outline: 0 });
+  k.strip([100, 150], [A.gate[0] - 2, A.gate[1]], 4, 0.14, T(SADDLE2), 0, { outline: 0 });
+}
+
 // ---- flood masts round the course (dn_flood), their heads turned toward the middle of the oval ----
 function floods(k) {
   for (const [x, z] of [[-74, 146], [74, 146], [-74, 188], [74, 188], [-102, -106], [102, -106], [-38, -108], [38, -108]]) {
@@ -336,6 +474,11 @@ export function buildDowns(w, loc) {
     clubhouse(k);
     arcades(k);
     forecourt(k);
+    drum(k);
+    podiums(k);
+    stables(k);
+    paddock(k);
+    annex(w, loc, k);
     floods(k);
   });
 }

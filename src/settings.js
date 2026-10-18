@@ -8,6 +8,19 @@ import { DEV_TOOLS } from './devtools.js';
 import { SKIN_FROM_URL } from './moonSkins.js';
 
 const KEY = 'moonrunner-settings-v1';
+const BINDS_V = 2; // 2: thrusters left the keyboard (right mouse only) and the power moved from Z to E
+
+// Binds saved before v2: the thruster key is gone, and whatever the power (Z) was moved to now belongs to E.
+function migrateBinds(old) {
+  const out = {};
+  for (const [def, phys] of Object.entries(old)) {
+    if (def === 'KeyE') continue;
+    out[def === 'KeyZ' ? 'KeyE' : def] = phys;
+  }
+  // another action sitting on the physical E (the thruster's old key) trades places with the power
+  if (!out.KeyE) for (const def of Object.keys(out)) if (out[def] === 'KeyE') out[def] = 'KeyZ';
+  return out;
+}
 
 // Remappable actions: the game always checks the DEFAULT code; Input translates.
 export const ACTIONS = [
@@ -17,7 +30,6 @@ export const ACTIONS = [
   { code: 'KeyD', label: 'Right / carve / spin' },
   { code: 'Space', label: 'Quantum-Lock skates (hold)' },
   { code: 'ShiftLeft', label: 'Mag-jump / Dive (hold in the air)' },
-  { code: 'KeyE', label: 'Thrusters (hold)' },
   { code: 'KeyQ', label: 'Tricks (hold in the air)' },
   { code: 'KeyF', label: 'Interact / job board' },
   { code: 'KeyG', label: 'Scoop into jar' },
@@ -29,7 +41,7 @@ export const ACTIONS = [
   { code: 'KeyR', label: 'Emergency recall (hold 1.5 s)' },
   { code: 'KeyN', label: 'Music on / off' },
   { code: 'KeyV', label: 'Vehicle: call / board / leave' },
-  { code: 'KeyZ', label: 'Power (mouse wheel: pick one)' },
+  { code: 'KeyE', label: 'Power (mouse wheel: pick one)' },
   { code: 'KeyT', label: 'Personal Teleporter (tech)' },
   { code: 'KeyH', label: 'Blackjack: hit' }, // (H used to be the help panel: that's the pause card's HELP now, but the casino still reads the code)
 ];
@@ -129,7 +141,7 @@ const PAD_ROWS = [
   ['Interact / job board', ['X']],
   ['Scoop into jar', ['R3']],
   ['Vehicle: call / board / leave', ['Y']],
-  ['Power (hold for the winch)', ['RB']],
+  ['Power (again to let go of the winch)', ['RB']],
   ['Next power', ['DU']],
   ['Fire', ['RT']],
   ['Previous / next weapon', ['DL', 'DR']],
@@ -145,7 +157,7 @@ const PAD_ROWS = [
 
 // Help-table rows whose key names aren't a single key (the rest go through tokensFor)
 const HELP_PAD = {
-  Mouse: ['RS'], 'Left mouse': ['RT'], 'SPACE (hold)': ['LB'], 'A / D on skates': ['LS'], 'E / Right mouse': ['LT'],
+  Mouse: ['RS'], 'Left mouse': ['RT'], 'SPACE (hold)': ['LB'], 'A / D on skates': ['LS'], 'Right mouse': ['LT'],
   'Q + W/S · Q + A/D': ['B', '#+', 'LS'], '1 2 3 4': ['DL', 'DR'], 'X (hold)': ['DD'], 'R (hold)': ['VIEW', '#hold'], M: ['VIEW', '#tap'],
 };
 
@@ -157,16 +169,15 @@ const HELP_ROWS = {
   'W A S D': (k) => `${k('KeyW')} ${k('KeyA')} ${k('KeyS')} ${k('KeyD')}`,
   'SPACE (hold)': (k) => `${k('Space')} (hold)`,
   'A / D on skates': (k) => `${k('KeyA')} / ${k('KeyD')} on skates`,
-  'E / Right mouse': (k) => `${k('KeyE')} / Right mouse`,
   SHIFT: (k) => (k('ShiftLeft') === 'L-SHIFT' ? 'SHIFT' : k('ShiftLeft')),
   'Q + W/S · Q + A/D': (k) => `${k('KeyQ')} + ${k('KeyW')}/${k('KeyS')} · ${k('KeyQ')} + ${k('KeyA')}/${k('KeyD')}`,
-  J: (k) => k('KeyJ'), C: (k) => k('KeyC'), N: (k) => k('KeyN'), P: (k) => k('KeyP'), V: (k) => k('KeyV'), Z: (k) => k('KeyZ'), T: (k) => k('KeyT'),
+  J: (k) => k('KeyJ'), C: (k) => k('KeyC'), N: (k) => k('KeyN'), P: (k) => k('KeyP'), V: (k) => k('KeyV'), E: (k) => k('KeyE'), T: (k) => k('KeyT'),
   'X (hold)': (k) => `${k('KeyX')} (hold)`, G: (k) => k('KeyG'),
   F: (k) => k('KeyF'), M: (k) => k('KeyM'), R: (k) => k('KeyR'),
   '` (backtick)': (k) => (k('Backquote') === '`' ? '` (backtick)' : k('Backquote')),
 };
 const MINI_ROWS = {
-  SPACE: (k) => k('Space'), WASD: (k) => `${k('KeyW')}${k('KeyA')}${k('KeyS')}${k('KeyD')}`, 'E/RMB': (k) => `${k('KeyE')}/RMB`,
+  SPACE: (k) => k('Space'), WASD: (k) => `${k('KeyW')}${k('KeyA')}${k('KeyS')}${k('KeyD')}`,
   SHIFT: (k) => (k('ShiftLeft') === 'L-SHIFT' ? 'SHIFT' : k('ShiftLeft')), Q: (k) => k('KeyQ'), M: (k) => k('KeyM'), J: (k) => k('KeyJ'),
   F: (k) => k('KeyF'), C: (k) => k('KeyC'),
 };
@@ -198,7 +209,7 @@ export class Settings {
       for (const tab of Object.values(SCHEMA)) {
         for (const s of tab) if (d[s.key] !== undefined && typeof d[s.key] === typeof s.def) this.v[s.key] = d[s.key];
       }
-      if (d.binds && typeof d.binds === 'object') this.v.binds = { ...d.binds };
+      if (d.binds && typeof d.binds === 'object') this.v.binds = d.bindsV >= 2 ? { ...d.binds } : migrateBinds(d.binds);
       if (typeof d.autoTuned === 'boolean') this.v.autoTuned = d.autoTuned;
       if (d.preset === undefined) this.v.preset = this.matchPreset(); // (settings saved before presets existed)
       // (saved before Ground detail existed: it follows the preset they were on, so a LOW preset does not get HIGH detail)
@@ -266,7 +277,7 @@ export class Settings {
   }
 
   save() {
-    try { localStorage.setItem(KEY, JSON.stringify(this.v)); } catch { /* storage unavailable */ }
+    try { localStorage.setItem(KEY, JSON.stringify({ ...this.v, bindsV: BINDS_V })); } catch { /* storage unavailable */ }
   }
 
   // physical key currently bound to an action's default code

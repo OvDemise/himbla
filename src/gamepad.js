@@ -15,10 +15,10 @@
 //   X            interact (F)                   MENUS
 //   Y            vehicle (V)                    d-pad / left stick  move the highlight
 //   LB           Quantum-Lock skates, hold      A  press   B  back   right stick  scroll
-//   RB           power (Z, hold for the winch)  LB / RB  previous / next tab (where there are tabs)
+//   RB           power (E; again lets go of the winch)  LB / RB  previous / next tab (where there are tabs)
 //   LT           thrusters / Rail Lance scope
 //   RT           fire                           Start        pause / resume
-//   L3           thrusters (E)                  View, tap    globe map (M)
+//   L3           thrusters (like LT)            View, tap    globe map (M)
 //   R3           scoop into the jar (G)         View, hold   emergency recall (R)
 //   d-pad ←/→    previous / next weapon
 //   d-pad ↑      next power (the mouse wheel)    GLOBE MAP
@@ -58,7 +58,7 @@ const DEAD = 0.18; // stick deadzone (radial)
 const AIM_SHOW = 10; // seconds the crosshair stays up after the last shot
 const B = { A: 0, B: 1, X: 2, Y: 3, LB: 4, RB: 5, LT: 6, RT: 7, VIEW: 8, START: 9, L3: 10, R3: 11, UP: 12, DOWN: 13, LEFT: 14, RIGHT: 15 };
 // buttons held straight onto default key codes in play
-const HOLD = { [B.A]: 'ShiftLeft', [B.B]: 'KeyQ', [B.X]: 'KeyF', [B.Y]: 'KeyV', [B.LB]: 'Space', [B.RB]: 'KeyZ', [B.L3]: 'KeyE', [B.R3]: 'KeyG' };
+const HOLD = { [B.A]: 'ShiftLeft', [B.B]: 'KeyQ', [B.X]: 'KeyF', [B.Y]: 'KeyV', [B.LB]: 'Space', [B.RB]: 'KeyE', [B.L3]: 'Thrust', [B.R3]: 'KeyG' };
 // the radial menu on d-pad down: everything that has no button of its own, clockwise from the top.
 // `has`: is it yours yet (the wedge stays in place, dimmed, until it is); `code`: the key it presses
 const RADIAL = [

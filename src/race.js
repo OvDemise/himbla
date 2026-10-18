@@ -1,25 +1,25 @@
 import * as THREE from 'three';
-import { toon } from './toon.js';
+import { toon, inkMat } from './toon.js';
 import { frameQuat } from './geo.js';
 import { pick } from './rng.js';
 import { spliceGenes, makeChimera, LIVING } from './chimera.js';
 import { ensureStats, statTotal, newRunner, stepRunner, raceOdds, CONDITIONS } from './chimerastats.js';
 import { chimeraCard, cardList } from './chimeracard.js';
-import { makeDownsPart } from './models.js';
+import { makeDownsPart, downsNode } from './models.js';
 import { buildDowns } from './downsWorld.js';
-import { LAP, LANES, RAIL_IN, RAIL_OUT, FINISH_U, STAND, FAR, CLUB, WINDOW, BOARD, DRUM, oval } from './downsPlan.js';
-import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import { LAP, LANES, RAIL_IN, RAIL_OUT, FINISH_U, STAND, FAR, CLUB, WINDOW, BOARD, DRUM, PODIUMS, oval } from './downsPlan.js';
 import { pixelFont } from './fonts.js';
+import { bendPoint, bendQuat } from './curve.js';
 
 // Chimera Downs: a proper racecourse for the things that crawl out of Dr. Zbornak's reactor.
-// A dirt oval with four lanes, a grandstand full of cheering spectators, a jumbotron, a finish
-// gantry, and a race office whose board posts races over time (up to three at once): each has
+// A dirt oval with four lanes, a grandstand full of cheering spectators, a screen drum, a finish
+// arch, winners' podiums, and a clubhouse whose board posts races over time (up to three at once): each has
 // its own distance (450 m sprints to 3.6 km marathons, so stamina matters), class, going, purse
 // and field. Enter one of your chimeras, bet on it, and the camera locks onto it for the race
-// (1-5 or C switch cameras, the mouse orbits, SPACE spends one of three crowd cheers).
+// (1-5 or C switch cameras, the mouse orbits, SPACE spends one of three crowd cheers). When it is
+// over, the first three stand on a podium and the camera swings round to them behind the result.
 
 // The oval, the stands and the grounds are in downsPlan.js (the location's frame: two 180 m straights joined by half circles; the finish at x = 45 on the home straight).
-const SCREEN = { x: DRUM.x, z: DRUM.z, w: DRUM.w, h: DRUM.h, y: DRUM.y };
 const MAX_CARD = 3;
 
 const BETS = [0, 50, 200, 500];
@@ -44,7 +44,7 @@ const MOD_KINDS = ['water', 'rock', 'dirt', 'mud', 'wiring', 'engine'];
 
 const _v = new THREE.Vector3(), _w = new THREE.Vector3(), _up = new THREE.Vector3(), _f = new THREE.Vector3();
 const _m4 = new THREE.Matrix4(), _q = new THREE.Quaternion(), _s = new THREE.Vector3(), _p = new THREE.Vector3(), _Y = new THREE.Vector3(0, 1, 0);
-const _o = {};
+const _o = {}, _bq = new THREE.Quaternion();
 const fmt = (n) => Math.round(n).toLocaleString('en-US');
 const rand = (a, b) => a + Math.random() * (b - a);
 export class Race {
@@ -84,11 +84,22 @@ export class Race {
     buildDowns(w, loc);
 
     // ---- moving parts ----
-    // the jumbotron screen and the race card board are live canvases; the board hangs in the clubhouse's recess
-    this.screen = this.canvasPlane(512, 256, SCREEN.w, SCREEN.h);
-    w.put(this.screen.mesh, loc, SCREEN.x, SCREEN.z - 0.15, SCREEN.y, 0, true);
+    // the drum's four screens (dn_drum) are live canvases: one shared by the two long faces, one by the two ends; the race card board hangs in the clubhouse's recess, and each podium set
+    // has a plate on its backdrop
+    this.screen = this.canvasPlane(512, 256, DRUM.w, DRUM.h);
+    w.put(this.screen.mesh, loc, DRUM.x, DRUM.z + DRUM.d / 2 + 0.03, DRUM.yc, 0, true);
+    w.put(new THREE.Mesh(this.screen.mesh.geometry, this.screen.mesh.material), loc, DRUM.x, DRUM.z - DRUM.d / 2 - 0.03, DRUM.yc, Math.PI, true);
+    this.endScreen = this.canvasPlane(256, 366, DRUM.end, DRUM.h);
+    w.put(this.endScreen.mesh, loc, DRUM.x + DRUM.w / 2 + 0.53, DRUM.z, DRUM.yc, Math.PI / 2, true);
+    w.put(new THREE.Mesh(this.endScreen.mesh.geometry, this.endScreen.mesh.material), loc, DRUM.x - DRUM.w / 2 - 0.53, DRUM.z, DRUM.yc, -Math.PI / 2, true);
     this.board = this.canvasPlane(512, 300, BOARD.w, BOARD.h);
     w.put(this.board.mesh, loc, BOARD.x, CLUB.z1 - 5 + 0.37, BOARD.y, 0, true);
+    this.plates = PODIUMS.xs.map((px) => {
+      const p = this.canvasPlane(704, 90, PODIUMS.plate.w, PODIUMS.plate.h);
+      w.put(p.mesh, loc, px, PODIUMS.z + PODIUMS.plate.z + 0.03, PODIUMS.plate.y, 0, true);
+      return p;
+    });
+    this.podiumResult = null;
     // the starting gate (moved to wherever the next race starts)
     this.gate = this.makeGate();
     this.gate.root.visible = false;
@@ -96,14 +107,19 @@ export class Race {
     // the crowd: outlined spectators in both stands
     this.buildCrowd();
     // foot traffic: racegoers wandering the forecourt, the apron and the infield
-    w.addFigures(loc, 30, {
+    w.addFigures(loc, 40, {
       kind: 'worker',
       look: (i) => (i % 7 === 6 ? { kind: 'kid', scale: 0.6 } : { look: ['casual', 'casual', 'trader', 'elder'][i % 4] }),
-      // (each walker keeps to its own patch: the forecourt, the apron in front of the stands, or the infield)
+      // (each walker keeps to its own patch: the forecourt, the apron in front of the stands, the arcades' rail walk, the fairground or the infield)
       area: (out, f) => {
-        if (f.zone === undefined) { const q = Math.random(); f.zone = q < 0.5 ? 0 : q < 0.8 ? 1 : 2; }
+        if (f.zone === undefined) { const q = Math.random(); f.zone = q < 0.3 ? 0 : q < 0.45 ? 1 : q < 0.75 ? 2 : q < 0.88 ? 3 : 4; }
         if (f.zone === 0) out.set(-60 + Math.random() * 120, 0, CLUB.z1 + 6 + Math.random() * 36);
         else if (f.zone === 1) out.set(-100 + Math.random() * 200, 0, (Math.random() < 0.5 ? 1 : -1) * (RAIL_OUT + 3 + Math.random() * 5));
+        else if (f.zone === 2) {
+          // the rail walk round a turn (the west one or the east one), between the rail and the arcade
+          const a = (125 + Math.random() * 120) * Math.PI / 180, r = RAIL_OUT + 3 + Math.random() * 14, s = f.side ?? (f.side = Math.random() < 0.5 ? -1 : 1);
+          out.set(s * (-90 + r * Math.cos(a)), 0, r * Math.sin(a));
+        } else if (f.zone === 3) out.set(136 + Math.random() * 66, 0, 112 + Math.random() * 50);
         else out.set(-80 + Math.random() * 160, 0, -30 + Math.random() * 60);
         return out;
       },
@@ -164,8 +180,13 @@ export class Race {
   placeGate(u) {
     const G0 = this.gate;
     oval(u, G0.mid, _o);
+    const yaw = Math.atan2(_o.hx, _o.hz), R = this.game.world.curveR(this.loc);
     G0.root.position.set(_o.x, 0.05, _o.z);
-    G0.root.rotation.y = Math.atan2(_o.hx, _o.hz);
+    G0.root.rotation.y = yaw;
+    if (R) { // (stood on the curved plateau, curve.js)
+      bendPoint(R, _o.x, 0.05, _o.z, G0.root.position);
+      G0.root.quaternion.setFromAxisAngle(_Y, yaw).premultiply(bendQuat(R, _o.x, _o.z, _bq));
+    }
     G0.root.visible = true;
     this.setGate(0);
   }
@@ -189,24 +210,19 @@ export class Race {
         seats.push({ x, y: (tier + 1) * S.rise + 0.3, z: sign * (S.z0 + tier * S.depth + 0.95), face });
       }
     };
-    sit(STAND, 900, Math.PI, 1, 8.7);
-    sit(FAR, 360, 0, -1, 7.7);
+    sit(STAND, 760, Math.PI, 1, 8.7);
+    sit(FAR, 300, 0, -1, 7.7);
     const N = seats.length;
-    const torsoG = new THREE.CapsuleGeometry(0.3, 0.42, 3, 10).scale(1, 1, 0.78);
-    const headG = new THREE.SphereGeometry(0.27, 12, 9);
-    const hatG = new THREE.CylinderGeometry(0.2, 0.3, 0.2, 10).translate(0, 0.2, 0); // (a cap or a bowler)
-    const hairG = new THREE.SphereGeometry(0.29, 12, 6, 0, Math.PI * 2, 0, Math.PI * 0.55).translate(0, 0.02, -0.02); // (hair, under no hat)
-    // both arms, raised: two capsules angled up and out from the shoulders
-    const armUp = new THREE.CapsuleGeometry(0.09, 0.5, 2, 6);
-    const armsUpG = mergeGeometries([armUp.clone().rotateZ(0.5).translate(0.36, 0.38, 0), armUp.clone().rotateZ(-0.5).translate(-0.36, 0.38, 0)]);
-    const inkM = new THREE.MeshBasicMaterial({ color: 0x0b0612, side: THREE.BackSide });
+    // the spectator's parts come from the kit (tools/blender/build_downs_crowd.py): a seated body, a head, a cap, hair and a pair of raised arms, each one white mesh tinted per fan
+    const part = (n) => downsNode(n);
     const mk = (geo, mat) => { const m = new THREE.InstancedMesh(geo, mat, N); m.frustumCulled = false; return m; };
-    const body = mk(torsoG, toon(0xffffff)), head = mk(headG, toon(0xffffff)), hat = mk(hatG, toon(0xffffff)), arms = mk(armsUpG, toon(0xffffff)), hair = mk(hairG, toon(0xffffff));
-    const bodyInk = mk(torsoG, inkM), headInk = mk(headG, inkM);
+    const body = mk(part('dn_fan_body').parts[0].geo, toon(0xffffff)), head = mk(part('dn_fan_head').parts[0].geo, toon(0xffffff)), hat = mk(part('dn_fan_cap').parts[0].geo, toon(0xffffff));
+    const arms = mk(part('dn_fan_arms').parts[0].geo, toon(0xffffff)), hair = mk(part('dn_fan_hair').parts[0].geo, toon(0xffffff));
+    const bodyInk = mk(part('dn_fan_body').ink, inkMat), headInk = mk(part('dn_fan_head').ink, inkMat);
     // racegoers' colours: smart jackets, a few loud shirts, skin and hair tones, hats
-    const cols = [0x2f4f7a, 0x7a2f3a, 0x3f6a4a, 0xd8cfb8, 0x4a4660, 0xc7863a, 0x2c6f8a, 0x8a5aa8, 0xe2d6a0, 0x5e5e6e];
+    const cols = [0x3b393a, 0x8b4044, 0x7b9a6e, 0xcfb352, 0xb07c57, 0xf8fff8, 0x2f4f7a, 0x5b7a52, 0xdfe8dd, 0x6a2e33];
     const skin = [0xf1c9a5, 0xd8a47f, 0xa8714f, 0x6e4632, 0xe9b98f];
-    const hats = [0x2a2a33, 0xe8dfc4, 0x7a2f3a, 0x245c40, 0xc7a24a];
+    const hats = [0x3b393a, 0xdfe8dd, 0x8b4044, 0x5b7a52, 0xcfb352];
     const hairs = [0x2a1d18, 0x5a3a22, 0x9a6a3a, 0xd8b56a, 0x8a8698, 0x1d1a29];
     const c = new THREE.Color();
     this.crowd = seats.map((s, i) => {
@@ -226,34 +242,34 @@ export class Race {
 
   updateCrowd(t) {
     const { body, head, hat, arms, hair, bodyInk, headInk } = this.crowdParts;
-    const ex = this.excite;
+    const ex = this.excite, R = this.game.world.curveR(this.loc);
     for (let i = 0; i < this.crowd.length; i++) {
       const p = this.crowd[i];
       // fans bob in their seats; when the crowd is excited, they leap and wave
       const hop = ex > 0.05 ? Math.max(0, Math.sin(t * p.f + p.ph)) * (0.25 + p.jump * 0.9) * ex : Math.max(0, Math.sin(t * 1.3 + p.ph)) * 0.05;
       const sway = Math.sin(t * 0.9 + p.ph) * 0.06;
-      _q.setFromAxisAngle(_Y, p.face + sway);
       const k = p.sc;
-      _p.set(p.x, p.y + 0.5 * k + hop, p.z);
-      _m4.compose(_p, _q, _s.set(k, k, k));
-      body.setMatrixAt(i, _m4);
-      _m4.compose(_p, _q, _s.set(k * 1.13, k * 1.08, k * 1.15));
-      bodyInk.setMatrixAt(i, _m4);
-      const armsOn = ex > 0.35 && p.wave;
-      _m4.compose(_p, _q, _s.set(armsOn ? k : 0, armsOn ? k : 0, armsOn ? k : 0));
-      arms.setMatrixAt(i, _m4);
-      _p.y += 0.66 * k;
-      _m4.compose(_p, _q, _s.set(k, k, k));
-      head.setMatrixAt(i, _m4);
-      _m4.compose(_p, _q, _s.set(k * 1.14, k * 1.14, k * 1.14));
-      headInk.setMatrixAt(i, _m4);
-      _m4.compose(_p, _q, _s.set(p.hat ? k : 0, p.hat ? k : 0, p.hat ? k : 0));
-      hat.setMatrixAt(i, _m4);
-      _m4.compose(_p, _q, _s.set(p.hat ? 0 : k, p.hat ? 0 : k, p.hat ? 0 : k));
-      hair.setMatrixAt(i, _m4);
+      const y = p.y + 0.5 * k + hop;
+      // (the stands are on a curved plateau: each fan is stood on the sphere and turned with it, curve.js)
+      const set = (m, yy, sc) => {
+        _q.setFromAxisAngle(_Y, p.face + sway);
+        _p.set(p.x, yy, p.z);
+        if (R) { _q.premultiply(bendQuat(R, p.x, p.z, _bq)); bendPoint(R, p.x, yy, p.z, _p); }
+        m.setMatrixAt(i, _m4.compose(_p, _q, _s.set(sc, sc, sc)));
+      };
+      set(body, y, k);
+      set(bodyInk, y, k);
+      set(arms, y, ex > 0.35 && p.wave ? k : 0);
+      set(head, y + 0.66 * k, k);
+      set(headInk, y + 0.66 * k, k);
+      set(hat, y + 0.66 * k, p.hat ? k : 0);
+      set(hair, y + 0.66 * k, p.hat ? 0 : k);
     }
     for (const m of [body, head, hat, arms, hair, bodyInk, headInk]) m.instanceMatrix.needsUpdate = true;
   }
+
+  // the race keeps the camera while the result dialog is up: the finishers are on the podium
+  holdsCamera() { return this.state === 'cooldown' && this.camMode === 'podium'; }
 
   near(p) { return !!this.booth && this.loc.active && this.windows.some((q) => p.distanceTo(q) < 5.5); }
 
@@ -383,8 +399,10 @@ export class Race {
   // ================= the race =================
   start(race, field, bet, odds) {
     const g = this.game;
+    race.slot = Math.max(0, Math.min(2, this.card.indexOf(race)));      // (which podium set is this race's)
     this.card = this.card.filter((r) => r !== race);
     this.race = race;
+    this.podiumResult = null;
     this.cond = CONDITIONS[race.cond];
     this.bet = bet;
     this.odds = odds;
@@ -504,7 +522,7 @@ export class Race {
       this.excite = Math.max(this.state === 'run' ? 0.25 : 0, this.excite - dt * 0.25);
       this.updateCrowd(this.t);
       this.screenT -= dt;
-      if (this.screenT <= 0) { this.screenT = 0.3; this.drawScreen(); this.drawBoard(); }
+      if (this.screenT <= 0) { this.screenT = 0.3; this.drawScreen(); this.drawEnd(); this.drawBoard(); this.drawPlates(); }
       if (this.gate.root.visible && this.state !== 'countdown') this.setGate(Math.min(1, this.gate.open + dt * 4));
     }
     if (this.state === 'idle') { this.panel.classList.add('hidden'); return; }
@@ -554,9 +572,30 @@ export class Race {
       if (!this.finishAt && (this.finished >= this.racers.length || this.racers[0].done)) this.finishAt = this.t + 2.2;
       if (this.finishAt && this.t >= this.finishAt) { this.finishAt = 0; this.finish(); }
     } else if (this.state === 'cooldown') {
-      for (const r of this.racers) { r.t += dt; r.v = Math.max(0, r.v - dt * 6); r.s += r.v * dt; this.place(r); r.m.anim(r.t, r.v); }
+      for (const r of this.racers) {
+        r.t += dt;
+        if (r.podium) { r.m.anim(r.t, 0); continue; }                     // (on the podium: standing there, nodding)
+        r.v = Math.max(0, r.v - dt * 6); r.s += r.v * dt; this.place(r); r.m.anim(r.t, r.v);
+      }
     }
     this.drawPanel();
+  }
+
+  // stand a finisher on step `n` (1 to 3) of podium set `slot`, facing the main stand
+  toPodium(r, n, slot) {
+    const g = this.game, w = g.world;
+    const [dx, h] = PODIUMS.steps[n], px = PODIUMS.xs[slot] + dx;
+    w.toWorld(this.loc, px, 0, PODIUMS.z, _v);
+    g.planet.ground(_v, _v);
+    _up.copy(_v).normalize();
+    w.toWorld(this.loc, px, 0, PODIUMS.z + 1, _f).sub(w.toWorld(this.loc, px, 0, PODIUMS.z, _w));
+    r.podium = n;
+    r.m.root.visible = true;
+    r.m.root.position.copy(_v).addScaledVector(_up, h + 0.1);
+    frameQuat(_up, _f, r.m.root.quaternion);
+    r.pos = r.m.root.position;
+    r.fwd = (r.fwd || new THREE.Vector3()).copy(_f).normalize();
+    r.m.anim(r.t, 0);
   }
 
   confetti(pos) {
@@ -613,6 +652,11 @@ export class Race {
       oval(this.startU + subject.s, RAIL_IN - 7, _o);
       w.toWorld(this.loc, _o.x, 3 + size, _o.z, want);
       look.copy(P).addScaledVector(up, 1 + size * 0.5);
+    } else if (this.camMode === 'podium') {
+      // the winners' podium, from the front and a little above, once the race is over
+      const px = PODIUMS.xs[this.podiumSlot ?? 1];
+      w.toWorld(this.loc, px + 3, 6.5, PODIUMS.z + 17, want);
+      w.toWorld(this.loc, px, 3.1, PODIUMS.z, look);
     } else if (this.camMode === 'stands') {
       // high in the stands, sliding along with the runner
       oval(this.startU + subject.s, 0, _o);
@@ -639,7 +683,7 @@ export class Race {
     if (sk > 0) { g.cam.shake = Math.max(0, g.cam.shake - dt * 2.5); cam.position.x += (Math.random() - 0.5) * sk; cam.position.y += (Math.random() - 0.5) * sk; }
     cam.up.copy(up);
     cam.lookAt(this.camL);
-    const fov = this.camMode === 'stands' ? 38 : this.camMode === 'blimp' ? 55 : 66;
+    const fov = this.camMode === 'stands' ? 38 : this.camMode === 'blimp' ? 55 : this.camMode === 'podium' ? 52 : 66;
     g.cam.fov += (fov - g.cam.fov) * Math.min(1, dt * 3);
     if (Math.abs(cam.fov - g.cam.fov) > 0.01) { cam.fov = g.cam.fov; cam.updateProjectionMatrix(); }
   }
@@ -686,6 +730,14 @@ export class Race {
     g.save();
     this.state = 'cooldown';
     const order = this.order();
+    // the first three go up on their steps, and the camera swings round to them
+    const slot = race.slot ?? 1;
+    this.podiumResult = { slot, name: race.name, top: order.slice(0, 3).map((r) => r.genes.name) };
+    order.slice(0, 3).forEach((r, i) => this.toPodium(r, i + 1, slot));
+    this.podiumSlot = slot;
+    this.camMode = 'podium';
+    this.camT = 0;
+    this.confetti(order[0].pos);
     const rows = order.map((r) => `<div class="race-row ${r.mine ? 'mine' : ''}"><b>${r.place}</b> ${r.genes.name} <small>(${r.genes.tier})</small><span>${r.behind !== undefined ? `+${fmt(r.behind)} m` : `${r.time.toFixed(1)}s`}</span></div>`).join('');
     const quip = place === 1 ? pick(['Wire to wire. Beautiful. Terrifying, but beautiful.', 'The crowd is chanting its name. One of its names.', 'Dr. Zbornak will want a sample.'])
       : place <= 3 ? pick(['In the money!', 'A podium finish. The podium is slightly sticky now.'])
@@ -712,40 +764,82 @@ export class Race {
     g.updateCamera(0.016, true);
   }
 
-  // ---------- the big screen and the race board ----------
+  // ---------- the drum's screens, the race board and the podium plates (the palette: Black, Gold Gleam, Touch of Mint, Barn Red, Money, Saddle Brown) ----------
   drawScreen() {
     const { ctx: x, c, tex } = this.screen;
     const W = c.width, H = c.height;
-    x.fillStyle = '#0d0a1a'; x.fillRect(0, 0, W, H);
-    x.fillStyle = '#1d4632'; x.fillRect(0, 0, W, 40);
-    x.fillStyle = '#ffffff'; x.font = pixelFont(20); x.textBaseline = 'middle';
+    x.fillStyle = '#2b2a2c'; x.fillRect(0, 0, W, H);
+    x.fillStyle = '#8b4044'; x.fillRect(0, 0, W, 40);
+    x.fillStyle = '#cfb352'; x.fillRect(0, 40, W, 3);
+    x.fillStyle = '#f8fff8'; x.font = pixelFont(20); x.textBaseline = 'middle';
     if (this.state !== 'idle' && this.race) {
       x.textAlign = 'left';
       x.fillText(this.race.name.toUpperCase(), 14, 21);
       x.textAlign = 'right';
       const togo = Math.max(0, this.race.dist - this.order()[0].s);
-      x.fillText(this.state === 'countdown' ? 'GET READY' : togo > 0 ? `${fmt(togo)} M` : 'FINISH!', W - 14, 21);
+      x.fillText(this.state === 'countdown' ? 'GET READY' : this.state === 'cooldown' ? 'RESULT' : togo > 0 ? `${fmt(togo)} M` : 'FINISH!', W - 14, 21);
       this.order().forEach((r, i) => {
-        const y = 66 + i * 46;
-        x.fillStyle = r.mine ? '#7dff3a' : '#ffd23f'; x.textAlign = 'left'; x.font = pixelFont(24);
+        const y = 68 + i * 46;
+        x.fillStyle = r.mine ? '#a8d08d' : '#cfb352'; x.textAlign = 'left'; x.font = pixelFont(24);
         x.fillText(`${r.done ? r.place : i + 1}`, 16, y);
-        x.fillStyle = '#ffffff'; x.font = pixelFont(18);
+        x.fillStyle = '#f8fff8'; x.font = pixelFont(18);
         x.fillText(r.genes.name.slice(0, 22).toUpperCase(), 56, y);
-        x.fillStyle = '#2a2540'; x.fillRect(56, y + 14, 300, 6);
-        x.fillStyle = r.stam < 0.25 ? '#ff9f1c' : '#7dff6a'; x.fillRect(56, y + 14, 300 * r.stam, 6);
+        x.fillStyle = '#3b393a'; x.fillRect(56, y + 14, 300, 6);
+        x.fillStyle = r.stam < 0.25 ? '#b07c57' : '#7b9a6e'; x.fillRect(56, y + 14, 300 * r.stam, 6);
       });
     } else {
       x.textAlign = 'center';
       x.fillText('★ CHIMERA DOWNS ★', W / 2, 21);
       x.font = pixelFont(16);
-      if (!this.card.length) { x.fillStyle = '#ffd23f'; x.fillText(`NEXT RACE POSTS IN ${Math.ceil(this.postT)}s`, W / 2, H / 2); }
+      if (!this.card.length) { x.fillStyle = '#cfb352'; x.fillText(`NEXT RACE POSTS IN ${Math.ceil(this.postT)}s`, W / 2, H / 2); }
       this.card.forEach((r, i) => {
-        const y = 70 + i * 62;
-        x.fillStyle = '#ffd23f'; x.textAlign = 'left'; x.font = pixelFont(18);
-        x.fillText(r.name.toUpperCase(), 16, y);
-        x.fillStyle = '#9be7ff'; x.font = pixelFont(13);
+        const y = 72 + i * 62;
+        x.fillStyle = '#cfb352'; x.textAlign = 'left'; x.font = pixelFont(18);
+        x.fillText(`${i + 1} · ${r.name.toUpperCase()}`, 16, y);
+        x.fillStyle = '#f8fff8'; x.font = pixelFont(13);
         x.fillText(`${fmt(r.dist)} M · CLASS ${r.cls} · ${CONDITIONS[r.cond].name} · PURSE ${fmt(r.purse)}`, 16, y + 24);
       });
+    }
+    tex.needsUpdate = true;
+  }
+
+  // the drum's end faces: tall and narrow, seen down the arcades
+  drawEnd() {
+    const { ctx: x, c, tex } = this.endScreen;
+    const W = c.width, H = c.height;
+    x.fillStyle = '#2b2a2c'; x.fillRect(0, 0, W, H);
+    x.fillStyle = '#8b4044'; x.fillRect(0, 0, W, 46);
+    x.fillStyle = '#cfb352'; x.fillRect(0, 46, W, 3);
+    x.fillStyle = '#f8fff8'; x.font = pixelFont(17); x.textAlign = 'center'; x.textBaseline = 'middle';
+    x.fillText('CHIMERA DOWNS', W / 2, 24);
+    const running = this.state !== 'idle' && this.race && this.racers.length;
+    const lines = (str, y, size, col) => { x.fillStyle = col; x.font = pixelFont(size); x.fillText(str, W / 2, y); };
+    if (running) {
+      const order = this.order();
+      lines(this.race.name.toUpperCase(), 80, 14, '#cfb352');
+      if (this.state === 'cooldown') lines('FINAL', 130, 30, '#f8fff8');
+      else {
+        const togo = Math.max(0, this.race.dist - order[0].s);
+        lines(this.state === 'countdown' ? 'READY' : togo > 0 ? fmt(togo) : 'FINISH', 128, 38, '#f8fff8');
+        lines(this.state === 'countdown' ? '' : 'METRES TO GO', 158, 11, '#b07c57');
+      }
+      order.slice(0, 3).forEach((r, i) => {
+        const y = 215 + i * 50;
+        x.fillStyle = [ '#cfb352', '#f8fff8', '#b07c57' ][i]; x.font = pixelFont(26); x.textAlign = 'left'; x.fillText(String(r.done ? r.place : i + 1), 16, y);
+        x.fillStyle = '#f8fff8'; x.font = pixelFont(13); x.fillText(r.genes.name.slice(0, 15).toUpperCase(), 52, y);
+        x.textAlign = 'center';
+      });
+    } else {
+      lines('NEXT RACE', 86, 16, '#cfb352');
+      const r = this.card[0];
+      if (r) {
+        lines(r.name.toUpperCase().slice(0, 18), 130, 14, '#f8fff8');
+        lines(`${fmt(r.dist)} M`, 184, 36, '#f8fff8');
+        lines(`${r.cat} · CLASS ${r.cls}`, 226, 13, '#b07c57');
+        lines(CONDITIONS[r.cond].name, 252, 13, '#7b9a6e');
+        lines(`PURSE ₵${fmt(r.purse)}`, 296, 16, '#cfb352');
+        lines(`CLOSES IN ${Math.ceil(r.ttl / 60)} MIN`, 330, 11, '#f8fff8');
+      } else lines('POSTING SOON', 200, 16, '#f8fff8');
     }
     tex.needsUpdate = true;
   }
@@ -753,21 +847,47 @@ export class Race {
   drawBoard() {
     const { ctx: x, c, tex } = this.board;
     const W = c.width, H = c.height;
-    x.fillStyle = '#16121f'; x.fillRect(0, 0, W, H);
-    x.fillStyle = '#ffd23f'; x.fillRect(0, 0, W, 44);
-    x.fillStyle = '#16121f'; x.font = pixelFont(22); x.textAlign = 'center'; x.textBaseline = 'middle';
+    x.fillStyle = '#2b2a2c'; x.fillRect(0, 0, W, H);
+    x.fillStyle = '#cfb352'; x.fillRect(0, 0, W, 44);
+    x.fillStyle = '#3b393a'; x.font = pixelFont(22); x.textAlign = 'center'; x.textBaseline = 'middle';
     x.fillText('TODAY\'S RACE CARD', W / 2, 23);
-    if (!this.card.length) { x.fillStyle = '#9be7ff'; x.font = pixelFont(15); x.fillText('NEXT RACE POSTING SOON', W / 2, H / 2); }
+    if (!this.card.length) { x.fillStyle = '#f8fff8'; x.font = pixelFont(15); x.fillText('NEXT RACE POSTING SOON', W / 2, H / 2); }
     this.card.forEach((r, i) => {
       const y = 76 + i * 76;
       x.textAlign = 'left';
-      x.fillStyle = '#f2d27a'; x.font = pixelFont(22); x.fillText(String(i + 1), 14, y);
-      x.fillStyle = '#ffffff'; x.font = pixelFont(16); x.fillText(r.name.toUpperCase(), 48, y);
-      x.fillStyle = '#9be7ff'; x.font = pixelFont(12);
+      x.fillStyle = '#cfb352'; x.font = pixelFont(22); x.fillText(String(i + 1), 14, y);
+      x.fillStyle = '#f8fff8'; x.font = pixelFont(16); x.fillText(r.name.toUpperCase(), 48, y);
+      x.fillStyle = '#b07c57'; x.font = pixelFont(12);
       x.fillText(`${fmt(r.dist)} M ${r.cat} · CLASS ${r.cls} · ${CONDITIONS[r.cond].name}`, 48, y + 22);
-      x.fillStyle = '#7dff6a';
+      x.fillStyle = '#a8d08d';
       x.fillText(`PURSE ₵${fmt(r.purse)} · ENTRY ₵${r.fee} · ${Math.ceil(r.ttl / 60)} MIN`, 48, y + 40);
     });
     tex.needsUpdate = true;
+  }
+
+  // the plates on the podium backdrops: each set shows its slot of the race card, or, once a race from that slot has finished, its first three
+  drawPlates() {
+    this.plates.forEach((p, i) => {
+      const { ctx: x, c, tex } = p;
+      const W = c.width, H = c.height;
+      const res = this.podiumResult && this.podiumResult.slot === i ? this.podiumResult : null;
+      x.fillStyle = res ? '#cfb352' : '#2b2a2c'; x.fillRect(0, 0, W, H);
+      x.textBaseline = 'middle'; x.textAlign = 'left';
+      if (res) {
+        x.fillStyle = '#3b393a'; x.font = pixelFont(26); x.fillText(res.name.toUpperCase().slice(0, 22), 16, 26);
+        x.font = pixelFont(24);
+        x.fillText(`1 ${res.top[0] || ''}`.toUpperCase().slice(0, 18), 16, 66);
+        x.textAlign = 'right';
+        x.font = pixelFont(18);
+        x.fillText(`2 ${res.top[1] || ''}  3 ${res.top[2] || ''}`.toUpperCase().slice(0, 34), W - 16, 66);
+      } else {
+        const r = this.card[i];
+        x.fillStyle = '#cfb352'; x.font = pixelFont(26); x.fillText(`RACE ${i + 1}`, 16, 26);
+        x.fillStyle = '#f8fff8'; x.font = pixelFont(22);
+        x.fillText(r ? `${r.name.toUpperCase()}` : 'NEXT RACE POSTING SOON', 16, 64);
+        if (r) { x.textAlign = 'right'; x.fillStyle = '#b07c57'; x.font = pixelFont(18); x.fillText(`${fmt(r.dist)} M · CLASS ${r.cls}`, W - 16, 64); }
+      }
+      tex.needsUpdate = true;
+    });
   }
 }

@@ -4,6 +4,7 @@ import { toon, glow, inkMat, textSprite, vcMaterial, vcable, paintVertices, drop
 import { mulberry32 } from './rng.js';
 import { bakeStatic } from './staticBake.js';
 import { outpostAsset } from './outpostGlb.js';
+import { bendPoint, bendQuat, bendGeometry } from './curve.js';
 
 // The small faction structures that dot the countryside (watchtowers, depots, farm domes, relay
 // masts, kiosks, scrap shacks, junk piles). Each is a ~50 m compound on its own flattened plateau.
@@ -63,6 +64,7 @@ class Kit {
     // stands: rr for the yard, mr for the intact main building, wr for its wreckage
     this.rr = mulberry32(seed); this.mr = mulberry32(seed + 1); this.wr = mulberry32(seed + 2);
     this.wreck = wreck;
+    this.curveR = 0; // a curved place's plateau radius (curve.js): the kit is drawn flat and bent onto the sphere at finish(), its moving parts and text planes as they are placed
     this.onGround = false; // a settlement's kit (y = 0 is the ground): the undersides of what stands on it are never seen, and are left out (toon.dropFloorFaces)
     this.drop = null; // open apron spot where loot can be thrown to
     this.byMat = new Map();
@@ -151,6 +153,14 @@ class Kit {
 
   // separate (animated or textured) objects
   dyn(obj, x, y, z, ry = 0) {
+    if (this.curveR) { // (on a holder that stands on the sphere, so a moving part keeps turning in its own frame)
+      const p = this.P(x, y, z), h = new THREE.Group();
+      bendPoint(this.curveR, p.x, p.y, p.z, h.position);
+      h.quaternion.setFromAxisAngle(UP, this.yaw + ry).premultiply(bendQuat(this.curveR, p.x, p.z, _q));
+      h.add(obj);
+      this.root.add(h);
+      return obj;
+    }
     obj.position.copy(this.P(x, y, z));
     obj.rotation.y += this.yaw + ry;
     this.root.add(obj);
@@ -176,10 +186,18 @@ class Kit {
   text(str, x, y, z, ry, w, { fg = '#ffd23f', bg = '#241a3a', stroke = '#120a1e', rz = 0, back = true, off = 0.17 } = {}) {
     const mat = textMat(str, fg, bg, stroke);
     const h = w / mat.userData.aspect;
-    const geo = new THREE.PlaneGeometry(w, h);
+    const geo = new THREE.PlaneGeometry(w, h, this.curveR ? Math.ceil(w / 5) : 1, 1);
     for (const side of back ? [0, 1] : [0]) {
-      const m = new THREE.Mesh(geo, mat);
       const lz = side ? -1 : 1;
+      if (this.curveR) { // (cut into short strips and bent with the wall behind it)
+        const g = geo.clone();
+        _m.compose(_p.copy(this.P(x, y, z)).add(_d.set(Math.sin(this.yaw + ry), 0, Math.cos(this.yaw + ry)).multiplyScalar(off * lz)),
+          _q.setFromEuler(_e.set(0, this.yaw + ry + (side ? Math.PI : 0), side ? -rz : rz)), _s);
+        const m = new THREE.Mesh(bendGeometry(g.applyMatrix4(_m), this.curveR), mat);
+        this.root.add(m);
+        continue;
+      }
+      const m = new THREE.Mesh(geo, mat);
       m.position.copy(this.P(x, y, z)).add(_d.set(Math.sin(this.yaw + ry), 0, Math.cos(this.yaw + ry)).multiplyScalar(off * lz));
       m.rotation.set(0, this.yaw + ry + (side ? Math.PI : 0), side ? -rz : rz);
       this.root.add(m);
@@ -238,6 +256,10 @@ class Kit {
   hit(hx, hy, hz, x, z, ry = 0) { const p = this.P(x, 0, z); this.hits.push({ hx, hy, hz, x: p.x, y: hy, z: p.z, yaw: this.yaw + ry }); }
 
   finish() {
+    if (this.curveR) { // (long pieces cut every 8 m so they curve: curve.js)
+      for (const list of this.byMat.values()) for (let i = 0; i < list.length; i++) list[i] = bendGeometry(list[i], this.curveR, 8);
+      for (let i = 0; i < this.ink.length; i++) this.ink[i] = bendGeometry(this.ink[i], this.curveR, 8);
+    }
     // the shared plain colours all go in one vertex-coloured mesh per kind (toon / glow) and side
     const vc = new Map();
     for (const [mat, list] of [...this.byMat]) {

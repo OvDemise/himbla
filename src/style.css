@@ -1357,7 +1357,7 @@ body.trailer #tutorial, body.trailer #racepanel, body.trailer #vehbar { display:
 #bossbar .bb-track { height: 16px; background: rgba(5,3,12,.8); border: 3px solid #05030c; outline: 2px solid #ff2a4a; border-radius: 2px; overflow: hidden; }
 #bossbar .bb-fill { height: 100%; width: 100%; background: linear-gradient(#ff5a6e, #d7263d); transition: width .12s; }
 
-/* the selected power (Z) */
+/* the selected power (E) */
 #powerchip { margin-top: 6px; font-family: var(--comic); font-size: 9px; line-height: 1; color: var(--ui-text); }
 #powerchip b { display: inline-block; padding: 3px 5px 2px; background: #ff9f1c; color: #05030c; margin-right: 4px; }
 #powerchip .pc-ok { color: #7dff6a; }

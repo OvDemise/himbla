@@ -9,8 +9,9 @@ import { DISH_SIZE } from '../models.js';
 import { buildHomeTown, addBuilding, slotAt } from '../hometown.js';
 import {
   habDome, cabin, warehouse, quonset, lattice, hortonSphere, floodMast, stack, ticker, conveyor, pipe, radar, searchlight, shanty,
-  wreckHull, penTerminal, jobTerminal, playground, waterTower, greenhouse, commsMast, townHall, ferrisWheel, carousel, towerCrane, gantryCrane, cargoStack, garage, dishStation,
+  wreckHull, penTerminal, jobTerminal, playground, waterTower, greenhouse, commsMast, townHall, towerCrane, gantryCrane, cargoStack, garage, dishStation,
 } from '../settlements.js';
+import { ferrisWheel, carousel } from '../downsFair.js';
 import { animate, together, lineUp } from './common.js';
 
 // Asset Row catalogue group: the small faction outposts (intact and wreck), the building parts the settlements are made of, and the
@@ -222,8 +223,8 @@ const parts = {
       worldPart((world, loc, k) => commsMast(world, loc, k, 0, 0, 30, 0xffd23f, 'spacecom')),
     ], 6)),
     item('part.town-hall', 'KEPLER TOWN HALL', 44, 19, () => worldPart((world, loc, k) => townHall(world, loc, k))),
-    item('part.ferris-wheel', 'FERRIS WHEEL (KEPT FOR CHIMERA DOWNS)', 50, 12, () => worldPart((world, loc, k) => ferrisWheel(world, loc, k, 0, 0))),
-    item('part.carousel', 'CAROUSEL (KEPT FOR CHIMERA DOWNS)', 22, 22, () => worldPart((world, loc, k) => carousel(world, loc, k, 0, 0))),
+    item('part.ferris-wheel', 'FERRIS WHEEL', 50, 12, () => worldPart((world, loc, k) => ferrisWheel(world, loc, k, 0, 0))),
+    item('part.carousel', 'CAROUSEL', 22, 22, () => worldPart((world, loc, k) => carousel(world, loc, k, 0, 0))),
     item('part.tower-crane', 'TOWER CRANE', 44, 9, () => kitPart((k) => towerCrane(k, 0, 0, 34, 30, YEL, { speed: 0.12 }))),
     item('part.gantry-crane', 'GANTRY CRANE', 58, 36, () => kitPart((k) => gantryCrane(k, 0, 0, YEL, { speed: 1 / 40, phase: 0.3, travel: 24 }))),
     item('part.cargo-stacks', 'CARGO CONTAINER STACKS', 42, 9, () => kitPart((k) => {

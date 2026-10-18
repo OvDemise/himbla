@@ -4,6 +4,7 @@ import { toon, ink, inkMat, glow, textSprite, nameTag, setMask, vcMaterial, vcab
 import { makeDish, makeDishHead, makeFigure, makeRover, makeRocket, makeShuttle, makePlanets, makeHoverCar } from './models.js';
 import { mulberry32 } from './rng.js';
 import { FACTIONS } from './locations.js';
+import { bendPoint, bendQuat, unbendPoint } from './curve.js';
 import { SUN, frameQuat, arcDist, dirFromAngles, tangent } from './geo.js';
 import { buildCasino } from './casinoWorld.js'; // casino
 import { Traffic } from './traffic.js';
@@ -25,6 +26,7 @@ function mesh(geo, mat, outline = 0.15) {
 const _v = new THREE.Vector3();
 const _q = new THREE.Quaternion();
 const _e = new THREE.Euler();
+const _up = new THREE.Vector3(0, 1, 0);
 const ACTIVE_DIST = 2600;
 // Culling (all cheap, all per frame): a settlement within ACTIVE_DIST still leaves the scene while a
 // hill or the moon's curve hides it from the camera (terrain line of sight to its top); within one
@@ -485,8 +487,14 @@ export class World {
     return g;
   }
 
+  // The radius a curved place (locations.js `curved`: the Downs) is bent onto, 0 for a flat one. A place's builders and callers all work in flat
+  // local coordinates; toWorld, put and the colliders bend them onto the sphere (curve.js), and the Kit bends the geometry it bakes.
+  curveR(loc) { return loc.curved && loc.zr > 1000 ? loc.zr : 0; }
+
   toWorld(loc, x, y, z, out = new THREE.Vector3()) {
-    return loc.group.localToWorld(out.set(x, y, z));
+    const R = this.curveR(loc);
+    if (R) bendPoint(R, x, y, z, out); else out.set(x, y, z);
+    return loc.group.localToWorld(out);
   }
 
   col(loc, spec) {
@@ -497,20 +505,28 @@ export class World {
   }
 
   colAdd(loc, spec) {
-    const g = loc.group;
+    const g = loc.group, R = this.curveR(loc);
+    // (a curved place: the turn that stands the flat frame at the collider on the sphere; identity otherwise)
+    const bq = R ? bendQuat(R, spec.x, spec.z, new THREE.Quaternion()) : null;
     if (spec.type === 'sphere') {
       return this.colliders.add({ type: 'sphere', c: this.toWorld(loc, spec.x, spec.y, spec.z), r: spec.r });
     }
     if (spec.type === 'cyl') {
-      return this.colliders.add({ type: 'cyl', c: this.toWorld(loc, spec.x, 0, spec.z), axis: loc.dir.clone(), y0: spec.y0, y1: spec.y1, r: spec.r });
+      const axis = loc.dir.clone();
+      if (bq) axis.set(0, 1, 0).applyQuaternion(bq).applyQuaternion(g.quaternion);
+      return this.colliders.add({ type: 'cyl', c: this.toWorld(loc, spec.x, 0, spec.z), axis, y0: spec.y0, y1: spec.y1, r: spec.r });
     }
     if (spec.type === 'hcyl') {
       // a horizontal cylinder (axis along local (sin yaw, 0, cos yaw)), so arched roofs are round to bump into
-      const axis = new THREE.Vector3(Math.sin(spec.yaw || 0), 0, Math.cos(spec.yaw || 0)).applyQuaternion(g.quaternion);
+      const axis = new THREE.Vector3(Math.sin(spec.yaw || 0), 0, Math.cos(spec.yaw || 0));
+      if (bq) axis.applyQuaternion(bq);
+      axis.applyQuaternion(g.quaternion);
       return this.colliders.add({ type: 'cyl', c: this.toWorld(loc, spec.x, spec.y, spec.z), axis, y0: -spec.len / 2, y1: spec.len / 2, r: spec.r, caps: true });
     }
     // yaw, then an optional pitch about the box's own x (ramps and bowl walls tilt their top face)
-    _q.setFromEuler(_e.set(spec.pitch || 0, spec.yaw || 0, spec.roll || 0, 'YXZ')).premultiply(g.quaternion);
+    _q.setFromEuler(_e.set(spec.pitch || 0, spec.yaw || 0, spec.roll || 0, 'YXZ'));
+    if (bq) _q.premultiply(bq);
+    _q.premultiply(g.quaternion);
     return this.colliders.add({
       type: 'box', c: this.toWorld(loc, spec.x, spec.y, spec.z),
       ax: new THREE.Vector3(1, 0, 0).applyQuaternion(_q), ay: new THREE.Vector3(0, 1, 0).applyQuaternion(_q), az: new THREE.Vector3(0, 0, 1).applyQuaternion(_q),
@@ -527,8 +543,14 @@ export class World {
 
   // Place object in a settlement's local frame. Static objects get frozen matrices.
   put(obj, loc, dx, dz, dy = 0, yaw = 0, dynamic = false) {
-    obj.position.set(dx, dy, dz);
-    obj.rotation.y = yaw;
+    const R = this.curveR(loc);
+    if (R) { // (a curved place: stood on the sphere, turned with it)
+      bendPoint(R, dx, dy, dz, obj.position);
+      obj.quaternion.setFromAxisAngle(_up, yaw).premultiply(bendQuat(R, dx, dz, _q));
+    } else {
+      obj.position.set(dx, dy, dz);
+      obj.rotation.y = yaw;
+    }
     loc.group.add(obj);
     if (!dynamic) {
       obj.updateMatrix();
@@ -882,8 +904,29 @@ export class World {
       else { const a = this.r() * Math.PI * 2, d = (0.3 + this.r() * 0.55) * loc.r; f.root.position.set(Math.cos(a) * d, 0, Math.sin(a) * d); }
       loc.group.add(f.root);
       // residents are the damageable crowd (civilians.js): spawn remembers how to make a replacement
-      this.figures.push({ ...ent, ...f, loc, spawn, area: opts.area, kind: spawn.kind || opts.kind || 'worker', target: f.root.position.clone(), wait: this.r() * 3, phase: this.r() * 10, vy: 0, hop: 0 });
+      const fig = { ...ent, ...f, loc, spawn, area: opts.area, kind: spawn.kind || opts.kind || 'worker', target: f.root.position.clone(), wait: this.r() * 3, phase: this.r() * 10, vy: 0, hop: 0 };
+      this.figures.push(fig);
+      if (this.curveR(loc)) { fig.fp = f.root.position.clone(); this.poseFigure(fig); }
     }
+  }
+
+  // A resident of a curved place (curve.js) walks on flat local coordinates, kept in `fp`; its root is posed on the sphere from them, so everything that
+  // reads root.position (civilians.js, the ink hulls) sees where it really stands.
+  poseFigure(f) {
+    const R = this.curveR(f.loc), p = f.fp;
+    bendPoint(R, p.x, p.y, p.z, f.root.position);
+    f.root.quaternion.setFromAxisAngle(_up, f.yaw || 0).premultiply(bendQuat(R, p.x, p.z, _q));
+  }
+
+  // ... and one that was knocked about and put back on the ground (civilians.js finish) takes its flat place from where it landed
+  reseatFigure(f) {
+    const R = this.curveR(f.loc);
+    if (!R) return;
+    const p = f.root.position;
+    unbendPoint(R, p.x, p.y, p.z, f.fp ||= new THREE.Vector3());
+    f.fp.y = 0;
+    const fwd = _v.set(0, 0, 1).applyQuaternion(f.root.quaternion);
+    f.yaw = Math.atan2(fwd.x, fwd.z);
   }
 
   // A knocked-out resident was cleared away (civilians.js): a fresh one moves in.
@@ -895,6 +938,7 @@ export class World {
     loc.group.add(f.root);
     Object.assign(entry, f, { target: f.root.position.clone(), wait: Math.random() * 3, vy: 0, hop: 0, hp: undefined, inks: null, inkOn: undefined });
     delete entry.civ;
+    if (this.curveR(loc)) { entry.fp = f.root.position.clone(); this.poseFigure(entry); }
   }
 
   buildLocation(loc) {
@@ -2015,7 +2059,7 @@ export class World {
         const near = Math.hypot(e[12] - cp.x, e[13] - cp.y, e[14] - cp.z) < (f.inkOn === false ? FIG_INK_DIST : FIG_INK_DIST + 10);
         if (near !== f.inkOn) { f.inkOn = near; for (const o of hulls) o.visible = near; }
       }
-      const p = f.root.position;
+      const R = this.curveR(loc), p = R ? f.fp : f.root.position;
       if (f.kind === 'kid') {
         f.hop -= dt;
         if (f.vy === 0 && f.hop <= 0) { f.vy = 3 + Math.random() * 3; f.hop = 0.5 + Math.random(); }
@@ -2025,7 +2069,7 @@ export class World {
           if (p.y <= 0) { p.y = 0; f.vy = 0; }
         }
       }
-      if (f.wait > 0) { f.wait -= dt; continue; }
+      if (f.wait > 0) { f.wait -= dt; if (R) this.poseFigure(f); continue; }
       const dx = f.target.x - p.x, dz = f.target.z - p.z;
       const d = Math.hypot(dx, dz);
       if (d < 1) {
@@ -2036,17 +2080,20 @@ export class World {
           f.target.set(Math.cos(a) * rr, 0, Math.sin(a) * rr);
         }
         f.wait = f.kind === 'soldier' ? 0.5 : 1 + Math.random() * 4;
+        if (R) this.poseFigure(f);
         continue;
       }
       const sp = f.kind === 'kid' ? 2.5 : f.kind === 'soldier' ? 2.2 : 1.4;
       const k = Math.min(d, sp * dt) / d;
       p.x += dx * k; p.z += dz * k;
-      f.root.rotation.y = Math.atan2(dx, dz);
+      f.yaw = Math.atan2(dx, dz);
+      if (!R) f.root.rotation.y = f.yaw;
       f.phase += dt * 6;
       f.legL.rotation.x = Math.sin(f.phase) * 0.6;
       f.legR.rotation.x = -Math.sin(f.phase) * 0.6;
       if (f.armL) { f.armL.rotation.x = -Math.sin(f.phase) * f.swing; f.armR.rotation.x = Math.sin(f.phase) * f.swing; }
       if (f.kind !== 'kid') p.y = Math.abs(Math.sin(f.phase)) * 0.15;
+      if (R) this.poseFigure(f);
     }
   }
 }

@@ -5,7 +5,7 @@
 #
 # Every piece is authored in the STAND's frame: spectators face -z (toward the track), the stand's front edge is z = 0 and its back is +z; x runs along the stand; each piece
 # stands on y = 0 (the game lifts it where it belongs). One material per mesh named after a slot (DOWNS_TOON / DOWNS_GLOW in src/models.js; the glow slots are lit).
-#   dn_seat3        3 box seats on one frame, 2.7 m wide, 0.7 deep, 0.9 tall: cushion, raked back, armrests (the `seat` slot takes the section's colour)
+#   dn_seat3        3 seats on one frame, 2.7 m wide, 0.7 deep, 0.9 tall: one cushion, three raked backs, armrests between (the `seat` slot takes the section's colour)
 #   dn_roof_bay     19 m of the main stand's roof: the raked cantilever deck (barn, Mint ribs), the soffit, a trussed girder at each edge, two columns, the fascia with its gold lip
 #                   and three pennants, three lit lamps underneath. Deck from z = -4.5 to 39.5, the front tip 22.9 m up, the back 26 m
 #   dn_roof_bay_s   the same for the far stand: from z = -3.5 to 23.5, the front tip 15.3 m up, the back 17 m
@@ -24,13 +24,12 @@ exec(open(os.path.join(os.environ.get("MOONRUNNER_REPO") or os.path.abspath(os.p
 # dn_seat3
 # =====================================================================================================
 root = pivot("dn_seat3", (0, 0, 0))
-P = parts(root, "dn_seat3", {"seat": 0.012, "black": 0.01})
+P = parts(root, "dn_seat3", {"seat": 0.0, "black": 0.0})                                # (no outlines: about 1,650 of these stand in the two stands)
+P["seat"].boxc(0.0, 0.15, 0.0, 2.7, 0.3, 0.66)                                          # one long cushion
 for i in range(3):
-    x = -0.9 + 0.9 * i
-    P["seat"].boxc(x, 0.15, 0.0, 0.76, 0.3, 0.66)                                       # the cushion
-    P["seat"].boxc(x, 0.6, 0.3, 0.74, 0.6, 0.12, rot=(0.12, 0, 0))                      # the back, raked toward +z
-for x in (-1.35, -0.45, 0.45):
-    P["black"].boxc(x, 0.43, 0.0, 0.07, 0.26, 0.56)                                     # armrests (the next strip's first one closes the run)
+    P["seat"].boxc(-0.9 + 0.9 * i, 0.6, 0.3, 0.74, 0.6, 0.12, rot=(0.12, 0, 0))         # a raked back for each seat
+for x in (-0.45, 0.45):
+    P["black"].boxc(x, 0.43, 0.0, 0.07, 0.26, 0.56)                                     # armrests between the seats
 
 
 # =====================================================================================================

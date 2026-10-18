@@ -89,7 +89,7 @@ Vite's hot reload restarts the page.
 | Mouse | Look / aim |
 | `W A S D` | Run in boots. On skates, `A`/`D` steer you along the ground: full input carves hard, `W`+`A` carves gently |
 | `SPACE` (hold) | **Quantum-Lock Skates**: near-frictionless glide. Release to brake hard in boots |
-| `E` / right mouse (hold) | Thrusters: mostly forward, with only a little lift or dive (drains JET) |
+| Right mouse (hold) | Thrusters: mostly forward, with only a little lift or dive (drains JET) |
 | `SHIFT` | Mag-jump; in the air, press again and hold to **Dive** |
 | `Q` + `W`/`S` (air) | Front / back flips |
 | `Q` + `A`/`D` (air) | Spins |
@@ -98,7 +98,7 @@ Vite's hot reload restarts the page.
 | `C` | Wardrobe: cycle owned outfits, skate finishes and pulse-disc colours; `J` in the wardrobe shows or hides the containment jar |
 | `N` | Music on / off |
 | `V` (hold: radial) | Call / board / leave your faction vehicle; hold to pick one (story unlock) |
-| `Z` · mouse wheel | Use your selected **power** · step through your powers. Powers: Phase Dash, the Teleporter (`T` too), the Slipstream Vanes (steer in the air for 10 s), the Kepler Hitch-Line Winch (hold) and the pen link (`P` too) |
+| `E` · mouse wheel | Use your selected **power** · step through your powers. Powers: Phase Dash, the Teleporter (`T` too), the Slipstream Vanes (steer in the air for 10 s), the Kepler Hitch-Line Winch (press again to let go) and the pen link (`P` too) |
 | `Esc` → SETTINGS | Graphics, gameplay, camera, audio and key remapping |
 | `P` | Holding pen, anywhere (needs the remote pen link from Dr. Zbornak) |
 | `Shift`+`X` (hold) | Dump the jar anywhere: materials are destroyed, creatures pop back out |
@@ -119,7 +119,7 @@ back. Prompts show the pad's buttons while it's in use.
 | Left stick · right stick | Move / steer / carve (analog) · look |
 | `A` · `B` | Mag-jump / dive · tricks (hold in the air) |
 | `X` · `Y` | Interact · vehicle |
-| `LB` (hold) · `RB` | Quantum-Lock skates · power (hold for the winch) |
+| `LB` (hold) · `RB` | Quantum-Lock skates · power (press again to let go of the winch) |
 | `LT` · `RT` | Thrusters (Rail Lance: scope) · fire |
 | `L3` · `R3` | Thrusters · scoop into the jar |
 | D-pad ← → · ↑ | Previous / next weapon · next power |
@@ -171,7 +171,7 @@ an arrow showing which way it lies from where you're looking; the event you're r
 **Style** pays half what it used to and can at most double a contract's base reward (a ₵400 job tops out at
 ₵800 before condition). The package's condition then scales the whole payout.
 
-**Rail Lance scope:** with the Rail Lance equipped, hold right mouse to scope in (E still fires thrusters). The beam pierces
+**Rail Lance scope:** with the Rail Lance equipped, hold right mouse to scope in (L3 on a pad still fires thrusters). The beam pierces
 pirates, troops, buildings and traffic, but the ground and any rock (boulders, ramps, arches, spires, ridges) stop it, so nothing behind a rock is hit.
 
 **First shift:** a new game offers to send **BOLT**, a courier-school drone, along with you. It hovers at your
@@ -257,7 +257,7 @@ Daedalus, and vice versa.
 - **Faction gear:** each HQ sells unique gear gated by reputation: SPACECOM Seeker Module (homing),
   Meridian Gyro-Edges (steering) and Market Uplink (pay), the Kepler Twin Cradle (carry two contracts at
   once, crates stacked; both waypoints on the HUD), Vostok Flak Weave (health, knockback), Daedalus
-  Overcharger (fire rate) and Rustmoon Shadow Rig (harder to hit). Kepler also sells the **Hitch-Line Winch**: hold `Z` to fire a steel cable onto a vehicle or a structure within 120 m (the hook bites the nearest surface; whatever the reticle is on wins, else the target closest to it, and a faint tow-line marker shows what it will hook). The drum reels you in smoothly, easing to a stop with about 2 m of cable left, and you can hold for up to 20 s. The cable bends round the corners of structures in its way like a rope round pegs (boxes at their edges, cylinders and spheres along an arc, so a round tower is no obstacle; up to five structures at least 4 m across; slim columns and anything it can't bend round it passes through), and if the drum strains against something that won't give the pull builds to yank you free and, after about 2.5 s, the line slips loose. You can swing under flying transits or trailing behind rovers and land-trains (they're heavy; drag one off its route and it eases back on). Rustmoon's black market at the Hold
+  Overcharger (fire rate) and Rustmoon Shadow Rig (harder to hit). Kepler also sells the **Hitch-Line Winch**: press `E` to fire a steel cable onto a vehicle or a structure within 120 m (the hook bites the nearest surface; whatever the reticle is on wins, else the target closest to it, and a faint tow-line marker shows what it will hook). The drum reels you in smoothly, easing to a stop with about 2 m of cable left, and the line holds for up to 20 s, without holding the key; press `E` again to let go sooner. The cable bends round the corners of structures in its way like a rope round pegs (boxes at their edges, cylinders and spheres along an arc, so a round tower is no obstacle; up to five structures at least 4 m across; slim columns and anything it can't bend round it passes through), and if the drum strains against something that won't give the pull builds to yank you free and, after about 2.5 s, the line slips loose. You can swing under flying transits or trailing behind rovers and land-trains (they're heavy; drag one off its route and it eases back on). Rustmoon's black market at the Hold
   stocks the ILMB kit and other factions' upgrades, weapons, tech and vehicles, each one brought in by a
   smuggling run that carries it as a payload (named on the job board).
 - **Clearance:** FRIENDLY (10+) with Vostok or Daedalus means their turrets stop shooting you and you
@@ -316,7 +316,7 @@ guns silent, its outposts the clans'). Kepler founds **your own town** (a real s
 and the Moon Council's hall), and Meridian sends you to **the Spindle**, the long asteroid rolling overhead,
 for its Quantum Core, with an alien mothership hunting you across it. The Spindle is a real cylinder: you can
 run all the way round its girth (gravity points at its axis) on the way to the core at the far end. The prize
-is the **Quantum Slipstream Vanes**, a power (pick it on the power wheel, then `Z`): for 10 s your skates keep a
+is the **Quantum Slipstream Vanes**, a power (pick it on the power wheel, then `E`): for 10 s your skates keep a
 share of their handling in the air, so you can steer mid-flight (30 s from using them until they're ready again).
 
 **Your town** (the Kepler finale) has eight plots and nine buildings to put on them, built from the council hall's terminal
@@ -355,7 +355,7 @@ the Kepler Militia Carrier).
   already built, or its price in credits if both are.
 - **Research (Meridian, plus Daedalus):** plant sensor relays, survive **phase-field experiments**
   (anomalies strike where the warning rings appear), carry unstable antimatter without cracking it, and
-  build a research station. Rewards are **tech**: Phase Dash (`Z`, swings all your momentum, plus a kick, to where you
+  build a research station. Rewards are **tech**: Phase Dash (`E`, swings all your momentum, plus a kick, to where you
   look, leaving a trail of violet ghost copies of you along the way) and a Personal Teleporter (`T`, any discovered location or your outposts). The **Deflector Shield**
   (an invisible field that absorbs a hit every 12 s, and shows itself when it does) comes with SPACECOM's,
   Vostok's and Rustmoon's third chapters.
@@ -567,9 +567,9 @@ the unlock counters, toggle any splice-pod mutation (with a reset), or reset all
 ### The Asset Row (dev builds only)
 
 Dev menu (`F8`) → **Full cheat menu** → **Teleport** → option 1, **ASSET ROW**: a flat showroom with every asset in the game
-lined up side by side, 217 of them in 25 sections (the runner and its gear, people, creatures, props and markers,
+lined up side by side, 225 of them in 26 sections (the runner and its gear, people, creatures, props and markers,
 weapons and effects, rocks and nature, the secrets and the Spindle's props, ground vehicles and ships, outposts intact and
-wrecked, the building parts the settlements are made of, the hometown, and all the places). The small ones stand in the
+wrecked, the building parts the settlements are made of, the hometown, Chimera Downs' kits, and all the places). The small ones stand in the
 yellow lane (z = 0), the places over 100 m across in the cyan lane 460 m over; the whole row is about 9 km, so the dev
 speed multiplier helps. There is a terminal by the plaza and at the start of every section (a dark console under a tall light column): stand by one, press `F`, and jump to the start of any other section instead of walking. Each item has a name board and is built when you come near and let go of when you walk off, so the
 row costs nothing to keep. You cannot be hurt there, the Moon (its story, missions and events) waits frozen, and nothing you
@@ -646,9 +646,14 @@ crowd-noise bed for now (the cheering is due a rework), and the race countdown b
   Void Skin (water/void-touched, see in the dark and harder to hit), Stone Hide (rock, +40 hull, more drag),
   Burrower Claws (dirt/mud, painless boot landings), Pirate Blood (pirate, hunting squads mostly ignore you).
   Each shows on your runner. Dr. Zbornak cures them for ₵200 each.
-- **Chimera Downs** (the racecourse): a four-lane dirt oval with a grandstand full of
-  cheering fans, a jumbotron with live standings, a finish gantry, distance poles, a winner's circle and a golden
-  chimera statue. The **race office** window (`F`) posts races over time, **up to three on the card**, each with
+- **Chimera Downs** (the racecourse): a four-lane dirt oval under a 14-tier roofed grandstand (suites, end towers,
+  a clubhouse with a clock tower and six betting windows behind it) and a smaller far stand, joined round the two turns
+  by colonnaded arcades with twenty concession stalls and a gate hall each; a **screen drum** in the middle of the
+  infield with live standings (one 40 × 20 m face for each stand, a tall one for each arcade), three sets of **winners'
+  podiums** (the first three home stand on their steps behind the result, and the camera swings round to them), a finish
+  arch, a photo-finish tower, distance poles, a parade ring, a weighing room, a stable yard, a grand forecourt with a
+  fountain, and a fairground annex with the ferris wheel and carousel (rideable: `F`). In the Gold Gleam / Saddle Brown /
+  Black / Money / Barn Red / Touch of Mint palette. The **race office** window (`F`, under the clubhouse's portico) posts races over time, **up to three on the card**, each with
   its own **distance** (450 m sprints, miles, 2–2.8 km stakes and 3–3.6 km marathons), **class** (C, B, A or S
   and under, or open), **going** (FAST, DUSTY, HEAVY: tiring, LOW-G: bouncy and chaotic), purse (60/25/15 % to the
   top three), entry fee and a pre-drawn field of three rivals ("Glue Factory Escapee", "Hoof Hearted"…). Races close
@@ -676,7 +681,7 @@ crowd-noise bed for now (the cheering is due a rework), and the race countdown b
 | Bastion Vostok-9 · Vostok-4 Outpost | Vostok | Restricted zones: turrets, patrols, artillery |
 | Daedalus Citadel · Daedalus Forward Post | Daedalus (dark side) | Restricted zones: turrets, patrols, artillery |
 | Rustmoon Hold · Scrapjaw Gulch · Blackrock Den · Gloom Harbor + scattered camps | Rustmoon (dark side) | Stolen cargo is fenced at the nearest working den |
-| Chimera Downs | Racecourse | Grandstand, jumbotron, race office with a rotating race card; chimera racing and betting |
+| Chimera Downs | Racecourse | Grandstand and clubhouse, screen drum, podiums, arcades with stalls, stables, fairground; the race card and tote windows; chimera racing and betting |
 
 ## Keeping it light on the GPU
 
@@ -742,8 +747,13 @@ src/
   fountainFx.js  the plaza fountain's water: ripple, curtain and jet shaders on the casino.glb water pivots, sharing one clock
   pixelIcons.js  the classic-games overlay's pixel-art sprites (slot symbols, the pit boss, chips, cards' suits…) as plain rows of palette letters
   cosmetics.js   outfits, skate finishes, laser colours, wardrobe
-  race.js        Chimera Downs: racecourse, race card, betting, locked race camera, chaos racing
-  rides.js       hop-in rides: free transit-ship rides, and the fairground's ferris wheel and carousel (built by `settlements.js` `ferrisWheel` / `carousel`, kept in the Asset Row but not placed anywhere until Chimera Downs' rework)
+  race.js        Chimera Downs: race card, betting, locked race camera, chaos racing, the live screens, the crowd, the podium finish
+  downsPlan.js   Chimera Downs' plan: the oval, the stands, the arcades and their stalls, the forecourt, the drum, the podiums, the annex (no three.js)
+  downsWorld.js  Chimera Downs' scenery, built from the Blender kits (the Downs kit baked into one settlement kit)
+  downsKit.js    what the Downs builders share: the palette, text widths, `bake` (a Blender kit part into a settlement kit)
+  curve.js       a `curved` place's bend: flat local coordinates onto the sphere (point, frame, geometry cut into short pieces); the Downs plateau is a cap of the Moon, not a plane, so nothing on it leans
+  downsFair.js   the fairground's ferris wheel and carousel, from the Blender fair kit, with their rideable seats
+  rides.js       hop-in rides: free transit-ship rides, and the fairground's ferris wheel and carousel at Chimera Downs (built by `downsFair.js`; `F` beside one pops you into the nearest gondola or onto the nearest horse)
   rocks.js       shaped rocks (ramps, arches, hoodoos, snake rails) and their colliders
   rails.js       grinding the snake rocks' crests and crater rims (the Asset Row's flat world has rails too)
   meteors.js     meteor showers: the warning zone, falling rocks (colliders), chunks and scorch marks
@@ -779,6 +789,15 @@ src/
   assets/claw.glb    the casino's Zero-G claw: the 16 m glass-tank machine (plum base, brass mullions, marquee box, console, ten shuffle jets, the drop hole), the energy claw, a chain link and each kind of thing in the tank (the salvaged engine and the credits case are the game's own models)
   assets/hall.glb    the casino's hall kit: the wall bay (half a gold pilaster each side, a lacquer wainscot with a framed suit panel, a tall arched panel with a cyan line) in four suits, a coffer ceiling tile, the compass-star floor medallion, the Chip Bar with its turning chip and halo, a banquette and table, the grand doors' frame, the outside's suit panels and the drum, dome and lantern
   assets/lot.glb     the casino forecourt's kit: the card wall (giant cards dominoed on a plum and gold kerb), its posts, the walkway's chip bollard, the P pylon and a bay stud
+  assets/downs-stand.glb  Chimera Downs' grandstand kit: a three-seat strip, a bay of the raked Barn Red roof on its trusses (main and far stand), the end towers, a suites bay, the back wall bays and a way in
+  assets/downs-club.glb   the clubhouse and tote hall: a Mint hall under hip roofs, a colonnade over six betting windows, the board's recess, the 50 m clock tower with four faces
+  assets/downs-course.glb the course kit: the rail, distance pole, finish arch, photo-finish tower, lamp, flood mast, flag mast, crossing post and the starting gate with its doors
+  assets/downs-stalls.glb twelve concession stalls (hot dogs, fries, fizz, chow, rock candy, tote, slush, coffee, donuts, grill, foam fingers, bar) on one kit with their own props
+  assets/downs-arcade.glb a wedge bay of the arcades, the gate hall, the forecourt's gate and fountain, a valet bay, bench, planter and a festoon
+  assets/downs-screen.glb the scoreboard drum (core, struts, shell, four bezelled openings, cap with a beacon) and the winners' podium set
+  assets/downs-fair.glb   the fairground: the ferris wheel (frame, wheel, gondola), the carousel (base, canopy deck, horse), a ticket hall, a gate, queue posts and fence
+  assets/downs-stable.glb the stable block (six boxes), hay barn, weighing room, ring gate, hay bale and picnic table
+  assets/downs-crowd.glb  a seated racegoer in parts (body, head, cap, hair, raised arms), drawn instanced in the stands
   assets/duck.glb    the casino's Duck Derby: the four racers (a cap, hat, fez or bubble helmet each, a numbered wing disc) and the gilded track: basin with lane floats, start gate and grille, finish arch, odds-board frame, bookmaker's kiosk, brass rail post and velvet rope
   assets/blackjack.glb  the casino's gilded blackjack table (plum lacquer, gold, cream suit panels, a leather rail, a chip rack, shoe and discard well, the dealer's back counter) and its chip
   assets/dish.glb    the dish stations: the two for the research arrays' big dishes, the cryo receiver (a banded Helium-3 vessel with a stair, valve cabinet and branding panel) and the gantry station (a lattice mast, container control rooms, battery bank, fuel tank), the field dish the smaller bases use (an eight-sided tower with a gallery and caged ladder, an equipment-room container, and the gantry's truss-backed reflector) and a light head (the field dish's reflector and trunnions with no tower) for the small dishes on masts and roofs, each with the dish, its yaw and tilt pivots and a livery for every faction (the stations also a number for every dish)
@@ -816,6 +835,9 @@ tools/
   blender/build_duck.py    builds the Duck Derby's racers and track -> src/assets/duck.glb (also runs headless)
   blender/build_hall.py    builds the casino's hall kit (wall bays, ceiling tiles, the floor medallion, the Chip Bar, a banquette, the doors' frame, the facade's panels, the crown) -> src/assets/hall.glb (also runs headless; the build stops if two faces of one model share a plane: `audit_coplanar` in kit.py)
   blender/build_lot.py     builds the forecourt kit (card wall, post, chip bollard, P pylon, bay stud) -> src/assets/lot.glb (runs `audit_coplanar` too)
+  blender/downs_common.py  shared by the Downs builders: the palette, the accumulator that merges boxes and cylinders per slot, the export (and the coplanar audit)
+  blender/build_downs_stand.py, build_downs_club.py, build_downs_course.py, build_downs_stalls.py, build_downs_arcade.py, build_downs_screen.py, build_downs_fair.py,
+                           build_downs_stable.py, build_downs_crowd.py   build Chimera Downs' kits -> src/assets/downs-*.glb (each runs `audit_coplanar` too)
   blender/build_blackjack.py  builds the blackjack table and chip -> src/assets/blackjack.glb (also runs headless; the build stops if anything stands in the places cards, chips and the felt's lettering go)
   blender/build_dish.py    builds the cryo receiver, the gantry station, the field dish and the light dish head -> src/assets/dish.glb (also runs headless)
   blender/build_winch.py   builds the winch's grapple and cable piece -> src/assets/winch.glb and renders the tow-line marker -> src/assets/towmark.png (also runs headless: `pip install bpy`, then `MOONRUNNER_REPO=. python3 tools/blender/build_winch.py`)
@@ -824,7 +846,7 @@ tools/
   blender/decals.py        flat lettering, emblems, hazard stripes and safety signs (no textures) the land-train builder execs after kit.py
   blender/kit.py           shared geometry/material/export helpers every Blender builder execs (the runner and ships keep their own variants of a few)
   viewer.html              dev-only model viewer (npm run dev, then /tools/viewer.html?m=shuttle|freighter|apc|landtrain|crane|gantry|cargobox|garage|slots|dish|outpost|mite|lineup…; slots takes &n=<cabinets in a row>&ring=<cabinets round a pillar>&idx=<first colour and name>&play=1 (works them like a patron); casino takes &part=lamp|fountain|bouncer|chandelier|welcome|wall|blackjack|claw|clawthings|duckderby (&accent=<hex>&n=<lamps> for lamp); shuttle takes &sign=<route board text>&ships=<a ships .glb to load instead of ships.glb> (docs/shuttle-design.md); freighter takes &faction=spacecom|vostok|kepler|meridian (the cargo's livery); dish takes &kind=cryo|gantry|field|head&faction=…&no=01..04&size=30&tilt=<rad>&sweep=1; apc takes &turret=<rad>&barrel=<rad>; landtrain takes &type=moonliner|prospector&faction=spacecom|vostok|kepler|meridian&cars=pax,tank,cargo,blast&unit=<n>)
-  downs-layouts.mjs        dev-only: the Chimera Downs overhaul study (docs/downs-layouts.md): today's course and two proposed layouts, a clearance check against the oval and the plateau, and the plan drawings in docs/ (`node tools/downs-layouts.mjs docs`)
+  downs-layouts.mjs        dev-only: the Chimera Downs overhaul study (docs/downs-layouts.md): the old course and the two proposed layouts (B was built), a clearance check against the oval and the plateau, and the plan drawings in docs/ (`node tools/downs-layouts.mjs docs`)
   meridian-layouts.mjs     the Meridian Exchange layout study (docs/meridian-layouts.md): the footprints of the site as built and of two proposed layouts, a clearance check, and the plan drawings in docs/
   winch-ride.mjs           dev-only headless test of the Hitch-Line winch with the real player and the real winch: rides toward the casino fountain past the Lucky Crater Casino's old sign posts (the harness stands their colliders in: coasting, running at them, circling a post, skating the ring road), and judges flings, snapped lines, posts the cable gave up on and cable inside a post; `--gate ring` is the check to run after touching `src/winch.js` (see docs/winch-handoff.md)
 ```

@@ -52,7 +52,7 @@ const pirates = [
 ];
 const fun = [
   P('casino', 'LUCKY CRATER CASINO', 152, 174, { loc: 'casino' }),
-  P('downs', 'CHIMERA DOWNS', 332, 229, { loc: 'downs', race: true, yaw: Math.PI }),
+  P('downs', 'CHIMERA DOWNS', 470, 345, { loc: 'downs', race: true, yaw: Math.PI }),
 ];
 
 const zones = [

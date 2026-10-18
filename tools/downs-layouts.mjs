@@ -174,17 +174,18 @@ const layoutB = {
     over('drum', 'SCREEN DRUM 40 x 20 + 14 x 20 ends', R(-20, 20, -7, 7), { g: 'drum' }), el('core', '', R(-5, 5, -5, 5), { zone: 'in', fill: PAL.black, line: PAL.mint, g: 'drum' }),
     ...[-30, 0, 30].map((x) => el(`pod${x}`, '', R(x - 9, x + 9, 16, 21), { zone: 'in', fill: PAL.gold, line: PAL.black })),
     free('winplaza', R(-44, 44, 10, 28), { fill: PAL.gold, op: 0.25, line: PAL.gold }),
-    el('ring', '', E(-96, 0, 26, 18), { zone: 'in', fill: PAL.money, line: PAL.mint }), el('weigh', '', R(-66, -56, -9, 9), { zone: 'in' }),
+    el('ring', '', E(-96, 0, 26, 18), { zone: 'in', fill: PAL.money, line: PAL.mint }), el('weigh', '', R(-65.2, -52, -9.2, 9.2), { zone: 'in' }),
     free('lawn', C(100, 0, 28), { fill: PAL.money, op: 0.4, line: PAL.money }),
     // at-grade crossings with barrier arms, four of them
     ...[[-70, 1], [70, 1], [-70, -1], [70, -1]].map(([x, s]) => free(`x${x}${s}`, R(x - 4, x + 4, s > 0 ? LANE_IN : -LANE_OUT, s > 0 ? LANE_OUT : -LANE_IN), { fill: PAL.mint, op: 0.5, line: PAL.mint })),
     // stables behind the far stand
-    el('stables', '', R(-70, 70, -134, -108), { zone: 'out' }),
+    ...[[-36, -135.2, -123.6], [36, -135.2, -123.6], [-36, -116.4, -104.8], [36, -116.4, -104.8]].map(([x, z0, z1], i) => el(`stable${i}`, '', R(x - 15.3, x + 15.3, z0, z1), { zone: 'out' })),
+    el('barn', '', R(-12.2, 12.2, -140.2, -126), { zone: 'out' }),
     // the fairground annex, offset to the south-east behind the main stand's east end
     free('annex', R(124, 206, 106, 168), { fill: PAL.money, op: 0.3, line: PAL.money }),
-    el('wheel', 'FERRIS WHEEL', R(150, 200, 150, 162), { zone: 'out', fill: PAL.gold, line: PAL.black }), el('carou', 'CAROUSEL', C(142, 134, 11), { zone: 'out', fill: PAL.barn, line: PAL.gold }),
-    el('ticket', '', R(160, 182, 112, 122), { zone: 'out' }), stall('fk1', R(168, 176, 128, 136), { zone: 'out' }), stall('fk2', R(190, 198, 128, 136), { zone: 'out' }),
-    el('gateF', '', R(122, 126, 132, 146), { zone: 'out' }),
+    el('wheel', 'FERRIS WHEEL', R(150, 200, 150, 162), { zone: 'out', fill: PAL.gold, line: PAL.black }), el('carou', 'CAROUSEL', C(142, 134, 10.5), { zone: 'out', fill: PAL.barn, line: PAL.gold }),
+    el('ticket', '', R(160, 182, 110, 118), { zone: 'out' }), stall('fk1', R(165.6, 174.4, 125.8, 134), { zone: 'out' }), stall('fk2', R(189.6, 198.4, 125.8, 134), { zone: 'out' }),
+    el('gateF', '', R(123, 125, 133, 145), { zone: 'out' }),
   ],
   paths: [[[70, 160], [100, 150], [122, 140]]],
 };

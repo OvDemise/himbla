@@ -132,7 +132,7 @@ function applyCouncil(ws, locations) {
     }
     sell('vostok', { key: 'v_apc', name: 'Vostok BTR-M APC', desc: 'VEHICLE: the Moon APC, yours to call with V', cost: 4000, max: 1, vehicle: 'apc' });
     sell('daedalus', { key: 'v_skimmer', name: 'Daedalus Phase Skimmer', desc: 'VEHICLE: the hover skimmer, yours to call with V', cost: 4000, max: 1, vehicle: 'skimmer' });
-    sell('daedalus', { key: 't_dash', name: 'Daedalus Phase Dash Rig', desc: 'TECH (Z): swing all your momentum to wherever you look', cost: 3500, max: 1, tech: 'dash' });
+    sell('daedalus', { key: 't_dash', name: 'Daedalus Phase Dash Rig', desc: 'TECH (E): swing all your momentum to wherever you look', cost: 3500, max: 1, tech: 'dash' });
     open('vostok', 'scatter'); open('daedalus', 'rail');
   }
   if (passed.includes('openSkies')) {

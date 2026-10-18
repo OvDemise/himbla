@@ -262,7 +262,7 @@ class Game {
     this.assetRow = null; // the dev menu's flat showroom, made on first use (cheats.js, assetRow.js; not in a release build)
     this.garage = new Garage(this);
     this.winch = new Winch(this); // Kepler Hitch-Line Winch
-    this.powers = new Powers(this); // Z: the selected power; the mouse wheel picks
+    this.powers = new Powers(this); // E: the selected power; the mouse wheel picks
     this.tutorial = new Tutorial(this);
     this.recall = new Recall(this);
     this.chamber = new Chamber(this); // the Moon Council vote cutscene (builds its set on first use)
@@ -1193,7 +1193,7 @@ class Game {
     if (!playing) { if (this.garage && this.garage.radial) this.garage.closeRadial(false); this.vHold = 0; } // (the vehicle wheel, or a V / Y tap still in flight, doesn't outlive the play screen: a pause, the map, a dialog, a death)
     if (playing && !this.world.mergeDone) this.world.finishMerges(); // (static geometry: see world.mergeLocation)
     if (playing) this.updatePlay(dt);
-    else if (this.state === 'derby') this.race.watch(dt); // watching your chimera race: the race drives the camera
+    else if (this.state === 'derby' || (this.state === 'dialog' && this.race.holdsCamera())) this.race.watch(dt); // watching your chimera race (and, once it is over, the podium behind the result dialog): the race drives the camera
     else this.input.consumeMouse();
     if (this.state === 'dead') {
       this.enemies.update(dt, this.time);
@@ -1204,7 +1204,7 @@ class Game {
     this.chamber.update(dt, rdt); // (real time too: its fade to black keeps easing under a dialog)
     this.spindle.updateRecovery(dt);
     if (this.state === 'title') this.updateTitleTour(rdt);
-    else if (this.state !== 'cutscene' && this.state !== 'derby') this.updateCamera(dt);
+    else if (this.state !== 'cutscene' && this.state !== 'derby' && !(this.state === 'dialog' && this.race.holdsCamera())) this.updateCamera(dt);
     this.cheats.freeCam.view(); // (dev free cam: the view is its own, so the world and the terrain below are built round it)
     if (this.trailer) this.trailer.camera(rdt); // trailer: the shot owns the camera
     dbg.lap('other');

@@ -1,10 +1,10 @@
-// The Kepler Hitch-Line Winch (Kepler's unique upgrade, an active on Z). Fire a steel cable onto a passing
+// The Kepler Hitch-Line Winch (Kepler's unique upgrade, an active on E). Fire a steel cable onto a passing
 // vehicle or a structure and let the drum reel you in: the pull builds up, runs at a steady speed and eases
 // off to leave about two metres of cable between you and the hook. Hooked on a vehicle you then ride its pull:
 // swing under a flying transit like a pendulum (momentum and all), or trail along behind a rover or a land-train.
-// It holds as long as you hold Z, up to twenty seconds.
+// It stays on without holding anything, up to twenty seconds, until you press E again to let go.
 //
-// Targeting: with the winch equipped, a faint tow-line marker sits on whatever Z would hook (hud: markerFor).
+// Targeting: with the winch equipped, a faint tow-line marker sits on whatever E would hook (hud: markerFor).
 // Whatever the reticle is on wins (the nearest such surface); otherwise the target nearest the reticle. The hook
 // bites the nearest surface of the thing, not its middle, and the cable is only as long as the gap.
 //
@@ -419,7 +419,7 @@ export class Winch {
     this.game = game;
     this.on = null; // { target, off, len, t, reel, dist }
     this.cd = 0;
-    this.cand = null; // what Z would hook right now (while the winch is equipped)
+    this.cand = null; // what E would hook right now (while the winch is equipped)
     this.pickT = 0;
     this.pts = Array.from({ length: SEG_MAX + 1 }, () => new THREE.Vector3());
     this.old = Array.from({ length: SEG_MAX + 1 }, () => new THREE.Vector3());
@@ -529,7 +529,7 @@ export class Winch {
     return out.normalize();
   }
 
-  // What Z would hook: the nearest surface of whatever the reticle is on; failing that, whatever's closest to
+  // What E would hook: the nearest surface of whatever the reticle is on; failing that, whatever's closest to
   // the reticle (nearer wins a near tie). Vehicles and structures compete alike; the first of the best few that
   // you could actually see is the one (a vehicle behind a wall is out).
   pick() {
@@ -594,7 +594,7 @@ export class Winch {
     return !(P.dead || P.vehicle || P.seat || P.rag) && this.game.state === 'play';
   }
 
-  // Z pressed with the winch selected
+  // E pressed with the winch selected and the cable off (powers.js: with it on, E releases)
   fire() {
     const g = this.game;
     if (this.on || this.cd > 0 || !this.hasHand()) return;
@@ -735,7 +735,7 @@ export class Winch {
   }
 
   // every frame (after the player has moved): the drum reels you in and the cable pulls when it's taut
-  update(dt, held) {
+  update(dt, usable) {
     const g = this.game;
     const P = g.player;
     if (this.cd > 0) this.cd -= dt;
@@ -755,7 +755,7 @@ export class Winch {
     if (!o) return;
     o.t += dt;
     const T = o.target;
-    if (!held || o.t > HOLD || !this.hasHand() || !T.alive()) { this.release(); return; }
+    if (!usable || o.t > HOLD || !this.hasHand() || !T.alive()) { this.release(); return; }
     this.buildPath(o, this.hand(_a), this.anchorOf(o, _b));
     // (the wraps are checked every frame, bent or not: at 20 Hz a player running at a post at 15 m/s covers 0.75 m between checks, and the
     // cable ran through the post for up to three frames before the first bend. el = the frame time, so the 0.2 s unwrap hold counts real
@@ -945,7 +945,7 @@ export class Winch {
     this.strand.visible = this.tracer.visible = true;
   }
 
-  // The tow-line marker: a faint bracket on the HUD where Z would hook (brighter when it's what the reticle is
+  // The tow-line marker: a faint bracket on the HUD where E would hook (brighter when it's what the reticle is
   // on), and, once hooked, at the hook with the cable still to reel.
   drawMarker(equipped) {
     const g = this.game;
@@ -971,7 +971,7 @@ export class Winch {
     if (m !== this.markTxt) { this.markTxt = m; el.querySelector('span').textContent = `${m} m`; }
   }
 
-  // the Z chip's line
+  // the E chip's line
   status() {
     if (this.on) return this.on.strain > 0.4 ? 'LINE STRAINING' : this.on.reel > 0 ? `REELING ${Math.round(this.on.dist)} m` : `HITCHED ${Math.ceil(HOLD - this.on.t)} s`;
     if (this.cd > 0) return `${Math.ceil(this.cd)} s`;
