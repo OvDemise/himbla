@@ -223,12 +223,12 @@ function rocket() {
 }
 
 // ---- settlement helpers (World.prototype pad / flag / lamp / tower / solarField / defensePylons, Traffic.prototype.shelter) ----
-// They only ever call put / col / toWorld / mount (and rand, blinkers for the tower, glow and pool materials for the rest) on
+// They only ever call put / curveR / col / toWorld / mount (and rand, blinkers for the tower, glow and pool materials for the rest) on
 // their World, so a bare stand-in with the real put and the real material helpers runs them as they are.
 function stubWorld() {
   const W = World.prototype, rr = mulberry32(9);
   return {
-    put: W.put, toWorld: W.toWorld, mount: W.mount, glowM: W.glowM, poolMat: W.poolMat, _mats: new Map(),
+    put: W.put, curveR: W.curveR, toWorld: W.toWorld, mount: W.mount, glowM: W.glowM, poolMat: W.poolMat, _mats: new Map(),
     col() {}, colAdd() {}, r: rr, rand: rr, blinkers: [], colliders: { query: () => [], contact: () => 0 },
   };
 }
@@ -267,7 +267,7 @@ function furniture() {
   at((l) => World.prototype.tower.call(w, l, 0, 0, 30, 1.6, 0xe0e0e0, 0x6aff9e)); // the bio-lab's beacon tower (world.js:1558)
   at((l) => World.prototype.defensePylons.call(w, l, [[0, 0]], 6)); // a free-standing settlement's gun pylon
   at((l) => {
-    const traffic = { w: { put: World.prototype.put, col() {} }, groundY: () => 0 };
+    const traffic = { w: { put: World.prototype.put, curveR: World.prototype.curveR, col() {} }, groundY: () => 0 };
     Traffic.prototype.shelter.call(traffic, l, 0, 0, 0, 'SHUTTLE > ILMB', 0xff9f1c); // a transit stop (traffic.js:421)
   });
   const root = lineUp(items, 4).root;
