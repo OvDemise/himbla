@@ -44,7 +44,9 @@ export function bendMatrix(R, m) {
 // Cut every triangle edge whose horizontal length is over `maxLen` (conforming: a shared edge is cut the same way on both sides, so there are no
 // cracks), repeating until none is. Indexed, position + normal only (outpostModels.js prep). Returns the same geometry.
 export function refine(geo, maxLen) {
-  let pos = Array.from(geo.attributes.position.array), nor = geo.attributes.normal ? Array.from(geo.attributes.normal.array) : null;
+  const names = Object.keys(geo.attributes), arrs = {}, size = {};
+  for (const n of names) { arrs[n] = Array.from(geo.attributes[n].array); size[n] = geo.attributes[n].itemSize; }
+  const pos = arrs.position;
   let idx = Array.from(geo.index.array);
   const max2 = maxLen * maxLen;
   const long = (a, b) => { const dx = pos[3 * a] - pos[3 * b], dz = pos[3 * a + 2] - pos[3 * b + 2]; return dx * dx + dz * dz > max2; };
@@ -55,8 +57,7 @@ export function refine(geo, maxLen) {
       let m = mids.get(key);
       if (m === undefined) {
         m = pos.length / 3;
-        for (let c = 0; c < 3; c++) pos.push((pos[3 * a + c] + pos[3 * b + c]) / 2);
-        if (nor) for (let c = 0; c < 3; c++) nor.push((nor[3 * a + c] + nor[3 * b + c]) / 2);
+        for (const n of names) for (let c = 0; c < size[n]; c++) arrs[n].push((arrs[n][size[n] * a + c] + arrs[n][size[n] * b + c]) / 2);
         mids.set(key, m);
       }
       return m;
@@ -85,8 +86,7 @@ export function refine(geo, maxLen) {
     idx = out;
     if (!cut) break;
   }
-  geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(pos), 3));
-  if (nor) geo.setAttribute('normal', new THREE.BufferAttribute(new Float32Array(nor), 3));
+  for (const n of names) geo.setAttribute(n, new THREE.BufferAttribute(new Float32Array(arrs[n]), size[n]));
   geo.setIndex(new THREE.BufferAttribute(pos.length / 3 > 65535 ? new Uint32Array(idx) : new Uint16Array(idx), 1));
   return geo;
 }

@@ -16,5 +16,8 @@ const matFor = (slot, over) => { const c = downsSlot(slot, over); return c.glow 
 // Bake a kit part into `k` in its current frame: at (x, y, z) turned `ry` about y, scaled (sx, sy, sz); `over` maps a slot to the colour it should wear instead.
 export function bake(k, name, x = 0, y = 0, z = 0, { ry = 0, sx = 1, sy = 1, sz = 1, over } = {}) {
   _M.compose(_P.set(x, y, z), _Q.setFromAxisAngle(_Y, ry), _S.set(sx, sy, sz));
+  const tag = k.tag;
+  k.tag = `${tag}>${name}`;
   k.baked(downsNode(name), (slot) => matFor(slot, over), _M);
+  k.tag = tag;
 }

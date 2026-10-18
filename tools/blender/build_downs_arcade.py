@@ -92,7 +92,7 @@ for sx in (-1, 1):
     P["mint2"].box(x0 - (0 if sx > 0 else 0.3), x1 + (0.3 if sx > 0 else 0), 0.0, 1.0, -11.3, 11.3)       # plinth
     P["mint"].box(x0, x1, 1.0, 12.0, -11.0, 11.0)                                       # the block
     P["gold"].box(x0 - 0.2, x1 + 0.2, 11.6, 12.4, -11.4, 11.4)                            # cornice
-    P["barn"].add(cylinder(4.6, 11.2, 4.4, 4), t=((x0 + x1) / 2, 12.3 + 2.2, 0), rot=(0, PI / 4, 0), s=(0.9, 1.0, 1.85))   # the hip roof
+    P["barn"].add(hip(4.0, 8.06, 4.4), t=((x0 + x1) / 2, 12.3 + 2.2, 0), s=(1.0, 1.0, 2.123))   # the hip roof: 11.4 x 24.2 m at the eaves over the 10 x 22 block and its cornice
     P["gold"].bm(((x0 + x1) / 2, 16.6, 0), ((x0 + x1) / 2, 18.4, 0), 0.07)
     P["gold"].add(sphere(0.28, 10, 8), t=((x0 + x1) / 2, 18.6, 0))
     for zf in (-1, 1):                                                                  # lit slits on both faces, frames behind the panes
@@ -166,7 +166,8 @@ for r in (3.6, 5.2, 6.8):
     P["mint"].tor(r, 0.05, t=(0, 0.84, 0), n=40, rs=5)                                   # ripples
 P["mint2"].lath([(0.0, 0.0), (1.7, 0.0), (1.7, 1.3), (1.0, 1.7), (0.7, 3.0)], segs=24)      # the pedestal and its first tier
 P["mint"].lath([(0.7, 2.9), (2.6, 3.0), (3.0, 3.5), (2.5, 3.65), (0.6, 3.3)], segs=32)    # the lower bowl
-P["mint2"].lath([(0.6, 3.3), (0.45, 4.6), (0.9, 5.0)], segs=16)
+P["mint2"].cylc(0, 3.95, 0, 0.6, 1.3, 16, rt=0.45)                                       # the stem between the bowls (two solid frusta: a one-sided lathe shell came out inside-out here,
+P["mint2"].cylc(0, 4.8, 0, 0.45, 0.4, 16, rt=0.9)                                         # a dark hollow, since Blender picks which way an open shell faces)
 P["mint"].lath([(0.5, 4.9), (1.7, 5.0), (1.95, 5.35), (1.6, 5.45), (0.4, 5.25)], segs=24)  # the upper bowl
 P["gold"].bm((0, 5.2, 0), (0, 6.6, 0), 0.1)
 P["gold"].add(sphere(0.38, 12, 8), t=(0, 6.9, 0))

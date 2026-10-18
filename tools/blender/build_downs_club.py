@@ -81,7 +81,7 @@ P["black"].box(-9.2, 9.2, 9.2, 17.2, ZF + 0.34, ZF + 0.28)
 for sx in (-1, 1):
     xc = sx * 20.0
     zc = (ZB + ZF) / 2
-    P["barn"].add(cylinder(7.2, 14.6, 4.2, 4), t=(xc, BH + 0.9 + 2.1, zc), rot=(0, PI / 4, 0), s=(1, 1, 1.12))    # a hip roof: a four-sided frustum
+    P["barn"].add(hip(7.2, 14.6, 4.2), t=(xc, BH + 0.9 + 2.1, zc), s=(1, 1, 1.12))    # a hip roof: a four-sided frustum
     P["gold"].boxc(xc, BH + 0.9 + 4.35, zc, 6.0, 0.3, 0.6)                              # its ridge
     for dx in (-5.0, 5.0):                                                              # a dormer on the front slope
         P["mint2"].boxc(xc + dx, BH + 3.0, ZF + 0.6, 2.2, 2.0, 1.4)

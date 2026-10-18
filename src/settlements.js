@@ -30,6 +30,7 @@ export function settle(world, loc, seed, fn) {
   fn(k, ctx);
   k.at();
   const t = k.finish();
+  if (globalThis.__kitTags) loc._kitCols = t.cols; // (the dev audit looks at the colliders a place was built with)
   world.put(t.root, loc, 0, 0, 0, 0, true);
   t.root.userData.kitRoot = true; // (it never moves; only its tagged moving parts do)
   for (const c of t.cols) world.col(loc, c);

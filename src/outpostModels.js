@@ -57,7 +57,26 @@ function prep(g) {
   return g;
 }
 
+// Dev audit (tools: the Downs z-fight audit): with `Kit.tags = []` every piece a kit bakes carries a `tag` attribute, an index into that list, naming the builder and
+// part it came from (`k.tag`). Off (null) in the game; the attribute is merged and bent along with the rest.
 class Kit {
+  static tags = globalThis.__kitTags ? (globalThis.__kitTagNames = []) : null;
+  tag = '';
+  instN = 0;
+  // (and the box each piece fills, in the kit's frame, for the near-miss audit: globalThis.__kitBoxes)
+  boxOf(g, inst) {
+    if (!Kit.tags || !this.tag) return;
+    g.computeBoundingBox();
+    const b = g.boundingBox;
+    (globalThis.__kitBoxes ||= []).push({ i: inst, t: this.tag, a: [b.min.x, b.min.y, b.min.z], b: [b.max.x, b.max.y, b.max.z] });
+  }
+  tagGeo(g) {
+    if (!Kit.tags) return g;
+    let id = Kit.tags.indexOf(this.tag);
+    if (id < 0) id = Kit.tags.push(this.tag) - 1;
+    g.setAttribute('tag', new THREE.BufferAttribute(new Float32Array(g.attributes.position.count).fill(id), 1));
+    return g;
+  }
   constructor(c, seed, wreck) {
     this.c = c;
     // separate streams so the shared props come out the same whether or not the main building
@@ -107,6 +126,8 @@ class Kit {
       this.ink.push(this.onGround ? dropFloorFaces(hg) : hg);
     }
     geo.applyMatrix4(_m);
+    this.tagGeo(geo);
+    this.boxOf(geo, ++this.instN);
     list.push(mat.side === THREE.FrontSide && this.onGround ? dropFloorFaces(geo) : geo);
     return this;
   }
@@ -115,12 +136,14 @@ class Kit {
   // baked into the kit in the current frame, placed by the matrix `m` (the part's frame -> the kit frame: scale, turn, offset).
   // `mat(slot)` picks the kit material for a slot. Only that node's own meshes go in, not its child pivots.
   baked(node, mat, m) {
+    this.instN++;
     const w = new THREE.Matrix4().multiplyMatrices(this.base, m);
     for (const { slot, geo } of node.parts) {
       const km = mat(slot);
       let list = this.byMat.get(km);
       if (!list) this.byMat.set(km, (list = []));
-      const g = prep(geo.clone()).applyMatrix4(w);
+      const g = this.tagGeo(prep(geo.clone()).applyMatrix4(w));
+      this.boxOf(g, this.instN);
       list.push(km.side === THREE.FrontSide && this.onGround ? dropFloorFaces(g) : g);
     }
     if (node.ink) {
@@ -248,9 +271,9 @@ class Kit {
   }
 
   // colliders / blast boxes, given in the current frame
-  solid(hx, hy, hz, x, z, ry = 0, y0 = 0) { const p = this.P(x, 0, z); this.cols.push({ type: 'box', hx, hy, hz, x: p.x, y: y0 + hy, z: p.z, yaw: this.yaw + ry }); }
-  sphere(r, x, y, z) { const p = this.P(x, y, z); this.cols.push({ type: 'sphere', r, x: p.x, y: p.y, z: p.z }); }
-  column(r, h, x, z, y0 = 0) { const p = this.P(x, 0, z); this.cols.push({ type: 'cyl', r, y0, y1: h, x: p.x, z: p.z }); }
+  solid(hx, hy, hz, x, z, ry = 0, y0 = 0) { const p = this.P(x, 0, z); this.cols.push({ type: 'box', hx, hy, hz, x: p.x, y: y0 + hy, z: p.z, yaw: this.yaw + ry, tag: this.tag }); }
+  sphere(r, x, y, z) { const p = this.P(x, y, z); this.cols.push({ type: 'sphere', r, x: p.x, y: p.y, z: p.z, tag: this.tag }); }
+  column(r, h, x, z, y0 = 0) { const p = this.P(x, 0, z); this.cols.push({ type: 'cyl', r, y0, y1: h, x: p.x, z: p.z, tag: this.tag }); }
   // a lying-down cylinder (quonset huts, hangars, pipes): axis along local z (turned by ry), centre at height y
   hcyl(r, len, x, z, ry = 0, y = 0) { const p = this.P(x, 0, z); this.cols.push({ type: 'hcyl', r, len, x: p.x, y, z: p.z, yaw: this.yaw + ry }); }
   hit(hx, hy, hz, x, z, ry = 0) { const p = this.P(x, 0, z); this.hits.push({ hx, hy, hz, x: p.x, y: hy, z: p.z, yaw: this.yaw + ry }); }

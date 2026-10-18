@@ -104,6 +104,13 @@ class Acc:
         self.geos = []
 
 
+def hip(rt, rb, h):
+    """A four-sided frustum (a hip roof) with its sides parallel to the axes: cylinder() puts the corners there, and xf() scales before it turns, so a stretched one has to be turned FIRST
+    (turned after, a stretch shears it into a rhombus). Scale it with Acc.add(..., s=(sx, 1, sz)): its half-width at the foot is rb * 0.7071 * sx."""
+    v, f = cylinder(rt, rb, h, 4)[:2]
+    return xf((v, f), (0, 0, 0), (0, PI / 4, 0))
+
+
 def flush_all():
     for a in Acc.all:
         a.flush()
@@ -114,9 +121,51 @@ def parts(root, prefix, specs):
     return {s: Acc(f"{prefix}_{s}", s, root, ink) for s, ink in specs.items()}
 
 
+def audit_flips(objs, min_faces=6):
+    """Primitives built inside-out. Every box, frustum, cylinder and prism of the kit is convex, so every face of one points away from its middle; a connected piece most of whose faces
+    point inward was built with its winding reversed (it shows only from inside, or not at all) or turned the wrong way. Reports (does not stop the build)."""
+    import mathutils
+    bad = []
+    dg = bpy.context.evaluated_depsgraph_get()
+    for o in objs:
+        if o.type != "MESH":
+            continue
+        me = o.evaluated_get(dg).to_mesh()
+        mw, nm = o.matrix_world, o.matrix_world.to_3x3()
+        parent = list(range(len(me.vertices)))
+
+        def find(a):
+            while parent[a] != a:
+                parent[a] = parent[parent[a]]
+                a = parent[a]
+            return a
+        for f in me.polygons:
+            vs = list(f.vertices)
+            for a in vs[1:]:
+                parent[find(a)] = find(vs[0])
+        groups = {}
+        for f in me.polygons:
+            groups.setdefault(find(f.vertices[0]), []).append(f)
+        for fs in groups.values():
+            if len(fs) < min_faces:
+                continue
+            vs = {v for f in fs for v in f.vertices}
+            mid = sum((mw @ me.vertices[v].co for v in vs), mathutils.Vector()) / len(vs)
+            inward = sum(1 for f in fs if (nm @ f.normal).dot(mw @ f.center - mid) < -1e-6)
+            if inward > 0.6 * len(fs):
+                # (reported in three.js axes, like the builders write them)
+                bad.append(f"{o.name}: {inward}/{len(fs)} faces point inward, piece at ({mid.x:.2f}, {mid.z:.2f}, {-mid.y:.2f})")
+        o.evaluated_get(dg).to_mesh_clear()
+    if bad:
+        print("AUDIT flips: " + str(len(bad)) + " inside-out piece(s):\n  " + "\n  ".join(bad[:15]))
+    else:
+        print("AUDIT flips ok")
+
+
 def finish_and_export():
     flush_all()
     audit_coplanar(C.objects)
+    audit_flips(C.objects)
     dg = bpy.context.evaluated_depsgraph_get()
     tris = {}
     for o in C.objects:

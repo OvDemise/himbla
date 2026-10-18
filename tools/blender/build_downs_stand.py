@@ -67,11 +67,11 @@ def roof_bay(name, TIP, BACK, ZF, ZB):
             if i < n:
                 z2 = ZF + 0.8 + (zt - ZF - 0.8) * (i + 1) / n
                 P["black"].bm((x, yr(z) - 0.5, z), (x, low(z2), z2), 0.06)                  # a diagonal
-        colz = ZB - 1.3
-        top = yr(colz) - 3.9
-        P["black"].box(x - 0.45, x + 0.45, 0.1, top, colz - 0.45, colz + 0.45)              # the column
-        P["gold"].boxc(x, 0.22, colz, 1.3, 0.44, 1.3)                                       # its footing
-        P["gold"].boxc(x, top + 0.05, colz, 1.1, 0.16, 1.1)                                 # and cap
+    colz = ZB - 1.3                                                                         # one column under the middle of each bay (a bay's edges meet its neighbours' on the back wall's
+    top = yr(colz) - 3.9                                                                    # pilasters; a column at each edge stood in front of the entries), carrying a beam across both girders
+    P["black"].box(-0.45, 0.45, 0.1, top, colz - 0.45, colz + 0.45)                         # the column
+    P["black"].box(-9.45, 9.45, top - 0.15, top + 0.25, colz - 0.35, colz + 0.35)           # the beam the girders end on
+    P["gold"].boxc(0, 0.22, colz, 1.3, 0.44, 1.3)                                           # its footing
     for z in (ZB * 0.22, ZB * 0.55, ZB * 0.85):                                             # lamps under the soffit, lit
         y = yr(z) - 0.62
         P["glowgold"].boxc(0, y, z, 0.7, 0.1, 2.0, rot=(ang, 0, 0))
@@ -173,7 +173,7 @@ back_wall("dn_back_s", 14.6)
 # =====================================================================================================
 root = pivot("dn_entry", (0, 0, 0))
 P = parts(root, "dn_entry", {"black": 0.02, "gold": 0.015, "barn": 0.03, "mint2": 0.0, "glowgold": 0.0, "black2": 0.012})
-P["black"].box(-2.5, 2.5, 0.0, 4.2, -0.82, -0.3)                                        # the recess, dark
+P["black"].box(-2.5, 2.5, 0.0, 4.2, -0.03, 0.05)                                         # the doorway, dark, on the wall face (it was sunk inside the wall, so the way in read as blank wall)
 P["mint2"].box(-3.1, -2.5, 0.0, 5.0, -0.12, 0.3)                                        # jambs
 P["mint2"].box(2.5, 3.1, 0.0, 5.0, -0.12, 0.3)
 P["gold"].box(-3.2, 3.2, 4.2, 4.65, -0.1, 0.4)                                          # the lintel
