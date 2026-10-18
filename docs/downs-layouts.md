@@ -184,3 +184,7 @@ The build follows the plan above, with these differences and additions:
 - **Models.** Nothing of the old derby survives unreworked: the starting gate, rails, finish arch, lamps, flood masts, festoons, flags, stalls and spectators are all new Blender models. The golden
   statue, its plinth and the winner's circle were removed.
 - **Not built:** Layout A's bridges and Midway.
+- **Curved ground.** The plateau is a cap of the Moon's sphere (`curved: true` in `locations.js`), not a flat plane: on a plane the far arcades, 250 m out, stood about 9 m above the Moon's curve and
+  leaned about 4 degrees away from the local up. The builders still draw on flat coordinates (x, z across the site, y up from the ground); `src/curve.js` bends them onto the sphere (see its header):
+  geometry is cut into pieces of at most 8 m and bent, so long walls, rails and the stands curve; the dressing's text planes, moving parts, colliders, the race's screens, crowd, gate and cameras, and the
+  walking figures all go through the same bend. `tools/downs-layouts.mjs` still checks the plan in flat coordinates, which is what the plan drawings show.

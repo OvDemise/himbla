@@ -18,7 +18,7 @@ const _g = { f: 0, i: 0, j: 0 };
 const WORKERS = Math.max(2, Math.min(4, ((typeof navigator !== 'undefined' && navigator.hardwareConcurrency) || 4) - 2)), IN_FLIGHT = 4;
 // a plateau as a worker needs it (the zone objects are whole locations: just the numbers)
 // (a fitted town sends its plane as zrSet, which the worker takes as it is rather than fitting again)
-function zoneMsg(z) { return { dir: [z.dir.x, z.dir.y, z.dir.z], r: z.r, late: !!z.late, zoneR: z.zoneR || 0, flatR: z.flatR, fit: !!z.fit, zrSet: z.zrSet }; }
+function zoneMsg(z) { return { dir: [z.dir.x, z.dir.y, z.dir.z], r: z.r, late: !!z.late, zoneR: z.zoneR || 0, flatR: z.flatR, fit: !!z.fit, curved: !!z.curved, zrSet: z.zrSet }; }
 const AHEAD_LOD = 1; // build-ahead: chunks round where you'll be soon, up to this level of detail
 // the ink line along crater crests: how many rims the terrain shader takes, and how far out
 const ROAD_KEEP = 14; // m a boulder's centre stays from the nearest sample of a road, beyond its own radius

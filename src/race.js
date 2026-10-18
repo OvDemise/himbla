@@ -9,6 +9,7 @@ import { makeDownsPart, downsNode } from './models.js';
 import { buildDowns } from './downsWorld.js';
 import { LAP, LANES, RAIL_IN, RAIL_OUT, FINISH_U, STAND, FAR, CLUB, WINDOW, BOARD, DRUM, PODIUMS, oval } from './downsPlan.js';
 import { pixelFont } from './fonts.js';
+import { bendPoint, bendQuat } from './curve.js';
 
 // Chimera Downs: a proper racecourse for the things that crawl out of Dr. Zbornak's reactor.
 // A dirt oval with four lanes, a grandstand full of cheering spectators, a screen drum, a finish
@@ -43,7 +44,7 @@ const MOD_KINDS = ['water', 'rock', 'dirt', 'mud', 'wiring', 'engine'];
 
 const _v = new THREE.Vector3(), _w = new THREE.Vector3(), _up = new THREE.Vector3(), _f = new THREE.Vector3();
 const _m4 = new THREE.Matrix4(), _q = new THREE.Quaternion(), _s = new THREE.Vector3(), _p = new THREE.Vector3(), _Y = new THREE.Vector3(0, 1, 0);
-const _o = {};
+const _o = {}, _bq = new THREE.Quaternion();
 const fmt = (n) => Math.round(n).toLocaleString('en-US');
 const rand = (a, b) => a + Math.random() * (b - a);
 export class Race {
@@ -179,8 +180,13 @@ export class Race {
   placeGate(u) {
     const G0 = this.gate;
     oval(u, G0.mid, _o);
+    const yaw = Math.atan2(_o.hx, _o.hz), R = this.game.world.curveR(this.loc);
     G0.root.position.set(_o.x, 0.05, _o.z);
-    G0.root.rotation.y = Math.atan2(_o.hx, _o.hz);
+    G0.root.rotation.y = yaw;
+    if (R) { // (stood on the curved plateau, curve.js)
+      bendPoint(R, _o.x, 0.05, _o.z, G0.root.position);
+      G0.root.quaternion.setFromAxisAngle(_Y, yaw).premultiply(bendQuat(R, _o.x, _o.z, _bq));
+    }
     G0.root.visible = true;
     this.setGate(0);
   }
@@ -236,29 +242,28 @@ export class Race {
 
   updateCrowd(t) {
     const { body, head, hat, arms, hair, bodyInk, headInk } = this.crowdParts;
-    const ex = this.excite;
+    const ex = this.excite, R = this.game.world.curveR(this.loc);
     for (let i = 0; i < this.crowd.length; i++) {
       const p = this.crowd[i];
       // fans bob in their seats; when the crowd is excited, they leap and wave
       const hop = ex > 0.05 ? Math.max(0, Math.sin(t * p.f + p.ph)) * (0.25 + p.jump * 0.9) * ex : Math.max(0, Math.sin(t * 1.3 + p.ph)) * 0.05;
       const sway = Math.sin(t * 0.9 + p.ph) * 0.06;
-      _q.setFromAxisAngle(_Y, p.face + sway);
       const k = p.sc;
-      _p.set(p.x, p.y + 0.5 * k + hop, p.z);
-      _m4.compose(_p, _q, _s.set(k, k, k));
-      body.setMatrixAt(i, _m4);
-      bodyInk.setMatrixAt(i, _m4);
-      const armsOn = ex > 0.35 && p.wave;
-      _m4.compose(_p, _q, _s.set(armsOn ? k : 0, armsOn ? k : 0, armsOn ? k : 0));
-      arms.setMatrixAt(i, _m4);
-      _p.y += 0.66 * k;
-      _m4.compose(_p, _q, _s.set(k, k, k));
-      head.setMatrixAt(i, _m4);
-      headInk.setMatrixAt(i, _m4);
-      _m4.compose(_p, _q, _s.set(p.hat ? k : 0, p.hat ? k : 0, p.hat ? k : 0));
-      hat.setMatrixAt(i, _m4);
-      _m4.compose(_p, _q, _s.set(p.hat ? 0 : k, p.hat ? 0 : k, p.hat ? 0 : k));
-      hair.setMatrixAt(i, _m4);
+      const y = p.y + 0.5 * k + hop;
+      // (the stands are on a curved plateau: each fan is stood on the sphere and turned with it, curve.js)
+      const set = (m, yy, sc) => {
+        _q.setFromAxisAngle(_Y, p.face + sway);
+        _p.set(p.x, yy, p.z);
+        if (R) { _q.premultiply(bendQuat(R, p.x, p.z, _bq)); bendPoint(R, p.x, yy, p.z, _p); }
+        m.setMatrixAt(i, _m4.compose(_p, _q, _s.set(sc, sc, sc)));
+      };
+      set(body, y, k);
+      set(bodyInk, y, k);
+      set(arms, y, ex > 0.35 && p.wave ? k : 0);
+      set(head, y + 0.66 * k, k);
+      set(headInk, y + 0.66 * k, k);
+      set(hat, y + 0.66 * k, p.hat ? k : 0);
+      set(hair, y + 0.66 * k, p.hat ? 0 : k);
     }
     for (const m of [body, head, hat, arms, hair, bodyInk, headInk]) m.instanceMatrix.needsUpdate = true;
   }

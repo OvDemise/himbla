@@ -333,9 +333,11 @@ export class TerrainField {
       const dot = dx * zn.dir.x + dy * zn.dir.y + dz * zn.dir.z;
       if (dot < zn.cosFlat) continue;
       const d = R * Math.acos(Math.min(1, dot));
-      // plateau is a true plane in the settlement's local frame
+      // plateau is a true plane in the settlement's local frame (or, for a `curved` place, a cap of the sphere at the plane's height, so
+      // nothing built on it leans away from the local up; see downsKit.js makeBend)
       const t = smoothstep(zn.fr, zn.fr * 1.95, d);
-      rad = zn.zr / dot + (rad - zn.zr / dot) * t;
+      const pl = zn.curved ? zn.zr : zn.zr / dot;
+      rad = pl + (rad - pl) * t;
       floorA *= t; rimA *= t; rayA *= t; ejA *= t; oldA *= t; this.attr.rock *= t; this.attr.rille *= t; this.attr.crest *= t;
     }
     const fb = this.flatBuckets[(_g.f * CPF + cy) * CPF + cx];
@@ -409,7 +411,7 @@ export class TerrainField {
         for (let i = 0; i < n; i++) {
           const a = i / n * 2 * Math.PI;
           _c.copy(d).multiplyScalar(R).addScaledVector(t1, Math.cos(a) * r).addScaledVector(t2, Math.sin(a) * r).normalize();
-          sum += this.H(_c.x, _c.y, _c.z) * _c.dot(d) * ww;
+          sum += this.H(_c.x, _c.y, _c.z) * (z.curved ? 1 : _c.dot(d)) * ww;
           w += ww;
         }
       }

@@ -147,7 +147,7 @@ export const LOCATIONS = [
   // generation (old saves keep the same terrain and outpost ids); its plateau flattens what's there
   {
     id: 'downs', name: 'Chimera Downs', short: 'DOWNS', type: 'derby', faction: 'none', poi: true, late: true,
-    theta: 22, phi: 160, r: 280, safe: true, repair: 6,
+    theta: 22, phi: 160, r: 280, curved: true, safe: true, repair: 6,
     blurb: "A proper racecourse for the things that crawl out of Dr. Zbornak's reactor: a roofed grandstand, a screen the size of a barn and a race card that never sleeps.",
   },
 ];
