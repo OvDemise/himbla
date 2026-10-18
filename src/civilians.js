@@ -564,8 +564,11 @@ export class Civilians {
     p.y = 0;
     f.vy = 0;
     // amble back into town
-    const a = Math.random() * Math.PI * 2, rr = (0.25 + Math.random() * 0.5) * loc.r;
-    f.target.set(Math.cos(a) * rr, 0, Math.sin(a) * rr);
+    if (f.area) f.area(f.target, f); // (back to its own patch: a vendor's post)
+    else {
+      const a = Math.random() * Math.PI * 2, rr = (0.25 + Math.random() * 0.5) * loc.r;
+      f.target.set(Math.cos(a) * rr, 0, Math.sin(a) * rr);
+    }
     f.wait = 0.5 + Math.random() * 2;
     if (W.curveR(loc)) W.poseFigure(f);
     if (f.hp !== undefined && f.hp > 0) f.hp = Math.min(f.kind === 'soldier' ? HP_SOLDIER : HP, f.hp + 20); // patched up a bit

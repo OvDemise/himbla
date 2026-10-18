@@ -322,7 +322,7 @@ function joiner(k, mir, th, side0, wallU, rearZ) {
 
 // ---- the arcades round the turns ----
 // A wedge's origin is the middle of its inner chord; its local +z points outward along the radius. The east arcade is the west one's mirror (x negated, yaws negated).
-function arcades(k) {
+function arcades(k, vendors) {
   for (const mir of [1, -1]) {                                       // 1 = west, -1 = east
     const at = (r, th) => [mir * (-ARCADE.cx + r * Math.cos(th * Math.PI / 180)), r * Math.sin(th * Math.PI / 180)];
     const yawOf = (th) => mir * (Math.PI / 2 - th * Math.PI / 180);
@@ -335,15 +335,17 @@ function arcades(k) {
         k.solid(WEDGE.wo, 4.2, 0.4, 0, WEDGE.d - 0.35);                // the back wall
         k.column(0.4, 6.5, -WEDGE.wi + 0.55, 0.55);                    // the colonnade
         if (i % 2 === 1 && i < 10) {
-          // a stall in this bay: its front toward the walk, its body against the back wall
+          // a stall in this bay: built into it (dn_stall_*, tools/blender/build_downs_stalls.py: an alcove against the back wall, in the bay's own frame), a vendor behind its counter
           const slot = ri * 5 + (i - 1) / 2;
           const st = STALLS[STALL_ORDER[mir > 0 ? 0 : 1][slot]];
-          const sx = x + 7.6 * Math.sin(yaw), sz = z + 7.6 * Math.cos(yaw);
-          k.at(sx, sz, yaw + Math.PI);
           bake(k, `dn_stall_${st.d}`, 0, 0, 0, { over: { accent: st.accent } });
-          k.text(st.name, 0, 4.65, -0.5, 0, Math.min(7.6, tw(st.name, 0.9)), { fg: FG.gold, bg: BG.black, back: false, off: 0.01 });
-          k.solid(4.4, 1.9, 3.5, 0, -3.9);
-          k.solid(4.5, 0.6, 0.7, 0, 0.15);
+          for (const sx of [-1, 1]) {
+            k.solid(0.35, 1.83, 0.25, sx * 4.65, 11.85, 0, 0.34);          // the screen wall's piers
+            k.solid(0.1, 3.7, 1.7, sx * 4.9, 13.4, 0, 0.34);               // the alcove's side walls
+          }
+          k.solid(5, 1.85, 0.25, 0, 11.85, 0, 4.0);                        // the screen above its arch
+          k.solid(4.4, 0.65, 0.8, 0, 12.95, 0, 0);                         // the counter
+          vendors.push({ x: x + 14.5 * Math.sin(yaw), z: z + 14.5 * Math.cos(yaw), yaw: yaw + Math.PI, accent: st.accent });
         } else {
           // an open bay: a bench against the back wall, a planter each side of it
           k.at(x, z, yaw);
@@ -596,14 +598,15 @@ function floods(k) {
 }
 
 export function buildDowns(w, loc) {
-  return settle(w, loc, 9091, (k) => {
+  const vendors = [];
+  const kit = settle(w, loc, 9091, (k) => {
     const as = (name, f) => { k.tag = name; f(); k.tag = ''; };      // (the dev audit names each triangle's builder: outpostModels.js Kit.tags)
     as('course', () => course(k));
     as('aprons', () => aprons(k));
     as('stand', () => grandstand(k, STAND));
     as('farstand', () => grandstand(k, FAR, { far: true }));
     as('clubhouse', () => clubhouse(k));
-    as('arcades', () => arcades(k));
+    as('arcades', () => arcades(k, vendors));
     as('forecourt', () => forecourt(k));
     as('drum', () => drum(k));
     as('podiums', () => podiums(k));
@@ -612,4 +615,18 @@ export function buildDowns(w, loc) {
     as('annex', () => annex(w, loc, k));
     as('floods', () => floods(k));
   });
+  // the stalls' vendors: stand behind their counters facing the walk, serving (world.addFigures; `vendor` figures keep their post and wave their arms a little: world.updateFigures)
+  if (w.addFigures && vendors.length) {
+    let next = 0;
+    w.addFigures(loc, vendors.length, {
+      kind: 'worker',
+      look: (i) => ({ look: i % 3 === 1 ? 'trader' : 'casual', suit: vendors[i].accent, scale: 1.3 }),     // (a bit taller than the walkers, to stand over the counter)
+      area: (out, f) => {
+        const v = vendors[f.vi ??= next++];
+        f.vendor = true; f.yaw = v.yaw;
+        return out.set(v.x, 0.34, v.z);
+      },
+    });
+  }
+  return kit;
 }

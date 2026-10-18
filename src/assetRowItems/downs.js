@@ -47,9 +47,14 @@ const downs = {
         P('dn_flood', 4, { d: 1 }), P('dn_mast', 4, { d: 1 }), P('dn_crossing', 2, { d: 1 }), gate,
       ], 2);
     }),
-    item('downs.stalls', 'DOWNS CONCESSION STALLS ×12: MOON DOGS · CRATER FRIES · HE-3 FIZZ · CHIMERA CHOW · ROCK CANDY · TOTE · SPACE SLUSH · LUNAR COFFEE · DERBY DONUTS · JOCKEY\'S GRILL · FOAM FINGERS · RAIL BAR', 125, 9, () => {
+    item('downs.stalls', 'DOWNS CONCESSION STALLS ×12, EACH IN AN ARCADE BAY: MOON DOGS · CRATER FRIES · HE-3 FIZZ · CHIMERA CHOW · ROCK CANDY · TOTE · SPACE SLUSH · LUNAR COFFEE · DERBY DONUTS · JOCKEY\'S GRILL · FOAM FINGERS · RAIL BAR', 140, 18, () => {
       const accents = [0x8b4044, 0xcfb352, 0x7b9a6e, 0xb07c57, 0x8b4044, 0x3b393a, 0x7b9a6e, 0xb07c57, 0x8b4044, 0xcfb352, 0x7b9a6e, 0x3b393a];
-      return row(accents.map((c, i) => P(`dn_stall_${i}`, 9.2, { d: 8, dz: 3.6, tint: { accent: c }, ry: Math.PI })), 0.3);
+      return row(accents.map((c, i) => {
+        const g = new THREE.Group();
+        g.add(makeDownsPart('dn_arcade'));
+        g.add(makeDownsPart(`dn_stall_${i}`, { accent: c }));
+        return { root: g, w: 11, d: 16 };
+      }), 0.3);
     }),
     item('downs.arcade', 'DOWNS ARCADE BAY · GATE HALL · FORECOURT GATE · FOUNTAIN · VALET BAY · BENCH · PLANTER · FESTOON', 154, 27, () => {
       const fs = [];
@@ -58,19 +63,6 @@ const downs = {
         P('dn_bay', 3, { d: 6, dz: -2.8 }), P('dn_bench', 2.4, { d: 1 }), P('dn_planter', 2.6, { d: 1 }), P('dn_festoon', 30, { d: 1, y: 10 }),
       ], 2);
       return { root: L.root, update: (dt, t) => { for (const f of fs) f.update(t, dt); } };
-    }),
-    // two sets of designs for the concession stalls rebuilt INTO the arcade's bays (tools/blender/build_downs_stall_proposals.py; not in the game yet): each stall stands in its own bay (dn_arcade) against the back wall
-    item('downs.stall-proposals', 'DOWNS STALL PROPOSALS: SET A "THE SHOPFRONT" (LEFT) AND SET B "THE ALCOVE" (RIGHT), EACH IN AN ARCADE BAY, THREE NAMES EACH', 76, 18, () => {
-      const bay = (set, key, accent) => {
-        const g = new THREE.Group();
-        g.add(makeDownsPart('dn_arcade'));
-        g.add(makeDownsPart(`dn_stall${set}_${key}`, { accent }));
-        return { root: g, w: 11, d: 16 };
-      };
-      return row([
-        bay('A', 'moondogs', 0x8b4044), bay('A', 'fries', 0xcfb352), bay('A', 'fizz', 0x7b9a6e),
-        bay('B', 'moondogs', 0x8b4044), bay('B', 'fries', 0xcfb352), bay('B', 'fizz', 0x7b9a6e),
-      ], 1.2);
     }),
     item('downs.screen', 'DOWNS SCREEN DRUM AND WINNERS\' PODIUM', 63, 20, () => row([P('dn_drum', 42, { d: 16 }), P('dn_podium', 19, { d: 5 })], 2)),
     item('downs.stable', 'DOWNS STABLE BLOCK · HAY BARN · WEIGHING ROOM · RING GATE · HAY · PICNIC TABLE', 112, 16, () => row([
