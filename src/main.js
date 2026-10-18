@@ -1182,6 +1182,7 @@ class Game {
     dbg.lap('pad');
     dbg.updateInput(); // (dev overlay: controller map and held keys)
     dbg.lap('debug');
+    this.cheats.freeCam.takeInput(rdt); // (dev free cam: while it is on, the keys and the mouse are the camera's and the game is lent a blank input until giveBack() below)
     const frozen = FROZEN_STATES.has(this.state);
     const dt = frozen ? 0 : rdt;
     this.time += dt;
@@ -1204,6 +1205,7 @@ class Game {
     this.spindle.updateRecovery(dt);
     if (this.state === 'title') this.updateTitleTour(rdt);
     else if (this.state !== 'cutscene' && this.state !== 'derby') this.updateCamera(dt);
+    this.cheats.freeCam.view(); // (dev free cam: the view is its own, so the world and the terrain below are built round it)
     if (this.trailer) this.trailer.camera(rdt); // trailer: the shot owns the camera
     dbg.lap('other');
     // the Monolith's time dilation: the world crawls, you don't
@@ -1245,6 +1247,7 @@ class Game {
     else if (this.chamber.on) this.post.render(this.chamber.scene, this.chamber.camera); // (the council's cutscene draws its own set instead of the Moon)
     else this.post.render(this.scene, this.camera);
     dbg.renderEnd();
+    this.cheats.freeCam.giveBack();
     this.input.endFrame();
     dbg.end();
   }
