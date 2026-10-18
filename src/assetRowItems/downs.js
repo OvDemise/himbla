@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { makeDownsPart } from '../models.js';
+import { makeDownsPart, makeDownsFountain } from '../models.js';
 import { lineUp } from './common.js';
 
 // Asset Row catalogue group: Chimera Downs' Blender kits (tools/blender/build_downs_*.py; docs/downs-layouts.md), each file's parts side by side as one item. The two rides (wheel and
@@ -14,6 +14,8 @@ const P = (name, w, { d = 0, dz = 0, tint, y = 0, ry = 0 } = {}) => {
   g.add(o);
   return { root: g, w, d };
 };
+// The fountain with its water running and its cup turning: a part of a line-up whose row item has an `update` hook (below).
+const fountainPart = (list) => { const f = makeDownsFountain(); list.push(f); return { root: f.root, w: 25, d: 25 }; };
 const item = (id, label, w, d, make, extra = {}) => ({ id, label, w, d, make: () => make(), ...extra });
 const row = (parts, gap = 3) => { const L = lineUp(parts, gap); return { root: L.root }; };
 
@@ -23,9 +25,9 @@ const downs = {
   id: 'downs',
   title: 'CHIMERA DOWNS',
   items: [
-    item('downs.stand', 'DOWNS GRANDSTAND KIT: SEATS · ROOF BAYS · TOWERS · SUITE · BACK WALLS · ENTRY', 168, 46, () => row([
+    item('downs.stand', 'DOWNS GRANDSTAND KIT: SEATS · ROOF BAYS · TOWERS · SUITE · BACK WALLS · WALLS WITH A WAY IN · ENTRY FRAME', 188, 46, () => row([
       P('dn_seat3', 3, { d: 1, tint: { seat: 0x7b9a6e } }), P('dn_seat3', 3, { d: 1, tint: { seat: 0xf8fff8 } }), P('dn_seat3', 3, { d: 1, tint: { seat: 0x8b4044 } }),
-      P('dn_suite', 19.4, { d: 4, dz: -1.6 }), P('dn_back', 19.4, { d: 1 }), P('dn_back_s', 19.4, { d: 1 }), P('dn_entry', 7, { d: 3, dz: 0 }),
+      P('dn_suite', 19.4, { d: 4, dz: -1.6 }), P('dn_back', 19.4, { d: 1 }), P('dn_back_s', 19.4, { d: 1 }), P('dn_back_gate', 19.4, { d: 1 }), P('dn_back_s_gate', 19.4, { d: 1 }), P('dn_entry', 8, { d: 3, dz: 0 }),
       P('dn_tower', 10, { d: 10, dz: -4.5 }), P('dn_tower_s', 9, { d: 9, dz: -4 }),
       P('dn_roof_bay', 19.6, { d: 44, dz: -17.5 }), P('dn_roof_bay_s', 19.6, { d: 27, dz: -10 }),
     ], 2)),
@@ -45,14 +47,23 @@ const downs = {
         P('dn_flood', 4, { d: 1 }), P('dn_mast', 4, { d: 1 }), P('dn_crossing', 2, { d: 1 }), gate,
       ], 2);
     }),
-    item('downs.stalls', 'DOWNS CONCESSION STALLS ×12: MOON DOGS · CRATER FRIES · HE-3 FIZZ · CHIMERA CHOW · ROCK CANDY · TOTE · SPACE SLUSH · LUNAR COFFEE · DERBY DONUTS · JOCKEY\'S GRILL · FOAM FINGERS · RAIL BAR', 125, 9, () => {
+    item('downs.stalls', 'DOWNS CONCESSION STALLS ×12, EACH IN AN ARCADE BAY: MOON DOGS · CRATER FRIES · HE-3 FIZZ · CHIMERA CHOW · ROCK CANDY · TOTE · SPACE SLUSH · LUNAR COFFEE · DERBY DONUTS · JOCKEY\'S GRILL · FOAM FINGERS · RAIL BAR', 140, 18, () => {
       const accents = [0x8b4044, 0xcfb352, 0x7b9a6e, 0xb07c57, 0x8b4044, 0x3b393a, 0x7b9a6e, 0xb07c57, 0x8b4044, 0xcfb352, 0x7b9a6e, 0x3b393a];
-      return row(accents.map((c, i) => P(`dn_stall_${i}`, 9.2, { d: 8, dz: 3.6, tint: { accent: c }, ry: Math.PI })), 0.3);
+      return row(accents.map((c, i) => {
+        const g = new THREE.Group();
+        g.add(makeDownsPart('dn_arcade'));
+        g.add(makeDownsPart(`dn_stall_${i}`, { accent: c }));
+        return { root: g, w: 11, d: 16 };
+      }), 0.3);
     }),
-    item('downs.arcade', 'DOWNS ARCADE BAY · GATE HALL · FORECOURT GATE · FOUNTAIN · VALET BAY · BENCH · PLANTER · FESTOON', 154, 27, () => row([
-      P('dn_arcade', 11, { d: 16, dz: -8 }), P('dn_gate_hall', 32, { d: 22 }), P('dn_gate_main', 30, { d: 4 }), P('dn_fountain', 25, { d: 25 }),
-      P('dn_bay', 3, { d: 6, dz: -2.8 }), P('dn_bench', 2.4, { d: 1 }), P('dn_planter', 2.6, { d: 1 }), P('dn_festoon', 30, { d: 1, y: 10 }),
-    ], 2)),
+    item('downs.arcade', 'DOWNS ARCADE BAY · GATE HALL · FORECOURT GATE · FOUNTAIN · VALET BAY · BENCH · PLANTER · FESTOON', 154, 27, () => {
+      const fs = [];
+      const L = row([
+        P('dn_arcade', 11, { d: 16, dz: -8 }), P('dn_gate_hall', 32, { d: 22 }), P('dn_gate_main', 30, { d: 4 }), fountainPart(fs),
+        P('dn_bay', 3, { d: 6, dz: -2.8 }), P('dn_bench', 2.4, { d: 1 }), P('dn_planter', 2.6, { d: 1 }), P('dn_festoon', 30, { d: 1, y: 10 }),
+      ], 2);
+      return { root: L.root, update: (dt, t) => { for (const f of fs) f.update(t, dt); } };
+    }),
     item('downs.screen', 'DOWNS SCREEN DRUM AND WINNERS\' PODIUM', 63, 20, () => row([P('dn_drum', 42, { d: 16 }), P('dn_podium', 19, { d: 5 })], 2)),
     item('downs.stable', 'DOWNS STABLE BLOCK · HAY BARN · WEIGHING ROOM · RING GATE · HAY · PICNIC TABLE', 112, 16, () => row([
       P('dn_stable_block', 31, { d: 12, dz: 3 }), P('dn_hay_barn', 25, { d: 14, dz: 7 }), P('dn_pavilion', 19, { d: 13, dz: 3.4 }), P('dn_ring_gate', 4, { d: 1 }),

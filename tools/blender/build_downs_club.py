@@ -4,7 +4,7 @@
 # or headless, with the bpy module:         MOONRUNNER_REPO=<repo> python3 build_downs_club.py
 #
 # Authored in the building's frame: its front (the forecourt side) is z = 0 and faces +z, the building stands back from it to z = -27, x runs along the front (60 m), y up.
-#   dn_club      the building: a Mint two-storey hall 60 x 18 m on a plinth, a colonnade of ten columns carrying a Barn Red and Mint striped awning over six betting windows and the
+#   dn_club      the building: a Mint two-storey hall 60 x 18 m on a plinth, a colonnade of ten columns, a Barn Red and Mint striped awning pitched from the entablature over six betting windows (each with a BETS sign in raised letters) and the
 #                great door, a recess for the race card board (the game hangs its live 17 x 8.6 m canvas in it, centre 13.2 m up), lit windows, a Barn Red hip roof on each wing and
 #                a 50 m clock tower behind the board: four clock faces, a belfry, a Barn Red spire and a gold finial
 DOWNS_OUT = "downs-club.glb"
@@ -38,10 +38,17 @@ for i in range(10):
     P["gold"].cylc(x, 8.05, -0.8, 0.62, 0.22, 14)                                       # capital
 P["mint2"].box(-30.2, 30.2, 8.15, 9.15, -1.6, 0.0)                                      # entablature
 P["gold"].box(-30.3, 30.3, 9.15, 9.35, -1.7, 0.1)
-P["mint2"].box(-30.2, 30.2, 7.2, 7.5, -4.8, -1.62)                                      # the awning's board, under the entablature, over the windows
-for i in range(12):                                                                     # stripes on it
+# the awning over the windows: a striped canopy pitched from the wall (under the string course) down to the colonnade (it was a flat board a hand's width off the wall and 0.65 m under the
+# entablature, floating), a valance on its front edge and a short black brace from that edge up to the entablature over every column
+AWN_A, AWN_L = math.atan2(0.75, 3.35), math.hypot(3.35, 0.75)
+for i in range(12):
     x0 = -30.0 + i * 5.0
-    (P["barn"] if i % 2 == 0 else P["mint"]).box(x0 + 0.01, x0 + 4.99, 7.5, 7.64, -4.8, -1.62)
+    col = P["barn"] if i % 2 == 0 else P["mint"]
+    col.boxc(x0 + 2.5, 7.625, -3.375, 4.98, 0.14, AWN_L, rot=(AWN_A, 0, 0))
+    col.box(x0 + 0.01, x0 + 4.99, 6.8, 7.3, -1.76, -1.7)                                # the valance
+for i in range(10):
+    x = -27.0 + i * 6.0
+    P["black"].bm((x, 7.2, -1.74), (x, 8.2, -1.62), 0.05)
 
 # ---- the ground floor: six betting windows and the great door ----
 for sx in (-1, 1):
@@ -53,7 +60,8 @@ for sx in (-1, 1):
             P["gold"].box(x + gx - 0.03, x + gx + 0.03, 1.7, 3.5, ZF + 0.08, ZF + 0.13)  # the grille's bars
         P["saddle"].box(x - 2.0, x + 2.0, 1.34, 1.5, ZF + 1.0, ZF + 0.03)               # the counter's shelf
         P["black2"].box(x - 1.95, x + 1.95, 0.8, 1.34, ZF + 0.9, ZF + 0.1)              # and its front
-        P["gold"].box(x - 0.9, x + 0.9, 3.95, 4.55, ZF + 0.1, ZF + 0.03)                # the number plate above
+        P["gold"].box(x - 1.2, x + 1.2, 3.9, 4.7, ZF + 0.1, ZF + 0.03)                  # the sign plate above, with BETS on it in raised Black letters
+        P["black"].letters("BETS", x, 4.3, ZF + 0.1, 0.085, 0.03)
 P["black"].box(-3.2, 3.2, 0.8, 6.2, ZF + 0.06, ZF + 0.02)                               # the great door's opening, dark
 P["glasswarm"].box(-2.9, -0.15, 0.9, 5.9, ZF + 0.1, ZF + 0.06)
 P["glasswarm"].box(0.15, 2.9, 0.9, 5.9, ZF + 0.1, ZF + 0.06)
@@ -81,7 +89,7 @@ P["black"].box(-9.2, 9.2, 9.2, 17.2, ZF + 0.34, ZF + 0.28)
 for sx in (-1, 1):
     xc = sx * 20.0
     zc = (ZB + ZF) / 2
-    P["barn"].add(cylinder(7.2, 14.6, 4.2, 4), t=(xc, BH + 0.9 + 2.1, zc), rot=(0, PI / 4, 0), s=(1, 1, 1.12))    # a hip roof: a four-sided frustum
+    P["barn"].add(hip(7.2, 14.6, 4.2), t=(xc, BH + 0.9 + 2.1, zc), s=(1, 1, 1.12))    # a hip roof: a four-sided frustum
     P["gold"].boxc(xc, BH + 0.9 + 4.35, zc, 6.0, 0.3, 0.6)                              # its ridge
     for dx in (-5.0, 5.0):                                                              # a dormer on the front slope
         P["mint2"].boxc(xc + dx, BH + 3.0, ZF + 0.6, 2.2, 2.0, 1.4)

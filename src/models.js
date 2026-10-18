@@ -2592,6 +2592,18 @@ export const DOWNS_TOON = {
 };
 export const DOWNS_GLOW = { glasswarm: 0xfff0c0, glowgold: 0xffe9a0, glowmint: 0xe8fff0, glowred: 0xff5a4a };
 export const makeDownsPart = (name, tint) => ddGroup(SHIP_PARTS[name], tint || null, DOWNS_TOON, DOWNS_GLOW);
+// The forecourt's fountain as plain meshes (the Asset Row's), the casino's way (makeFountain): { root, update(t, dt) }; the cup turns and the water runs with `t`.
+export function makeDownsFountain() {
+  const node = SHIP_PARTS.dn_fountain, root = ddGroup(node, null, DOWNS_TOON, DOWNS_GLOW);
+  const water = [];
+  for (const k of node.kids) {
+    if (k.role === 'spin') continue;
+    root.getObjectByName(k.name)?.removeFromParent();
+    const m = waterMesh(k); root.add(m); water.push(m);
+  }
+  const spinner = root.getObjectByName('trophy');
+  return { root, spinner, update(t, dt = 0) { if (spinner) spinner.rotation.y += dt * (spinner.userData.speed || 0.7); for (const m of water) m.userData.tick(m, dt, t); } };
+}
 export const downsNode = (name) => {
   if (!SHIP_PARTS[name]) throw new Error('no Downs model ' + name);
   return SHIP_PARTS[name];

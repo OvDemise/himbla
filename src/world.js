@@ -2069,12 +2069,21 @@ export class World {
           if (p.y <= 0) { p.y = 0; f.vy = 0; }
         }
       }
-      if (f.wait > 0) { f.wait -= dt; if (R) this.poseFigure(f); continue; }
+      if (f.wait > 0) {
+        f.wait -= dt;
+        if (f.vendor) { // (serving: forearms forward and a gentle swing)
+          f.phase += dt * 2.2;
+          if (f.armL) { f.armL.rotation.x = -0.7 + Math.sin(f.phase) * 0.3; f.armR.rotation.x = -0.7 + Math.sin(f.phase + 1.9) * 0.3; }
+        }
+        if (R) this.poseFigure(f);
+        continue;
+      }
       const dx = f.target.x - p.x, dz = f.target.z - p.z;
       const d = Math.hypot(dx, dz);
       if (d < 1) {
         if (f.area) {
           f.area(f.target, f); // (somewhere else in its own patch)
+          if (f.vendor) p.copy(f.target); // (a vendor's patch is its post: it is there, at its own height)
         } else {
           const a = Math.random() * Math.PI * 2, rr = (0.25 + Math.random() * 0.6) * loc.r;
           f.target.set(Math.cos(a) * rr, 0, Math.sin(a) * rr);

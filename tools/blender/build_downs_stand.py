@@ -14,7 +14,8 @@
 #   dn_suite        19 m of the suites row over the top tier: 3.4 m tall, 3.2 deep, three lit windows, a gold sill, an awning
 #   dn_back         19 m of the main stand's back wall, seen from +z (its rear face is z = 0, 0.8 m thick toward -z), 22.4 m tall
 #   dn_back_s       the far stand's, 14.6 m tall
-#   dn_entry        a way in through a back wall, 6 x 5 m, seen from +z: a black recess, a gold lintel, a barn red canopy, two lamps and a turnstile
+#   dn_back_gate, dn_back_s_gate   the same with a 6 x 4.2 m opening through the middle, for the bay of each way in (the tunnel through the stand starts there)
+#   dn_entry        the frame of a way in, round the opening of a _gate wall bay, seen from +z: two jambs, a gold lintel, a barn red canopy and two lamps
 DOWNS_OUT = "downs-stand.glb"
 DOWNS_COLL = "MoonDownsStand"
 import os
@@ -67,11 +68,11 @@ def roof_bay(name, TIP, BACK, ZF, ZB):
             if i < n:
                 z2 = ZF + 0.8 + (zt - ZF - 0.8) * (i + 1) / n
                 P["black"].bm((x, yr(z) - 0.5, z), (x, low(z2), z2), 0.06)                  # a diagonal
-        colz = ZB - 1.3
-        top = yr(colz) - 3.9
-        P["black"].box(x - 0.45, x + 0.45, 0.1, top, colz - 0.45, colz + 0.45)              # the column
-        P["gold"].boxc(x, 0.22, colz, 1.3, 0.44, 1.3)                                       # its footing
-        P["gold"].boxc(x, top + 0.05, colz, 1.1, 0.16, 1.1)                                 # and cap
+    colz = ZB - 1.3                                                                         # one column under the middle of each bay (a bay's edges meet its neighbours' on the back wall's
+    top = yr(colz) - 3.9                                                                    # pilasters; a column at each edge stood in front of the entries), carrying a beam across both girders
+    P["black"].box(-0.45, 0.45, 0.1, top, colz - 0.45, colz + 0.45)                         # the column
+    P["black"].box(-9.45, 9.45, top - 0.15, top + 0.25, colz - 0.35, colz + 0.35)           # the beam the girders end on
+    P["gold"].boxc(0, 0.22, colz, 1.3, 0.44, 1.3)                                           # its footing
     for z in (ZB * 0.22, ZB * 0.55, ZB * 0.85):                                             # lamps under the soffit, lit
         y = yr(z) - 0.62
         P["glowgold"].boxc(0, y, z, 0.7, 0.1, 2.0, rot=(ang, 0, 0))
@@ -100,10 +101,12 @@ def tower(name, W, D, H, bands, slit, banner):
         for y, h in slit:
             P["black"].boxc(x, y, -0.02, 1.2, h + 0.4, 0.04)                                # (the frame sits behind the pane, so it shows as a border)
             P["glasswarm"].boxc(x, y, -0.055, 0.9, h, 0.03)
+    wlo, whi = bands[0] + 0.275 + 0.45, bands[1] - 0.275 - 0.45                              # (the flank windows fit between the first two bands: they used to run through them)
+    wc, wh = (wlo + whi) / 2, whi - wlo
     for sx in (-1, 1):                                                                      # and on both flanks
         for z in (D * 0.3, D * 0.7):
-            P["black"].boxc(sx * (W / 2 + 0.02), slit[0][0] + 1.0, z, 0.04, slit[0][1] + 1.6, 1.2)
-            P["glasswarm"].boxc(sx * (W / 2 + 0.055), slit[0][0] + 1.0, z, 0.03, slit[0][1] + 1.2, 0.9)
+            P["black"].boxc(sx * (W / 2 + 0.02), wc, z, 0.04, wh + 0.4, 1.2)
+            P["glasswarm"].boxc(sx * (W / 2 + 0.055), wc, z, 0.03, wh, 0.9)
     P["black"].boxc(0, 2.6, -0.04, 2.6, 3.4, 0.1)                                           # a door at the foot
     P["gold"].boxc(0, 4.5, -0.1, 3.0, 0.3, 0.3)
     by, bh = banner
@@ -142,12 +145,19 @@ P["gold"].boxc(0, 2.72, -1.18, 18.96, 0.08, 0.12)
 # =====================================================================================================
 # the back walls
 # =====================================================================================================
-def back_wall(name, WH):
+def back_wall(name, WH, door=False):
+    """door: a bay with a way in: a 6 m wide, 4.2 m high opening through the middle (the tunnel through the stand starts there), a lintel of the wall above it"""
+    DW, DH = 3.0, 4.2
     root = pivot(name, (0, 0, 0))
     P = parts(root, name, {"mint": 0.05, "mint2": 0.0, "money2": 0.0, "gold": 0.012, "black": 0.012, "glasswarm": 0.0, "glowgold": 0.0})
-    P["mint"].box(-9.5, 9.5, 0.0, WH, -0.8, 0.0)
-    P["money2"].box(-9.49, 9.49, -0.02, 2.6, -0.02, 0.14)                                   # the wainscot
-    P["money2"].box(-9.49, 9.49, 2.6, 2.95, -0.02, 0.2)
+    cuts = [(-9.5, -DW), (DW, 9.5)] if door else [(-9.5, 9.5)]
+    for a, b in cuts:
+        P["mint"].box(a, b, 0.0, WH, -0.8, 0.0)
+    if door:
+        P["mint"].box(-DW, DW, DH, WH, -0.8, 0.0)                                           # the lintel course
+    for a, b in ((-9.49, -DW - 0.03), (DW + 0.03, 9.49)) if door else ((-9.49, 9.49),):
+        P["money2"].box(a, b, -0.02, 2.6, -0.02, 0.14)                                      # the wainscot
+        P["money2"].box(a, b, 2.6, 2.95, -0.02, 0.2)
     P["money2"].box(-9.49, 9.49, WH - 3.2, WH - 2.8, -0.02, 0.2)
     for sx in (-1, 1):
         P["mint2"].box(sx * 9.48 - (0.3 if sx > 0 else 0), sx * 9.48 + (0 if sx > 0 else 0.3), -0.04, WH, 0.0, 0.28)    # half a pilaster at each edge (two bays make one)
@@ -167,24 +177,22 @@ def back_wall(name, WH):
 
 back_wall("dn_back", 22.4)
 back_wall("dn_back_s", 14.6)
+back_wall("dn_back_gate", 22.4, door=True)
+back_wall("dn_back_s_gate", 14.6, door=True)
 
 # =====================================================================================================
 # dn_entry
 # =====================================================================================================
 root = pivot("dn_entry", (0, 0, 0))
 P = parts(root, "dn_entry", {"black": 0.02, "gold": 0.015, "barn": 0.03, "mint2": 0.0, "glowgold": 0.0, "black2": 0.012})
-P["black"].box(-2.5, 2.5, 0.0, 4.2, -0.82, -0.3)                                        # the recess, dark
-P["mint2"].box(-3.1, -2.5, 0.0, 5.0, -0.12, 0.3)                                        # jambs
-P["mint2"].box(2.5, 3.1, 0.0, 5.0, -0.12, 0.3)
-P["gold"].box(-3.2, 3.2, 4.2, 4.65, -0.1, 0.4)                                          # the lintel
-P["barn"].boxc(0, 5.2, 0.9, 7.0, 0.14, 2.4, rot=(0.22, 0, 0))                           # a canopy pitched away from the wall
-P["gold"].boxc(0, 4.82, 2.0, 7.0, 0.1, 0.12)
-for x in (-1.6, 1.6):
+P["mint2"].box(-3.5, -3.0, 0.0, 5.0, -0.12, 0.3)                                        # jambs framing the opening
+P["mint2"].box(3.0, 3.5, 0.0, 5.0, -0.12, 0.3)
+P["gold"].box(-3.7, 3.7, 4.2, 4.65, -0.1, 0.4)                                          # the lintel
+P["barn"].boxc(0, 5.2, 0.9, 7.4, 0.14, 2.4, rot=(0.22, 0, 0))                           # a canopy pitched away from the wall
+P["gold"].boxc(0, 4.82, 2.0, 7.4, 0.1, 0.12)
+for x in (-2.0, 2.0):
     P["black"].bm((x, 4.65, 0.2), (x, 5.0, 1.4), 0.04)
     P["black2"].boxc(x, 4.05, 0.5, 0.3, 0.5, 0.3)
     P["glowgold"].boxc(x, 4.05, 0.5, 0.22, 0.4, 0.22)
-for i in range(5):                                                                      # a turnstile: bars on a post
-    P["black2"].cylc(-1.6 + i * 0.8, 0.5, 0.2, 0.05, 1.0, 8)
-    P["black2"].boxc(-1.6 + i * 0.8, 0.95, 0.2, 0.7, 0.05, 0.05)
 
 finish_and_export()
