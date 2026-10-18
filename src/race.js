@@ -869,17 +869,18 @@ export class Race {
       x.fillStyle = res ? '#cfb352' : '#2b2a2c'; x.fillRect(0, 0, W, H);
       x.textBaseline = 'middle'; x.textAlign = 'left';
       if (res) {
-        x.fillStyle = '#3b393a'; x.font = pixelFont(16); x.fillText(res.name.toUpperCase().slice(0, 22), 16, 24);
-        x.font = pixelFont(15);
-        x.fillText(`1 ${res.top[0] || ''}`.toUpperCase().slice(0, 26), 16, 62);
+        x.fillStyle = '#3b393a'; x.font = pixelFont(26); x.fillText(res.name.toUpperCase().slice(0, 22), 16, 26);
+        x.font = pixelFont(24);
+        x.fillText(`1 ${res.top[0] || ''}`.toUpperCase().slice(0, 18), 16, 66);
         x.textAlign = 'right';
-        x.fillText(`2 ${res.top[1] || ''}   3 ${res.top[2] || ''}`.toUpperCase().slice(0, 40), W - 16, 62);
+        x.font = pixelFont(18);
+        x.fillText(`2 ${res.top[1] || ''}  3 ${res.top[2] || ''}`.toUpperCase().slice(0, 34), W - 16, 66);
       } else {
         const r = this.card[i];
-        x.fillStyle = '#cfb352'; x.font = pixelFont(18); x.fillText(`RACE ${i + 1}`, 16, 24);
-        x.fillStyle = '#f8fff8'; x.font = pixelFont(15);
-        x.fillText(r ? `${r.name.toUpperCase()}` : 'NEXT RACE POSTING SOON', 16, 62);
-        if (r) { x.textAlign = 'right'; x.fillStyle = '#b07c57'; x.fillText(`${fmt(r.dist)} M · CLASS ${r.cls}`, W - 16, 62); }
+        x.fillStyle = '#cfb352'; x.font = pixelFont(26); x.fillText(`RACE ${i + 1}`, 16, 26);
+        x.fillStyle = '#f8fff8'; x.font = pixelFont(22);
+        x.fillText(r ? `${r.name.toUpperCase()}` : 'NEXT RACE POSTING SOON', 16, 64);
+        if (r) { x.textAlign = 'right'; x.fillStyle = '#b07c57'; x.font = pixelFont(18); x.fillText(`${fmt(r.dist)} M · CLASS ${r.cls}`, W - 16, 64); }
       }
       tex.needsUpdate = true;
     });

@@ -182,11 +182,11 @@ for i in range(4):                                                              
 # dn_bay
 # =====================================================================================================
 root = pivot("dn_bay", (0, 0, 0))
-P = parts(root, "dn_bay", {"mint": 0.0, "mint2": 0.015, "black2": 0.012, "gold": 0.012})
-P["mint2"].box(-1.1, 1.1, 0.0, 0.14, 0.0, 0.3)                                            # the wheel stop
+P = parts(root, "dn_bay", {"barn": 0.015, "saddle2": 0.0, "black2": 0.012, "gold": 0.012})
+P["barn"].box(-1.1, 1.1, 0.0, 0.14, 0.0, 0.3)                                             # the wheel stop
 for sx in (-1, 1):
-    P["mint"].box(sx * 1.4 - 0.06, sx * 1.4 + 0.06, 0.0, 0.015, 0.0, 5.6)               # the paint lines
-P["mint"].box(-1.4, 1.4, 0.0, 0.015, 5.54, 5.6)
+    P["saddle2"].box(sx * 1.4 - 0.07, sx * 1.4 + 0.07, 0.0, 0.015, 0.0, 5.6)             # the paint lines (brown on the pale paving)
+P["saddle2"].box(-1.4, 1.4, 0.0, 0.015, 5.53, 5.6)
 P["black2"].box(-0.04, 0.04, 0.0, 0.7, -0.5, -0.42)                                      # a post behind the stop
 P["gold"].box(-0.25, 0.25, 0.6, 0.95, -0.42, -0.38)                                      # the number plate (facing +z toward the car)
 
