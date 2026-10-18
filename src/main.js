@@ -262,7 +262,7 @@ class Game {
     this.assetRow = null; // the dev menu's flat showroom, made on first use (cheats.js, assetRow.js; not in a release build)
     this.garage = new Garage(this);
     this.winch = new Winch(this); // Kepler Hitch-Line Winch
-    this.powers = new Powers(this); // Z: the selected power; the mouse wheel picks
+    this.powers = new Powers(this); // E: the selected power; the mouse wheel picks
     this.tutorial = new Tutorial(this);
     this.recall = new Recall(this);
     this.chamber = new Chamber(this); // the Moon Council vote cutscene (builds its set on first use)

@@ -100,7 +100,7 @@
 //   MODE=direct : the calls frame() makes around the sim: updatePlay, updateCamera, world.update, rideCarry, fx.update, input.endFrame.
 // Keys are real KeyboardEvents on window (input.js:24-31); the mouse is added to input.dx/dy, which updatePlay consumes.
 // A scenario: respawn on the real ground, 90 settle frames on boots, aim (camera servo until the marker is on the fountain), optional start
-// speed, press Z the same frame, then SECS of the policy. The run ends when the winch lets go (toast text is the reason), the state leaves
+// speed, press E the same frame, then SECS of the policy. The run ends when the winch lets go (toast text is the reason), the state leaves
 // "play", or SECS is up ("held").
 import fs from 'node:fs';
 
@@ -482,8 +482,8 @@ const installHarness = (o) => {
     out.sig.z = sigOf();
     out.arm = { ticks: i, err: r3(err), posCasino: toLoc(P.body.pos).toArray().map(r3), speed: r3(P.vel.length()), cand: W.cand ? idOf(W.cand.target.col || { type: 'x' }) + ' ' + (W.cand.target.col ? desc(W.cand.target.col) : 'vehicle') : null };
     if (!armed) { out.end = 'no-target'; out.why = notes.join(';') || 'cand=' + out.arm.cand + ' err=' + out.arm.err; releaseAll(); return out; }
-    // Z through the input layer: pressed() fires winch.fire() in this frame's powers.update (powers.js:167-169), down() keeps it held (173)
-    hold('KeyZ', true);
+    // E through the input layer: pressed() fires winch.fire() in this frame's powers.update (powers.js:167-169), down() keeps it held (173)
+    hold('KeyE', true);
     step(dt);
     if (!W.on) { out.end = 'not-fired'; out.why = toasts.join('|'); releaseAll(); return out; }
     const ride = W.on;

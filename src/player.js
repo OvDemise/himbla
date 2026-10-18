@@ -262,8 +262,8 @@ export class Player {
     const ctrl = {
       wish,
       skates: input.down('Space'),
-      // with the Rail Lance out, right mouse is the scope instead of the thrusters (E still thrusts)
-      thrust: input.down('KeyE') || (input.mouse[2] && WEAPONS[this.weapon || 0].key !== 'rail'),
+      // with the Rail Lance out, right mouse is the scope instead of the thrusters (L3 on a pad still thrusts)
+      thrust: input.down('Thrust') || (input.mouse[2] && WEAPONS[this.weapon || 0].key !== 'rail'),
       jump: jumpNow,
       // Dive: a fresh press of the jump key while airborne, held (so the jump itself never dives)
       dive: this.diveLatch = !b.grounded && !jumpNow && (this.diveLatch || (jumpKey && b.airTime > 0.15)) && (input.down('ShiftLeft') || input.down('ShiftRight')),

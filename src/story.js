@@ -28,9 +28,9 @@ export const LEADERS = {
 
 // Tech unlocked by the research-minded stories.
 export const TECH = {
-  dash: { name: 'Phase Dash', key: 'Z', desc: 'Swing all your momentum (plus a kick) towards wherever you are looking: a mid-air turn, climb or dive, leaving a violet ghost trail of you along the way. 4 s cooldown.' },
+  dash: { name: 'Phase Dash', key: 'E', desc: 'Swing all your momentum (plus a kick) towards wherever you are looking: a mid-air turn, climb or dive, leaving a violet ghost trail of you along the way. 4 s cooldown.' },
   shield: { name: 'Deflector Shield', key: '—', desc: 'An invisible field that absorbs one hit or hard knock every 12 s (you see it when it takes one).' },
-  vanes: { name: 'Quantum Slipstream Vanes', key: 'Z', desc: 'Switch on to let your skates keep a share of their grip on the air for 10 s: steer while you fly. 30 s cooldown.' },
+  vanes: { name: 'Quantum Slipstream Vanes', key: 'E', desc: 'Switch on to let your skates keep a share of their grip on the air for 10 s: steer while you fly. 30 s cooldown.' },
   teleport: { name: 'Personal Teleporter', key: 'T', desc: 'Jump to any discovered settlement or your outposts. 90 s cooldown.' },
 };
 
@@ -168,7 +168,7 @@ const CHAPTERS = {
         { t: 'experiment', at: { prev: true }, secs: 75, nodes: 5, label: 'Fly through the calibration nodes' },
       ],
       reward: { credits: 780, tech: 'dash', vehicle: 'skimmer' },
-      outro: '"Calibrated. The field rewrote a little of you: point yourself anywhere and press Z, and your momentum will follow. And take a Phase Skimmer (V). It hovers. It drifts. Do not do either into a wall."',
+      outro: '"Calibrated. The field rewrote a little of you: point yourself anywhere and press E, and your momentum will follow. And take a Phase Skimmer (V). It hovers. It drifts. Do not do either into a wall."',
     },
     {
       title: 'The Black Sun',

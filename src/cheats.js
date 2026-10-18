@@ -206,7 +206,7 @@ export class Cheats {
   }
 
   // The dev menu's meteor button. The first time it also becomes a power (the power wheel's METEOR SPAWN, equipped straight
-  // away), so from then on Z / RB drops one on you without the menu.
+  // away), so from then on E / RB drops one on you without the menu.
   meteorFromMenu() {
     const g = this.game;
     const first = !this.meteorPower;
@@ -216,7 +216,7 @@ export class Cheats {
       g.powers.select('meteor');
     }
     const ok = this.spawnMeteor(!first);
-    if (first) g.hud.toast(`${ok ? 'Meteor inbound. ' : ''}Meteor Spawn is now one of your powers, and equipped: Z / RB drops another on you.`, 5);
+    if (first) g.hud.toast(`${ok ? 'Meteor inbound. ' : ''}Meteor Spawn is now one of your powers, and equipped: E / RB drops another on you.`, 5);
   }
 
   // A rock that comes down on the spot you're standing on (meteors.js spawnOnPlayer): a few seconds' warning from the ring.

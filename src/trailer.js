@@ -616,7 +616,7 @@ const SHOTS = [
         // spin round and kick off (a shove for the first stride, then skates and thrusters)
         if (!T.kicked) { T.kicked = true; P.body.vel.copy(T.out).setLength(7); P.heading.copy(T.out).normalize(); g.audio.jump(); }
         T.steer = T.out;
-        T.hold = new Set(['Space', 'KeyW', 'KeyE']);
+        T.hold = new Set(['Space', 'KeyW', 'Thrust']);
       }
     },
     cam(T, t) {
@@ -832,7 +832,7 @@ const SHOTS = [
       const g = T.g, P = g.player;
       // skate, then let go of the ground, mag-jump and jet up out of the gatling stream: straight
       // into his flak (and its burning phosphor)
-      T.hold = new Set(t < 1.7 ? ['Space', 'KeyW'] : ['KeyW', 'KeyE']);
+      T.hold = new Set(t < 1.7 ? ['Space', 'KeyW'] : ['KeyW', 'Thrust']);
       if (t >= 1.7 && !T.jumped) { T.jumped = true; T.tap.add('ShiftLeft'); }
       T.steer = T.F0.fwd;
       T.keepSpeed(30, 0.15);
@@ -928,7 +928,7 @@ const SHOTS = [
       const P = T.g.player, A = T.air;
       const r = tangent(P.pos.clone().sub(A.cen), A.cen.clone().normalize(), V()).length();
       if (!A.launched) {
-        T.hold = new Set(['Space', 'KeyW', 'KeyE']);
+        T.hold = new Set(['Space', 'KeyW', 'Thrust']);
         T.steer = T.dir;
         T.keepSpeed(52, 0.2);
         if (r < 134) {
