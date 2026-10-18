@@ -99,12 +99,12 @@ def tower(name, W, D, H, bands, slit, banner):
         P["money2"].boxc(0, y, zc, W + 0.2, 0.55, D + 0.2)
     for x in (-W * 0.3, 0.0, W * 0.3):                                                      # lit slits on the track face
         for y, h in slit:
-            P["glasswarm"].boxc(x, y, -0.02, 0.9, h, 0.06)
-            P["black"].boxc(x, y, -0.045, 1.2, h + 0.4, 0.05)
+            P["black"].boxc(x, y, -0.02, 1.2, h + 0.4, 0.04)                                # (the frame sits behind the pane, so it shows as a border)
+            P["glasswarm"].boxc(x, y, -0.055, 0.9, h, 0.03)
     for sx in (-1, 1):                                                                      # and on both flanks
         for z in (D * 0.3, D * 0.7):
-            P["glasswarm"].boxc(sx * (W / 2 + 0.02), slit[0][0] + 1.0, z, 0.06, slit[0][1] + 1.2, 0.9)
-            P["black"].boxc(sx * (W / 2 + 0.045), slit[0][0] + 1.0, z, 0.05, slit[0][1] + 1.6, 1.2)
+            P["black"].boxc(sx * (W / 2 + 0.02), slit[0][0] + 1.0, z, 0.04, slit[0][1] + 1.6, 1.2)
+            P["glasswarm"].boxc(sx * (W / 2 + 0.055), slit[0][0] + 1.0, z, 0.03, slit[0][1] + 1.2, 0.9)
     P["black"].boxc(0, 2.6, -0.04, 2.6, 3.4, 0.1)                                           # a door at the foot
     P["gold"].boxc(0, 4.5, -0.1, 3.0, 0.3, 0.3)
     by, bh = banner
@@ -132,9 +132,9 @@ P["mint2"].box(-9.5, 9.5, 0.0, 3.4, 0.0, 3.2)
 P["money2"].box(-9.6, 9.6, 3.4, 3.72, -0.1, 3.3)                                        # cap
 P["gold"].box(-9.6, 9.6, 0.86, 1.0, -0.22, 0.0)                                         # sill
 for x in (-6.0, 0.0, 6.0):
-    P["glasswarm"].box(x - 2.3, x + 2.3, 1.0, 2.7, -0.04, 0.0)
-    P["black"].box(x - 2.45, x + 2.45, 0.95, 2.85, -0.08, -0.03)                        # the frame
-    P["black"].box(x - 0.06, x + 0.06, 1.0, 2.7, -0.1, -0.04)                           # a mullion
+    P["black"].box(x - 2.45, x + 2.45, 1.0, 2.85, -0.04, 0.0)                          # the frame (behind the pane, so it shows as a border)
+    P["glasswarm"].box(x - 2.3, x + 2.3, 1.0, 2.7, -0.07, -0.04)
+    P["black"].box(x - 0.06, x + 0.06, 1.0, 2.7, -0.1, -0.07)                           # a mullion
     P["gold"].box(x - 2.5, x + 2.5, 2.85, 3.0, -0.12, -0.05)                            # lintel
 P["barn"].boxc(0, 3.1, -0.55, 18.96, 0.1, 1.5, rot=(0.3, 0, 0))                         # an awning over the glass, pitched down toward the track
 P["gold"].boxc(0, 2.72, -1.18, 18.96, 0.08, 0.12)
@@ -154,9 +154,9 @@ def back_wall(name, WH):
         P["mint2"].box(sx * 9.48 - (0.3 if sx > 0 else 0), sx * 9.48 + (0 if sx > 0 else 0.3), -0.04, WH, 0.0, 0.28)    # half a pilaster at each edge (two bays make one)
     wy = WH - 6.6
     for x in (-6.0, 0.0, 6.0):                                                              # the members' bar's windows
-        P["glasswarm"].box(x - 1.6, x + 1.6, wy, wy + 1.8, 0.0, 0.05)
-        P["black"].box(x - 1.75, x + 1.75, wy - 0.15, wy + 1.95, 0.04, 0.1)
-        P["black"].box(x - 0.05, x + 0.05, wy, wy + 1.8, 0.05, 0.11)
+        P["black"].box(x - 1.75, x + 1.75, wy - 0.15, wy + 1.95, 0.0, 0.04)
+        P["glasswarm"].box(x - 1.6, x + 1.6, wy, wy + 1.8, 0.04, 0.08)
+        P["black"].box(x - 0.05, x + 0.05, wy, wy + 1.8, 0.08, 0.12)
         P["gold"].box(x - 1.85, x + 1.85, wy + 1.95, wy + 2.12, 0.04, 0.2)
     P["gold"].box(-9.46, 9.46, WH - 0.1, WH + 0.5, -0.9, 0.55)                              # cornice
     P["mint2"].box(-9.42, 9.42, WH + 0.5, WH + 0.85, -0.9, 0.35)

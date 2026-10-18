@@ -47,10 +47,10 @@ for i in range(12):                                                             
 for sx in (-1, 1):
     for xa in (9.5, 17.0, 24.5):
         x = sx * xa
-        P["glasswarm"].box(x - 1.5, x + 1.5, 1.7, 3.5, ZF + 0.04, ZF)                   # the lit pane
-        P["black"].box(x - 1.7, x + 1.7, 1.55, 3.7, ZF + 0.09, ZF + 0.03)              # frame
+        P["black"].box(x - 1.7, x + 1.7, 1.55, 3.7, ZF, ZF + 0.04)                      # frame (behind the pane, so it shows as a border)
+        P["glasswarm"].box(x - 1.5, x + 1.5, 1.7, 3.5, ZF + 0.04, ZF + 0.08)             # the lit pane
         for gx in (-0.9, -0.3, 0.3, 0.9):
-            P["gold"].box(x + gx - 0.03, x + gx + 0.03, 1.7, 3.5, ZF + 0.14, ZF + 0.09)  # the grille's bars
+            P["gold"].box(x + gx - 0.03, x + gx + 0.03, 1.7, 3.5, ZF + 0.08, ZF + 0.13)  # the grille's bars
         P["saddle"].box(x - 2.0, x + 2.0, 1.34, 1.5, ZF + 1.0, ZF + 0.03)               # the counter's shelf
         P["black2"].box(x - 1.95, x + 1.95, 0.8, 1.34, ZF + 0.9, ZF + 0.1)              # and its front
         P["gold"].box(x - 0.9, x + 0.9, 3.95, 4.55, ZF + 0.1, ZF + 0.03)                # the number plate above
@@ -67,10 +67,10 @@ P["mint2"].box(-4.2, 4.2, 0.8, 0.9, ZF + 1.4, ZF + 0.52)                        
 for sx in (-1, 1):
     for xa in (13.5, 20.5, 26.8):
         x = sx * xa
-        P["glasswarm"].box(x - 1.3, x + 1.3, 10.6, 15.6, ZF + 0.04, ZF)
-        P["black"].box(x - 1.5, x + 1.5, 10.45, 15.75, ZF + 0.09, ZF + 0.03)
-        P["black"].box(x - 0.05, x + 0.05, 10.6, 15.6, ZF + 0.12, ZF + 0.09)
-        P["black"].box(x - 1.3, x + 1.3, 13.1, 13.2, ZF + 0.12, ZF + 0.09)
+        P["black"].box(x - 1.5, x + 1.5, 10.45, 15.75, ZF, ZF + 0.04)
+        P["glasswarm"].box(x - 1.3, x + 1.3, 10.6, 15.6, ZF + 0.04, ZF + 0.08)
+        P["black"].box(x - 0.05, x + 0.05, 10.6, 15.6, ZF + 0.08, ZF + 0.12)
+        P["black"].box(x - 1.3, x + 1.3, 13.1, 13.2, ZF + 0.08, ZF + 0.12)
         P["gold"].box(x - 1.7, x + 1.7, 15.75, 16.0, ZF + 0.14, ZF + 0.03)
         P["gold"].box(x - 1.7, x + 1.7, 10.2, 10.45, ZF + 0.22, ZF + 0.03)
 # the board's recess: a black panel with a gold surround (the game's live canvas hangs in front of the panel)

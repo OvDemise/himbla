@@ -37,7 +37,7 @@ def S(h):
 HEX = {
     "mint": "f8fff8", "mint2": "dfe8dd", "gold": "cfb352", "gold2": "a8903a", "saddle": "b07c57", "saddle2": "8c5f3f", "black": "3b393a", "black2": "5a5760",
     "money": "7b9a6e", "money2": "5b7a52", "barn": "8b4044", "barn2": "6a2e33",
-    "seat": "7b9a6e", "cloth": "8b4044", "glasswarm": "fff0c0", "glowgold": "ffe9a0", "glowmint": "e8fff0", "glowred": "ff5a4a",
+    "seat": "7b9a6e", "cloth": "8b4044", "accent": "8b4044", "glasswarm": "fff0c0", "glowgold": "ffe9a0", "glowmint": "e8fff0", "glowred": "ff5a4a",
 }
 SLOT_COLORS = {k: S(v) for k, v in HEX.items()}
 exec(open(os.path.join(REPO, "tools", "blender", "kit.py"), encoding="utf-8").read(), globals())
@@ -83,6 +83,17 @@ class Acc:
     def polyx(self, pts, x0, x1):
         """a flat outline [(z, y)] extruded along x from x0 to x1 (a side profile)"""
         self.geos.append(xf(extrude(pts, x1 - x0, "x"), ((x0 + x1) / 2, 0, 0))); return self
+
+    def polyy(self, pts, y0, y1, t=(0, 0, 0), rot=(0, 0, 0)):
+        """a flat outline [(x, z)] extruded upward from y0 to y1 (a floor, a roof deck); `t` and `rot` move it afterwards"""
+        area = sum(pts[i][0] * pts[(i + 1) % len(pts)][1] - pts[(i + 1) % len(pts)][0] * pts[i][1] for i in range(len(pts)))
+        if area > 0:                                                                        # (it needs to run clockwise on the x-right, z-up plan to face its cap up)
+            pts = pts[::-1]
+        self.geos.append(xf(extrude(pts, y1 - y0, "y"), (t[0], t[1] + (y0 + y1) / 2, t[2]), rot)); return self
+
+    def lath(self, profile, t=(0, 0, 0), segs=24, rot=(0, 0, 0)):
+        """a solid of revolution: profile [(r, y)] bottom to top"""
+        self.geos.append(xf(lathe(profile, segs)[:2], t, rot)); return self
 
     def add(self, geo, t=(0, 0, 0), rot=(0, 0, 0), s=(1, 1, 1)):
         self.geos.append(xf(geo[:2], t, rot, s)); return self

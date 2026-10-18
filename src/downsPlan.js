@@ -50,3 +50,28 @@ export const ENTRIES = [-47.5, 47.5];
 
 // ---- the screen drum at the infield's centre: faces 40 x 20 on the long sides, 14 x 20 on the ends, its underside 18 m up ----
 export const DRUM = { x: 0, z: 0, w: 40, d: 14, h: 20, y: 18, core: 10 };
+
+// ---- the arcades: a covered market hall round each turn (docs/downs-layouts.md). Each is a run of 6.3 degree wedges between radius 84 and 100 round the turn's centre (the west
+// one's is (-90, 0), the east one's (90, 0), its mirror), with a gate hall in the middle (at 180 degrees on the west one). Angles are in degrees, measured from the turn's centre
+// (x = cx + r cos a, z = r sin a), the west arcade's way round: from the main stand's end (108) through the gate (180) to the far stand's (264.6) ----
+export const ARCADE = { cx: 90, ri: 84, ro: 100, step: 6.3, runs: [{ a0: 108, n: 10 }, { a0: 189, n: 12 }], gate: 180, walk: [112, 262] };
+export const WEDGE = (() => {
+  const a2 = (ARCADE.step / 2) * Math.PI / 180, s = Math.sin(a2), c = Math.cos(a2);
+  return { a2, wi: ARCADE.ri * s, wo: ARCADE.ro * s, d: (ARCADE.ro - ARCADE.ri) * c, r0: ARCADE.ri * c };
+})();
+// a stall stands in every second bay of a run (the others hold a bench and two planters): five on each run, ten on each arcade
+export const STALLS = [
+  { d: 0, name: 'MOON DOGS', accent: 0x8b4044 }, { d: 1, name: 'CRATER FRIES', accent: 0xcfb352 }, { d: 2, name: 'HE-3 FIZZ', accent: 0x7b9a6e },
+  { d: 3, name: 'CHIMERA CHOW', accent: 0xb07c57 }, { d: 4, name: 'ROCK CANDY', accent: 0x8b4044 }, { d: 5, name: 'TOTE · BETS', accent: 0x3b393a },
+  { d: 6, name: 'SPACE SLUSH', accent: 0x7b9a6e }, { d: 7, name: 'LUNAR COFFEE', accent: 0xb07c57 }, { d: 8, name: 'DERBY DONUTS', accent: 0x8b4044 },
+  { d: 9, name: "JOCKEY'S GRILL", accent: 0xcfb352 }, { d: 10, name: 'FOAM FINGERS', accent: 0x7b9a6e }, { d: 11, name: 'RAIL BAR', accent: 0x3b393a },
+];
+// which stall goes in which slot: [west, east], slot 0 to 9 along the arcade from the main stand
+export const STALL_ORDER = [[0, 1, 2, 3, 4, 5, 6, 7, 8, 9], [10, 11, 0, 2, 4, 1, 3, 5, 7, 9]];
+
+// ---- the track's crossings: the rails leave an 8 m gap at x = +-70 on both straights, a barrier post at each end ----
+export const CROSSINGS = [-70, 70];
+export const CROSS_GAP = 8;
+
+// ---- the forecourt and the concourse behind the main stand ----
+export const FORECOURT = { x0: -76, x1: 76, z0: 114, z1: 191, avenue: 14, fountain: [0, 166], gate: 193, promenade: [143, 149] };
