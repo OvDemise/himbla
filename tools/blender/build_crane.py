@@ -68,6 +68,7 @@ SLOT_COLORS = {
 
 exec(open(os.path.join(REPO, "tools", "blender", "kit.py"), encoding="utf-8").read(), globals())
 exec(open(os.path.join(REPO, "tools", "blender", "decals.py"), encoding="utf-8").read(), globals())
+exec(open(os.path.join(REPO, "tools", "blender", "spreader.py"), encoding="utf-8").read(), globals())
 
 C = coll()
 for s in SLOT_COLORS:
@@ -493,7 +494,7 @@ M("hookLatch", B((0.07, -1.47, 0), (tip[0] - 0.02, tip[1] + 0.04, 0), 0.025, 4, 
 SADDLE = (0.0, HC_[1] - HR + 0.1)   # where the sling eyes sit in the bowl
 
 # ---- the load: the Prospector's cargo container (faction-coloured corrugated steel, corner castings, roof rails, barred rear doors,
-# a branding plate and the container number on each flank), hung from a spreader frame by four bridle slings. Built in the
+# a branding plate and the container number on each flank), hung from its spreader (spreader.py) by four bridle slings. Built in the
 # container's own frame (long axis z, deck level 0, box centre at y 3.3, as in build_landtrain.py), then the pivot is turned a
 # quarter so it lies along the jib.
 LOAD_Y = -10.55
@@ -521,16 +522,12 @@ for (e, slot, ink), geos in sorted(doors.items()):
 for sx in (-1, 1):
     rb(f"plate{sx}", 0.04, CARGO_PLATE_HALF[1], CARGO_PLATE_HALF[0], (sx * 1.64, CARGO_PLATE_Y, 0.0), "dark", load, 0.03, e=0.08)
 
-# the spreader: four beams in a frame on the top castings (a twist-lock stub in each), a spine with a lifting eye, a lug at each corner
-SY = 5.05
-M("spreader", rbj([(0.1, 0.08, 3.75, (sx * 1.5, SY, 0)) for sx in (-1, 1)] + [(1.6, 0.08, 0.1, (0, SY, sz * 3.55)) for sz in (-1, 1)] + [(0.16, 0.1, 3.4, (0, SY + 0.05, 0))], e=0.2), "steel", load, 0.04)
-M("twistLocks", join([xf(lathe([(0.0, 4.78), (0.1, 4.78), (0.1, 4.98), (0.0, 4.98)], 8), (sx * 1.5, 0, sz * 3.55)) for sx in (-1, 1) for sz in (-1, 1)]), "dark", load, 0.02)
-M("lugs", rbj([(0.16, 0.12, 0.16, (sx * 1.5, SY + 0.17, sz * 3.55)) for sx in (-1, 1) for sz in (-1, 1)], e=0.3), "dark", load, 0.03)
-M("liftEye", join([xf(torus(0.2, 0.05, 12, 6), (0, SY + 0.35, 0), (PI / 2, 0, 0))]), "dark", load, 0.02)
+# the spreader (spreader.py) on the top castings (their tops at 4.79)
+PIN = spreader("crane_", load, 4.79)
 
-# the four bridle slings from the hook's saddle to the spreader's corners (in the hook's frame the container's z runs along x,
+# the four bridle slings from the hook's saddle to the spreader's pad-eye pins (in the hook's frame the container's z runs along x,
 # and x along -z)
-M("slings", join([B((SADDLE[0], SADDLE[1], 0), (sz * 3.55, LOAD_Y + SY + 0.3, -sx * 1.5), 0.04, 4, True) for sx in (-1, 1) for sz in (-1, 1)]), "dark", hook, 0)
+M("slings", join([B((SADDLE[0], SADDLE[1], 0), (sz * SPR_Z, LOAD_Y + PIN, -sx * SPR_X), 0.04, 4, True) for sx in (-1, 1) for sz in (-1, 1)]), "dark", hook, 0)
 
 
 for f in FACTIONS:

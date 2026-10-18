@@ -5,8 +5,7 @@
 #
 # The tower crane's little sibling for a container yard (the Meridian Exchange's), in the same family as build_crane.py: the same
 # lattice work, ladders, hatched decks and handrails, the same slot colours, and the very same trolley, rope falls, hook block and
-# bridle slings (turned to run along the girder), lifting the land-train's cargo container (cargo.py) on a spreader. Everything is
-# authored in three.js axes; the origin is on the ground, midway between the rails. The girder runs along z between two legs at
+# bridle slings, lifting the land-train's cargo container (cargo.py) on a spreader (spreader.py). Everything is authored in three.js axes; the origin is on the ground, midway between the rails. The girder runs along z between two legs at
 # z = +-LEG, each on a sill with two rail bogies; the whole crane travels along x on its rails (the game moves the root).
 #
 # Built so a climber could get everywhere: an access ladder up each sill's outer side to the leg's floor deck; a ladder inside each
@@ -19,8 +18,9 @@
 #   trolley   the carriage under the girder's bottom chords, a child of the root; the game slides it along z (it sits at z = 0)
 #   cable     the two rope falls, a child of `trolley`: one metre long, hanging from its origin; the game scales y
 #   hook      the hook block, hook and slings, a child of `trolley`; the game sets its y to minus the rope length
-#   load      under `hook`: the spreader frame, and under that a `cargo` pivot (cargo.py's box container, lying along the girder) with
-#             a `livery` pivot per faction; the game builds the livery of the crane's cargo and leaves the rest out
+#   load      under `hook`, turned a quarter: the spreader, and under it a `cargo` pivot (cargo.py's box container, lying across the
+#             girder like the yard's stacks) with a `livery` pivot per faction; the game builds the livery of the crane's cargo and
+#             leaves the rest out
 #   blinker   the aircraft warning lamps (the girder's ends, the cab and the hoist house); the game puts a blinking lamp on each
 # The file also holds `gantry_box`, one box container of its own (a top-level `cargo` pivot, its origin the middle of its footprint on
 # the ground) for the yard's stacks: the game bakes it per stack in a faction's colours.
@@ -62,6 +62,7 @@ SLOT_COLORS = {
 exec(open(os.path.join(REPO, "tools", "blender", "kit.py"), encoding="utf-8").read(), globals())
 exec(open(os.path.join(REPO, "tools", "blender", "decals.py"), encoding="utf-8").read(), globals())
 exec(open(os.path.join(REPO, "tools", "blender", "cargo.py"), encoding="utf-8").read(), globals())
+exec(open(os.path.join(REPO, "tools", "blender", "spreader.py"), encoding="utf-8").read(), globals())
 
 C = coll()
 for s in SLOT_COLORS:
@@ -399,24 +400,16 @@ tip = path[-1]
 M("hookLatch", B((0, -1.47, 0.07), (0, tip[1] + 0.04, tip[0] - 0.02), 0.025, 4, True), "body", hook, 0)
 SADDLE = HC_[1] - HR + 0.1           # where the sling eyes sit in the bowl
 
-# ---- the load: a spreader frame (four beams on the top castings with a twist-lock stub in each, a spine with a lifting eye, a lug at
-# each corner) over the land-train's box container (cargo.py, at the land-train's size: 7.2 m along z), on the bottom of four bridle
-# slings from the hook. The container's origin (the middle of its footprint, under its rack) is the load pivot's.
-SY = 5.05 - CARGO_BASE               # the spreader's height over the container's origin (on the top castings)
-LOAD_Y = -(2.0 + 3.2 + SY + 0.3)     # hook origin -> container bottom: the slings' 3.2 m plus the spreader
+# ---- the load: the spreader (spreader.py) on the top castings of the land-train's box container (cargo.py, at the land-train's
+# size: 7.2 m long), on the bottom of four bridle slings from the hook. The container's origin (the middle of its footprint, under
+# its rack) is the load pivot's; the pivot is turned a quarter so the box lies across the girder (along x), like the yard's stacks.
+TOP = 4.79 - CARGO_BASE              # the top castings' tops over the container's origin
+LOAD_Y = -(2.0 + 3.2 + TOP + SPR_PIN)  # hook origin -> container bottom: the slings' 3.2 m plus the spreader
 LOAD_DROP = -LOAD_Y
 load = PV("load", (0, LOAD_Y, 0), hook, role="load")
-
-
-def rbj(items, e=0.3, nu=6, nv=4):
-    return join([xf(rbox(hx, hy, hz, e, nu, nv), pos) for hx, hy, hz, pos in items])
-
-
-M("spreader", rbj([(0.1, 0.08, 3.75, (sx * 1.5, SY, 0)) for sx in (-1, 1)] + [(1.6, 0.08, 0.1, (0, SY, sz * 3.55)) for sz in (-1, 1)] + [(0.16, 0.1, 3.4, (0, SY + 0.05, 0))], e=0.2), "steel", load, 0.04)
-M("twistLocks", join([xf(lathe([(0.0, SY - 0.27), (0.1, SY - 0.27), (0.1, SY - 0.07), (0.0, SY - 0.07)], 8), (sx * 1.5, 0, sz * 3.55)) for sx in (-1, 1) for sz in (-1, 1)]), "dark", load, 0.02)
-M("lugs", rbj([(0.16, 0.12, 0.16, (sx * 1.5, SY + 0.17, sz * 3.55)) for sx in (-1, 1) for sz in (-1, 1)], e=0.3), "dark", load, 0.03)
-M("liftEye", join([xf(torus(0.2, 0.05, 12, 6), (0, SY + 0.35, 0), (PI / 2, 0, 0))]), "dark", load, 0.02)
-M("slings", join([B((0, SADDLE, 0), (sx * 1.5, LOAD_Y + SY + 0.3, sz * 3.55), 0.04, 4, True) for sx in (-1, 1) for sz in (-1, 1)]), "dark", hook, 0)
+load.rotation_euler = (0, 0, PI / 2)  # (three.js: a quarter turn about y)
+PIN = spreader("gantry_", load, TOP)
+M("slings", join([B((0, SADDLE, 0), (sz * SPR_Z, LOAD_Y + PIN, -sx * SPR_X), 0.04, 4, True) for sx in (-1, 1) for sz in (-1, 1)]), "dark", hook, 0)
 cargo_unit("box", "gantry_cargo", load, (0, 0, 0), 1.0)
 hook["drop"] = round(LOAD_DROP, 3)
 
