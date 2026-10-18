@@ -98,7 +98,7 @@ Vite's hot reload restarts the page.
 | `C` | Wardrobe: cycle owned outfits, skate finishes and pulse-disc colours; `J` in the wardrobe shows or hides the containment jar |
 | `N` | Music on / off |
 | `V` (hold: radial) | Call / board / leave your faction vehicle; hold to pick one (story unlock) |
-| `E` · mouse wheel | Use your selected **power** · step through your powers. Powers: Phase Dash, the Teleporter (`T` too), the Slipstream Vanes (steer in the air for 10 s), the Kepler Hitch-Line Winch (hold) and the pen link (`P` too) |
+| `E` · mouse wheel | Use your selected **power** · step through your powers. Powers: Phase Dash, the Teleporter (`T` too), the Slipstream Vanes (steer in the air for 10 s), the Kepler Hitch-Line Winch (press again to let go) and the pen link (`P` too) |
 | `Esc` → SETTINGS | Graphics, gameplay, camera, audio and key remapping |
 | `P` | Holding pen, anywhere (needs the remote pen link from Dr. Zbornak) |
 | `Shift`+`X` (hold) | Dump the jar anywhere: materials are destroyed, creatures pop back out |
@@ -119,7 +119,7 @@ back. Prompts show the pad's buttons while it's in use.
 | Left stick · right stick | Move / steer / carve (analog) · look |
 | `A` · `B` | Mag-jump / dive · tricks (hold in the air) |
 | `X` · `Y` | Interact · vehicle |
-| `LB` (hold) · `RB` | Quantum-Lock skates · power (hold for the winch) |
+| `LB` (hold) · `RB` | Quantum-Lock skates · power (press again to let go of the winch) |
 | `LT` · `RT` | Thrusters (Rail Lance: scope) · fire |
 | `L3` · `R3` | Thrusters · scoop into the jar |
 | D-pad ← → · ↑ | Previous / next weapon · next power |
@@ -257,7 +257,7 @@ Daedalus, and vice versa.
 - **Faction gear:** each HQ sells unique gear gated by reputation: SPACECOM Seeker Module (homing),
   Meridian Gyro-Edges (steering) and Market Uplink (pay), the Kepler Twin Cradle (carry two contracts at
   once, crates stacked; both waypoints on the HUD), Vostok Flak Weave (health, knockback), Daedalus
-  Overcharger (fire rate) and Rustmoon Shadow Rig (harder to hit). Kepler also sells the **Hitch-Line Winch**: hold `E` to fire a steel cable onto a vehicle or a structure within 120 m (the hook bites the nearest surface; whatever the reticle is on wins, else the target closest to it, and a faint tow-line marker shows what it will hook). The drum reels you in smoothly, easing to a stop with about 2 m of cable left, and you can hold for up to 20 s. The cable bends round the corners of structures in its way like a rope round pegs (boxes at their edges, cylinders and spheres along an arc, so a round tower is no obstacle; up to five structures at least 4 m across; slim columns and anything it can't bend round it passes through), and if the drum strains against something that won't give the pull builds to yank you free and, after about 2.5 s, the line slips loose. You can swing under flying transits or trailing behind rovers and land-trains (they're heavy; drag one off its route and it eases back on). Rustmoon's black market at the Hold
+  Overcharger (fire rate) and Rustmoon Shadow Rig (harder to hit). Kepler also sells the **Hitch-Line Winch**: press `E` to fire a steel cable onto a vehicle or a structure within 120 m (the hook bites the nearest surface; whatever the reticle is on wins, else the target closest to it, and a faint tow-line marker shows what it will hook). The drum reels you in smoothly, easing to a stop with about 2 m of cable left, and the line holds for up to 20 s, without holding the key; press `E` again to let go sooner. The cable bends round the corners of structures in its way like a rope round pegs (boxes at their edges, cylinders and spheres along an arc, so a round tower is no obstacle; up to five structures at least 4 m across; slim columns and anything it can't bend round it passes through), and if the drum strains against something that won't give the pull builds to yank you free and, after about 2.5 s, the line slips loose. You can swing under flying transits or trailing behind rovers and land-trains (they're heavy; drag one off its route and it eases back on). Rustmoon's black market at the Hold
   stocks the ILMB kit and other factions' upgrades, weapons, tech and vehicles, each one brought in by a
   smuggling run that carries it as a payload (named on the job board).
 - **Clearance:** FRIENDLY (10+) with Vostok or Daedalus means their turrets stop shooting you and you

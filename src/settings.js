@@ -141,7 +141,7 @@ const PAD_ROWS = [
   ['Interact / job board', ['X']],
   ['Scoop into jar', ['R3']],
   ['Vehicle: call / board / leave', ['Y']],
-  ['Power (hold for the winch)', ['RB']],
+  ['Power (again to let go of the winch)', ['RB']],
   ['Next power', ['DU']],
   ['Fire', ['RT']],
   ['Previous / next weapon', ['DL', 'DR']],

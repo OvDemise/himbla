@@ -15,7 +15,7 @@
 //   X            interact (F)                   MENUS
 //   Y            vehicle (V)                    d-pad / left stick  move the highlight
 //   LB           Quantum-Lock skates, hold      A  press   B  back   right stick  scroll
-//   RB           power (E, hold for the winch)  LB / RB  previous / next tab (where there are tabs)
+//   RB           power (E; again lets go of the winch)  LB / RB  previous / next tab (where there are tabs)
 //   LT           thrusters / Rail Lance scope
 //   RT           fire                           Start        pause / resume
 //   L3           thrusters (like LT)            View, tap    globe map (M)
