@@ -59,6 +59,19 @@ const downs = {
       ], 2);
       return { root: L.root, update: (dt, t) => { for (const f of fs) f.update(t, dt); } };
     }),
+    // two sets of designs for the concession stalls rebuilt INTO the arcade's bays (tools/blender/build_downs_stall_proposals.py; not in the game yet): each stall stands in its own bay (dn_arcade) against the back wall
+    item('downs.stall-proposals', 'DOWNS STALL PROPOSALS: SET A "THE SHOPFRONT" (LEFT) AND SET B "THE ALCOVE" (RIGHT), EACH IN AN ARCADE BAY, THREE NAMES EACH', 76, 18, () => {
+      const bay = (set, key, accent) => {
+        const g = new THREE.Group();
+        g.add(makeDownsPart('dn_arcade'));
+        g.add(makeDownsPart(`dn_stall${set}_${key}`, { accent }));
+        return { root: g, w: 11, d: 16 };
+      };
+      return row([
+        bay('A', 'moondogs', 0x8b4044), bay('A', 'fries', 0xcfb352), bay('A', 'fizz', 0x7b9a6e),
+        bay('B', 'moondogs', 0x8b4044), bay('B', 'fries', 0xcfb352), bay('B', 'fizz', 0x7b9a6e),
+      ], 1.2);
+    }),
     item('downs.screen', 'DOWNS SCREEN DRUM AND WINNERS\' PODIUM', 63, 20, () => row([P('dn_drum', 42, { d: 16 }), P('dn_podium', 19, { d: 5 })], 2)),
     item('downs.stable', 'DOWNS STABLE BLOCK · HAY BARN · WEIGHING ROOM · RING GATE · HAY · PICNIC TABLE', 112, 16, () => row([
       P('dn_stable_block', 31, { d: 12, dz: 3 }), P('dn_hay_barn', 25, { d: 14, dz: 7 }), P('dn_pavilion', 19, { d: 13, dz: 3.4 }), P('dn_ring_gate', 4, { d: 1 }),

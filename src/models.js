@@ -36,6 +36,7 @@ const GLB = {
   'downs-club': () => import('./assets/downs-club.glb?inline'),
   'downs-course': () => import('./assets/downs-course.glb?inline'),
   'downs-stalls': () => import('./assets/downs-stalls.glb?inline'),
+  'downs-stall-proposals': () => import('./assets/downs-stall-proposals.glb?inline'),
   'downs-arcade': () => import('./assets/downs-arcade.glb?inline'),
   'downs-screen': () => import('./assets/downs-screen.glb?inline'),
   'downs-fair': () => import('./assets/downs-fair.glb?inline'),
@@ -2538,7 +2539,7 @@ export function lotSlot(slot) {
 // ---- Chimera Downs' kits (built in Blender, see build_downs_*.py and downs_common.py; docs/downs-layouts.md) ----
 // One file per family, each `dn_*` node standing on y = 0. downsNode / downsSlot are for baking into the Downs' kit (race.js build); makeDownsPart gives a piece as a Group (the Asset Row's).
 // The palette is Gold Gleam, Saddle Brown, Black, Money, Barn Red and Touch of Mint (a darker tint of each for shading); slots named glow* and glass* are lit.
-const DOWNS_FILES = ['downs-stand', 'downs-club', 'downs-course', 'downs-stalls', 'downs-arcade', 'downs-screen', 'downs-fair', 'downs-stable', 'downs-crowd'];
+const DOWNS_FILES = ['downs-stand', 'downs-club', 'downs-course', 'downs-stalls', 'downs-stall-proposals', 'downs-arcade', 'downs-screen', 'downs-fair', 'downs-stable', 'downs-crowd'];
 export const DOWNS_TOON = {
   mint: 0xf8fff8, mint2: 0xdfe8dd, gold: 0xcfb352, gold2: 0xa8903a, saddle: 0xb07c57, saddle2: 0x8c5f3f, black: 0x3b393a, black2: 0x5a5760,
   money: 0x7b9a6e, money2: 0x5b7a52, barn: 0x8b4044, barn2: 0x6a2e33, seat: 0x7b9a6e, cloth: 0x8b4044, accent: 0x8b4044,

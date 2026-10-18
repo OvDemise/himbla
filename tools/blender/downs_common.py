@@ -106,6 +106,14 @@ class Acc:
             self.boxc(cx + x, cy + (3 - r) * pix, z + (depth / 2 if ry == 0 else -depth / 2), pix * 1.03, pix * 1.03, depth)
         return self
 
+    def letters_x(self, text, x, cy, cz, pix, depth, face=1):
+        """raised lettering on a plane x = const, facing +x (face = 1) or -x (face = -1), read from outside: the text centred on (cy, cz)"""
+        px, w = letter_pixels(text)
+        for c, r in px:
+            u = (c - (w - 1) / 2) * pix * -face                  # (facing +x, the viewer's right is -z)
+            self.boxc(x + face * depth / 2, cy + (3 - r) * pix, cz + u, depth, pix * 1.03, pix * 1.03)
+        return self
+
     def letters_arc(self, text, yc, rm, pix, z, depth):
         """the same set along an arc round (0, yc) at radius rm, the tops of the letters outward, the text centred on the crown, on the plane z (+z face)"""
         px, w = letter_pixels(text)

@@ -567,7 +567,7 @@ the unlock counters, toggle any splice-pod mutation (with a reset), or reset all
 ### The Asset Row (dev builds only)
 
 Dev menu (`F8`) → **Full cheat menu** → **Teleport** → option 1, **ASSET ROW**: a flat showroom with every asset in the game
-lined up side by side, 225 of them in 26 sections (the runner and its gear, people, creatures, props and markers,
+lined up side by side, 226 of them in 26 sections (the runner and its gear, people, creatures, props and markers,
 weapons and effects, rocks and nature, the secrets and the Spindle's props, ground vehicles and ships, outposts intact and
 wrecked, the building parts the settlements are made of, the hometown, Chimera Downs' kits, and all the places). The small ones stand in the
 yellow lane (z = 0), the places over 100 m across in the cyan lane 460 m over; the whole row is about 9 km, so the dev
@@ -846,6 +846,7 @@ tools/
   blender/decals.py        flat lettering, emblems, hazard stripes and safety signs (no textures) the land-train builder execs after kit.py
   blender/kit.py           shared geometry/material/export helpers every Blender builder execs (the runner and ships keep their own variants of a few)
   viewer.html              dev-only model viewer (npm run dev, then /tools/viewer.html?m=shuttle|freighter|apc|landtrain|crane|gantry|cargobox|garage|slots|dish|outpost|mite|lineup…; slots takes &n=<cabinets in a row>&ring=<cabinets round a pillar>&idx=<first colour and name>&play=1 (works them like a patron); casino takes &part=lamp|fountain|bouncer|chandelier|welcome|wall|blackjack|claw|clawthings|duckderby (&accent=<hex>&n=<lamps> for lamp); shuttle takes &sign=<route board text>&ships=<a ships .glb to load instead of ships.glb> (docs/shuttle-design.md); freighter takes &faction=spacecom|vostok|kepler|meridian (the cargo's livery); dish takes &kind=cryo|gantry|field|head&faction=…&no=01..04&size=30&tilt=<rad>&sweep=1; apc takes &turret=<rad>&barrel=<rad>; landtrain takes &type=moonliner|prospector&faction=spacecom|vostok|kepler|meridian&cars=pax,tank,cargo,blast&unit=<n>)
+  blender/build_downs_stall_proposals.py   two sets of designs for stalls built into the arcade bays (not in the game: `downs.stall-proposals` in the Asset Row) -> src/assets/downs-stall-proposals.glb
   downs-audit.mjs         dev-only: audits Chimera Downs' build in its flat design frame: z-fighting (coplanar triangles of different colours, named by builder and part), colliders standing in each other, text planes facing into walls or hanging in air, bare-ground seams (`node tools/downs-audit.mjs [zfight|colliders|text|gaps|all]`)
   downs-layouts.mjs        dev-only: the Chimera Downs overhaul study (docs/downs-layouts.md): the old course and the two proposed layouts (B was built), a clearance check against the oval and the plateau, and the plan drawings in docs/ (`node tools/downs-layouts.mjs docs`)
   meridian-layouts.mjs     the Meridian Exchange layout study (docs/meridian-layouts.md): the footprints of the site as built and of two proposed layouts, a clearance check, and the plan drawings in docs/

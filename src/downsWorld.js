@@ -28,6 +28,13 @@ function ovalStrip(r0, r1, y, perCurve = 48) {
   return g;
 }
 
+// A lamp post of the kit (dn_lamp: its arm and lit globe reach toward the model's +x) at (x, z) with its head turned toward (tx, tz).
+function lamp(k, x, z, tx, tz) {
+  k.at(x, z, 0);
+  bake(k, 'dn_lamp', 0, 0, 0, { ry: Math.atan2(-(tz - z), tx - x) });
+  k.at();
+}
+
 // ---- the oval: the turf, the dirt, the lanes, the rails, the finish ----
 function course(k) {
   // the infield mown in bands, the dirt raked in strips, one white line per lane: the surface is one layer, cut into bands that share their edges, not strips laid over a base (layers
@@ -133,6 +140,12 @@ function grandstand(k, S, { far = false } = {}) {
       k.box(2 * MOUTH, top - TUN_CH, d, conc, ex, TUN_CH, zc, { outline: 0.03 });
       k.solid(MOUTH, (top - TUN_CH) / 2, d / 2, ex, zc, 0, TUN_CH);
     }
+    if (i === firstRoofed) for (const ex of ENTRIES) {                                                  // the step just above where a tunnel's roof starts: a themed barrier, not seats looking down into the cut
+      k.box(2 * MOUTH, 0.9, 0.3, T(PAL.barn), ex, top, z0 + 0.5, { outline: 0.03 });
+      k.box(2 * MOUTH + 0.2, 0.12, 0.5, T(PAL.gold), ex, top + 0.9, z0 + 0.5, { outline: 0.01 });
+      for (let j = -2; j <= 2; j++) k.box(0.9, 0.5, 0.04, T(j % 2 ? PAL.mint : PAL.gold), ex + j * 1.3, top + 0.2, z0 + 0.34, { outline: 0 });         // (banner panels on its face)
+      k.solid(MOUTH, 0.55, 0.2, ex, z0 + 0.5, 0, top);
+    }
     if (i < seatTiers) {
       // seats: strips of three, a run in each section between the aisles; the members' enclosure (the middle sections' upper tiers) in Barn Red
       const clip = z0 < towerD + 0.5 ? hw - towerW - 0.5 : hw;     // (the tower stands in each front corner)
@@ -145,7 +158,7 @@ function grandstand(k, S, { far = false } = {}) {
         const x0 = xa + ((xb - xa) - n * 2.7) / 2 + 1.35;
         for (let s = 0; s < n; s++) {
           const sx = x0 + s * 2.7;
-          if (!roofed(top) && ENTRIES.some((ex) => Math.abs(sx - ex) < MOUTH + 1.35)) continue;          // (no seats where the trench runs)
+          if (i <= firstRoofed && ENTRIES.some((ex) => Math.abs(sx - ex) < MOUTH + 1.35)) continue;          // (no seats where the trench runs, nor in the row above its roof)
           bake(k, 'dn_seat3', sx, top, z0 + 0.95, { over: { seat: col } });
         }
       }
@@ -231,12 +244,10 @@ function aprons(k) {
   for (const s of [-1, 1]) {
     const z0 = s * (DIRT[1] - 0.1), z1 = s * (STAND.z0 - 0.3), zc = (z0 + z1) / 2;       // (from just under the dirt's edge to just under the stand's parapet: no bare ground between)
     k.box(STAND.x1 - STAND.x0 + 12, 0.12, Math.abs(z1 - z0), T(SADDLE2), 0, 0, zc, { outline: 0 });
-    for (let x = -(STAND.x1 - STAND.x0 + 12) / 2 + 4; x < (STAND.x1 - STAND.x0 + 12) / 2; x += 8) k.box(0.1, 0.13, Math.abs(z1 - z0) - 0.04, T(0x7a5236), x, 0, zc, { outline: 0 });
+    for (let x = -84; x <= 84; x += 8) k.box(0.1, 0.13, Math.abs(z1 - z0) - 0.04, T(0x7a5236), x, 0, zc, { outline: 0 });
     for (let x = -100; x <= 100; x += 20) {
       if (Math.abs(x - FINISH_X) < 7) continue;
-      k.at(x, s * (STAND.z0 - 3), 0);
-      bake(k, 'dn_lamp');
-      k.at();
+      lamp(k, x, s * (STAND.z0 - 3), x, 0);                                  // (its head turned toward the track)
       k.column(0.4, 6.5, x, s * (STAND.z0 - 3));
     }
   }
@@ -398,9 +409,7 @@ function forecourt(k) {
     if (i % 2 === 0) { k.at(0, z, 0); bake(k, 'dn_festoon', 0, 10.3, 0, { sx: (2 * (F.avenue + 1.2)) / 30 }); k.at(); }
   }
   for (const s of [-1, 1]) for (let z = 154; z < 190; z += 12) {                                                   // lamps just outside the masts
-    k.at(s * (F.avenue + 4.2), z, 0);
-    bake(k, 'dn_lamp', 0, 0, 0, { ry: s > 0 ? -Math.PI / 2 : Math.PI / 2 });
-    k.at();
+    lamp(k, s * (F.avenue + 4.2), z, 0, z);                                  // (over the avenue)
     k.column(0.4, 6.5, s * (F.avenue + 4.2), z);
   }
   // benches facing the avenue with planters between them, either side
@@ -495,9 +504,7 @@ function paddock(k) {
   k.at();
   for (const [lx, lz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {                                          // lamps round the outside
     const px2 = rx + lx * (a + 3) * 0.72, pz2 = rz + lz * (b + 3) * 0.72;
-    k.at(px2, pz2, 0);
-    bake(k, 'dn_lamp');
-    k.at();
+    lamp(k, px2, pz2, rx, rz);                                               // (over the ring)
     k.column(0.4, 6.5, px2, pz2);
   }
   // the weighing room: its porch toward the ring
@@ -571,7 +578,7 @@ function annex(w, loc, k) {
   carousel(w, loc, k, A.carousel[0], A.carousel[1]);
   // lamps and a bench or two
   for (const [lx, lz] of [[132, 112], [200, 112], [200, 162], [132, 162], [165, 140]]) {
-    k.at(lx, lz, 0); bake(k, 'dn_lamp'); k.at(); k.column(0.4, 6.5, lx, lz);
+    lamp(k, lx, lz, xc, zc); k.column(0.4, 6.5, lx, lz);                      // (over the plaza)
   }
   // a way from the forecourt to the gate
   k.strip([70, 158], [100, 150], 4, 0.14, T(SADDLE2), 0, { outline: 0 });

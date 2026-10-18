@@ -101,10 +101,12 @@ def tower(name, W, D, H, bands, slit, banner):
         for y, h in slit:
             P["black"].boxc(x, y, -0.02, 1.2, h + 0.4, 0.04)                                # (the frame sits behind the pane, so it shows as a border)
             P["glasswarm"].boxc(x, y, -0.055, 0.9, h, 0.03)
+    wlo, whi = bands[0] + 0.275 + 0.45, bands[1] - 0.275 - 0.45                              # (the flank windows fit between the first two bands: they used to run through them)
+    wc, wh = (wlo + whi) / 2, whi - wlo
     for sx in (-1, 1):                                                                      # and on both flanks
         for z in (D * 0.3, D * 0.7):
-            P["black"].boxc(sx * (W / 2 + 0.02), slit[0][0] + 1.0, z, 0.04, slit[0][1] + 1.6, 1.2)
-            P["glasswarm"].boxc(sx * (W / 2 + 0.055), slit[0][0] + 1.0, z, 0.03, slit[0][1] + 1.2, 0.9)
+            P["black"].boxc(sx * (W / 2 + 0.02), wc, z, 0.04, wh + 0.4, 1.2)
+            P["glasswarm"].boxc(sx * (W / 2 + 0.055), wc, z, 0.03, wh, 0.9)
     P["black"].boxc(0, 2.6, -0.04, 2.6, 3.4, 0.1)                                           # a door at the foot
     P["gold"].boxc(0, 4.5, -0.1, 3.0, 0.3, 0.3)
     by, bh = banner
