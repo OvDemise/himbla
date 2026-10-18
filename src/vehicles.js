@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { makeRover, makeApc, makeSkimmer, makeLightBike, LightTrail } from './models.js';
+import { makeRover, makeInterceptor, makeApc, makeSkimmer, makeLightBike, LightTrail } from './models.js';
 import { fireCannon } from './weapons.js';
 import { makeBody } from './physics.js';
 import { stepRover, CRASH_SAFE } from './enemies.js';
@@ -36,6 +36,11 @@ const SUMMON_MAX_SPEED = 2; // m/s: the fastest the runner can be moving and sti
 export function buildVehicleModel(id) {
   const def = VEHICLES[id];
   let m;
+  if (id === 'interceptor') {
+    // its own pursuit-car model, with a seat back of its own
+    m = makeInterceptor({ color: def.color, trim: def.trim });
+    return m;
+  }
   if (id === 'skimmer') {
     // its own hover-racer model (it has a seat of its own, too)
     m = makeSkimmer({ color: def.color, trim: def.trim });

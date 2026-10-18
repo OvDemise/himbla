@@ -780,6 +780,7 @@ src/
   assets/skimmer.glb the Daedalus Phase Skimmer (hover-racer with spinning phase coils)
   assets/warrig.glb  the Rustmoon pirate war-rig (patchwork mad-max rover with a spiked ram plow)
   assets/rover.glb   the shared rovers: the civil buggy (Mule, road traffic, hometown) and the military patrol car (base patrols, troops)
+  assets/interceptor.glb the SPACECOM Lunar Interceptor, the player's pursuit car (open cockpit, rear wing, twin rocket bells)
   assets/apc.glb     the Vostok BTR-M Moon APC (eight wheels, a turret that yaws and a barrel that elevates)
   assets/landtrain.glb  the Moonliner and Prospector land-trains: two tractors and four trailers, each with a livery for every faction
   assets/crane.glb   the tower crane (cross-frame base with ballast, lattice mast with its ladder and hatched rest decks, railed top platform, slewing platform with the cab on a catwalk, counter-jib walkway, trolley and two-fall hook block)
@@ -821,6 +822,7 @@ tools/
   blender/build_plinko.py builds the Plinko booth and the board's cabinet frame -> src/assets/plinko.glb (casinoWorld.js, the PLINKO section)
   blender/build_warrig.py  builds the pirate war-rig -> src/assets/warrig.glb
   blender/build_rover.py   builds the civil buggy and the military patrol car -> src/assets/rover.glb
+  blender/build_interceptor.py builds the SPACECOM Lunar Interceptor -> src/assets/interceptor.glb
   blender/build_apc.py     builds the Vostok APC and its turret -> src/assets/apc.glb (also runs headless: `pip install bpy`, then `MOONRUNNER_REPO=. python3 tools/blender/build_apc.py`)
   blender/build_landtrain.py builds the Moonliner and Prospector tractors and trailers -> src/assets/landtrain.glb (also runs headless, like build_apc.py)
   blender/build_crane.py   builds the tower crane -> src/assets/crane.glb (also runs headless, like build_apc.py)

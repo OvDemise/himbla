@@ -16,6 +16,7 @@ const GLB = {
   skimmer: () => import('./assets/skimmer.glb?inline'),
   warrig: () => import('./assets/warrig.glb?inline'),
   rover: () => import('./assets/rover.glb?inline'),
+  interceptor: () => import('./assets/interceptor.glb?inline'),
   apc: () => import('./assets/apc.glb?inline'),
   landtrain: () => import('./assets/landtrain.glb?inline'),
   crane: () => import('./assets/crane.glb?inline'),
@@ -1339,6 +1340,83 @@ export function makeRover({ color = 0x7b2ff7, trim = 0xffd23f, pirate = true, fl
   return { root, chassis: out.chassis, gun: out.gun, wheels: out.wheels, antennas: out.antennas, anim, ownSeat: style === 'civil' };
 }
 
+// SPACECOM Lunar Interceptor, the player's pursuit car (built in Blender, see build_interceptor.py): the rover
+// layout (wheels at (+-1.85, 0.85, +-1.8), radius 0.85) under a low wedge hull with an open cockpit, a roll hoop with
+// a light bar, a rear wing and twin rocket bells. Body takes `color`, stripe takes `trim`; the rest are fixed. It has
+// its own seat back (ownSeat). anim(t, speed): the flag waves, the whips lie back and the rocket flames stretch with speed.
+const INTERCEPTOR_TOON = { navy: 0x2a3a6b, dark: 0x2a2540, steel: 0x8a87a0, tire: 0x1d1a29, seat: 0x221d33, white: 0xf3eee4 };
+const INTERCEPTOR_GLOW = { glass: 0xcfefff, lamp: 0xfff6a8, tail: 0xff2a4a, hot: 0xff9f1c, red: 0xff2a4a, blue: 0x2ec4ff };
+export function makeInterceptor({ color = 0xfff4e0, trim = 0xffd23f, flag = trim } = {}) {
+  const B = SHIP_PARTS.interceptor;
+  const add = { transparent: true, depthWrite: false, blending: THREE.AdditiveBlending };
+  const fx = {
+    plume: new THREE.MeshBasicMaterial({ color: 0xff9f1c, opacity: 0.6, ...add }),
+    plumeCore: new THREE.MeshBasicMaterial({ color: 0xfff1c0, opacity: 0.85, ...add }),
+  };
+  const mats = new Map();
+  const matFor = (slot) => {
+    if (fx[slot]) return fx[slot];
+    if (!mats.has(slot)) {
+      mats.set(slot, slot === 'body' ? toon(color) : slot === 'stripe' ? toon(trim) : INTERCEPTOR_GLOW[slot] !== undefined ? glow(INTERCEPTOR_GLOW[slot]) : toon(INTERCEPTOR_TOON[slot] ?? 0xff00ff));
+    }
+    return mats.get(slot);
+  };
+  const out = { chassis: null, wheels: [], antennas: [], plumes: [], cloth: null };
+  const build = (node) => {
+    const g = new THREE.Group();
+    g.name = node.name;
+    g.position.copy(node.pos);
+    g.quaternion.copy(node.quat);
+    for (const { slot, geo } of node.parts) {
+      const m = new THREE.Mesh(geo, matFor(slot));
+      m.castShadow = !FLAMES.has(slot) && INTERCEPTOR_GLOW[slot] === undefined;
+      if (FLAMES.has(slot)) m.renderOrder = 2;
+      g.add(m);
+    }
+    if (node.ink) {
+      const h = new THREE.Mesh(node.ink, inkMat);
+      h.castShadow = false;
+      h.userData.isInk = true;
+      g.add(h);
+    }
+    if (node.role === 'flag') {
+      out.cloth = makeWaveFlag({ w: 1.4, h: 0.9, mat: toon(flag, { side: THREE.DoubleSide }) });
+      g.add(out.cloth.mesh);
+    } else if (node.role === 'wheel') out.wheels.push(g);
+    else if (node.role === 'antenna') out.antennas.push(g);
+    else if (node.role === 'plume') out.plumes.push({ g, phase: out.plumes.length * 1.7 });
+    else if (node.role === 'chassis') out.chassis = g;
+    for (const k of node.kids) g.add(build(k));
+    return g;
+  };
+  const root = build(B);
+  root.position.set(0, 0, 0);
+  root.quaternion.identity();
+  const whips = out.antennas.map((g, i) => ({ g, a: 0, v: 0, ph: i * 2.1 }));
+  let lastT = null;
+  const anim = (t, sp = 0) => {
+    out.cloth.update(t, sp);
+    // the flames idle short and stretch to full length flat out, flickering
+    const k = Math.min(1, Math.abs(sp) / 60);
+    for (const P of out.plumes) {
+      const s = (0.35 + 0.9 * k) * (1 + 0.15 * Math.sin(t * 17 + P.phase) + 0.06 * Math.sin(t * 46 + P.phase));
+      P.g.scale.set(0.85 + 0.15 * s, 0.85 + 0.15 * s, s);
+    }
+    fx.plume.opacity = 0.35 + 0.35 * k;
+    const dt = lastT == null ? 0 : Math.min(0.05, Math.max(0, t - lastT));
+    lastT = t;
+    if (!dt) return;
+    const kw = Math.min(1, Math.abs(sp) / 40);
+    for (const w of whips) {
+      const target = -0.5 * kw - 0.03 * kw * Math.sin(t * 17 + w.ph);
+      w.v += (90 * (target - w.a) - 9 * w.v) * dt;
+      w.a += w.v * dt;
+      w.g.rotation.x = w.a; // (+z is forward: a negative turn about x lays the tip back)
+    }
+  };
+  return { root, chassis: out.chassis, gun: new THREE.Group(), wheels: out.wheels, antennas: out.antennas, anim, ownSeat: true };
+}
+
 // ---- transit ships: tools/blender/build_ships.py exports src/assets/ships.glb ----
 // Two flyers, "shuttle" (the 19 m shuttle-bus) and "freighter" (the ~70 m hauler). Each is a tree of
 // pivot empties with a role (hull, leg, foot, door, ramp, hatch, plume, lift); every mesh hangs off
@@ -1354,7 +1432,7 @@ const SHIP_TOON = { trim: 0xd8d4e8, dark: 0x2a2540, metal: 0x8a87a0, steel: 0x55
 const SHIP_FX = new Set(['plume', 'plumeCore', 'lift', 'engine', 'core', 'beacon']); // per-ship materials (they pulse)
 const FLAMES = new Set(['plume', 'plumeCore', 'lift', 'beacon']);
 export async function loadShipParts({ ships } = {}) {
-  const [gltf, sk, wr, rv, ap, lt, cr, ga, di, en, bc, hc, sl, pk, cs, bj, gy, cl, dd, hl, lo, ...dn] = await Promise.all(['ships', 'skimmer', 'warrig', 'rover', 'apc', 'landtrain', 'crane', 'garage', 'dish', 'engine', 'briefcase', 'hovercar', 'slots', 'plinko', 'casino', 'blackjack', 'gantry', 'claw', 'duck', 'hall', 'lot', ...DOWNS_FILES].map((n) => loadGlb(n, n === 'ships' ? ships : undefined)));
+  const [gltf, sk, wr, rv, ic, ap, lt, cr, ga, di, en, bc, hc, sl, pk, cs, bj, gy, cl, dd, hl, lo, ...dn] = await Promise.all(['ships', 'skimmer', 'warrig', 'rover', 'interceptor', 'apc', 'landtrain', 'crane', 'garage', 'dish', 'engine', 'briefcase', 'hovercar', 'slots', 'plinko', 'casino', 'blackjack', 'gantry', 'claw', 'duck', 'hall', 'lot', ...DOWNS_FILES].map((n) => loadGlb(n, n === 'ships' ? ships : undefined)));
   SHIP_PARTS = {};
   for (const name of ['shuttle', 'freighter']) {
     const root = gltf.scene.getObjectByName(name);
@@ -1375,6 +1453,10 @@ export async function loadShipParts({ ships } = {}) {
     if (!r) throw new Error('rover.glb has no ' + name);
     SHIP_PARTS[name] = bakeShip(r);
   }
+  // the SPACECOM Lunar Interceptor, the player's pursuit car (tools/blender/build_interceptor.py)
+  const icp = ic.scene.getObjectByName('interceptor');
+  if (!icp) throw new Error('interceptor.glb has no interceptor');
+  SHIP_PARTS.interceptor = bakeShip(icp);
   // the Vostok BTR-M Moon APC (tools/blender/build_apc.py)
   const apc = ap.scene.getObjectByName('apc');
   if (!apc) throw new Error('apc.glb has no apc');

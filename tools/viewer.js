@@ -1,7 +1,7 @@
 // Dev-only model viewer: renders one model through the game's comic post pass on a turntable.
 import * as THREE from 'three';
 import { loadFonts } from '../src/fonts.js';
-import { loadRunnerParts, loadShipParts, makeRunner, makeCrate, ScarfSim, makeShuttle, makeFreighter, makeHoverCar, makeRover, makeApc, makeLandTrain, makeTowerCrane, CRANE_TROLLEY_MIN, CRANE_TROLLEY_SPAN, makeGantryCrane, makeCargoBox, GANTRY_TROLLEY_SPAN, makeGarage, makeDishStation, DISH_SIZE, makeLampPost, makeFountain, makeBouncer, makeChandelier, makeCasinoSign, makeChipStack, makeClawMachine, makeClawHead, clawKindParts, makeDerbyPart, makeRacer } from '../src/models.js';
+import { loadRunnerParts, loadShipParts, makeRunner, makeCrate, ScarfSim, makeShuttle, makeFreighter, makeHoverCar, makeRover, makeInterceptor, makeApc, makeLandTrain, makeTowerCrane, CRANE_TROLLEY_MIN, CRANE_TROLLEY_SPAN, makeGantryCrane, makeCargoBox, GANTRY_TROLLEY_SPAN, makeGarage, makeDishStation, DISH_SIZE, makeLampPost, makeFountain, makeBouncer, makeChandelier, makeCasinoSign, makeChipStack, makeClawMachine, makeClawHead, clawKindParts, makeDerbyPart, makeRacer } from '../src/models.js';
 import { outpostTemplate } from '../src/outpostModels.js';
 import { loadOutpostParts, GLB_KINDS } from '../src/outpostGlb.js';
 import { makeChimera, makeMite, LIVING, MODIFIERS, spliceGenes } from '../src/chimera.js';
@@ -109,6 +109,13 @@ if (m === 'shuttle' || m === 'freighter') {
       model.add(l);
     }
   }
+} else if (m === 'interceptor') {
+  // &color=hex &trim=hex  &speed=<m/s> (stretches the rocket flames, lays the whips back)
+  const hex = (k, d) => (Q.has(k) ? parseInt(Q.get(k), 16) : d);
+  const ic = makeInterceptor({ color: hex('color', 0xfff4e0), trim: hex('trim', 0xffd23f) });
+  model = ic.root;
+  anim = (t) => ic.anim(t, num('speed', 0));
+  height = 3;
 } else if (m === 'apc') {
   // &turret=<yaw rad>&barrel=<elevation rad> to pose it; the faction colours as in the game
   const apc = makeApc({ color: Q.has('color') ? parseInt(Q.get('color'), 16) : 0x6b6f78, trim: Q.has('trim') ? parseInt(Q.get('trim'), 16) : 0xff3b5c });
