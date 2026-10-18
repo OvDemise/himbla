@@ -5,6 +5,15 @@ description: Build, change, compress and check the game's Blender-made models (s
 
 # Blender models
 
+## Design rules
+
+The house style is in [style.md](style.md). It covers slots and colours, ink thickness, the shared frames (the rover's wheels
+and gun pivot), mechanical plausibility, triangle budgets by model class, faction palettes, and naming and pivot roles.
+**Read it before you add a model or builder, or make a visible change to one:** a new part, a rebuild, a new livery or
+slot, a resized frame. Also read it when you are unsure of an ink value or a budget. A fix that touches only the build
+pipeline, the export or a number the game reads does not need it. Generic DCC rules (quads only, no n-gons, UVs, texel
+density) do not apply to these code-built, untextured, toon-shaded meshes.
+
 ## Setup
 
 `tools/setup-blender.sh` installs `bpy==5.2.2` (Python 3.13; about 30 s, 1 GB) and is a no-op when present. The
