@@ -781,8 +781,8 @@ src/
   assets/warrig.glb  the Rustmoon pirate war-rig (patchwork mad-max rover with a spiked ram plow)
   assets/apc.glb     the Vostok BTR-M Moon APC (eight wheels, a turret that yaws and a barrel that elevates)
   assets/landtrain.glb  the Moonliner and Prospector land-trains: two tractors and four trailers, each with a livery for every faction
-  assets/crane.glb   the tower crane (lattice mast, ballasted base, slewing head with cab, trolley and hook)
-  assets/gantry.glb  the gantry crane over the Meridian container yard (lattice legs on rail bogies, truss girder, the tower crane's trolley and hook carrying the land-train's box container) and that container on its own, for the yard's stacks
+  assets/crane.glb   the tower crane (cross-frame base with ballast, lattice mast with its ladder and hatched rest decks, railed top platform, slewing platform with the cab on a catwalk, counter-jib walkway, trolley and two-fall hook block)
+  assets/gantry.glb  the gantry crane over the Meridian container yard (lattice legs on rail bogies with ladders and hatched decks inside, truss girder with a railed walkway and the hoist house's deck, the cab on the +z leg, the tower crane's trolley and hook carrying the land-train's box container) and that container on its own, for the yard's stacks
   assets/garage.glb  the Meridian motor-pool garages: the main one (three bays with open and shut doors, workshop fit-outs, service office, fuel yard, roof plant) and a small two-bay one
   assets/slots.glb   the casino's slot-machine cabinet: a pixel-arcade video slot with a tilted screen under a marquee, speakers, LED chases, arcade buttons, a ticket printer, a coin cup and a lever (the game paints its colour, marquee, side art and reels)
   assets/casino.glb  the casino's lamp post, plaza fountain (basin, pedestal, bowl, spigots, a spinning chip or, for the Meridian Exchange's plaza, a spinning dollar sign, the water as pivots the game gives ripple, curtain and jet shaders), buff alien bouncer, hall chandelier and the welcome and blackjack signs' frames
