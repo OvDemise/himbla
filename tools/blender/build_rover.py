@@ -287,15 +287,17 @@ M("civ_wheelRim", xf(torus(0.24, 0.04, 16, 6), (0.6, 2.36, 0.38), (PI / 2 - 0.6,
 M("civ_wheelSpoke", xf(box(0.44, 0.04, 0.06), (0.6, 2.36, 0.38), (-0.6, 0, 0)), "dark", CH, 0)
 M("civ_joystick", join([beam((-0.6, 1.5, 0.75), (-0.6, 1.98, 0.66), 0.025, 5), xf(superquad(0.05, 0.07, 0.05, 1, 1, 8, 4), (-0.6, 2.0, 0.66))]), "dark", CH, 0)
 # roll cage: A-pillars from the dash corners, a rear hoop behind the seat, top rails, a brace
+CAGE_Y = 4.0  # the cage top: high enough for the runner (Mule x1.2) to sit under the canopy
+LIFT = CAGE_Y - 3.4  # (the searchlight on the canopy goes up with it)
 CAGE = []
 for sx in (-1, 1):
-    CAGE.append(tube([(sx * 1.3, 1.5, 1.05), (sx * 1.24, 2.6, 0.92), (sx * 1.18, 3.4, 0.72)], [0.065] * 3, 8))
-    CAGE.append(tube([(sx * 1.3, 1.5, -0.88), (sx * 1.18, 3.42, -0.98)], [0.07] * 2, 8))
-    CAGE.append(beam((sx * 1.18, 3.4, 0.72), (sx * 1.18, 3.42, -0.98), 0.065, 8))
-CAGE.append(beam((-1.18, 3.4, 0.72), (1.18, 3.4, 0.72), 0.065, 8))
-CAGE.append(beam((-1.2, 3.42, -0.98), (1.2, 3.42, -0.98), 0.07, 8))
+    CAGE.append(tube([(sx * 1.3, 1.5, 1.05), (sx * 1.24, 2.6, 0.92), (sx * 1.2, 3.3, 0.8), (sx * 1.18, CAGE_Y, 0.72)], [0.065] * 4, 8))
+    CAGE.append(tube([(sx * 1.3, 1.5, -0.88), (sx * 1.18, CAGE_Y + 0.02, -0.98)], [0.07] * 2, 8))
+    CAGE.append(beam((sx * 1.18, CAGE_Y, 0.72), (sx * 1.18, CAGE_Y + 0.02, -0.98), 0.065, 8))
+CAGE.append(beam((-1.18, CAGE_Y, 0.72), (1.18, CAGE_Y, 0.72), 0.065, 8))
+CAGE.append(beam((-1.2, CAGE_Y + 0.02, -0.98), (1.2, CAGE_Y + 0.02, -0.98), 0.07, 8))
 CAGE.append(beam((-1.25, 2.3, -0.93), (1.25, 2.3, -0.93), 0.055, 8))
-CAGE.append(beam((-1.25, 1.55, -0.88), (1.2, 3.38, -0.98), 0.05, 6))
+CAGE.append(beam((-1.25, 1.55, -0.88), (1.2, CAGE_Y - 0.02, -0.98), 0.05, 6))
 CAGE.append(beam((-1.27, 2.15, 0.96), (1.27, 2.15, 0.96), 0.05, 6))
 M("civ_cage", join(CAGE), "steel", CH, 0.02)
 for sx in (-1, 1):
@@ -303,11 +305,11 @@ for sx in (-1, 1):
     M(f"civ_mirror{sx}", xf(cbox(0.2, 0.15, 0.05, 0.03), (sx * 1.6, 2.58, 0.95)), "dark", CH, 0.012)
     M(f"civ_mirrorGlass{sx}", xf(box(0.16, 0.11, 0.01), (sx * 1.6, 2.58, 0.92)), "glass", CH, 0)
 # the canopy: a frame on the cage, solar cells in a 4 x 3 grid
-M("civ_canopy", xf(cbox(2.6, 0.07, 1.95, 0.025), (0, 3.5, -0.12)), "metal", CH, 0.03)
-cells = [xf(box(0.6, 0.02, 0.58), (-0.96 + i * 0.64, 3.535, -0.74 + j * 0.62)) for i in range(4) for j in range(3)]
+M("civ_canopy", xf(cbox(2.6, 0.07, 1.95, 0.025), (0, CAGE_Y + 0.1, -0.12)), "metal", CH, 0.03)
+cells = [xf(box(0.6, 0.02, 0.58), (-0.96 + i * 0.64, CAGE_Y + 0.135, -0.74 + j * 0.62)) for i in range(4) for j in range(3)]
 M("civ_cells", join(cells), "panel", CH, 0)
-M("civ_beacon", join([xf(cyl(0.1, 0.08, 10), (0.98, 3.57, -0.9)), ]), "dark", CH, 0.01)
-M("civ_beaconLens", xf(lathe([(0.08, 0), (0.08, 0.1), (0.04, 0.16), (0, 0.17)], 10), (0.98, 3.61, -0.9)), "hot", CH, 0.01)
+M("civ_beacon", join([xf(cyl(0.1, 0.08, 10), (0, CAGE_Y + 0.17, -0.95)), ]), "dark", CH, 0.01)
+M("civ_beaconLens", xf(lathe([(0.08, 0), (0.08, 0.1), (0.04, 0.16), (0, 0.17)], 10), (0, CAGE_Y + 0.21, -0.95)), "hot", CH, 0.01)
 
 # ---- the bed: walls, a tailgate, floor slats, cargo strapped down ----
 for sx in (-1, 1):
@@ -356,19 +358,22 @@ M("civ_spare", xf(torus(0.42, 0.18, 18, 8), (0, 1.62, -2.82), (PI / 2, 0, 0)), "
 M("civ_spareHub", xf(disc_z(0.3, 0.12, 12), (0, 1.62, -2.82)), "metal", CH, 0)
 M("civ_spareBracket", xf(box(0.12, 0.5, 0.2), (0, 1.62, -2.68)), "dark", CH, 0)
 # the umbrella dish on its mast at the bed's front right corner, and the flag pole at the left back corner
-M("civ_mast", beam((1.18, 1.5, -1.12), (1.18, 3.0, -1.12), 0.04, 6), "dark", CH, 0.01)
+DISH = (1.24, 3.0, -2.3)  # on the bed's back right corner, in line with the flag pole across the back
+DISH_R = (0.75, PI / 2, 0)  # tilted up 0.75 rad and turned to face out over the right side
+M("civ_mast", beam((DISH[0], 1.5, DISH[2]), (DISH[0], DISH[1] - 0.02, DISH[2]), 0.04, 6), "dark", CH, 0.01)
 dish = lathe([(0, 0), (0.12, 0.01), (0.3, 0.06), (0.46, 0.15), (0.44, 0.17), (0.28, 0.09), (0.12, 0.04), (0, 0.03)], 16)
-M("civ_dish", xf(dish, (1.18, 3.02, -1.12), (0.75, 0, -0.25), (0.8, 0.8, 0.8)), "white", CH, 0.02)
-M("civ_dishFeed", beam((1.18, 3.05, -1.12), (1.2, 3.3, -0.92), 0.015, 4), "dark", CH, 0)
-flag_pole("civ", CH, (-1.24, 1.5, -2.3), (-1.24, 5.1, -2.3))
+M("civ_dish", xf(dish, DISH, DISH_R, (0.8, 0.8, 0.8)), "white", CH, 0.02)
+M("civ_dishFeed", xf(beam((0, 0.03, 0), (0, 0.32, 0), 0.015, 4), DISH, DISH_R), "dark", CH, 0)
+M("civ_dishHorn", xf(xf(cyl(0.035, 0.06, 8), (0, 0.34, 0)), DISH, DISH_R), "dark", CH, 0)
+flag_pole("civ", CH, (-1.24, 1.5, -2.3), (-1.24, 5.1 + LIFT, -2.3))
 
 # ---- the gun pivot: a searchlight on a post through the canopy ----
 G = pivot("civil_gun", (0, 3.0, 0.8), CH, role="gun")
-M("civ_lightPost", beam((0, 0.4, 0), (0, 0.78, 0), 0.05, 8), "dark", G, 0.015)
-M("civ_lightYoke", join([beam((-0.3, 0.78, 0), (0.3, 0.78, 0), 0.04, 6), beam((-0.3, 0.78, 0), (-0.3, 0.98, 0), 0.04, 6), beam((0.3, 0.78, 0), (0.3, 0.98, 0), 0.04, 6)]), "dark", G, 0.015)
-M("civ_lightBody", xf(lathe([(0, -0.24), (0.14, -0.24), (0.2, -0.16), (0.24, 0.1), (0.25, 0.22), (0, 0.22)], 14), (0, 0.98, 0), (PI / 2, 0, 0)), "white", G, 0.03)
-M("civ_lightLens", xf(disc_z(0.22, 0.03, 14), (0, 0.98, 0.225)), "lamp", G, 0)
-M("civ_lightRing", xf(torus(0.235, 0.025, 14, 4), (0, 0.98, 0.23), (PI / 2, 0, 0)), "dark", G, 0)
+M("civ_lightPost", beam((0, 0.4 + LIFT, 0), (0, 0.78 + LIFT, 0), 0.05, 8), "dark", G, 0.015)
+M("civ_lightYoke", join([beam((-0.3, 0.78 + LIFT, 0), (0.3, 0.78 + LIFT, 0), 0.04, 6), beam((-0.3, 0.78 + LIFT, 0), (-0.3, 0.98 + LIFT, 0), 0.04, 6), beam((0.3, 0.78 + LIFT, 0), (0.3, 0.98 + LIFT, 0), 0.04, 6)]), "dark", G, 0.015)
+M("civ_lightBody", xf(lathe([(0, -0.24), (0.14, -0.24), (0.2, -0.16), (0.24, 0.1), (0.25, 0.22), (0, 0.22)], 14), (0, 0.98 + LIFT, 0), (PI / 2, 0, 0)), "white", G, 0.03)
+M("civ_lightLens", xf(disc_z(0.22, 0.03, 14), (0, 0.98 + LIFT, 0.225)), "lamp", G, 0)
+M("civ_lightRing", xf(torus(0.235, 0.025, 14, 4), (0, 0.98 + LIFT, 0.23), (PI / 2, 0, 0)), "dark", G, 0)
 
 for i, (sx, sz) in enumerate(((-1, 1), (1, 1), (-1, -1), (1, -1))):
     wheel("civ", R, i, sx, sz, False)
