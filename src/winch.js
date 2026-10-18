@@ -2,7 +2,7 @@
 // vehicle or a structure and let the drum reel you in: the pull builds up, runs at a steady speed and eases
 // off to leave about two metres of cable between you and the hook. Hooked on a vehicle you then ride its pull:
 // swing under a flying transit like a pendulum (momentum and all), or trail along behind a rover or a land-train.
-// It holds as long as you hold E, up to twenty seconds.
+// It stays on without holding anything, up to twenty seconds, until you press E again to let go.
 //
 // Targeting: with the winch equipped, a faint tow-line marker sits on whatever E would hook (hud: markerFor).
 // Whatever the reticle is on wins (the nearest such surface); otherwise the target nearest the reticle. The hook
@@ -594,7 +594,7 @@ export class Winch {
     return !(P.dead || P.vehicle || P.seat || P.rag) && this.game.state === 'play';
   }
 
-  // E pressed with the winch selected
+  // E pressed with the winch selected and the cable off (powers.js: with it on, E releases)
   fire() {
     const g = this.game;
     if (this.on || this.cd > 0 || !this.hasHand()) return;
@@ -735,7 +735,7 @@ export class Winch {
   }
 
   // every frame (after the player has moved): the drum reels you in and the cable pulls when it's taut
-  update(dt, held) {
+  update(dt, usable) {
     const g = this.game;
     const P = g.player;
     if (this.cd > 0) this.cd -= dt;
@@ -755,7 +755,7 @@ export class Winch {
     if (!o) return;
     o.t += dt;
     const T = o.target;
-    if (!held || o.t > HOLD || !this.hasHand() || !T.alive()) { this.release(); return; }
+    if (!usable || o.t > HOLD || !this.hasHand() || !T.alive()) { this.release(); return; }
     this.buildPath(o, this.hand(_a), this.anchorOf(o, _b));
     // (the wraps are checked every frame, bent or not: at 20 Hz a player running at a post at 15 m/s covers 0.75 m between checks, and the
     // cable ran through the post for up to three frames before the first bend. el = the frame time, so the 0.2 s unwrap hold counts real

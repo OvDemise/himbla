@@ -208,7 +208,7 @@ export const SHOPS = {
     { key: 'uplink', name: 'Meridian Market Uplink', desc: '+10% pay on every contract (per level)', cost: 900, max: 3, faction: 'meridian', req: [5, 15, 30] },
   ],
   kepler: [
-    { key: 'winch', name: 'Kepler Hitch-Line Winch', desc: 'POWER (E, hold): steel cable onto a vehicle or a structure within 120 m; the drum reels you in to 2 m. Swing under shuttles, trail behind rovers. Up to 20 s', cost: 2400, max: 1, faction: 'kepler', req: [15] },
+    { key: 'winch', name: 'Kepler Hitch-Line Winch', desc: 'POWER (E, again to let go): steel cable onto a vehicle or a structure within 120 m; the drum reels you in to 2 m. Swing under shuttles, trail behind rovers. Up to 20 s', cost: 2400, max: 1, faction: 'kepler', req: [15] },
     { key: 'twin', name: 'Kepler Twin Cradle', desc: 'Carry two contracts at once: the second crate stacks on top of the first', cost: 2600, max: 1, faction: 'kepler', req: [10] },
   ],
   vostok: [
@@ -241,7 +241,7 @@ export const SHOPS = {
     { key: 'uplink', name: 'Black-Market Market Uplink', desc: '+10% pay on every contract (per level)', cost: 1150, max: 3, faction: 'rustmoon', req: [0], unlock: { smuggle: true, n: 6 } },
     { key: 'v_skimmer', name: 'Hot-Wired Phase Skimmer', desc: 'VEHICLE: a Daedalus skimmer, liberated', cost: 4800, max: 1, faction: 'rustmoon', req: [0], vehicle: 'skimmer', unlock: { smuggle: true, n: 7 } },
     { key: 't_dash', name: 'Black-Market Phase Dash', desc: 'TECH (E): swing all your momentum to wherever you look', cost: 4200, max: 1, faction: 'rustmoon', req: [0], tech: 'dash', unlock: { smuggle: true, n: 8 } },
-    { key: 'winch', name: 'Black-Market Hitch-Line', desc: 'POWER (E, hold): steel cable onto a vehicle or a structure within 120 m and reel in', cost: 3000, max: 1, faction: 'rustmoon', req: [0], unlock: { smuggle: true, n: 9 } },
+    { key: 'winch', name: 'Black-Market Hitch-Line', desc: 'POWER (E, again to let go): steel cable onto a vehicle or a structure within 120 m and reel in', cost: 3000, max: 1, faction: 'rustmoon', req: [0], unlock: { smuggle: true, n: 9 } },
     { key: 'twin', name: 'Black-Market Twin Cradle', desc: 'Carry two contracts at once: the second crate stacks on top of the first', cost: 3200, max: 1, faction: 'rustmoon', req: [0], unlock: { smuggle: true, n: 9 } },
     { key: 'v_apc', name: 'Hot-Wired BTR-M', desc: 'VEHICLE: a Vostok APC, liberated', cost: 5200, max: 1, faction: 'rustmoon', req: [0], vehicle: 'apc', unlock: { smuggle: true, n: 10 } },
   ],

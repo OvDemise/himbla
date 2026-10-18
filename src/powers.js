@@ -4,7 +4,7 @@
 //   dash      Daedalus Phase Dash (story tech)
 //   teleport  Meridian Personal Teleporter (story tech; T still works)
 //   vanes     Meridian Quantum Slipstream Vanes (story tech: steer in the air for 10 s, story.js)
-//   winch     Kepler Hitch-Line Winch (hold E: winch.js)
+//   winch     Kepler Hitch-Line Winch (E toggles it: winch.js)
 //   pen       Dr. Zbornak's holding-pen link (P still works)
 //   meteor    dev: drops a meteor on you (granted the first time the dev menu's SPAWN A METEOR ON ME is used: cheats.js)
 //
@@ -151,7 +151,7 @@ export class Powers {
   use(k) {
     const g = this.game;
     if (k === 'dash' || k === 'teleport' || k === 'vanes') g.story.useTech(k);
-    else if (k === 'winch') g.winch.fire();
+    else if (k === 'winch') { if (g.winch.on) g.winch.release(); else g.winch.fire(); } // (E again lets go)
     else if (k === 'pen') g.alchemy.penMenu();
     else if (k === 'meteor') g.cheats.spawnMeteor(false);
   }
@@ -169,8 +169,8 @@ export class Powers {
       if (k) this.use(k);
       else g.hud.toast('No powers yet. Phase Dash, the Teleporter, the Kepler winch and the pen link all go on E.', 2.5);
     }
-    // the winch holds while E does
-    g.winch.update(dt, I.down('KeyE') && this.current() === 'winch' && !limp);
+    // the winch stays on until E is pressed again (or it runs out, snaps or slips)
+    g.winch.update(dt, this.current() === 'winch' && !limp);
     if (this.flash > 0) this.flash -= dt;
     if (this.radial && (this.radial.t -= dt) <= 0) { this.radial.t = 0.1; this.radialDraw(); }
     this.chipT -= dt;
