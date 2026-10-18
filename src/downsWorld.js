@@ -3,7 +3,7 @@ import { settle } from './settlements.js';
 import { T, G } from './outpostModels.js';
 import { downsNode, downsSlot } from './models.js';
 import {
-  HALF, LAP, SEGS, LANES, RAIL_IN, RAIL_OUT, DIRT, FINISH_U, FINISH_X, STAND, FAR, CLUB, ENTRIES, oval, lapLen, standBack,
+  LAP, SEGS, RAIL_IN, RAIL_OUT, DIRT, FINISH_U, FINISH_X, STAND, FAR, CLUB, ENTRIES, ARCADE, WEDGE, STALLS, STALL_ORDER, CROSSINGS, CROSS_GAP, FORECOURT, oval, lapLen,
 } from './downsPlan.js';
 
 // Chimera Downs' scenery, built from the Blender kits (tools/blender/build_downs_*.py) and a few code-made surfaces. race.js builds the racecourse itself (the live screens, the
@@ -57,11 +57,24 @@ function course(k) {
     for (let i = 1; i <= n; i++) {
       const p = oval((i / n) * LAP, r, {});
       const dx = p.x - prev.x, dz = p.z - prev.z, l = Math.hypot(dx, dz);
+      if (Math.abs(dz) < 0.01 && CROSSINGS.some((cx) => Math.abs((p.x + prev.x) / 2 - cx) < CROSS_GAP / 2 + 0.5)) { prev = p; continue; }     // (a crossing: the rail leaves a gap)
       k.at(prev.x, prev.z, Math.atan2(-dz, dx));
       bake(k, 'dn_rail', 0, 0, 0, { sx: l / 5, sy: h });
       k.at();
       k.solid(0.15, h / 2, l / 2, (p.x + prev.x) / 2, (p.z + prev.z) / 2, Math.atan2(dx, dz));
       prev = p;
+    }
+  }
+  // the crossings: planks across the dirt and a barrier post at each end of each rail's gap
+  for (const cx of CROSSINGS) for (const sz of [-1, 1]) {
+    const zc = sz * (DIRT[0] + DIRT[1]) / 2;
+    k.box(CROSS_GAP, 0.05, DIRT[1] - DIRT[0] + 0.4, T(MINT2), cx, 0.09, zc, { outline: 0 });
+    for (let i = 0; i < 4; i++) k.box(CROSS_GAP, 0.06, 0.5, T(i % 2 ? PAL.barn : PAL.mint), cx, 0.1, zc + (i - 1.5) * 4.6, { outline: 0 });
+    for (const [rz, side] of [[RAIL_IN, 1], [RAIL_OUT, 1]]) for (const dx of [-1, 1]) {
+      k.at(cx + dx * (CROSS_GAP / 2 + 0.4), sz * rz, dx > 0 ? Math.PI : 0);
+      bake(k, 'dn_crossing');
+      k.at();
+      k.column(0.3, 1.5, cx + dx * (CROSS_GAP / 2 + 0.4), sz * rz);
     }
   }
   // the finish: a chequered strip across the dirt, the arch over it, the photo-finish tower on the apron
@@ -194,6 +207,126 @@ function aprons(k) {
   }
 }
 
+// ---- the arcades round the turns ----
+// A wedge's origin is the middle of its inner chord; its local +z points outward along the radius. The east arcade is the west one's mirror (x negated, yaws negated).
+function arcades(k) {
+  for (const mir of [1, -1]) {                                       // 1 = west, -1 = east
+    const at = (r, th) => [mir * (-ARCADE.cx + r * Math.cos(th * Math.PI / 180)), r * Math.sin(th * Math.PI / 180)];
+    const yawOf = (th) => mir * (Math.PI / 2 - th * Math.PI / 180);
+    ARCADE.runs.forEach((run, ri) => {
+      for (let i = 0; i < run.n; i++) {
+        const th = run.a0 + ARCADE.step * (i + 0.5);
+        const [x, z] = at(WEDGE.r0, th), yaw = yawOf(th);
+        k.at(x, z, yaw);
+        bake(k, 'dn_arcade');
+        k.solid(WEDGE.wo, 4.2, 0.4, 0, WEDGE.d - 0.35);                // the back wall
+        k.column(0.4, 6.5, -WEDGE.wi + 0.55, 0.55);                    // the colonnade
+        if (i % 2 === 1 && i < 10) {
+          // a stall in this bay: its front toward the walk, its body against the back wall
+          const slot = ri * 5 + (i - 1) / 2;
+          const st = STALLS[STALL_ORDER[mir > 0 ? 0 : 1][slot]];
+          const sx = x + 7.6 * Math.sin(yaw), sz = z + 7.6 * Math.cos(yaw);
+          k.at(sx, sz, yaw + Math.PI);
+          bake(k, `dn_stall_${st.d}`, 0, 0, 0, { over: { accent: st.accent } });
+          k.text(st.name, 0, 4.65, -0.5, 0, Math.min(7.6, tw(st.name, 0.9)), { fg: FG.gold, bg: BG.black, back: false, off: 0.01 });
+          k.solid(4.4, 1.9, 3.5, 0, -3.9);
+          k.solid(4.5, 0.6, 0.7, 0, 0.15);
+        } else {
+          // an open bay: a bench against the back wall, a planter each side of it
+          k.at(x, z, yaw);
+          bake(k, 'dn_bench', 0, 0, WEDGE.d - 1.6, { ry: Math.PI });
+          for (const px of [-3.6, 3.6]) { bake(k, 'dn_planter', px, 0, WEDGE.d - 1.7); k.solid(1.2, 0.45, 0.5, px, WEDGE.d - 1.7); }
+        }
+        k.at();
+      }
+    });
+    // the gate hall, at the middle of the arcade
+    const [gx, gz] = at(ARCADE.ri + 8, ARCADE.gate), gyaw = yawOf(ARCADE.gate);
+    k.at(gx, gz, gyaw);
+    bake(k, 'dn_gate_hall');
+    const nm = mir > 0 ? 'WEST GATE' : 'EAST GATE';
+    k.text(nm, 0, 9.3, 11.27, 0, tw(nm, 1.7), { fg: FG.gold, bg: BG.black, back: false, off: 0.0 });
+    k.text('CHIMERA DOWNS', 0, 9.3, -11.27, Math.PI, tw('CHIMERA DOWNS', 1.5), { fg: FG.gold, bg: BG.black, back: false, off: 0.0 });
+    for (const sx of [-1, 1]) k.solid(5, 6.6, 11, sx * 11, 0);
+    k.at();
+    // the rail walk: a timber ring between the rail and the arcade
+    const lo = ARCADE.walk[0], hi = ARCADE.walk[1];
+    const [t0, t1] = mir > 0 ? [lo, hi] : [180 - hi, 180 - lo];
+    const g = new THREE.RingGeometry(RAIL_OUT + 1.5, ARCADE.ri, 96, 1, -t1 * Math.PI / 180, (t1 - t0) * Math.PI / 180).rotateX(-Math.PI / 2);
+    k.add(g, T(SADDLE2), mir * -ARCADE.cx, 0.1, 0, { outline: 0 });
+  }
+}
+
+// ---- the concourse behind the main stand and the grand forecourt: paving, a timber avenue, the fountain, masts with festoons, lamps, benches, planters, valet bays and the gate ----
+function forecourt(k) {
+  const F = FORECOURT, w = F.x1 - F.x0, zc = (F.z0 + F.z1) / 2, dz = F.z1 - F.z0;
+  k.box(w, 0.12, dz, T(MINT2), 0, 0, zc, { outline: 0 });                                                              // the paving
+  for (let x = F.x0 + 8; x < F.x1; x += 12) k.box(0.14, 0.13, dz, T(0xc9d4c6), x, 0, zc, { outline: 0 });
+  k.box(2 * F.avenue, 0.16, F.z1 - F.promenade[0], T(SADDLE2), 0, 0, (F.promenade[0] + F.z1) / 2, { outline: 0 });       // the avenue, in timber
+  for (let z = F.promenade[0] + 3; z < F.z1; z += 3) k.box(2 * F.avenue, 0.17, 0.08, T(0x7a5236), 0, 0, z, { outline: 0 });
+  for (const s of [-1, 1]) k.box(0.3, 0.18, F.z1 - F.promenade[0], T(PAL.gold), s * F.avenue, 0, (F.promenade[0] + F.z1) / 2, { outline: 0 });
+  k.box(w, 0.16, F.promenade[1] - F.promenade[0], T(SADDLE2), 0, 0, (F.promenade[0] + F.promenade[1]) / 2, { outline: 0 });   // the promenade along the clubhouse's front
+  for (const ex of ENTRIES) k.box(8, 0.16, F.promenade[0] - 114.5, T(SADDLE2), ex, 0, (114.5 + F.promenade[0]) / 2, { outline: 0 });   // the ways from the stand's entries
+  // the fountain, ringed in gold
+  const [fx, fz] = F.fountain;
+  k.at(fx, fz, 0);
+  bake(k, 'dn_fountain');
+  k.at();
+  k.column(12, 1.2, fx, fz);
+  k.ring(13.2, 0.12, G(PAL.gold), fx, 0.17, fz);
+  // masts down both sides of the avenue, a string of lights across it at every other pair
+  const cols = [PAL.barn, PAL.gold, PAL.money, PAL.mint, PAL.saddle, PAL.black];
+  for (let i = 0; i < 9; i++) {
+    const z = 150.5 + i * 4.5;
+    for (const s of [-1, 1]) {
+      k.at(s * (F.avenue + 1.2), z, 0);
+      bake(k, 'dn_mast', 0, 0, 0, { over: { cloth: cols[(i + (s > 0 ? 3 : 0)) % 6] }, ry: s > 0 ? 0 : Math.PI });
+      k.at();
+      k.column(0.3, 10, s * (F.avenue + 1.2), z);
+    }
+    if (i % 2 === 0) { k.at(0, z, 0); bake(k, 'dn_festoon', 0, 10.3, 0, { sx: (2 * (F.avenue + 1.2)) / 30 }); k.at(); }
+  }
+  for (const s of [-1, 1]) for (let z = 154; z < 190; z += 12) {                                                   // lamps just outside the masts
+    k.at(s * (F.avenue + 4.2), z, 0);
+    bake(k, 'dn_lamp', 0, 0, 0, { ry: s > 0 ? -Math.PI / 2 : Math.PI / 2 });
+    k.at();
+    k.column(0.4, 6.5, s * (F.avenue + 4.2), z);
+  }
+  // benches facing the avenue with planters between them, either side
+  for (const s of [-1, 1]) for (let z = 156; z < 188; z += 10) {
+    k.at(s * 26, z, 0);
+    bake(k, 'dn_bench', 0, 0, 0, { ry: -s * Math.PI / 2 });
+    bake(k, 'dn_planter', s * 3.5, 0, 0, { ry: s * Math.PI / 2 });
+    k.at();
+    k.solid(1.2, 0.45, 0.5, s * 26, z + 3.5);
+  }
+  // valet bays: two blocks of six, diagonal, their heads toward the sides
+  for (const s of [-1, 1]) for (let i = 0; i < 6; i++) {
+    const hx = s * (56 + 1.8 * i), hz = 152 + 2.14 * i;
+    k.at(hx, hz, -s * (50 * Math.PI) / 180);
+    bake(k, 'dn_bay');
+    k.text(String(i + 1 + (s > 0 ? 6 : 0)), 0, 0.78, -0.37, 0, 0.36, { fg: '#3b393a', bg: '#cfb352', back: false, off: 0.01 });
+    k.at();
+  }
+  // the gate
+  k.at(0, F.gate, 0);
+  bake(k, 'dn_gate_main');
+  k.text('CHIMERA DOWNS', 0, 13.0, 0.56, 0, tw('CHIMERA DOWNS', 0.95), { fg: FG.gold, bg: BG.black, back: false, off: 0.0 });
+  k.text('EST. YEAR ONE', 0, 13.0, -0.56, Math.PI, tw('EST. YEAR ONE', 0.95), { fg: FG.gold, bg: BG.black, back: false, off: 0.0 });
+  for (const s of [-1, 1]) k.solid(1.5, 6.6, 1.5, s * 12.5, 0);
+  k.at();
+}
+
+// ---- flood masts round the course (dn_flood), their heads turned toward the middle of the oval ----
+function floods(k) {
+  for (const [x, z] of [[-74, 146], [74, 146], [-74, 188], [74, 188], [-102, -106], [102, -106], [-38, -108], [38, -108]]) {
+    k.at(x, z, Math.atan2(-x, -z));
+    bake(k, 'dn_flood');
+    k.at();
+    k.column(0.5, 14, x, z);
+  }
+}
+
 export function buildDowns(w, loc) {
   return settle(w, loc, 9091, (k) => {
     course(k);
@@ -201,5 +334,8 @@ export function buildDowns(w, loc) {
     grandstand(k, STAND);
     grandstand(k, FAR, { far: true });
     clubhouse(k);
+    arcades(k);
+    forecourt(k);
+    floods(k);
   });
 }

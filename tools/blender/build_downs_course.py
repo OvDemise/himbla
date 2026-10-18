@@ -13,6 +13,7 @@
 #   dn_lamp        the Downs' lamp, 6.4 m: a Black post on a Mint plinth, a gold collar and a Barn Red band, a gooseneck with a lit globe
 #   dn_flood       a flood mast, 14 m: a Black pole with a bank of six lit lamps turned toward +z, on a gold footing
 #   dn_mast        a flag mast, 11 m: a Mint pole, a gold ball, a Barn Red pennant (slot `cloth`, which the game recolours) 3.2 x 1.5 m streaming toward +x
+#   dn_crossing    a track crossing's barrier post, 1.75 m: a Mint foot, a Black post with a gold cap, a raised Barn Red and Mint boom (leaning toward +x) and a red lamp
 #   dn_gate_frame  the starting gate, 16.4 m across x, 3.4 m deep (z = -3.2 to 0.2), 4.2 m tall, four stalls: Mint and padded dividers, a Black roof with a gold lip, number plate frames
 #   dn_gate_door   one stall door, hinged at x = 0 and reaching toward -x (1.9 m), 2.6 m tall, Barn Red with gold edging; the game hangs two on each stall and turns them open
 DOWNS_OUT = "downs-course.glb"
@@ -84,9 +85,9 @@ for sx in (-1, 1):
         P["black"].box(sx * 1.3 - 0.12, sx * 1.3 + 0.12, 0.55, 4.95, sz * 1.3 - 0.12, sz * 1.3 + 0.12)
 P["gold"].box(-1.5, 1.5, 4.8, 5.1, -1.5, 1.5)
 P["mint"].box(-2.6, 2.6, 5.1, 7.9, -2.1, 2.1)                                           # the glazed box
-P["glasswarm"].box(-2.3, 2.3, 5.5, 7.5, -2.14, -2.1)                                    # (its front is -z, toward the track)
-P["black"].box(-2.45, 2.45, 5.35, 7.65, -2.17, -2.12)
-P["black"].box(-0.05, 0.05, 5.5, 7.5, -2.2, -2.17)
+P["black"].box(-2.45, 2.45, 5.35, 7.65, -2.14, -2.1)                                    # (its front is -z, toward the track; the frame sits behind the pane, so it shows as a border)
+P["glasswarm"].box(-2.3, 2.3, 5.5, 7.5, -2.18, -2.14)
+P["black"].box(-0.05, 0.05, 5.5, 7.5, -2.22, -2.18)
 for sx in (-1, 1):
     P["glasswarm"].box(min(sx * 2.62, sx * 2.6), max(sx * 2.62, sx * 2.6), 5.5, 7.5, -1.5, 1.5)
 P["gold"].box(-2.8, 2.8, 7.9, 8.15, -2.3, 2.3)                                          # the cap
@@ -136,6 +137,20 @@ for i in range(4):                                                              
     x0, w = 0.08 + i * 0.8, 0.8
     y = 9.9 - i * 0.04
     P["cloth"].poly([(0, 0.75), (w, 0.75 - 0.18 * (1 if i < 3 else 1.8)), (w, -0.75 + 0.18 * (1 if i < 3 else 1.8)), (0, -0.75)], -0.02, 0.02, t=(x0, y, 0.12 * math.sin(i * 1.3 + 0.4)))
+
+# =====================================================================================================
+# dn_crossing
+# =====================================================================================================
+root = pivot("dn_crossing", (0, 0, 0))
+P = parts(root, "dn_crossing", {"mint2": 0.02, "black2": 0.015, "barn": 0.015, "mint": 0.012, "gold": 0.012, "glowred": 0.0})
+P["mint2"].box(-0.3, 0.3, 0.0, 0.3, -0.3, 0.3)
+P["black2"].box(-0.12, 0.12, 0.3, 1.35, -0.12, 0.12)                                    # the post
+P["gold"].box(-0.16, 0.16, 1.35, 1.45, -0.16, 0.16)
+for i in range(6):                                                                      # the boom, raised: striped
+    a0 = i * 0.75
+    (P["barn"] if i % 2 == 0 else P["mint"]).bm((0.1 + a0 * 0.34, 1.4 + a0 * 0.94, 0.0), (0.1 + (a0 + 0.75) * 0.34, 1.4 + (a0 + 0.75) * 0.94, 0.0), 0.06)
+P["black2"].box(-0.2, 0.2, 1.46, 1.66, -0.2, 0.2)                                       # the lamp housing
+P["glowred"].add(sphere(0.13, 8, 6), t=(0, 1.74, 0))
 
 # =====================================================================================================
 # dn_gate_frame / dn_gate_door
