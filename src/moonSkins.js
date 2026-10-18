@@ -206,22 +206,28 @@ vec2 skBlocksOn(vec2 uv, vec2 sd, float px, float cell, float rmin, float rmax, 
   float dome = max(1.0 - bd * bd, 0.0);
   float top = sqrt(dome); // (rounded: a flat top with steep sides made a ring of light and shade round each stone, like a pit's lip)
   float body = 1.0 - smoothstep(0.82, 1.0, bd);
-  float shadow = (1.0 - smoothstep(0.6, 1.1, length(bv + sd * 0.95))) * (1.0 - body);
+  float shadow = (1.0 - smoothstep(0.55, 1.05, length(bv + sd * 0.8))) * (1.0 - body);
   float foot = smoothstep(0.92, 1.02, bd) * (1.0 - smoothstep(1.02, 1.25, bd));
   float f = skFade(cell * 0.2, px);
-  float lum = mix(1.0, mix(tlo, thi, fract(bid * 7.3 + bz * 13.1)) * (1.0 + 0.1 * dome), body * f) * (1.0 - (0.45 * shadow + 0.06 * foot) * f);
+  float lum = mix(1.0, mix(tlo, thi, fract(bid * 7.3 + bz * 13.1)) * (1.0 + 0.1 * dome), body * f) * (1.0 - (0.3 * shadow + 0.05 * foot) * f);
   return vec2(top * top * mix(rmin, rmax, bid) * cell * hk * skFade(cell * 0.1, px), lum);
 }
+// (skRef, when skRefOn is 1, is the direction that decides the plane instead of the spot's own: skRim sets it to the crater's
+// centre, so that the stones of one rim lie on one plane all the way round, whatever cube-face seam it straddles. The crater is
+// tiny against the Moon, so the plane is at worst tilted 45 degrees to the ground there, which stretches the stones by 1.4 at
+// most. Away from a crater's rim the spot's own plane is blended with its neighbour's, as below.)
+vec3 skRef = vec3(0.0);
+float skRefOn = 0.0;
 void skBlocks(vec3 p, float px, float cell, float rmin, float rmax, float seed, float keep, float hk, float tlo, float thi, inout float h, inout float lum) {
   if (skFade(cell * 0.2, px) <= 0.0) return;
-  vec3 a = abs(normalize(p));
+  vec3 a = abs(normalize(skRefOn > 0.5 ? skRef : p));
   int i0 = (a.x >= a.y && a.x >= a.z) ? 0 : (a.y >= a.z ? 1 : 2);
   float am = i0 == 0 ? a.x : i0 == 1 ? a.y : a.z;
   int i1 = i0 == 0 ? (a.y >= a.z ? 1 : 2) : i0 == 1 ? (a.x >= a.z ? 0 : 2) : (a.x >= a.y ? 0 : 1);
   float as = i1 == 0 ? a.x : i1 == 1 ? a.y : a.z;
   vec2 s0 = skPlane(uSunW, i0);
   vec2 r = skBlocksOn(skPlane(p, i0), s0 / max(length(s0), 1e-3), px, cell, rmin, rmax, seed, keep, hk, tlo, thi);
-  float bl = smoothstep(0.85, 1.0, as / am) * 0.5;
+  float bl = skRefOn > 0.5 ? 0.0 : smoothstep(0.85, 1.0, as / am) * 0.5;
   if (bl > 0.001) {
     vec2 s1 = skPlane(uSunW, i1);
     r = mix(r, skBlocksOn(skPlane(p, i1), s1 / max(length(s1), 1e-3), px, cell, rmin, rmax, seed, keep, hk, tlo, thi), bl);
@@ -242,12 +248,16 @@ void skBlocks(vec3 p, float px, float cell, float rmin, float rmax, float seed, 
 // direction from the crater's centre). band comes out as how much the band darkens the paint (0 to about 0.87, as the classic's).
 void skRim(vec3 p, vec3 pr, float px, float have, float sd, vec3 cen, float far, float vrim, inout float h, inout float lum, out float band) {
   band = 0.0;
+  skRef = cen;
+  skRefOn = have;
   float zv = smoothstep(0.55, 1.0, vrim);
   float core = 0.0, halo = 0.0, zo = 0.0, zi = 0.0, lane = 0.5;
   if (have > 0.5) {
     float a = abs(sd);
-    zo = sd > 0.0 ? exp(-sd / 14.0) : 0.0;     // the ejecta outside
-    zi = sd < 0.0 ? exp(sd / 8.0) : 0.0;       // the foot of the wall inside
+    // (the ejecta outside and the foot of the wall inside ease in across the crest, over a few metres. Both used to start at full
+    // strength exactly on it, from zero on the other side: a hard step in the paint along the whole crest, a straight pale line)
+    zo = smoothstep(-2.0, 3.0, sd) * exp(-max(sd, 0.0) / 14.0);   // the ejecta outside
+    zi = smoothstep(2.0, -3.0, sd) * exp(min(sd, 0.0) / 8.0);     // the foot of the wall inside
     vec3 dr = normalize(pr - cen);
     // lanes along the crater's radii, broad and broken up (a pure radial pattern is a wheel of spokes): the second term
     // drifts with the distance from the crest, so no lane runs straight
@@ -258,13 +268,15 @@ void skRim(vec3 p, vec3 pr, float px, float have, float sd, vec3 cen, float far,
     float tin = -sd;
     float wall = smoothstep(0.0, 3.0, tin) * (1.0 - smoothstep(20.0, 45.0, tin));           // the wall: from the crest down about 30 m
     lum *= 1.0 + 0.11 * wall * (lane * 2.0 - 1.0) * far * fl;                                // pale outcrop and dark dust, running down it
-    lum *= 1.0 + 0.05 * sin(sd * 1.4 + rimNoise(p * 0.3) * 4.0) * zi * far * fl;             // faint terraces
     // the band itself, as the classic rim's (planet.js): a ragged core and a halo
-    float rag = (rimNoise(p * 0.21 + 1.7) - 0.5) * 2.2 + (rimNoise(p * 0.55 - 6.0) - 0.5);
+    // (near, where single stones show, the band is a quiet darkening of the dust under them: its ragged edges and the speckle
+    // below are what made the dark blotches, so they come in only as stones drop below a pixel, from about 3 cm to 12 cm a pixel)
+    float far3 = smoothstep(0.03, 0.12, px);
+    float rag = ((rimNoise(p * 0.21 + 1.7) - 0.5) * 1.6 + (rimNoise(p * 0.55 - 6.0) - 0.5) * 0.7) * mix(0.35, 1.0, far3);
     float hw = max(1.3 + 1.9 * rimNoise(p * 0.03 + 9.0), px * 1.2);
     core = 1.0 - smoothstep(hw * 0.55, hw * 1.35 + px, a + rag);
     halo = (1.0 - smoothstep(hw, hw * 3.2, a + rag * 1.5)) * 0.35;
-    band = max(core * (0.62 + 0.25 * rimNoise(p * 0.09 - 3.0)), halo) * far;
+    band = max(core * (0.5 + 0.2 * rimNoise(p * 0.09 - 3.0)), halo) * far * mix(0.4, 1.0, far3); // (the classic's core was 0.62 to 0.87: softer here)
   }
   // the stones: as thick as the band is dark (the classic's rule: the core, or the halo at 1.6 times), thinning out over the ejecta
   // and the foot of the wall
@@ -278,13 +290,13 @@ void skRim(vec3 p, vec3 pr, float px, float have, float sd, vec3 cen, float far,
     skBlocks(p, px, 3.0, 0.1, 0.2, 73.0, dens * 0.6, 1.4, 0.55, 1.0, h, lum);                   // boulders, 30 to 60 cm
     // and the classic's bright chips of fresh rock, on the core
     if (uSkinQ > 0.5) skBlocks(p, px, 0.55, 0.08, 0.16, 79.0, core * 0.45 * far, 1.0, 1.15, 1.9, h, lum);
-    lum *= 1.0 + (rimNoise(p * 0.9 + 4.0) - 0.5) * 0.3 * dens * skFade(1.2, px);               // the rubble's own patchiness
     // and, for the range where single stones are under a pixel (30 to 150 m), the classic's speckle: dark pebbles and bright chips
-    // about half a metre across, on the band, fading out past a pixel of 8 to 35 cm
-    float grit = 1.0 - smoothstep(0.08, 0.35, px);
+    // about half a metre across, on the band, in between a pixel of 3 to 12 cm (not nearer: there they are shapeless blotches) and
+    // 8 to 35 cm
+    float grit = (1.0 - smoothstep(0.08, 0.35, px)) * smoothstep(0.03, 0.12, px);
     float peb = smoothstep(0.62, 0.72, rimNoise(p * 1.3 + 11.0)) * grit;
     float chip = smoothstep(0.8, 0.86, rimNoise(p * 1.9 - 4.0)) * grit;
-    lum *= (1.0 - 0.45 * peb * max(core, halo * 1.6) * far) * (1.0 + 0.7 * chip * core * far);
+    lum *= (1.0 - 0.3 * peb * max(core, halo * 1.6) * far) * (1.0 + 0.7 * chip * core * far);
   }
 }
 
