@@ -8,7 +8,7 @@ import { patchBermMaterial } from './moonSkins.js';
 import { market, tickerText } from './market.js';
 import { casinoNode, casinoSlot, lotNode, lotSlot } from './models.js';
 import { waterMesh } from './fountainFx.js';
-import { craneModel, craneSlot, CRANE_H, CRANE_LOAD_DROP, CRANE_TROLLEY_MIN, CRANE_TROLLEY_SPAN, gantryModel, cargoSlot, GANTRY_TROLLEY_SPAN, CARGO_BOX, garageModel, garageSlot, GARAGE_HALL, dishModel, dishSlot, DISH_KINDS } from './models.js';
+import { craneModel, craneSlot, CRANE_H, CRANE_LOAD_DROP, CRANE_TROLLEY_MIN, CRANE_TROLLEY_SPAN, gantryModel, cargoSlot, GANTRY_TROLLEY_SPAN, CARGO_BOX, garageModel, garageSlot, dishModel, dishSlot, DISH_KINDS } from './models.js';
 
 // Settlements, HQs and landmarks built with the outpost Kit (outpostModels.js): every static part
 // of a place bakes into one merged mesh per material plus one ink hull, so a detailed settlement
@@ -439,12 +439,14 @@ export function warehouse(k, x, z, w, d, h, color, yaw, trim) {
 }
 
 // Vehicle garage (built in Blender, tools/blender/build_garage.py): the main one (`kind` 'main') is a three-bay motor pool with a
-// service office built onto one end and a fuel and coolant yard at the other; the small one ('small') is a two-bay shed about the
-// size of the old sheds. The shell, roof and yards are baked into the kit; `open` (a boolean per bay) says which bay doors are rolled
-// up, showing a lit workshop with a rover on a lift, an engine stand or a bench; the roof's turbine vents turn and (main) the antenna
-// lamp blinks. Its doors (+z) face along the yaw.
+// service office built onto one end and its compound round the other three sides (a bunded fuel yard with a pump island, a back yard
+// with a rover park, a parts store and a rack, a power compound behind the office); the small one ('small') is a two-bay shed about the
+// size of the old sheds. The shell, roof and yards are baked into the kit, and so are the parts store's cargo boxes (the gantry's);
+// `open` (a boolean per bay) says which bay doors are rolled up, showing a lit workshop with a rover on a lift, an engine stand or a
+// bench; the roof's turbine vents turn and (main) the antenna lamp blinks. Its doors (+z) face along the yaw. The colliders are the
+// model's own (its `col` pivots: the hall, whose doors' plane is a wall, the office, the tanks, the yard's furniture).
 export function garage(k, x, z, yaw, open = [true, false, true], kind = 'main') {
-  const M = garageModel(open, kind), { hx, hz } = GARAGE_HALL[kind];
+  const M = garageModel(open, kind);
   const mat = (slot) => { const c = garageSlot(slot); return c.glow ? G(c.color) : T(c.color); };
   const I = new THREE.Matrix4();
   k.at(x, z, yaw);
@@ -455,13 +457,11 @@ export function garage(k, x, z, yaw, open = [true, false, true], kind = 'main') 
     k.dyn(head, f.pos.x, f.pos.y, f.pos.z);
   }
   for (const b of M.blinkers) k.blinker(b.pos.x, b.pos.y, b.pos.z, 0xffd23f, b.data.radius || 0.25);
-  // solid: the hall (the bays are for show: the doors' plane is a wall), and on the main one the office, the two tanks and the pump island
-  k.solid(hx + 0.2, kind === 'main' ? 5.4 : 5.0, hz + 0.2, 0, 0);
-  if (kind === 'main') {
-    k.solid(4.4, 2.7, 6.7, 23.25, 3.5);
-    k.hcyl(1.5, 8.2, -23.6, 5.0, 0, 2.0);
-    k.hcyl(1.5, 8.2, -23.6, -4.2, 0, 2.0);
-    k.solid(2.4, 0.9, 0.8, -21.5, hz + 4.8);
+  for (const c of M.cargo) cargoStack(k, c.pos.x, c.pos.z, c.data.n || 1, [c.data.faction || 'meridian'], c.data.yaw || 0, c.pos.y);
+  for (const { pos: p, data: d } of M.cols) {
+    if (d.shape === 'box') k.solid(d.hx, d.hy, d.hz, p.x, p.z, d.yaw || 0, p.y);
+    else if (d.shape === 'cyl') k.column(d.r, p.y + d.h, p.x, p.z, p.y);
+    else if (d.shape === 'hcyl') k.hcyl(d.r, d.len, p.x, p.z, d.yaw || 0, p.y);
   }
   k.at();
 }
@@ -1115,6 +1115,8 @@ export function buildMeridian(world, loc) {
     const GA = GARAGE_AT;
     garage(k, GA.x, GA.z, GA.yaw, [true, false, true], 'main');
     loc.garage = { ...GA, bay: 2 }; // (the bay the rovers come out of: it is open and has nothing in the way)
+    // keep the traffic's pads and the defence pylons off its compound (61 by 45 m, its middle 3 m right of the hall's and 5.5 m behind)
+    (loc.keep ||= []).push({ x: GA.x + 3 * Math.cos(GA.yaw) - 5.5 * Math.sin(GA.yaw), z: GA.z - 3 * Math.sin(GA.yaw) - 5.5 * Math.cos(GA.yaw), r: 36 });
     // the container yard: a 70 x 30 slab with the gantry crane's rails along its long edges, three rows of stacks of the
     // land-train's box container (cargo.py, as the cranes carry it) in the freight factions' liveries, a lane along the
     // north side for the gantry to set its load down in, and the gantry running the length of the yard over it all

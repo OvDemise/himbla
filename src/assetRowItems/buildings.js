@@ -230,7 +230,8 @@ const parts = {
     item('part.cargo-stacks', 'CARGO CONTAINER STACKS', 42, 9, () => kitPart((k) => {
       ['spacecom', 'vostok', 'kepler', 'meridian'].forEach((f, i) => cargoStack(k, -16 + i * 10.5, 0, 1 + (i % 3), [f, f, f], Math.PI / 2));
     })),
-    item('part.garage.main', 'MOTOR POOL GARAGE', 54, 26, () => kitPart((k) => garage(k, 0, 0, 0, [true, false, true], 'main'))),
+    // (the motor pool with its compound, 61 by 45 m: shifted so the compound, not the hall, is centred on the item)
+    item('part.garage.main', 'MOTOR POOL GARAGE', 62, 46, () => kitPart((k) => garage(k, -2.8, 5.5, 0, [true, false, true], 'main'))),
     item('part.garage.small', 'SMALL GARAGE', 34, 20, () => kitPart((k) => garage(k, 0, 0, 0, [true, true], 'small'))),
     item('part.dish-stations', 'DISH STATIONS (CRYO · GANTRY)', 66, 30, () => row([
       kitPart((k) => dishStation(k, 0, 0, DISH_SIZE, 'cryo', 'meridian', '01', { speed: 0.1 })),

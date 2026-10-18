@@ -1431,9 +1431,9 @@ export class Traffic {
     const lenOf = (pts, a, b) => { let L = 0; for (let k = a + 1; k <= b; k++) L += pts[k].distanceTo(pts[k - 1]); return L; };
 
     // ---- the forecourt: a wide bed across the whole front, from under the plinth to the ring's inner lane ----
-    // (x across the garage's front, z out from it; its edges run straight out from the hall's and the office's corners, then bend away
+    // (x across the garage's front, z out from it; its edges run straight out from the compound's front corners, then bend away
     // along the ring's inner edge: a quarter-ellipse each side. The bed is as wide as a road is long, so the shader is told the width)
-    const FX0 = -(H.hx + 0.6), FX1 = 27.7;           // its edges at the garage are the building's own: the hall's plinth on the left, the office's end on the right
+    const FX0 = -27.6, FX1 = 33.2;                   // its edges at the garage are the compound's (build_garage.py): out past the pump island on the left, the side lane's railing on the right
     const TIP0 = -47, TIP1 = 44;                     // and where they have swung out to by the ring (the right stops short of the casino road's junction)
     const zA = H.hz + 0.2, zEnd = LZ0 + tLane - 1;   // (it begins under the plinth; it ends in the ring's bed, which melts it in)
     const sideAt = (z) => L2W(1, z).sub(L2W(0, z)).normalize();
@@ -1449,6 +1449,12 @@ export class Traffic {
       this.stripPush(centre, sv, z - zA, h / 7.3, fade, 0, berm, berm, 0, h / 7.3);
     }
     this.stripIdx(baseF, N + 1);
+
+    // ---- the compound's yard (build_garage.py): the same bed, without ruts, behind the hall (the back yard and its rover park) and down
+    // the side lane past the office from the forecourt to it. The back yard's edge along the hall has no berm (it runs under the
+    // plinth, the bund and the power compound's slab, and across the lane, which it meets there) ----
+    this.bedStrip(L2W(-22.6, -19.3), L2W(33.8, -19.3), 8.7, { bR: 0 });           // (x -22 to 33, z -28 to -10.6: its right is the hall's side)
+    this.bedStrip(L2W(30.3, H.hz + 1.0), L2W(30.3, -H.hz - 2.0), 2.9);           // (x 27.4 to 33.2, from inside the forecourt into the back yard)
 
     // ---- the rover's road: the same line as a sweep, melting in from the forecourt and out into the ring ----
     // the strip: its centre RIGHT-lane-width to the left of the line, so the rover keeps to the right of the road
@@ -1475,6 +1481,17 @@ export class Traffic {
     // (the ring's own berm makes way where the forecourt flares into it: a ring point's place in the garage's frame)
     const toGarage = (wp) => { const q = this.local(loc, wp, _a), dx = q.x - G.x, dz = q.z - G.z; return { lx: dx * c - dz * sn, lz: dx * sn + dz * c }; };
     return { i0, j, Q, raw, fc, toGarage, lead: Math.ceil(11 / step), trail: m + Math.ceil(14 / step), polyLen: lenOf(raw, 0, raw.length - 1), hallLen: lenOf(raw, 0, 0) + A.distanceTo(L2W(bx, H.hz)), plinthAt: A.distanceTo(L2W(bx, LZ0)), piece: null };
+  }
+
+  // A wide bed of the road's soil along a straight line on the ground (world points a, b), `hw` metres either side of it, without
+  // ruts (a yard, a lot), fading in and out over `fadeIn` / `fadeOut` metres at its ends; `bL` / `bR` how much berm shows on its left
+  // and right edge (0 where it runs under something or meets another bed).
+  bedStrip(a, b, hw, { fadeIn = 1.5, fadeOut = 1.5, bL = 1, bR = 1 } = {}) {
+    const n = Math.max(2, Math.ceil(a.distanceTo(b) / 4)), g = [];
+    for (let i = 0; i <= n; i++) g.push(this.P.ground(a.clone().lerp(b, i / n), new THREE.Vector3()));
+    const { side, cum } = this.frames(g), total = cum[n], k = hw / 7.3, base = this.roadGeo.pos.length / 3;
+    for (let i = 0; i <= n; i++) this.stripPush(g[i], side[i], cum[i], k, smooth(cum[i] / fadeIn) * smooth((total - cum[i]) / fadeOut), 0, bL, bR, 0, k);
+    this.stripIdx(base, n + 1);
   }
 
   // A straight road a settlement asked for inside its own grounds (`loc.paved`: { x0, z0, x1, z1 } in the settlement's frame; the

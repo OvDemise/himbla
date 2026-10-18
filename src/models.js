@@ -2163,10 +2163,12 @@ export function makeCargoBox({ faction = 'kepler' } = {}) {
 }
 
 // ---- The vehicle garage (built in Blender, see build_garage.py) ----
-// Two buildings in one file: the main garage, 38 m by 20 m with three bays, a service office and a fuel yard, and a small one,
-// 32 m by 17 m with two bays (about the old sheds' size). Bay doors face +z. The baked tree: the root's own meshes are the shell, roof and yards; its `door`
+// Two buildings in one file: the main garage, a 38 m by 20 m hall with three bays, a service office and its compound round it (the
+// fuel yard, the back yard and the power compound, 61 m by 45 m in all), and a small one, 32 m by 17 m with two bays (about the old
+// sheds' size). Bay doors face +z. The baked tree: the root's own meshes are the shell, roof and yards; its `door`
 // pivots hold each bay's closed and open door (extras `bay`, `state`), its `fit` pivots what is working inside a bay that is
-// open, `fan` the roof turbine heads (extra `speed`, spun about y) and `blinker` the antenna lamp.
+// open, `fan` the roof turbine heads (extra `speed`, spun about y), `blinker` the antenna lamp, `cargo` where a stack of the
+// gantry's cargo boxes stands (extras `n`, `yaw`, `faction`) and `col` the colliders (extras `shape` box / cyl / hcyl and its sizes).
 export const GARAGE_HALL = { main: { hx: 19, hz: 10 }, small: { hx: 16, hz: 8.5 } }; // each hall's half sizes
 export const GARAGE_BAYS = { main: [-10, 0, 10], small: [-8, 8] }; // and where its bays are (x)
 export const GARAGE_FLOOR = 0.08; // the hall's floor above the ground (FY in build_garage.py): the road meets the plinth's edge
@@ -2185,20 +2187,22 @@ export function garageSlot(slot, trim = 0x2ec4ff) {
 }
 
 // What to build for a garage whose bays are `open` (a boolean for each bay): the baked nodes of the static building, the moving
-// heads and the lamp. Every pivot of the model that isn't picked is left out.
+// heads, the lamp, the cargo stacks and the colliders. Every pivot of the model that isn't picked is left out.
 export function garageModel(open = [true, false, true], kind = 'main') {
   const root = SHIP_PARTS[kind === 'main' ? 'garage' : 'garage_small'];
   const keep = (n) => (n.role === 'door' ? (n.data.state === 'open') === !!open[n.data.bay] : n.role === 'fit' ? !!open[n.data.bay] : true);
-  const flat = [], fans = [], blinkers = [];
+  const flat = [], fans = [], blinkers = [], cargo = [], cols = [];
   const walk = (n) => {
     if (n.role === 'fan') { fans.push(n); return; }
     if (n.role === 'blinker') { blinkers.push(n); return; }
+    if (n.role === 'cargo') { cargo.push(n); return; }
+    if (n.role === 'col') { cols.push(n); return; }
     if (!keep(n)) return;
     flat.push(n);
     for (const k of n.kids) walk(k);
   };
   walk(root);
-  return { root, flat, fans, blinkers };
+  return { root, flat, fans, blinkers, cargo, cols };
 }
 
 // A whole garage as plain meshes (the model viewer's): `open` the bays that are up, the head of each vent turning with `t`.
