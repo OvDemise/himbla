@@ -512,10 +512,12 @@ M("ribs", rbj([(0.035, 1.28, 0.055, (sx * 1.57, 3.3, -3.3 + k * 0.388)) for sx i
 M("roofRibs", rbj([(1.42, 0.03, 0.06, (0, 4.72, -3.2 + k * 0.7)) for k in range(10)], nu=4, nv=2), "load", load, 0.02)
 M("roofRails", rbj([(0.08, 0.06, 3.62, (sx * 1.52, 4.74, 0)) for sx in (-1, 1)], e=0.2), "dark", load, 0.03)
 M("castings", rbj([(0.2, 0.17, 0.22, (sx * 1.5, y, sz * 3.55)) for sx in (-1, 1) for sz in (-1, 1) for y in (1.95, 4.62)], e=0.2), "dark", load, 0.03)
-# the rear doors: four locking bars, their cams and the seam
-M("doorBars", join([beam((x, 1.95, -3.66), (x, 4.6, -3.66), 0.05, 6) for x in (-1.0, -0.35, 0.35, 1.0)]), "metal", load, 0.02)
-M("doorCams", rbj([(0.12, 0.05, 0.05, (x, 2.7, -3.7)) for x in (-1.0, -0.35, 0.35, 1.0)]), "steel", load, 0.01)
-rb("doorSeam", 0.02, 1.35, 0.02, (0, 3.3, -3.65), "dark", load, 0, e=0.3, nu=6, nv=4)
+# the doors at both ends (decals.py container_doors): joined into one mesh per end, slot and outline, like the rest of the load
+doors = {}
+for name, geo, slot, ink in container_doors("load"):
+    doors.setdefault((name[4], slot, ink), []).append(geo)       # (name[4]: the end, F or R)
+for (e, slot, ink), geos in sorted(doors.items()):
+    M(f"doors{e}_{slot}_{round(ink * 1000)}", join(geos), slot, load, ink)
 for sx in (-1, 1):
     rb(f"plate{sx}", 0.04, CARGO_PLATE_HALF[1], CARGO_PLATE_HALF[0], (sx * 1.64, CARGO_PLATE_Y, 0.0), "dark", load, 0.03, e=0.08)
 

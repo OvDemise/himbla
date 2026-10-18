@@ -71,10 +71,8 @@ def _container_frame(R, body_slot, ribbed):
 
 def _cargo_box(R):
     _container_frame(R, "body", True)
-    for k, x in enumerate((-1.0, -0.35, 0.35, 1.0)):
-        _cbm(f"bar{k}", (x, 1.95, -3.66), (x, 4.6, -3.66), 0.05, "metal", R, 0.02)
-        _crb(f"cam{k}", 0.12, 0.05, 0.05, (x, 2.7, -3.7), "steel", R, 0.01, 0.3, nu=6, nv=4)
-    _crb("doorSeam", 0.02, 1.35, 0.02, (0, 3.3, -3.65), "dark", R, 0, 0.3, nu=6, nv=4)
+    for name, geo, slot, ink in container_doors("body"):     # (decals.py: a pair of doors at each end)
+        _cM(name, geo, slot, R, ink)
     for sx in (-1, 1):
         _crb(f"plate{sx}", 0.04, CARGO_PLATE_HALF[1], CARGO_PLATE_HALF[0], (sx * 1.64, CARGO_PLATE_Y, 0.0), "dark", R, 0.03, 0.08)
     _cliveries(R, "livery", lambda f, piv: cargo_decals(f, piv, _cargo_ctx["pfx"]))

@@ -10,7 +10,7 @@
 // A file that is already compressed is left alone. Not run on runner.glb (the player: the one model whose outline
 // follows the stored normals closely) or outposts.glb (checked by tools/check-outposts.mjs, and loaded only on request).
 // glTF-Transform comes through npx at a pinned version, so nothing is added to package.json.
-import { execFileSync } from 'node:child_process';
+import { execFileSync, execSync } from 'node:child_process';
 import { readFileSync, writeFileSync, mkdtempSync, rmSync, statSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -33,7 +33,10 @@ try {
   for (const file of files) {
     if (extensionsOf(file).includes('EXT_meshopt_compression')) { console.log(`${file}: already compressed`); continue; }
     const out = join(tmp, 'out.glb');
-    execFileSync('npx', ['--yes', CLI, 'meshopt', file, out, '--level', 'high'], { stdio: ['ignore', 'ignore', 'inherit'] });
+    const args = ['--yes', CLI, 'meshopt', file, out, '--level', 'high'], opts = { stdio: ['ignore', 'ignore', 'inherit'] };
+    // (npx is a .cmd on Windows, which Node runs only through a shell)
+    if (process.platform === 'win32') execSync(`npx ${args.map((a) => `"${a}"`).join(' ')}`, opts);
+    else execFileSync('npx', args, opts);
     const before = statSync(file).size, after = statSync(out).size;
     if (after >= before) { console.log(`${file}: no smaller (${kb(before)}), left alone`); continue; }
     writeFileSync(file, readFileSync(out));
