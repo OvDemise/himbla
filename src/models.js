@@ -15,6 +15,7 @@ const GLB = {
   ships: () => import('./assets/ships.glb?inline'),
   skimmer: () => import('./assets/skimmer.glb?inline'),
   warrig: () => import('./assets/warrig.glb?inline'),
+  rover: () => import('./assets/rover.glb?inline'),
   apc: () => import('./assets/apc.glb?inline'),
   landtrain: () => import('./assets/landtrain.glb?inline'),
   crane: () => import('./assets/crane.glb?inline'),
@@ -63,7 +64,7 @@ const loadGlb = async (name, url) => { // (url: a file to load instead of the bu
   gltf.scene.traverse((o) => { if (o.isMesh) for (const k of Object.keys(o.geometry.attributes)) o.geometry.setAttribute(k, toFloat(o.geometry.attributes[k])); });
   return gltf;
 };
-import { Kit, T as KT, G as KG, D as KD, crate } from './outpostModels.js';
+import { Kit, T as KT, G as KG } from './outpostModels.js';
 import { FACTIONS } from './locations.js';
 
 function part(geo, mat, x = 0, y = 0, z = 0, outline = 0.05) {
@@ -1267,121 +1268,75 @@ function makeWaveFlag({ w, h, mat, ragged = false }) {
 // Rovers: pirate war-rigs, military patrol cars and civilian buggies share one layout (body 3.2
 // x 5.2, wheels at (±1.85, 0.85, ±1.8), gun mount at (0, 3, 0.8), loot slot on the chassis) so the
 // AI, traffic and faction-vehicle code drive them all the same way. style: pirate | military | civil.
+// All three are built in Blender: the war-rig in build_warrig.py, the buggy and the patrol car in
+// build_rover.py (rover.glb). Body takes `color`, stripe takes `trim` (and the light bar's lenses glow
+// in it); the rest are fixed. The buggy has its own bench seat and steering wheel (ownSeat), and the
+// patrol car's two whip antennas lie back with speed.
+const ROVER_TOON = { dark: 0x2a2540, steel: 0x55607a, metal: 0x8a87a0, tire: 0x1d1a29, seat: 0x3a2f45, white: 0xe8e4f0, wood: 0x9a6a3a, olive: 0x4f5a42, panel: 0x1f3a6b, red: 0xd7263d };
+const ROVER_GLOW = { glass: 0xcfefff, lamp: 0xfff6a8, tail: 0xff2a4a, hot: 0xff9f1c };
+const ROVER_MATS = new Map(); // (shared per colour, as the baked rovers' were)
+function roverMat(slot, color, trim) {
+  const c = slot === 'body' ? color : slot === 'stripe' || slot === 'lens' ? trim : null;
+  const key = `${slot}|${c}`;
+  let m = ROVER_MATS.get(key);
+  if (!m) {
+    m = slot === 'lens' ? glow(trim) : c !== null ? toon(c) : ROVER_GLOW[slot] !== undefined ? glow(ROVER_GLOW[slot]) : toon(ROVER_TOON[slot] ?? 0xff00ff);
+    ROVER_MATS.set(key, m);
+  }
+  return m;
+}
 export function makeRover({ color = 0x7b2ff7, trim = 0xffd23f, pirate = true, flag = 0x111111, style = null } = {}) {
   style = style || (pirate ? 'pirate' : 'civil');
   if (style === 'pirate') return makeWarRig({ color, trim });
-  const root = new THREE.Group();
-  const chassis = new THREE.Group();
-  root.add(chassis);
-  chassis.add(baked(`rover|${style}|${color}|${trim}`, (k) => {
-    // common frame: skid plate, axles, fenders, lights
-    k.box(3.0, 0.5, 5.4, KT(VDARK), 0, 0.7, 0, { outline: 0.06 });
-    for (const sz of [-1.8, 1.8]) k.add(new THREE.CylinderGeometry(0.18, 0.18, 3.5, 8).rotateZ(Math.PI / 2), KT(VSTEEL), 0, 0.85, sz, { outline: 0 });
-    // fenders over the top of each wheel: the arc stops a little above the axle at the front and
-    // back (ends dipping below it hung down like fins under the wheels); the military hulls get
-    // heavier ones with a lip
-    const mil = style === 'military';
-    const a0 = 0.32, al = Math.PI - 2 * a0; // the arc, measured from the front of the wheel
-    for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
-      k.add(new THREE.CylinderGeometry(mil ? 1.14 : 1.06, mil ? 1.14 : 1.06, mil ? 0.95 : 0.85, 14, 1, true, a0, al).rotateZ(Math.PI / 2), KD(mil ? VSTEEL : color), sx * 1.85, 0.85, sz * 1.8, { outline: 0.04 });
-      if (mil) k.add(new THREE.TorusGeometry(1.16, 0.07, 6, 16, al).rotateZ(a0).rotateY(Math.PI / 2), KT(VDARK), sx * 2.32, 0.85, sz * 1.8, { outline: 0 });
+  const B = SHIP_PARTS[style === 'military' ? 'rover_military' : 'rover_civil'];
+  const out = { chassis: null, gun: null, wheels: [], antennas: [], cloth: null };
+  const build = (node) => {
+    const g = new THREE.Group();
+    g.name = node.name;
+    g.position.copy(node.pos);
+    g.quaternion.copy(node.quat);
+    for (const { slot, geo } of node.parts) {
+      const m = new THREE.Mesh(geo, roverMat(slot, color, trim));
+      m.castShadow = ROVER_GLOW[slot] === undefined && slot !== 'lens';
+      g.add(m);
     }
-    if (style === 'pirate') {
-      // welded war-rig: slab hull, scrap armour, a spiked ram plate, a cage cab and exhaust stacks
-      k.box(3.2, 1.1, 5.2, KT(color), 0, 0.9, 0, { outline: 0.08 });
-      k.add(new THREE.BoxGeometry(3.4, 1.4, 0.4), KT(VSTEEL), 0, 1.4, 2.85, { rx: -0.35, outline: 0.05 });
-      for (let i = 0; i < 4; i++) k.add(new THREE.ConeGeometry(0.18, 0.8, 5).rotateX(Math.PI / 2), KT(0xd8d4e8), -1.2 + i * 0.8, 1.2, 3.25, { outline: 0.02 });
-      for (const [x, y, z, h, c] of [[1.64, 1.2, 0.05, 0.8, 0x7a4a32], [-1.64, 1.15, -0.1, 0.9, 0x6b5a3a]]) k.box(0.12, h, 1.2, KT(c), x, y, z, { rz: 0.05, outline: 0.02 });
-      k.box(1.8, 0.7, 0.12, KT(0x5a5f6e), 0.3, 1.2, -2.65, { rz: 0.06, outline: 0.02 });
-      for (const sx of [-0.9, 0.9]) k.box(0.55, 0.3, 0.12, KG(0xfff6a8), sx, 1.0, 2.62, { outline: 0 });
-      for (const sx of [-1.2, 1.2]) k.box(0.4, 0.22, 0.12, KG(0xff2a4a), sx, 0.95, -2.62, { outline: 0 });
-      k.box(2.4, 1.0, 2.0, KT(trim), 0, 2.0, -0.6, { outline: 0.06 });
-      k.box(2.42, 0.4, 1.0, KG(0xcfefff), 0, 2.45, 0.1, { outline: 0 });
-      for (const sx of [-1, 1]) {
-        k.beam([sx * 1.15, 2.0, 0.5], [sx * 1.1, 3.6, 0.4], 0.08, KT(VDARK), { outline: 0.02 });
-        k.beam([sx * 1.15, 2.0, -1.6], [sx * 1.1, 3.6, -1.2], 0.08, KT(VDARK), { outline: 0.02 });
-        k.cyl(0.18, 0.22, 2.4, 8, KT(VSTEEL), sx * 1.35, 1.6, -2.3, { outline: 0.03 });
-        k.cyl(0.2, 0.2, 0.2, 8, KG(0xff9f1c), sx * 1.35, 4.0, -2.3, { outline: 0 });
-      }
-      k.beam([-1.1, 3.6, 0.4], [1.1, 3.6, 0.4], 0.08, KT(VDARK), { outline: 0 });
-      k.beam([-1.1, 3.6, -1.2], [1.1, 3.6, -1.2], 0.08, KT(VDARK), { outline: 0 });
-      for (const sx of [-1, 1]) k.box(0.1, 0.18, 1.3, KG(trim), sx * 1.63, 1.05, 0, { outline: 0 });
-    } else if (style === 'military') {
-      // armoured patrol car: a sloped hull with skirts, faction stripes, smoke launchers, antennas
-      k.add(new THREE.CylinderGeometry(1.45 * Math.SQRT2, 1.7 * Math.SQRT2, 1.3, 4, 1).rotateY(Math.PI / 4).scale(1, 1, 1.65), KT(color), 0, 1.6, 0, { outline: 0.1 });
-      k.add(new THREE.BoxGeometry(3.0, 0.7, 1.2), KT(color), 0, 1.35, 2.45, { rx: 0.5, outline: 0.05 });
-      // headlights on the nose plate's front face (it's tilted 0.5 rad: the face sits at
-      // (0, 1.06, 2.98) facing forward and a little down), tail lights on the sloped rear of the hull
-      for (const sx of [-0.9, 0.9]) k.box(0.55, 0.26, 0.1, KG(0xfff6a8), sx, 1.05, 3.0, { rx: 0.5, outline: 0 });
-      for (const sx of [-1.2, 1.2]) k.box(0.4, 0.22, 0.1, KG(0xff2a4a), sx, 1.5, -2.66, { rx: 0.3, outline: 0 });
-      for (const sx of [-1, 1]) {
-        // skirt plate between the wheel wells, the faction stripe up on the hull above the arches
-        k.box(0.25, 0.75, 1.3, KT(VSTEEL), sx * 1.72, 1.15, 0, { outline: 0.04 });
-        k.box(0.27, 0.12, 1.3, KT(trim), sx * 1.74, 1.47, 0, { outline: 0 });
-        k.box(0.08, 0.18, 4.2, KT(trim), sx * 1.5, 2.1, 0, { rz: sx * 0.19, outline: 0 });
-        for (let i = 0; i < 3; i++) k.add(new THREE.CylinderGeometry(0.1, 0.1, 0.45, 6).rotateX(-0.6), KT(VDARK), sx * (0.8 + i * 0.18), 2.35, 1.4, { outline: 0 });
-      }
-      k.cyl(0.95, 1.05, 0.35, 12, KT(VSTEEL), 0, 2.25, 0.8, { outline: 0.03 });
-      k.box(2.0, 0.5, 0.9, KG(0xcfefff), 0, 1.95, 1.75, { rx: 0.5, outline: 0 });
-      k.cyl(0.03, 0.05, 2.6, 4, KT(VDARK), -1.1, 2.2, -2.0, { outline: 0 });
-      k.cyl(0.03, 0.05, 1.8, 4, KT(VDARK), -0.8, 2.2, -2.2, { outline: 0 });
-      k.box(1.6, 0.6, 1.0, KT(VSTEEL), 0, 2.2, -1.9, { outline: 0.03 });
-    } else {
-      // civilian buggy: open tub, roll cage, seats, cargo bed with crates, a light bar
-      k.box(3.0, 0.7, 5.0, KT(color), 0, 0.9, 0, { outline: 0.08 });
-      k.add(new THREE.BoxGeometry(2.8, 0.5, 1.0), KT(color), 0, 1.3, 2.3, { rx: 0.4, outline: 0.04 });
-      // headlights on the nose plate's front face (tilted 0.4 rad: the face sits at (0, 1.1, 2.76)),
-      // tail lights set into the tub's back face (z = -2.5)
-      for (const sx of [-0.9, 0.9]) k.box(0.55, 0.24, 0.1, KG(0xfff6a8), sx, 1.0, 2.79, { rx: 0.4, outline: 0 });
-      for (const sx of [-1.2, 1.2]) k.box(0.4, 0.22, 0.1, KG(0xff2a4a), sx, 0.95, -2.53, { outline: 0 });
-      k.box(2.8, 0.15, 1.4, KT(trim), 0, 1.6, -1.6, { outline: 0 });
-      for (const sx of [-0.6, 0.6]) { k.box(0.8, 0.5, 0.8, KT(VDARK), sx, 1.6, 0.4, { outline: 0.02 }); k.box(0.8, 0.9, 0.2, KT(VDARK), sx, 1.6, 0.0, { outline: 0.02 }); }
-      for (const sx of [-1, 1]) {
-        k.beam([sx * 1.3, 1.6, 1.4], [sx * 1.1, 3.4, 0.8], 0.09, KT(VSTEEL), { outline: 0.02 });
-        k.beam([sx * 1.3, 1.6, -0.6], [sx * 1.1, 3.4, -0.4], 0.09, KT(VSTEEL), { outline: 0.02 });
-        k.beam([sx * 1.1, 3.4, 0.8], [sx * 1.1, 3.4, -0.4], 0.09, KT(VSTEEL), { outline: 0 });
-      }
-      k.beam([-1.1, 3.4, 0.8], [1.1, 3.4, 0.8], 0.09, KT(VSTEEL), { outline: 0 });
-      k.box(1.8, 0.25, 0.3, KG(0xfff6a8), 0, 3.5, 0.85, { outline: 0 });
-      crate(k, -0.6, 1.75, -1.7, 0.9, 0x9a6a3a, 0.2);
-      crate(k, 0.6, 1.75, -1.5, 0.8, 0x4f5a42, -0.3);
+    if (node.ink) {
+      const h = new THREE.Mesh(node.ink, inkMat);
+      h.castShadow = false;
+      h.userData.isInk = true;
+      g.add(h);
     }
-  }));
-  // gun (yawed by the AI): a pintle twin-gun, a small turret, or a searchlight on the civil buggy
-  const gun = new THREE.Group();
-  gun.position.set(0, 3.0, 0.8);
-  gun.add(baked(`gun|${style}|${trim}`, (k) => {
-    if (style === 'military') {
-      k.box(1.3, 0.6, 1.4, KT(VSTEEL), 0, -0.6, 0, { outline: 0.04 });
-      k.box(1.32, 0.15, 1.42, KT(trim), 0, -0.1, 0, { outline: 0 });
-      k.add(new THREE.CylinderGeometry(0.1, 0.12, 2.2, 8).rotateX(Math.PI / 2), KT(VDARK), 0, -0.3, 1.6, { outline: 0.03 });
-    } else if (style === 'pirate') {
-      k.cyl(0.12, 0.12, 0.7, 6, KT(VDARK), 0, -0.7, 0, { outline: 0.02 });
-      k.box(0.8, 0.5, 0.9, KT(VDARK), 0, 0, 0, { outline: 0.04 });
-      for (const sx of [-0.18, 0.18]) k.add(new THREE.CylinderGeometry(0.08, 0.1, 2.0, 6).rotateX(Math.PI / 2), KT(VDARK), sx, 0.25, 1.2, { outline: 0.02 });
-      k.box(0.9, 0.6, 0.1, KT(trim), 0, 0.2, 0.5, { outline: 0 });
-    } else {
-      k.cyl(0.1, 0.12, 0.6, 6, KT(VDARK), 0, -0.5, 0, { outline: 0.02 });
-      k.add(new THREE.CylinderGeometry(0.35, 0.3, 0.6, 10).rotateX(Math.PI / 2), KT(0xd8d4e8), 0, 0, 0, { outline: 0.03 });
-      k.add(new THREE.CylinderGeometry(0.3, 0.3, 0.05, 10).rotateX(Math.PI / 2), KG(0xfffbe0), 0, 0, 0.32, { outline: 0 });
+    if (node.role === 'flag') {
+      // the cloth hangs from the pole's tip and streams back; the vehicle code drives it through anim
+      out.cloth = makeWaveFlag({ w: 1.4, h: 0.9, mat: toon(flag, { side: THREE.DoubleSide }) });
+      g.add(out.cloth.mesh);
+    } else if (node.role === 'wheel') out.wheels.push(g);
+    else if (node.role === 'antenna') out.antennas.push(g);
+    else if (node.role === 'chassis') out.chassis = g;
+    else if (node.role === 'gun') out.gun = g;
+    for (const k of node.kids) g.add(build(k));
+    return g;
+  };
+  const root = build(B);
+  root.position.set(0, 0, 0);
+  root.quaternion.identity();
+  // the whips lag behind the speed like a damped spring and flutter a little flat out
+  const whips = out.antennas.map((g, i) => ({ g, a: 0, v: 0, ph: i * 2.1 }));
+  let lastT = null;
+  const anim = (t, sp = 0) => {
+    out.cloth.update(t, sp);
+    const dt = lastT == null ? 0 : Math.min(0.05, Math.max(0, t - lastT));
+    lastT = t;
+    if (!dt) return;
+    const k = Math.min(1, Math.abs(sp) / 40);
+    for (const w of whips) {
+      const target = -0.5 * k - 0.03 * k * Math.sin(t * 17 + w.ph);
+      w.v += (90 * (target - w.a) - 9 * w.v) * dt;
+      w.a += w.v * dt;
+      w.g.rotation.x = w.a; // (+z is forward: a negative turn about x lays the tip back)
     }
-  }));
-  chassis.add(gun);
-  // flag on a whip pole at the back
-  const flagM = toon(flag, { side: THREE.DoubleSide });
-  chassis.add(part(new THREE.CylinderGeometry(0.05, 0.05, 3), toon(VDARK), -1.2, 3.6, -2.2, 0.02));
-  // (the cloth hangs from the pole's top and streams back; the vehicle code drives it through anim)
-  const cloth = makeWaveFlag({ w: 1.4, h: 0.9, mat: flagM });
-  cloth.mesh.position.set(-1.2, 5.05, -2.2);
-  chassis.add(cloth.mesh);
-  const wheels = [];
-  for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
-    const w = rWheel(0.85, 0.7);
-    w.position.set(sx * 1.85, 0.85, sz * 1.8);
-    root.add(w);
-    wheels.push(w);
-  }
-  return { root, chassis, gun, wheels, anim: cloth.update };
+  };
+  return { root, chassis: out.chassis, gun: out.gun, wheels: out.wheels, antennas: out.antennas, anim, ownSeat: style === 'civil' };
 }
 
 // ---- transit ships: tools/blender/build_ships.py exports src/assets/ships.glb ----
@@ -1399,7 +1354,7 @@ const SHIP_TOON = { trim: 0xd8d4e8, dark: 0x2a2540, metal: 0x8a87a0, steel: 0x55
 const SHIP_FX = new Set(['plume', 'plumeCore', 'lift', 'engine', 'core', 'beacon']); // per-ship materials (they pulse)
 const FLAMES = new Set(['plume', 'plumeCore', 'lift', 'beacon']);
 export async function loadShipParts({ ships } = {}) {
-  const [gltf, sk, wr, ap, lt, cr, ga, di, en, bc, hc, sl, pk, cs, bj, gy, cl, dd, hl, lo, ...dn] = await Promise.all(['ships', 'skimmer', 'warrig', 'apc', 'landtrain', 'crane', 'garage', 'dish', 'engine', 'briefcase', 'hovercar', 'slots', 'plinko', 'casino', 'blackjack', 'gantry', 'claw', 'duck', 'hall', 'lot', ...DOWNS_FILES].map((n) => loadGlb(n, n === 'ships' ? ships : undefined)));
+  const [gltf, sk, wr, rv, ap, lt, cr, ga, di, en, bc, hc, sl, pk, cs, bj, gy, cl, dd, hl, lo, ...dn] = await Promise.all(['ships', 'skimmer', 'warrig', 'rover', 'apc', 'landtrain', 'crane', 'garage', 'dish', 'engine', 'briefcase', 'hovercar', 'slots', 'plinko', 'casino', 'blackjack', 'gantry', 'claw', 'duck', 'hall', 'lot', ...DOWNS_FILES].map((n) => loadGlb(n, n === 'ships' ? ships : undefined)));
   SHIP_PARTS = {};
   for (const name of ['shuttle', 'freighter']) {
     const root = gltf.scene.getObjectByName(name);
@@ -1414,6 +1369,12 @@ export async function loadShipParts({ ships } = {}) {
   const rig = wr.scene.getObjectByName('warrig');
   if (!rig) throw new Error('warrig.glb has no warrig');
   SHIP_PARTS.warrig = bakeShip(rig);
+  // the civil buggy and the military patrol car (tools/blender/build_rover.py)
+  for (const name of ['rover_civil', 'rover_military']) {
+    const r = rv.scene.getObjectByName(name);
+    if (!r) throw new Error('rover.glb has no ' + name);
+    SHIP_PARTS[name] = bakeShip(r);
+  }
   // the Vostok BTR-M Moon APC (tools/blender/build_apc.py)
   const apc = ap.scene.getObjectByName('apc');
   if (!apc) throw new Error('apc.glb has no apc');

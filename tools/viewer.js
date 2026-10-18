@@ -1,7 +1,7 @@
 // Dev-only model viewer: renders one model through the game's comic post pass on a turntable.
 import * as THREE from 'three';
 import { loadFonts } from '../src/fonts.js';
-import { loadRunnerParts, loadShipParts, makeRunner, makeCrate, ScarfSim, makeShuttle, makeFreighter, makeHoverCar, makeApc, makeLandTrain, makeTowerCrane, CRANE_TROLLEY_MIN, CRANE_TROLLEY_SPAN, makeGantryCrane, makeCargoBox, GANTRY_TROLLEY_SPAN, makeGarage, makeDishStation, DISH_SIZE, makeLampPost, makeFountain, makeBouncer, makeChandelier, makeCasinoSign, makeChipStack, makeClawMachine, makeClawHead, clawKindParts, makeDerbyPart, makeRacer } from '../src/models.js';
+import { loadRunnerParts, loadShipParts, makeRunner, makeCrate, ScarfSim, makeShuttle, makeFreighter, makeHoverCar, makeRover, makeApc, makeLandTrain, makeTowerCrane, CRANE_TROLLEY_MIN, CRANE_TROLLEY_SPAN, makeGantryCrane, makeCargoBox, GANTRY_TROLLEY_SPAN, makeGarage, makeDishStation, DISH_SIZE, makeLampPost, makeFountain, makeBouncer, makeChandelier, makeCasinoSign, makeChipStack, makeClawMachine, makeClawHead, clawKindParts, makeDerbyPart, makeRacer } from '../src/models.js';
 import { outpostTemplate } from '../src/outpostModels.js';
 import { loadOutpostParts, GLB_KINDS } from '../src/outpostGlb.js';
 import { makeChimera, makeMite, LIVING, MODIFIERS, spliceGenes } from '../src/chimera.js';
@@ -301,6 +301,25 @@ if (m === 'shuttle' || m === 'freighter') {
   model = R.root;
   height = 2.2;
   window.runner = R;
+} else if (m === 'rover') {
+  // &style=civil|military|pirate|all (all three side by side)  &color=hex &trim=hex &flag=hex  &driver=1 (the road-traffic buggy, with its driver)
+  // &gun=<yaw rad>
+  const hex = (k, d) => (Q.has(k) ? parseInt(Q.get(k), 16) : d);
+  const LOOKS = { civil: { color: 0x6a8f3a, trim: 0xff9f1c }, military: { color: 0x55607a, trim: 0x2ec4ff }, pirate: { color: 0x7b2ff7, trim: 0x7dff3a } };
+  const styles = Q.get('style') === 'all' ? ['civil', 'military', 'pirate'] : [Q.get('style') || 'civil'];
+  const { buildBuggyRig } = Q.get('driver') === '1' ? await import('../src/traffic.js') : {};
+  model = new THREE.Group();
+  const anims = [];
+  styles.forEach((s, i) => {
+    const L = LOOKS[s] || LOOKS.civil;
+    const r = buildBuggyRig && s === 'civil' ? buildBuggyRig(num('k', 0) | 0) : makeRover({ color: hex('color', L.color), trim: hex('trim', L.trim), flag: hex('flag', L.trim), pirate: s === 'pirate', style: s });
+    r.gun.rotation.y = num('gun', 0);
+    r.root.position.x = (i - (styles.length - 1) / 2) * 7;
+    model.add(r.root);
+    if (r.anim) anims.push(r.anim);
+  });
+  anim = (t, sp) => anims.forEach((a) => a(t, sp));
+  height = 3;
 } else if (m === 'hovercar') {
   model = makeHoverCar({}).root;
   model.position.y = 2;

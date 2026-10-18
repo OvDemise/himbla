@@ -219,21 +219,12 @@ export function buildBuggyRig(k) {
   const r = makeRover({ color: [0xffd23f, 0xff9f1c, 0x7dff6a][k % 3], trim: 0xfff4e0, pirate: false, flag: 0x2ec4ff });
   r.gun.visible = false;
   r.root.scale.setScalar(1.3);
-  // a driver in the left seat, legs out under the nose and hands on a little steering wheel
+  // a driver on the left of the bench, legs out under the dash and hands on the buggy's steering wheel
   const drv = makeFigure({ seed: 4100 + k });
-  drv.root.position.set(0.6, 1.3, 0.25);
+  drv.root.position.set(0.6, 1.12, -0.32);
   drv.legL.rotation.x = drv.legR.rotation.x = -1.45;
   drv.armL.rotation.x = drv.armR.rotation.x = -1.0;
   r.chassis.add(drv.root);
-  const wheelM = toon(0x221d33);
-  const sw = new THREE.Mesh(new THREE.TorusGeometry(0.27, 0.045, 6, 18), wheelM);
-  sw.position.set(0.6, 2.62, 0.98);
-  sw.rotation.x = -0.55;
-  ink(sw, 0.02);
-  const col = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.75, 6), wheelM);
-  col.position.set(0.6, 2.38, 1.22);
-  col.rotation.x = 1.0;
-  r.chassis.add(sw, col);
   return r;
 }
 

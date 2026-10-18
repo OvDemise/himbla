@@ -61,7 +61,8 @@ export function buildVehicleModel(id) {
     }
     if (def.scale) m.root.scale.setScalar(def.scale);
   }
-  // a seat-back so the runner looks like they're driving
+  // a seat-back so the runner looks like they're driving (the civil buggy has a bench of its own)
+  if (m.ownSeat) return m;
   const seat = new THREE.Mesh(new THREE.BoxGeometry(1, 1.2, 0.3), toon(0x221d33));
   ink(seat, 0.04);
   seat.position.set(0, 2.4, -0.6);
