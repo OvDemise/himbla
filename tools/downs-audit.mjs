@@ -103,7 +103,7 @@ if (run('zfight')) {
     }
     const groups = new Map();
     for (const { i, j, sep } of found) {
-      const a = [names[T[i]] || '?', names[T[j]] || '?'].sort(), k = a.join('  X  ');
+      const a = [names[T[i]] || '?', names[T[j]] || '?'].sort(), ax = Math.abs(ny[i]) > 0.9 ? 'up/down' : Math.abs(nx[i]) > 0.9 ? 'x wall' : Math.abs(nz[i]) > 0.9 ? 'z wall' : 'slope', k = `${a.join('  X  ')}  [${ax}, ${C[i].toString(16)} / ${C[j].toString(16)}]`;
       const gr = groups.get(k) || { k, n: 0, area: 0, sep: 1, at: [cen[3 * i], cen[3 * i + 1], cen[3 * i + 2]] };
       gr.n++; gr.area += Math.min(ar[i], ar[j]); gr.sep = Math.min(gr.sep, sep); groups.set(k, gr);
     }

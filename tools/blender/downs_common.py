@@ -98,10 +98,59 @@ class Acc:
     def add(self, geo, t=(0, 0, 0), rot=(0, 0, 0), s=(1, 1, 1)):
         self.geos.append(xf(geo[:2], t, rot, s)); return self
 
+    def letters(self, text, cx, cy, z, pix, depth, ry=0.0):
+        """raised lettering: `text` in the 5 x 7 pixel font, each pixel a box `pix` square and `depth` deep standing on the plane z (+z faces out; ry = pi for a -z face), the text centred on (cx, cy)"""
+        px, w = letter_pixels(text)
+        for c, r in px:
+            x = (c - (w - 1) / 2) * pix * (1 if ry == 0 else -1)
+            self.boxc(cx + x, cy + (3 - r) * pix, z + (depth / 2 if ry == 0 else -depth / 2), pix * 1.03, pix * 1.03, depth)
+        return self
+
+    def letters_arc(self, text, yc, rm, pix, z, depth):
+        """the same set along an arc round (0, yc) at radius rm, the tops of the letters outward, the text centred on the crown, on the plane z (+z face)"""
+        px, w = letter_pixels(text)
+        for c, r in px:
+            u = (c - (w - 1) / 2) * pix                      # arc length from the crown, + to the right
+            th = u / rm
+            rad = rm + (3 - r) * pix
+            self.boxc(rad * math.sin(th), yc + rad * math.cos(th), z + depth / 2, pix * 1.03, pix * 1.03, depth, rot=(0, 0, -th))
+        return self
+
     def flush(self):
         if self.geos:
             mesh(self.name, join(self.geos), self.slot, self.parent, self.ink)
         self.geos = []
+
+
+# A 5 x 7 pixel font for raised lettering (signs are built from boxes, not painted: Acc.letters). Rows top to bottom, 1 = a pixel.
+FONT5 = {
+    "A": "01110 10001 10001 11111 10001 10001 10001", "B": "11110 10001 10001 11110 10001 10001 11110", "C": "01110 10001 10000 10000 10000 10001 01110",
+    "D": "11110 10001 10001 10001 10001 10001 11110", "E": "11111 10000 10000 11110 10000 10000 11111", "F": "11111 10000 10000 11110 10000 10000 10000",
+    "G": "01110 10001 10000 10111 10001 10001 01111", "H": "10001 10001 10001 11111 10001 10001 10001", "I": "01110 00100 00100 00100 00100 00100 01110",
+    "J": "00111 00010 00010 00010 00010 10010 01100", "K": "10001 10010 10100 11000 10100 10010 10001", "L": "10000 10000 10000 10000 10000 10000 11111",
+    "M": "10001 11011 10101 10101 10001 10001 10001", "N": "10001 11001 10101 10011 10001 10001 10001", "O": "01110 10001 10001 10001 10001 10001 01110",
+    "P": "11110 10001 10001 11110 10000 10000 10000", "Q": "01110 10001 10001 10001 10101 10010 01101", "R": "11110 10001 10001 11110 10100 10010 10001",
+    "S": "01111 10000 10000 01110 00001 00001 11110", "T": "11111 00100 00100 00100 00100 00100 00100", "U": "10001 10001 10001 10001 10001 10001 01110",
+    "V": "10001 10001 10001 10001 10001 01010 00100", "W": "10001 10001 10001 10101 10101 11011 10001", "X": "10001 10001 01010 00100 01010 10001 10001",
+    "Y": "10001 10001 01010 00100 00100 00100 00100", "Z": "11111 00001 00010 00100 01000 10000 11111", " ": "00000 00000 00000 00000 00000 00000 00000",
+    "0": "01110 10001 10011 10101 11001 10001 01110", "1": "00100 01100 00100 00100 00100 00100 01110", "2": "01110 10001 00001 00110 01000 10000 11111",
+    "3": "11110 00001 00001 01110 00001 00001 11110", "4": "00010 00110 01010 10010 11111 00010 00010", "5": "11111 10000 11110 00001 00001 10001 01110",
+    "6": "00110 01000 10000 11110 10001 10001 01110", "7": "11111 00001 00010 00100 01000 01000 01000", "8": "01110 10001 10001 01110 10001 10001 01110",
+    "9": "01110 10001 10001 01111 00001 00010 01100", ".": "00000 00000 00000 00000 00000 01100 01100", "-": "00000 00000 00000 11111 00000 00000 00000",
+}
+
+
+def letter_pixels(text):
+    """(column, row) of every lit pixel of `text` in the 5 x 7 font, columns counted from the left (letters 6 apart), rows from the top; also the text's width in pixels"""
+    px, col = [], 0
+    for ch in text.upper():
+        rows = FONT5[ch].split()
+        for r, line in enumerate(rows):
+            for c, v in enumerate(line):
+                if v == "1":
+                    px.append((col + c, r))
+        col += 6
+    return px, col - 1
 
 
 def hip(rt, rb, h):

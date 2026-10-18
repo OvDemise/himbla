@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { settle } from './settlements.js';
 import { ferrisWheel, carousel } from './downsFair.js';
 import { T, G } from './outpostModels.js';
-import { PAL, MINT2, MONEY2, SADDLE2, BLACK2, CONC, CONC2, FG, BG, tw, bake } from './downsKit.js';
+import { PAL, MINT2, MONEY2, SADDLE2, BLACK2, CONC, CONC2, FG, BG, tw, bake, fountain } from './downsKit.js';
 import {
   LAP, SEGS, RAIL_IN, RAIL_OUT, DIRT, FINISH_U, FINISH_X, STAND, FAR, CLUB, ENTRIES, ARCADE, WEDGE, STALLS, STALL_ORDER, CROSSINGS, CROSS_GAP, FORECOURT, DRUM, PODIUMS, RING, PAVILION, LAWN, STABLES, ANNEX, oval, lapLen,
 } from './downsPlan.js';
@@ -79,7 +79,7 @@ function course(k) {
   for (const sx of [-1, 1]) k.solid(0.7, 5.7, 0.8, sx * 11.8, 0);
   k.solid(12.7, 0.9, 0.8, 0, 0, 0, 9.2);
   k.at();
-  k.at(FINISH_X + 1, 70.2, 0);
+  k.at(FINISH_X - 6, 70.2, 0);                                   // (just short of the line: its far side is where the stand's tunnel comes out onto the apron)
   bake(k, 'dn_photo_tower');
   k.solid(1.5, 4.2, 1.5, 0, 0);
   k.solid(2.6, 1.4, 2.1, 0, 0, 0, 5.1);
@@ -105,14 +105,34 @@ function grandstand(k, S, { far = false } = {}) {
   const seatTiers = far ? S.tiers : S.tiers - 1;           // (the main stand's top tier carries the suites)
   const towerW = far ? 7.7 : 8.7, towerD = far ? 8.7 : 9.7;
   const edges = [S.x0 + 0.8, ...S.aisles.flatMap((a) => [a - 1.2, a + 1.2]), S.x1 - 0.8];
+  // The ways in are tunnels: from each entry in the back wall straight through the stand at ground level to the front, 6 m wide and 4.2 m high (TUN_CH). Under the tiers that stand higher than
+  // that it is a roofed passage (the tier above it is a lintel over the opening); in front of them, where the tiers are lower than a person, it is an open trench cut through the steps, and
+  // it comes out through a gap in the front parapet onto the apron. `spans` is a width of the stand cut at the tunnels' mouths.
+  const TUN_W = 3.0, TUN_CH = 4.2, MOUTH = TUN_W + 0.2;
+  const spans = (xa, xb, cut = true) => {
+    const out = [];
+    let a = xa;
+    if (cut) for (const ex of [...ENTRIES].sort((p, q) => p - q)) { if (ex + MOUTH <= xa || ex - MOUTH >= xb) continue; if (ex - MOUTH > a) out.push([a, ex - MOUTH]); a = Math.max(a, ex + MOUTH); }
+    if (xb > a) out.push([a, xb]);
+    return out;
+  };
+  const roofed = (top) => top > TUN_CH + 0.05;
+  const firstRoofed = Array.from({ length: S.tiers }, (_, i) => i).find((i) => roofed((i + 1) * S.rise));
   for (let i = 0; i < S.tiers; i++) {
     const top = (i + 1) * S.rise, z0 = i * S.depth;
     const d = !far && i === S.tiers - 1 ? S.depth + 0.6 : S.depth;     // (the top tier is deeper, under the suites)
     const zc = z0 + d / 2;
     // each step its own block, with a dark nosing along its front edge so the rake reads
-    k.box(len - 0.04, top, d, T(i % 2 ? CONC : CONC2), 0, 0, zc, { outline: 0.03 });       // (2 cm short of each end, so its ends are not in the towers' and end walls' planes)
-    k.box(len - 0.08, 0.135, 0.16, T(PAL.black), 0, top - 0.12, z0 + 0.06, { outline: 0 });   // (and the nosing 1.5 cm proud of the step's top, 4 cm short)
-    k.solid(hw, top / 2, d / 2, 0, zc);
+    const conc = T(i % 2 ? CONC : CONC2);
+    for (const [xa, xb] of spans(-(len - 0.04) / 2, (len - 0.04) / 2)) {                                  // (2 cm short of each end, so its ends are not in the towers' and end walls' planes)
+      k.box(xb - xa, top, d, conc, (xa + xb) / 2, 0, zc, { outline: 0.03 });
+      k.solid((xb - xa) / 2, top / 2, d / 2, (xa + xb) / 2, zc);
+    }
+    for (const [xa, xb] of spans(-(len - 0.08) / 2, (len - 0.08) / 2, !roofed(top))) k.box(xb - xa, 0.135, 0.16, T(PAL.black), (xa + xb) / 2, top - 0.12, z0 + 0.06, { outline: 0 });   // (and the nosing 1.5 cm proud of the step's top, 4 cm short)
+    if (roofed(top)) for (const ex of ENTRIES) {                                                          // the lintel over each tunnel: the step above it
+      k.box(2 * MOUTH, top - TUN_CH, d, conc, ex, TUN_CH, zc, { outline: 0.03 });
+      k.solid(MOUTH, (top - TUN_CH) / 2, d / 2, ex, zc, 0, TUN_CH);
+    }
     if (i < seatTiers) {
       // seats: strips of three, a run in each section between the aisles; the members' enclosure (the middle sections' upper tiers) in Barn Red
       const clip = z0 < towerD + 0.5 ? hw - towerW - 0.5 : hw;     // (the tower stands in each front corner)
@@ -123,23 +143,33 @@ function grandstand(k, S, { far = false } = {}) {
         const mid = Math.abs((xa + xb) / 2) < 30;
         const col = mid && i > S.tiers - 6 ? PAL.barn : i % 2 ? PAL.mint : PAL.money;
         const x0 = xa + ((xb - xa) - n * 2.7) / 2 + 1.35;
-        for (let s = 0; s < n; s++) bake(k, 'dn_seat3', x0 + s * 2.7, top, z0 + 0.95, { over: { seat: col } });
+        for (let s = 0; s < n; s++) {
+          const sx = x0 + s * 2.7;
+          if (!roofed(top) && ENTRIES.some((ex) => Math.abs(sx - ex) < MOUTH + 1.35)) continue;          // (no seats where the trench runs)
+          bake(k, 'dn_seat3', sx, top, z0 + 0.95, { over: { seat: col } });
+        }
       }
     }
   }
   // aisle stairs: half-steps down the middle of each aisle, brass handrails up both sides
   for (const ax of S.aisles) {
+    const over = ENTRIES.some((ex) => Math.abs(ex - ax) < 0.1);     // (an aisle over a tunnel: its stairs start on the lintel)
     for (let i = 0; i < S.tiers; i++) {
       const top = (i + 1) * S.rise;
-      k.box(2.4, top - S.rise / 2, S.depth / 2 + 0.03, T(CONC2), ax, 0, i * S.depth + S.depth / 4 - 0.015, { outline: 0.015 });   // (3 cm proud of the step's riser)
+      if (over) continue;                                          // (the lintel is the step there)
+      const y0 = 0, h = top - S.rise / 2;
+      k.box(2.4, h, S.depth / 2 + 0.03, T(CONC2), ax, y0, i * S.depth + S.depth / 4 - 0.015, { outline: 0.015 });   // (3 cm proud of the step's riser)
       k.box(2.38, 0.06, 0.12, T(PAL.gold), ax, top - S.rise / 2 - 0.045, i * S.depth + 0.015, { outline: 0 });                  // (its brass edge 1.5 cm proud of that, and of its top)
     }
-    for (const s of [-1, 1]) k.beam([ax + s * 1.25, 1.9, 0], [ax + s * 1.25, topY + 0.9, S.tiers * S.depth - 1], 0.05, T(PAL.gold), { outline: 0.01 });
+    const zr = over ? firstRoofed * S.depth : 0, Z1 = S.tiers * S.depth - 1, yr = (z) => 1.9 + (topY + 0.9 - 1.9) * (z / Z1);
+    for (const s of [-1, 1]) k.beam([ax + s * 1.25, yr(zr) + (over ? TUN_CH - 1.9 : 0), zr], [ax + s * 1.25, topY + 0.9, Z1], 0.05, T(PAL.gold), { outline: 0.01 });
   }
   const back = (far ? S.tiers * S.depth : (S.tiers - 1) * S.depth + 3.2) + S.wall;   // the back wall's rear face: past the suites on the main stand
   // the front parapet, its sponsor boards and a gold rail along the top
-  k.box(len - 0.04, 1.3, 0.35, T(MONEY2), 0, 0, -0.2, { outline: 0.04 });
-  k.beam([-hw, 1.45, -0.2], [hw, 1.45, -0.2], 0.06, T(PAL.gold), { outline: 0.01 });
+  for (const [xa, xb] of spans(-(len - 0.04) / 2, (len - 0.04) / 2)) {
+    k.box(xb - xa, 1.3, 0.35, T(MONEY2), (xa + xb) / 2, 0, -0.2, { outline: 0.04 });
+    k.beam([xa, 1.45, -0.2], [xb, 1.45, -0.2], 0.06, T(PAL.gold), { outline: 0.01 });
+  }
   const ads = far ? [['THE FAR TURN CLUB', FG.gold]]
     : [['ANTIMATTER LAB · WE BREED WINNERS', '#9bd37a'], ['LUCKY CRATER CASINO', FG.gold], ['MERIDIAN EXCHANGE', '#9bd7ff'], ['QUANTUM-LOCK SKATES', FG.gold]];
   ads.forEach(([t, c], i) => k.text(t, far ? 0 : -75 + i * 50, 0.66, -0.38, Math.PI, Math.min(far ? 60 : 44, tw(t, 1.0)), { fg: c, bg: BG.black, back: false, off: 0.02 }));
@@ -147,9 +177,20 @@ function grandstand(k, S, { far = false } = {}) {
   const bays = Math.round(len / 19);
   const wallName = far ? 'dn_back_s' : 'dn_back';
   const wallH = far ? 14.6 : 22.4;
-  for (let i = 0; i < bays; i++) bake(k, wallName, S.x0 + 9.5 + i * 19, 0, back);
+  for (let i = 0; i < bays; i++) {
+    const bx = S.x0 + 9.5 + i * 19;
+    bake(k, ENTRIES.some((ex) => Math.abs(ex - bx) < 0.1) ? wallName + '_gate' : wallName, bx, 0, back);        // (the bay with a way in has an opening: its _gate variant)
+  }
   for (const ex of ENTRIES) bake(k, 'dn_entry', ex, 0, back + 0.02);
-  k.solid(hw + 1, wallH / 2, 0.4, 0, back - 0.4);
+  for (const [xa, xb] of spans(-hw - 1, hw + 1)) k.solid((xb - xa) / 2, wallH / 2, 0.4, (xa + xb) / 2, back - 0.4);
+  for (const ex of ENTRIES) k.solid(TUN_W, (wallH - TUN_CH) / 2, 0.4, ex, back - 0.4, 0, TUN_CH);
+  // the tunnels: a timber floor from the apron to the way in, a low kerb-wall down each side and lamps under the roof
+  const roofZ = firstRoofed * S.depth;
+  for (const ex of ENTRIES) {
+    k.box(2 * TUN_W, 0.12, back - 0.8 + 0.25, T(SADDLE2), ex, 0, (back - 0.8 - 0.25) / 2, { outline: 0 });
+    for (const sx of [-1, 1]) k.box(0.2, 1.3, back - 0.8 + 0.2, T(MONEY2), ex + sx * (TUN_W + 0.1), 0, (back - 0.8 - 0.2) / 2, { outline: 0.01 });
+    for (let z = roofZ + 3; z < back - 1.5; z += 7) k.box(1.4, 0.08, 0.9, G(0xffe9a0), ex, TUN_CH - 0.09, z, { outline: 0 });
+  }
   for (const sx of [-1, 1]) {
     k.box(0.8, wallH - 2, back, T(PAL.mint), sx * (hw + 0.4), 0, back / 2, { outline: 0.06 });
     k.box(0.9, 0.5, back - 0.04, T(MONEY2), sx * (hw + 0.4), 2.6, back / 2, { outline: 0 });
@@ -201,6 +242,73 @@ function aprons(k) {
   }
 }
 
+// A prism over a flat polygon [[x, z]...] in the current frame's plan, convex, its bottom at yb(x, z) and `h` thick: flat-shaded triangles (the joiner bays below are not boxes).
+function slab(poly, yb, h) {
+  const area = poly.reduce((a, p, i) => { const q = poly[(i + 1) % poly.length]; return a + p[0] * q[1] - q[0] * p[1]; }, 0);
+  const ring = area > 0 ? [...poly].reverse() : poly;                       // (clockwise on the x-right, z-up plan: then the triangles below face up, and the sides face out)
+  const pos = [], tri = (a, b, d) => pos.push(...a, ...b, ...d);
+  const lo = (p) => [p[0], yb(p[0], p[1]), p[1]], hi = (p) => [p[0], yb(p[0], p[1]) + h, p[1]];
+  for (let i = 1; i < ring.length - 1; i++) {
+    tri(hi(ring[0]), hi(ring[i]), hi(ring[i + 1]));
+    tri(lo(ring[0]), lo(ring[i + 1]), lo(ring[i]));
+  }
+  for (let i = 0; i < ring.length; i++) {
+    const p = ring[i], q = ring[(i + 1) % ring.length];
+    tri(lo(p), lo(q), hi(q));
+    tri(lo(p), hi(q), hi(p));
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.computeVertexNormals();
+  return g;
+}
+
+// The arcade's last wedge stops on a radial line and the stand's end wall is straight, so there is a gap between them, wide at the back wall and tapering to the walk. This is a bay shaped
+// to fill it: a timber floor, the Mint back wall (the arc from the wedge's corner to the stand's wall, as a chord) with its wainscot and cornice, a Barn Red roof on the wedges' own slope
+// and an architrave along the walk. Built in the adjacent wedge's frame (`th` its middle, `side0` +1 when, on the west arcade, the stand is on its local +x), so the shared edge is the wedge's own.
+// wallU: where the stand's end wall's face is (x, the west arcade's way round); rearZ: for the far stand, where that wall's rear corner is (the arcade's back wall runs on past it).
+function joiner(k, mir, th, side0, wallU, rearZ) {
+  const R = Math.PI / 180, side = side0 * mir;                                   // (the east arcade is the west one's mirror: the stand is on the other side of the wedge)
+  const polar = (r, t) => [mir * (-ARCADE.cx + r * Math.cos(t * R)), r * Math.sin(t * R)];
+  const [px, pz] = polar(WEDGE.r0, th), yaw = mir * (Math.PI / 2 - th * R), cy = Math.cos(yaw), sy = Math.sin(yaw);
+  const local = ([wx, wz]) => [(wx - px) * cy - (wz - pz) * sy, (wx - px) * sy + (wz - pz) * cy];
+  const south = rearZ !== null;
+  const onWall = (r) => { const t = Math.acos((wallU + ARCADE.cx) / r) / R; return south ? 360 - t : t; };          // (the angle at which circle r meets the wall)
+  const D = [side * WEDGE.wi, 0], C = [side * WEDGE.wo, WEDGE.d];                                                  // the wedge's corners on the shared edge
+  const A = local(polar(ARCADE.ri, onWall(ARCADE.ri))), B = local(polar(ARCADE.ro, onWall(ARCADE.ro)));          // where the walk's edge and the back wall meet the stand's wall
+  const E = south ? local([mir * wallU, rearZ]) : null;                                                            // the wall's rear corner
+  const plan = [D, C, B, ...(E ? [E] : []), A];
+  k.at(px, pz, yaw);
+  // the floor, and a gold inlay along the walk's edge as the wedges have
+  k.add(slab(plan, () => 0, 0.14), T(SADDLE2), 0, 0, 0, { outline: 0 });
+  k.add(slab([D, A, [A[0], A[1] + 0.35], [D[0], 0.35]], () => 0.14, 0.03), T(PAL.gold), 0, 0, 0, { outline: 0 });
+  // the roof, on the wedges' own slope (dn_arcade: a deck from y 7.15 at z = -0.8 to 9.15 at the back, 0.32 thick), pushed 0.8 m out in front and 0.2 m behind; a Mint soffit under it
+  const YF = 6.6, YB = 8.6, z0 = -0.8, z1 = WEDGE.d + 0.2, ym = (YF + YB) / 2 + 0.55, tn = (YB - YF) / (z1 - z0);
+  const roofY = (x, z) => ym + (z - (z0 + z1) / 2) * tn;
+  const roof = plan.map((p) => (p === D || p === A ? [p[0], p[1] + z0] : p === E ? p : [p[0], p[1] + 0.2]));
+  k.add(slab(roof, roofY, 0.32), T(PAL.barn), 0, 0, 0, { outline: 0.025 });
+  k.add(slab(roof, (x, z) => roofY(x, z) - 0.07, 0.07), T(MINT2), 0, 0, 0, { outline: 0 });
+  k.add(slab([[D[0], z0 + 0.7], [A[0], A[1] + z0 + 0.7], [A[0], A[1] + 1.0], [D[0], 1.0]], () => 6.5, 0.6), T(MINT2), 0, 0, 0, { outline: 0.012 });   // (the architrave over the walk's edge)
+  // the back wall along C-B (and B-E): Mint 0.7 thick on the bay's side of the line, a Money wainscot and a gold cornice
+  const cen = plan.reduce((a, p) => [a[0] + p[0] / plan.length, a[1] + p[1] / plan.length], [0, 0]);
+  for (const [P0, P1x] of [[C, B], ...(E ? [[B, E]] : [])]) {
+    let P1 = P1x;
+    if (P1x === E) { const l = Math.hypot(E[0] - B[0], E[1] - B[1]); P1 = [E[0] + (E[0] - B[0]) / l * 0.3, E[1] + (E[1] - B[1]) / l * 0.3]; }     // (a little into the stand's wall, not ending in its rear face's plane)
+    const dx = P1[0] - P0[0], dz = P1[1] - P0[1], len = Math.hypot(dx, dz), mx = (P0[0] + P1[0]) / 2, mz = (P0[1] + P1[1]) / 2;
+    let nx = -dz / len, nz = dx / len;
+    if (nx * (cen[0] - mx) + nz * (cen[1] - mz) < 0) { nx = -nx; nz = -nz; }                                  // (toward the bay)
+    const ry = Math.atan2(-dz, dx), at = (t) => [mx + nx * t, mz + nz * t];
+    const trim = P1x === E ? 0.7 : 0, ux = dx / len, uz = dz / len;           // (the cornice stops short of the stand's wall: it would end in the plane of its rear face)
+    const put = (y0, h, thick, t, mat, ink = 0, cut = 0) => { const q = at(t); k.box(len - cut, h, thick, mat, q[0] - ux * cut / 2, y0, q[1] - uz * cut / 2, { ry, outline: ink }); };
+    put(0.14, 8.16, 0.7, 0.35, T(PAL.mint), 0.03);
+    put(0.15, 2.4, 0.16, 0.78, T(MONEY2));
+    put(8.1, 0.4, 1.0, 0.45, T(PAL.gold), 0, trim);
+    const q = at(0.35);
+    k.solid(len / 2, 4.2, 0.4, q[0], q[1], ry);
+  }
+  k.at();
+}
+
 // ---- the arcades round the turns ----
 // A wedge's origin is the middle of its inner chord; its local +z points outward along the radius. The east arcade is the west one's mirror (x negated, yaws negated).
 function arcades(k) {
@@ -243,19 +351,30 @@ function arcades(k) {
     k.text('CHIMERA DOWNS', 0, 9.3, -11.27, Math.PI, tw('CHIMERA DOWNS', 1.5), { fg: FG.gold, bg: BG.black, back: false, off: 0.0 });
     for (const sx of [-1, 1]) k.solid(5, 6.6, 11, sx * 11, 0);
     k.at();
-    // the rail walk: a timber ring between the rail and the arcade
-    const lo = ARCADE.walk[0], hi = ARCADE.walk[1];
-    const [t0, t1] = mir > 0 ? [lo, hi] : [180 - hi, 180 - lo];
-    const g = new THREE.RingGeometry(DIRT[1] - 0.1, ARCADE.ri, 96, 1, -t1 * Math.PI / 180, (t1 - t0) * Math.PI / 180).rotateX(-Math.PI / 2);
-    k.add(g, T(SADDLE2), mir * -ARCADE.cx, 0.1, 0, { outline: 0 });
+    // the rail walk: a timber ring between the dirt and the arcade, a solid slab as high as the aprons it runs into (and under them: it covers the whole turn, from the straight's end to
+    // the far straight's, so no bare ground shows where the apron, the walk and the stands' ends meet)
+    const [t0, t1] = mir > 0 ? [90, 270] : [-90, 90];
+    const ring = new THREE.Shape(), steps = 120, r0 = DIRT[1] - 0.1, r1 = ARCADE.ri;
+    for (let i = 0; i <= steps; i++) { const t = (t0 + (t1 - t0) * i / steps) * Math.PI / 180; ring[i ? 'lineTo' : 'moveTo'](r1 * Math.cos(t), r1 * Math.sin(t)); }
+    for (let i = steps; i >= 0; i--) { const t = (t0 + (t1 - t0) * i / steps) * Math.PI / 180; ring.lineTo(r0 * Math.cos(t), r0 * Math.sin(t)); }
+    k.add(new THREE.ExtrudeGeometry(ring, { depth: 0.12, bevelEnabled: false }).rotateX(Math.PI / 2).translate(0, 0.12, 0), T(SADDLE2), mir * -ARCADE.cx, 0, 0, { outline: 0 });
+    // where each end of the arcade meets a stand: a bay to fill the gap between the arcade's last wedge and the stand's straight end wall
+    {
+      joiner(k, mir, ARCADE.runs[0].a0 + ARCADE.step * 0.5, 1, -(STAND.x1 + 0.8), null);
+      const last = ARCADE.runs[1];
+      joiner(k, mir, last.a0 + ARCADE.step * (last.n - 0.5), -1, -(FAR.x1 + 0.8), -(FAR.z0 + FAR.tiers * FAR.depth + FAR.wall), true);
+    }
   }
 }
+
+// the forecourt's paving: a cool slate that sits against the moon's pale ground and the timber of the avenue and promenade (the only paving off the palette)
+const SLATE = 0x6c7683, SLATE2 = 0x5c6571;
 
 // ---- the concourse behind the main stand and the grand forecourt: paving, a timber avenue, the fountain, masts with festoons, lamps, benches, planters, valet bays and the gate ----
 function forecourt(k) {
   const F = FORECOURT, w = F.x1 - F.x0, zc = (F.z0 + F.z1) / 2, dz = F.z1 - F.z0;
-  k.box(w, 0.12, dz + 1.1, T(MINT2), 0, 0, zc - 0.05, { outline: 0 });                                                  // the paving (under the stand's back wall, and to the gate's foot)
-  for (let x = F.x0 + 8; x < F.x1; x += 12) k.box(0.14, 0.13, dz - 0.04, T(0xc9d4c6), x, 0, zc, { outline: 0 });
+  k.box(w, 0.12, dz + 1.1, T(SLATE), 0, 0, zc - 0.05, { outline: 0 });                                                  // the paving (under the stand's back wall, and to the gate's foot)
+  for (let x = F.x0 + 8; x < F.x1; x += 12) k.box(0.14, 0.13, dz - 0.04, T(SLATE2), x, 0, zc, { outline: 0 });
   k.box(2 * F.avenue, 0.16, F.z1 - F.promenade[0] - 0.04, T(SADDLE2), 0, 0, (F.promenade[0] + F.z1) / 2, { outline: 0 });   // the avenue, in timber (every layer 2 cm short of the one under it)
   for (let z = F.promenade[0] + 3; z < F.z1 - 0.1; z += 3) k.box(2 * F.avenue - 0.04, 0.17, 0.08, T(0x7a5236), 0, 0, z, { outline: 0 });
   for (const s of [-1, 1]) k.box(0.3, 0.18, F.z1 - F.promenade[0] - 0.08, T(PAL.gold), s * F.avenue, 0, (F.promenade[0] + F.z1) / 2, { outline: 0 });
@@ -263,9 +382,7 @@ function forecourt(k) {
   for (const ex of ENTRIES) k.box(8, 0.16, F.promenade[0] - 114.5, T(SADDLE2), ex, 0, (114.5 + F.promenade[0]) / 2, { outline: 0 });   // the ways from the stand's entries
   // the fountain, ringed in gold
   const [fx, fz] = F.fountain;
-  k.at(fx, fz, 0);
-  bake(k, 'dn_fountain');
-  k.at();
+  fountain(k, fx, fz);
   k.column(12, 1.2, fx, fz);
   k.ring(13.2, 0.12, G(PAL.gold), fx, 0.17, fz);
   // masts down both sides of the avenue, a string of lights across it at every other pair
@@ -305,8 +422,6 @@ function forecourt(k) {
   // the gate
   k.at(0, F.gate, 0);
   bake(k, 'dn_gate_main');
-  k.text('CHIMERA DOWNS', 0, 13.0, 0.56, 0, tw('CHIMERA DOWNS', 0.95), { fg: FG.gold, bg: BG.black, back: false, off: 0.0 });
-  k.text('EST. YEAR ONE', 0, 13.0, -0.56, Math.PI, tw('EST. YEAR ONE', 0.95), { fg: FG.gold, bg: BG.black, back: false, off: 0.0 });
   for (const s of [-1, 1]) k.solid(1.5, 6.6, 1.5, s * 12.5, 0);
   k.at();
 }

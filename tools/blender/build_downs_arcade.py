@@ -10,8 +10,9 @@
 #   dn_gate_hall  a gate hall, 32 m across (x) and 22 m deep (z = -11 to 11), +z outward: two Mint blocks with Barn Red hip roofs either side of a 12 m passage under a gabled Barn Red lintel hall,
 #                 Black name boards (on both faces, 4.4 m by 2 m, centre 9.3 m up) and lit slits
 #   dn_gate_main  the forecourt's gate, 28 m between the outer faces of its pylons (x) and 3 m deep: two Mint pylons 12 m tall with gold bands and lanterns, and a Barn Red segmental arch between
-#                 them with a Black name board on both faces (centre y 13, 6.8 x 1.1)
-#   dn_fountain   the forecourt's fountain, 24 m across: a Money planter ring, a Mint rim, lit water, a three-tier centre with a gold finial, a ring of lit jets
+#                 them, the name CHIMERA DOWNS in raised gold letters along the arch's front face (the back is bare)
+#   dn_fountain   the forecourt's fountain, 24 m across, built to the casino's measures (src/fountainFx.js shades its water pivots): a Money planter ring, a Mint basin, a Mint bowl on a
+#                 pedestal, eight spigots, and a golden derby cup (pivot `trophy`, role spin) turning on the stem
 #   dn_bay        a valet bay's head: a wheel stop, two paint lines running 5.6 m toward +z, a post with a gold number plate (0.5 x 0.35, facing +z, centre 0.78 m up)
 #   dn_bench      a bench 2.2 m long: Saddle slats on Black legs, gold end caps, facing +z
 #   dn_planter    a planter 2.4 x 1 x 0.9 m: Money2 box, a gold edge, a mound of Money
@@ -146,38 +147,81 @@ def arc_band(r_in, r_out, depth, k=1.0, n=16):
 P["barn"].poly(arc_band(RR, RR + 1.3, 0.9), -0.45, 0.45)
 P["gold"].poly(arc_band(RR - 0.08, RR + 0.02, 1.0, 0.99), -0.5, 0.5)                          # gold on the intrados
 P["gold"].poly(arc_band(RR + 1.28, RR + 1.42, 1.0, 0.99), -0.5, 0.5)                           # and the extrados
-for zf in (-1, 1):                                                                      # the name board on each face
-    a, b = (0.45, 0.5) if zf > 0 else (-0.5, -0.45)
-    P["gold"].box(-3.5, 3.5, 12.4, 13.6, a, b)
-    c, d = (0.5, 0.55) if zf > 0 else (-0.55, -0.5)
-    P["black"].box(-3.4, 3.4, 12.45, 13.55, c, d)
+# the name, in raised gold letters along the arch's front band (+z face only: the back says nothing), 0.17 m a pixel, 0.14 m proud of the band
+P["gold"].letters_arc("CHIMERA DOWNS", YC, RR + 0.65, 0.17, 0.45, 0.14)
 
 # =====================================================================================================
 # dn_fountain
 # =====================================================================================================
+# The forecourt's fountain: the casino's and Meridian's (build_casino.py) in the Downs' palette, with a golden derby cup turning on top where theirs have the chip and the dollar sign. It is
+# built to the same measures because src/fountainFx.js shades its water: pivots `water_basin` and `water_bowl` (role water, tier basin / bowl: the discs the two tiers' ripples run across), `curtain`
+# (the sheet spilling over the bowl's lip) and `streams` (eight jets from the spigots), and the `trophy` pivot (role spin) is what turns. The water pivots' slot (glowmint) is not drawn: the game dresses them.
 root = pivot("dn_fountain", (0, 0, 0))
-P = parts(root, "dn_fountain", {"money2": 0.02, "money": 0.0, "mint2": 0.03, "mint": 0.03, "gold": 0.02, "glowmint": 0.0})
+P = parts(root, "dn_fountain", {"money2": 0.02, "money": 0.0, "mint2": 0.04, "mint": 0.03, "gold": 0.02, "barn": 0.02, "gold2": 0.02})
 P["money2"].lath([(12.0, 0.0), (12.0, 0.7), (10.4, 0.7), (10.4, 0.0)], segs=48)           # the planter ring
 P["money"].lath([(10.5, 0.72), (11.9, 0.72)], segs=48)                                    # (its turf, a hair above the rim's inside)
-P["mint2"].lath([(9.4, 0.0), (9.4, 1.0), (8.7, 1.0), (8.7, 0.1)], segs=48)                # the basin's rim
-P["gold"].tor(9.05, 0.07, t=(0, 1.04, 0), n=48, rs=6)                                    # a gold bead along the rim
-P["glowmint"].lath([(0.0, 0.8), (8.65, 0.8)], segs=48)                                    # the water
-for r in (3.6, 5.2, 6.8):
-    P["mint"].tor(r, 0.05, t=(0, 0.84, 0), n=40, rs=5)                                   # ripples
-P["mint2"].lath([(0.0, 0.0), (1.7, 0.0), (1.7, 1.3), (1.0, 1.7), (0.7, 3.0)], segs=24)      # the pedestal and its first tier
-P["mint"].lath([(0.7, 2.9), (2.6, 3.0), (3.0, 3.5), (2.5, 3.65), (0.6, 3.3)], segs=32)    # the lower bowl
-P["mint2"].cylc(0, 3.95, 0, 0.6, 1.3, 16, rt=0.45)                                       # the stem between the bowls (two solid frusta: a one-sided lathe shell came out inside-out here,
-P["mint2"].cylc(0, 4.8, 0, 0.45, 0.4, 16, rt=0.9)                                         # a dark hollow, since Blender picks which way an open shell faces)
-P["mint"].lath([(0.5, 4.9), (1.7, 5.0), (1.95, 5.35), (1.6, 5.45), (0.4, 5.25)], segs=24)  # the upper bowl
-P["gold"].bm((0, 5.2, 0), (0, 6.6, 0), 0.1)
-P["gold"].add(sphere(0.38, 12, 8), t=(0, 6.9, 0))
-for i in range(12):                                                                       # a ring of lit jets, arching from the lower bowl into the basin
+# the basin: a stepped foot, a flared wall with a flat top, a floor, a pilaster every 30 degrees and a gold bead along the lip
+P["mint2"].lath([(9.7, 0.0), (9.7, 0.16), (9.32, 0.2), (9.3, 0.5), (9.05, 0.92), (9.15, 0.98), (9.15, 1.04), (8.55, 1.04), (8.55, 0.9), (8.5, 0.3), (8.5, 0.0), (9.7, 0.0)], segs=48)
+P["money2"].lath([(0.0, 0.3), (8.5, 0.3)], segs=40)
+for i in range(12):
     a = 2 * PI * i / 12
-    P["glowmint"].bm((2.7 * math.sin(a), 3.55, 2.7 * math.cos(a)), (3.9 * math.sin(a), 3.05, 3.9 * math.cos(a)), 0.05)
-    P["glowmint"].bm((3.9 * math.sin(a), 3.05, 3.9 * math.cos(a)), (5.0 * math.sin(a), 1.2, 5.0 * math.cos(a)), 0.05)
-for i in range(4):                                                                        # four gold spouts on the rim
-    a = PI / 4 + i * PI / 2
-    P["gold"].cylc(9.0 * math.sin(a), 1.25, 9.0 * math.cos(a), 0.14, 0.5, 8)
+    P["mint"].boxc(math.sin(a) * 9.18, 0.52, math.cos(a) * 9.18, 0.7, 0.62, 0.32, rot=(0, a, 0))
+P["gold"].tor(8.85, 0.09, t=(0, 1.05, 0), n=48, rs=5)
+for i in range(16):
+    a = 2 * PI * (i + 0.5) / 16
+    P["gold"].add(sphere(0.1, 5, 3), t=(math.sin(a) * 9.4, 0.7, math.cos(a) * 9.4))
+# the pedestal and its bowl (an ogee column over a stepped plinth, a saucer with a gold rim)
+P["mint2"].lath([(0, 0.3), (2.5, 0.3), (2.5, 0.6), (2.1, 0.75), (1.7, 1.0), (1.4, 1.5), (1.3, 2.0), (1.3, 3.0), (1.5, 3.4), (1.9, 3.7), (2.6, 3.9), (0, 3.9)], segs=20)
+P["mint"].lath([(0, 3.9), (2.6, 3.9), (3.2, 4.05), (3.62, 4.3), (3.72, 4.66), (3.5, 4.66), (3.3, 4.45), (0, 4.4)], segs=28)
+P["gold"].tor(1.45, 0.07, t=(0, 1.5, 0), n=24, rs=5)
+P["gold"].tor(1.32, 0.06, t=(0, 3.0, 0), n=24, rs=5)
+P["gold"].tor(3.6, 0.1, t=(0, 4.68, 0), n=36, rs=5)
+for i in range(8):                                                                        # eight studs round the bowl, in Barn Red
+    a = 2 * PI * (i + 0.5) / 8
+    P["barn"].add(sphere(0.17, 6, 4), t=(math.sin(a) * 3.55, 4.2, math.cos(a) * 3.55), s=(1, 1.3, 1))
+# the stem, a gold collar, and eight spigots near the top (under the cup)
+P["mint2"].lath([(0, 4.4), (0.9, 4.4), (0.75, 4.75), (0.55, 5.1), (0.5, 5.6), (0.58, 6.0), (0.72, 6.2), (0, 6.2)], segs=16)
+P["gold"].tor(0.6, 0.07, t=(0, 6.05, 0), n=16, rs=5)
+P["gold"].tor(0.52, 0.06, t=(0, 5.35, 0), n=16, rs=5)
+for i in range(8):
+    a = 2 * PI * i / 8
+    s_, c_ = math.sin(a), math.cos(a)
+    P["gold"].path([(s_ * 0.45, 5.78, c_ * 0.45), (s_ * 0.85, 5.73, c_ * 0.85), (s_ * 0.98, 5.71, c_ * 0.98)], [0.08, 0.08, 0.125], 8)   # (a nozzle with a flared mouth)
+# the derby cup that turns on the stem: a plinth, a gold stem and knop, a deep cup with a Barn Red band and two handles, 5 m up from the stem's top
+K = 1.25
+tr = pivot("trophy", (0, 6.2, 0), root, role="spin", speed=0.7, kind="trophy")
+T_ = parts(tr, "dn_trophy", {"mint2": 0.03, "gold": 0.03, "gold2": 0.02, "barn": 0.02})
+T_["mint2"].cylc(0, 0.2 * K, 0, 1.0 * K, 0.4 * K, 20)                                      # the plinth
+T_["gold2"].cylc(0, 0.5 * K, 0, 0.78 * K, 0.22 * K, 20)                                    # its gold collar
+T_["gold"].lath([(0.0, 0.6 * K), (0.4 * K, 0.6 * K), (0.22 * K, 0.95 * K), (0.18 * K, 1.3 * K), (0.0, 1.3 * K)], segs=16)      # the stem
+T_["gold"].add(sphere(0.32 * K, 12, 8), t=(0, 1.15 * K, 0))                                # the knop
+T_["gold"].lath([(0.0, 1.5 * K), (0.34 * K, 1.5 * K), (0.9 * K, 1.9 * K), (1.22 * K, 2.7 * K), (1.28 * K, 3.3 * K), (1.2 * K, 3.8 * K), (1.04 * K, 3.8 * K), (1.1 * K, 3.3 * K), (1.04 * K, 2.75 * K), (0.7 * K, 2.05 * K), (0.0, 1.85 * K)], segs=28)    # the cup
+for sx in (-1, 1):
+    T_["gold"].tor(0.55 * K, 0.085 * K, t=(sx * 1.32 * K, 2.95 * K, 0), rot=(PI / 2, 0, 0), n=20, rs=6)                       # a handle each side
+T_["barn"].tor(1.265 * K, 0.07 * K, t=(0, 3.05 * K, 0), n=32, rs=5)                         # the band round the cup
+T_["gold2"].tor(1.18 * K, 0.05 * K, t=(0, 3.78 * K, 0), n=32, rs=5)                         # the lip's bead
+# the water: discs for the two tiers (the game ripples them), the sheet falling from the bowl's lip, and the jets from the spigots. Both faces: the game's shaders draw one side only.
+def two_sided(a, geo):
+    a.geos.append(xf(geo[:2], (0, 0, 0)))
+    a.geos.append((geo[0], [tuple(reversed(f)) for f in geo[1]]))
+w1 = pivot("water_basin", (0, 0.72, 0), root, role="water", tier="basin")
+two_sided(Acc("dn_waterBasin", "glowmint", w1, 0.0), lathe([(0, 0), (8.5, 0)], 48))
+w2 = pivot("water_bowl", (0, 4.52, 0), root, role="water", tier="bowl")
+two_sided(Acc("dn_waterBowl", "glowmint", w2, 0.0), lathe([(0, 0), (3.36, 0)], 32))
+cu = pivot("curtain", (0, 0, 0), root, role="curtain")
+two_sided(Acc("dn_curtainSheet", "glowmint", cu, 0.0), lathe([(3.76, 4.6), (3.84, 4.0), (3.92, 3.0), (4.0, 2.0), (4.05, 1.2), (4.07, 0.74)], 40))
+st = pivot("streams", (0, 0, 0), root, role="streams")
+A_ = Acc("dn_streamArcs", "glowmint", st, 0.0)
+for i in range(8):
+    a = 2 * PI * i / 8
+    s_, c_ = math.sin(a), math.cos(a)
+    pts = []
+    for k in range(11):
+        t = k / 10
+        r = 1.0 + 1.55 * t
+        y = 5.7 - 1.18 * t * t
+        pts.append((s_ * r, y, c_ * r))
+    A_.path(pts, 0.065, 5)
 
 # =====================================================================================================
 # dn_bay
