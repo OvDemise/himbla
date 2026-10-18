@@ -48,8 +48,12 @@ export const BOARD = { x: 0, y: 13.2, w: 13.3, h: 7.8 };    // the race card boa
 // ---- the stand's own ways in (through its back wall) and the posters' places ----
 export const ENTRIES = [-47.5, 47.5];
 
-// ---- the screen drum at the infield's centre: faces 40 x 20 on the long sides, 14 x 20 on the ends, its underside 18 m up ----
-export const DRUM = { x: 0, z: 0, w: 40, d: 14, h: 20, y: 18, core: 10 };
+// ---- the screen drum at the infield's centre (dn_drum): a 41 x 15 m shell from y = 17.2 to 38.8 on a 10 x 10 core, four live screens with their bottom edge at 18 m: 40 x 20 on the long faces
+// (z = +-7.5, facing the two stands), 14 x 20 on the ends (x = +-20.5, facing down the arcades) ----
+export const DRUM = { x: 0, z: 0, w: 40, d: 15, h: 20, yc: 28, end: 14, core: 10 };
+
+// ---- the winners' podiums: a set of three steps (dn_podium) in front of the drum for each race on the card, facing the main stand. Steps at x offsets from the set's middle ----
+export const PODIUMS = { z: 18.5, xs: [-30, 0, 30], steps: { 1: [0, 1.4], 2: [-6.5, 1.0], 3: [6.5, 0.7] }, plate: { y: 4.6, z: -2.2, w: 11, h: 1.4 } };
 
 // ---- the arcades: a covered market hall round each turn (docs/downs-layouts.md). Each is a run of 6.3 degree wedges between radius 84 and 100 round the turn's centre (the west
 // one's is (-90, 0), the east one's (90, 0), its mirror), with a gate hall in the middle (at 180 degrees on the west one). Angles are in degrees, measured from the turn's centre
@@ -75,3 +79,17 @@ export const CROSS_GAP = 8;
 
 // ---- the forecourt and the concourse behind the main stand ----
 export const FORECOURT = { x0: -76, x1: 76, z0: 114, z1: 191, avenue: 14, fountain: [0, 166], gate: 193, promenade: [143, 149] };
+
+// ---- the infield: the parade ring and the weighing room on the west side, a picnic lawn on the east ----
+export const RING = { x: -96, z: 0, rx: 26, rz: 18 };                // the parade ring's rail runs round this ellipse; its gate is on the east end, toward the weighing room
+export const PAVILION = { x: -62, z: 0 };                             // the weighing room's front wall (the porch stands 3.2 m west of it)
+export const LAWN = { x: 100, z: 0, r: 28, tables: [[84, -12, 0], [92, 12, 1], [104, -16, 2], [110, 6, 3], [96, -2, 4], [118, -6, 5]] };
+
+// ---- the stables behind the far stand: four blocks of six boxes round a lane, the hay barn between the back two ----
+export const STABLES = { blocks: [[-36, -126, 0], [36, -126, 0], [-36, -114, Math.PI], [36, -114, Math.PI]], barn: [0, -126] };
+
+// ---- the fairground annex, behind the main stand's east end ----
+export const ANNEX = {
+  x0: 124, x1: 206, z0: 106, z1: 168, gate: [124, 139], wheel: [175, 156], carousel: [142, 134], ticket: [171, 118],
+  kiosks: [[170, 133, 6], [194, 133, 8]],
+};

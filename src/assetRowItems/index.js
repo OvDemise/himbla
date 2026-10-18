@@ -30,7 +30,8 @@ import characters from './characters.js';
 import props from './props.js';
 import vehicles from './vehicles.js';
 import buildings from './buildings.js';
+import downs from './downs.js';
 import places from './places.js';
 
 // (small things first, so the first stretch of the row is cheap and dense; the places, the biggest and heaviest, last)
-export const GROUPS = [characters, props, vehicles, buildings, places].flat();
+export const GROUPS = [characters, props, vehicles, buildings, downs, places].flat();

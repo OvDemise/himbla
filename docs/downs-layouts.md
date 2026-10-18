@@ -1,7 +1,8 @@
 # Chimera Downs: overhaul, two layouts
 
-Two proposals for the big Chimera Downs overhaul (`src/race.js` `build()` today). **Nothing here is built yet.** The plans are
-`docs/downs-layout-current.svg`, `-a.svg` and `-b.svg`, drawn and clearance-checked by `tools/downs-layouts.mjs` (the footprints are the
+Two layouts for the big Chimera Downs overhaul (`src/race.js` `build()` before it). **Layout B, The Horseshoe, is built** (`src/downsWorld.js` lays it out from `src/downsPlan.js`
+and the Blender kits `tools/blender/build_downs_*.py`; see "As built" below); Layout A stays a proposal. The plans are
+`docs/downs-layout-current.svg` (the course before the overhaul), `-a.svg` and `-b.svg`, drawn and clearance-checked by `tools/downs-layouts.mjs` (the footprints are the
 data in that script; `node tools/downs-layouts.mjs` checks them, `node tools/downs-layouts.mjs docs` redraws the plans).
 
 All positions are in the Downs' own frame, metres, +x to the right of the plan and +z **down** it (the main grandstand is at the bottom,
@@ -159,10 +160,27 @@ outer rail, and no two things from different builders are closer than 2.4 m.
 4. Stables, parade ring, pavilion; the annex, with the wheel and carousel rebuilt in Blender and set back into `rides.js`.
 5. The crowd, the racegoers (26 now, about 40 after) and the music zone's extent; the trailer's Downs shot; Asset Row items, README and CHANGELOG.
 
-## Decisions for you
+## Decisions
 
-1. **Which reading of "between the two stands"?** A (the infield), B (the turns), or a mix: for example B's arcades with A's screen and
-   podium arrangement, or A's Midway with B's forecourt.
-2. **Plateau r 215 → 280.** It is the cost of the bigger site; the terrain round the Downs will be re-cut. OK?
-3. **Podiums in play (optional).** The finishing chimeras could stand on the steps while the result dialog is up. It is a small change in
-   `race.js` `finish()`; say if you want it.
+1. **Which reading of "between the two stands"?** B: the arcades round the turns.
+2. **Plateau r 215 → 280.** Yes; `locations.js` has it.
+3. **Podiums in play.** Yes: `race.js` `finish()` stands the first three on their steps and swings the camera round to them while the result dialog is up.
+
+## As built (Layout B)
+
+The build follows the plan above, with these differences and additions:
+
+- **Stands.** The main stand is 14 tiers and 228 m with a row of lit suites over the top tier and 11 roof bays between two end towers in its front corners; the far stand is 8 tiers and
+  190 m (not 184) with its own lower roof and towers. Seats are Blender strips (`dn_seat3`); the crowd is 1,060 seated figures (`downs-crowd`).
+- **Clubhouse and tote hall** are one building behind the main stand's centre: the six betting windows are under its portico (three each side of the great door), the race card board
+  hangs in the recess over them, and the prompt (`F`) works at those windows.
+- **Stables.** Four blocks of six boxes (24) round a lane, with the hay barn between the back two, not twelve boxes.
+- **Weighing room.** 13.2 m deep with its porch, 18 m long (the plan had 10 × 18), on the ring's east side.
+- **Crossings.** The rails leave an 8 m gap at x = +-70 on both straights with a raised-boom barrier post at each end of each gap. The booms do not drop: nobody is on the track while a race runs.
+- **Forecourt.** Gate arch, fountain (24 m across), nine flag masts a side with festoons across the avenue at every other pair, lamps, benches and planters, and twelve valet bays (no cars parked in them).
+- **Drum.** A 41 × 15 m shell on a 10 × 10 m core; the long faces (40 × 20 m) look at the stands, the ends (14 × 20 m) down the arcades. Each podium set has a plate on its backdrop: its slot of the
+  race card, or, after a race from that slot has finished, the first three home.
+- **Annex.** The ticket hall, two stalls, queue posts, a striped fence with a gate on its west side, and the two rides (rebuilt in Blender; `src/downsFair.js`).
+- **Models.** Nothing of the old derby survives unreworked: the starting gate, rails, finish arch, lamps, flood masts, festoons, flags, stalls and spectators are all new Blender models. The golden
+  statue, its plinth and the winner's circle were removed.
+- **Not built:** Layout A's bridges and Midway.

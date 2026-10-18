@@ -148,7 +148,7 @@ export const LOCATIONS = [
   {
     id: 'downs', name: 'Chimera Downs', short: 'DOWNS', type: 'derby', faction: 'none', poi: true, late: true,
     theta: 22, phi: 160, r: 280, safe: true, repair: 6,
-    blurb: "A proper racecourse for the things that crawl out of Dr. Zbornak's reactor: a grandstand, a jumbotron and a race card that never sleeps.",
+    blurb: "A proper racecourse for the things that crawl out of Dr. Zbornak's reactor: a roofed grandstand, a screen the size of a barn and a race card that never sleeps.",
   },
 ];
 

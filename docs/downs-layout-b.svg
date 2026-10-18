@@ -52,14 +52,18 @@
 <rect x="421.7" y="402.2" width="30.6" height="8.5" fill="#cfb352" fill-opacity="0.85" stroke="#3b393a" stroke-width="0.8"/>
 <rect x="472.7" y="402.2" width="30.6" height="8.5" fill="#cfb352" fill-opacity="0.85" stroke="#3b393a" stroke-width="0.8"/>
 <ellipse cx="273.8" cy="375.0" rx="44.2" ry="30.6" fill="#7b9a6e" fill-opacity="0.85" stroke="#f8fff8" stroke-width="0.8"/>
-<rect x="324.8" y="359.7" width="17.0" height="30.6" fill="#f8fff8" fill-opacity="0.85" stroke="#cfb352" stroke-width="0.8"/>
-<rect x="318.0" y="147.2" width="238.0" height="44.2" fill="#f8fff8" fill-opacity="0.85" stroke="#cfb352" stroke-width="0.8"/>
+<rect x="326.2" y="359.4" width="22.4" height="31.3" fill="#f8fff8" fill-opacity="0.85" stroke="#cfb352" stroke-width="0.8"/>
+<rect x="349.8" y="145.2" width="52.0" height="19.7" fill="#f8fff8" fill-opacity="0.85" stroke="#cfb352" stroke-width="0.8"/>
+<rect x="472.2" y="145.2" width="52.0" height="19.7" fill="#f8fff8" fill-opacity="0.85" stroke="#cfb352" stroke-width="0.8"/>
+<rect x="349.8" y="177.1" width="52.0" height="19.7" fill="#f8fff8" fill-opacity="0.85" stroke="#cfb352" stroke-width="0.8"/>
+<rect x="472.2" y="177.1" width="52.0" height="19.7" fill="#f8fff8" fill-opacity="0.85" stroke="#cfb352" stroke-width="0.8"/>
+<rect x="416.3" y="136.7" width="41.5" height="24.1" fill="#f8fff8" fill-opacity="0.85" stroke="#cfb352" stroke-width="0.8"/>
 <rect x="692.0" y="630.0" width="85.0" height="20.4" fill="#cfb352" fill-opacity="0.85" stroke="#3b393a" stroke-width="0.8"/>
-<circle cx="678.4" cy="602.8" r="18.7" fill="#8b4044" fill-opacity="0.85" stroke="#cfb352" stroke-width="0.8"/>
-<rect x="709.0" y="565.4" width="37.4" height="17.0" fill="#f8fff8" fill-opacity="0.85" stroke="#cfb352" stroke-width="0.8"/>
-<rect x="722.6" y="592.6" width="13.6" height="13.6" fill="#8b4044" fill-opacity="0.85" stroke="#f8fff8" stroke-width="0.8"/>
-<rect x="760.0" y="592.6" width="13.6" height="13.6" fill="#8b4044" fill-opacity="0.85" stroke="#f8fff8" stroke-width="0.8"/>
-<rect x="644.4" y="599.4" width="6.8" height="23.8" fill="#f8fff8" fill-opacity="0.85" stroke="#cfb352" stroke-width="0.8"/>
+<circle cx="678.4" cy="602.8" r="17.8" fill="#8b4044" fill-opacity="0.85" stroke="#cfb352" stroke-width="0.8"/>
+<rect x="709.0" y="562.0" width="37.4" height="13.6" fill="#f8fff8" fill-opacity="0.85" stroke="#cfb352" stroke-width="0.8"/>
+<rect x="718.5" y="588.9" width="15.0" height="13.9" fill="#8b4044" fill-opacity="0.85" stroke="#f8fff8" stroke-width="0.8"/>
+<rect x="759.3" y="588.9" width="15.0" height="13.9" fill="#8b4044" fill-opacity="0.85" stroke="#f8fff8" stroke-width="0.8"/>
+<rect x="646.1" y="601.1" width="3.4" height="20.4" fill="#f8fff8" fill-opacity="0.85" stroke="#cfb352" stroke-width="0.8"/>
 <text x="137.8" y="341.0" text-anchor="middle" class="n" style="paint-order:stroke;stroke:#242326;stroke-width:3px">WEST ARCADE (10 stalls)</text>
 <text x="736.2" y="341.0" text-anchor="middle" class="n" style="paint-order:stroke;stroke:#242326;stroke-width:3px">EAST ARCADE (10 stalls)</text>
 <text x="437.0" y="534.8" text-anchor="middle" class="n" style="paint-order:stroke;stroke:#242326;stroke-width:3px">MAIN GRANDSTAND</text>

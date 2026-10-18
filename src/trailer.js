@@ -1064,8 +1064,8 @@ const SHOTS = [
     },
   },
 
-  // 12a · Chimera Downs from above: a slow crane along the packed grandstand, the dirt oval and the
-  // finish gantry, before the race
+  // 12a · Chimera Downs from the infield: a slow crane along the packed grandstand under its red roof, the dirt oval and the
+  // finish arch, before the race
   {
     name: 'downs pan',
     dur: 3.0,
@@ -1076,8 +1076,8 @@ const SHOTS = [
     },
     cam(T, t) {
       const k = ease(t / 3);
-      T.at('downs', lerp(-75, 15, k), lerp(26, 21, k), lerp(18, 10, k), T.eye);
-      T.at('downs', lerp(-15, 45, k), 6, lerp(72, 62, k), T.look);
+      T.at('downs', lerp(-90, 25, k), lerp(32, 25, k), lerp(22, 12, k), T.eye);
+      T.at('downs', lerp(-20, 55, k), 9, lerp(84, 70, k), T.look);
       T.fov = 56;
     },
     cards: [{ key: 'festive', at: 0.4, dur: 99, html: 'JOIN THE LOCAL FESTIVITIES.<br><span class="tr-sub">PLACE YOUR BETS. LET IT RIDE.</span>' }],
