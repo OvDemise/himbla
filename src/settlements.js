@@ -1,10 +1,13 @@
+import { FRONT_OUT, HALL } from './casinoPlan.js'; // casino: where the hall's doors' wall ends and the forecourt starts
 import * as THREE from 'three';
 import { Kit, T, G, D, GLASS, BEAM, prism, sandbags, container, crate, tank, lightString, junkHeap, PALETTE } from './outpostModels.js';
 import { FACTIONS } from './locations.js';
 import { pixelFont } from './fonts.js';
 import { glow } from './toon.js';
 import { market, tickerText } from './market.js';
-import { craneModel, craneSlot, CRANE_H, CRANE_LOAD_DROP, CRANE_TROLLEY_MIN, CRANE_TROLLEY_SPAN, garageModel, garageSlot, GARAGE_HALL, dishModel, dishSlot, DISH_KINDS } from './models.js';
+import { casinoNode, casinoSlot, lotNode, lotSlot } from './models.js';
+import { waterMesh } from './fountainFx.js';
+import { craneModel, craneSlot, CRANE_H, CRANE_LOAD_DROP, CRANE_TROLLEY_MIN, CRANE_TROLLEY_SPAN, gantryModel, cargoSlot, GANTRY_TROLLEY_SPAN, CARGO_BOX, garageModel, garageSlot, GARAGE_HALL, dishModel, dishSlot, DISH_KINDS } from './models.js';
 
 // Settlements, HQs and landmarks built with the outpost Kit (outpostModels.js): every static part
 // of a place bakes into one merged mesh per material plus one ink hull, so a detailed settlement
@@ -305,6 +308,78 @@ export function towerCrane(k, x, z, h, jib, color, { speed = 0.12, phase = 0 } =
   };
   k.dyn(top, 0, top.position.y, 0);
   k.at();
+}
+
+// Gantry crane (built in Blender, tools/blender/build_gantry.py): the tower crane's sibling over a container yard. A portal of two
+// lattice legs on rail bogies under a truss girder; the whole crane is one moving object that runs along x on its rails (`travel` m
+// either way of `x`), the trolley (the tower crane's) hangs under the girder at `lane` along z, and the hook block lowers the
+// crane's load (the land-train's box container on a spreader, in `faction`'s livery) to the ground at each end of the run, then
+// lifts it and comes back: a cycle every 1 / `speed` seconds, starting `phase` of the way through. Drawn in the settlement's frame
+// (call with k at the origin); the legs ride at z +- GANTRY_LEG of `z`. No colliders: it never stands still.
+export function gantryCrane(k, x, z, color, { speed = 1 / 70, phase = 0, travel = 24, lane = 10, faction = 'meridian' } = {}) {
+  const C = gantryModel();
+  const mat = (slot, cargo) => { const c = cargo ? cargoSlot(slot, faction) : craneSlot(slot, color, faction); return c.glow ? G(c.color) : T(c.color); };
+  // a moving piece: the node's own meshes, and under its `load` the spreader, the cargo unit and its matching livery
+  const piece = (node) => part(color, (q) => {
+    const walk = (n, m, cargo) => {
+      q.baked(n, (slot) => mat(slot, cargo), m);
+      for (const c of n.kids) {
+        if (c.role === 'load' || c.role === 'cargo' || (c.role === 'livery' && c.data.faction === faction)) {
+          walk(c, new THREE.Matrix4().compose(c.pos, c.quat, new THREE.Vector3(1, 1, 1)).premultiply(m), cargo || c.role === 'cargo');
+        }
+      }
+    };
+    walk(node, new THREE.Matrix4(), false);
+  });
+  const body = piece(C.root);
+  for (const b of C.blinkers) {
+    const lamp = new THREE.Mesh(new THREE.SphereGeometry(b.data.radius || 0.3, 8, 6), G(0xff2a4a));
+    lamp.userData.blink = true;
+    lamp.position.copy(b.pos);
+    body.add(lamp);
+  }
+  const trolley = piece(C.trolley), cable = piece(C.cable), hook = piece(C.hook);
+  trolley.position.copy(C.trolley.pos);
+  cable.position.copy(C.cable.pos);
+  hook.position.copy(C.hook.pos);
+  trolley.add(cable, hook);
+  body.add(trolley);
+  // the rope pays out until the container's bottom is 0.3 m off the ground
+  const drop = C.hook.data.drop || 8.9;
+  const ropeMin = 1.5, ropeMax = C.trolley.pos.y + C.hook.pos.y - drop - 0.3;
+  const ease = (f) => 0.5 - 0.5 * Math.cos(Math.PI * Math.min(1, Math.max(0, f)));
+  body.userData.tick = (o, dt, t) => {
+    const u = ((t * speed + phase) % 1 + 1) % 1;
+    // the cycle: set down and lift at this end (0 - 0.2), run to the far end (0.2 - 0.5), set down and lift there (0.5 - 0.7), run back
+    let along, dip;
+    if (u < 0.2) { along = 0; dip = Math.sin(Math.PI * u / 0.2); }
+    else if (u < 0.5) { along = ease((u - 0.2) / 0.3); dip = 0; }
+    else if (u < 0.7) { along = 1; dip = Math.sin(Math.PI * (u - 0.5) / 0.2); }
+    else { along = 1 - ease((u - 0.7) / 0.3); dip = 0; }
+    o.position.x = x - travel + 2 * travel * along;
+    trolley.position.z = lane + Math.sin(t * 0.5 + phase * 7) * 0.4;
+    const rope = ropeMin + (ropeMax - ropeMin) * dip;
+    cable.scale.y = rope;
+    hook.position.y = C.hook.pos.y - rope;
+  };
+  k.dyn(body, x, 0, z);
+}
+
+// A stack of `n` of the land-train's box containers (the gantry file's own, gantryModel().box) at (x, z), each in the livery of
+// `factions[j]` (bottom first), lying along local z, turned by `ry`, standing on y0; one collider the size of the stack.
+export function cargoStack(k, x, z, n, factions, ry = 0, y0 = 0) {
+  const C = gantryModel();
+  for (let j = 0; j < n; j++) {
+    const f = factions[j % factions.length];
+    const mat = (slot) => { const c = cargoSlot(slot, f); return c.glow ? G(c.color) : T(c.color); };
+    const m = new THREE.Matrix4().makeRotationY(ry).setPosition(x, y0 + j * CARGO_BOX.h, z);
+    k.baked(C.box, mat, m);
+    for (const c of C.box.kids) {
+      if (c.role === 'livery' && c.data.faction !== f) continue;
+      k.baked(c, mat, new THREE.Matrix4().compose(c.pos, c.quat, new THREE.Vector3(1, 1, 1)).premultiply(m));
+    }
+  }
+  k.solid(CARGO_BOX.hx + 0.1, (n * CARGO_BOX.h) / 2, CARGO_BOX.hz + 0.1, x, z, ry, y0);
 }
 
 // Radio-dish array station (built in Blender, tools/blender/build_dish.py): 'cryo' (the Helium-3 tanker on end under a banded dish) or
@@ -653,17 +728,72 @@ export function buildHelium(world, loc) {
   });
 }
 
+// Sawtooth trade hall (the Exchange's bonded market, layout A of docs/meridian-layouts.md): a plinth, white walls with a
+// faction band, a sawtooth roof whose vertical faces are glass and face -x (the avenue), three glass doors on that side
+// and three loading doors on the back, the name over the doors. w across x, d along z.
+function tradeHall(k, x, z, w, d, trim, name = 'TRADE HALL') {
+  const H = 7, teeth = 4, tw = w / teeth, rise = 3.2;
+  k.at(x, z);
+  k.box(w + 1.2, 0.6, d + 1.2, T(CONC), 0, 0, 0, { outline: 0.08 });
+  k.box(w, H, d, T(WHITE), 0, 0.6, 0, { outline: 0.14 });
+  k.box(w + 0.12, 0.6, d + 0.12, T(trim), 0, 5.4, 0, { outline: 0.03 });
+  // the roof: a sawtooth profile across x, extruded along z
+  const pts = [new THREE.Vector2(-w / 2, 0)];
+  for (let i = 0; i < teeth; i++) { const x0 = -w / 2 + i * tw; pts.push(new THREE.Vector2(x0, rise), new THREE.Vector2(x0 + tw, 0)); }
+  k.add(new THREE.ExtrudeGeometry(new THREE.Shape(pts), { depth: d, bevelEnabled: false }).translate(0, 0, -d / 2), T(0xd8d4e8), 0, 0.6 + H, 0, { outline: 0.1 });
+  for (let i = 0; i < teeth; i++) k.box(0.16, rise - 0.7, d - 2, G(0xbfe9ff), -w / 2 + i * tw + 0.1, 0.6 + H + 0.35, 0, { outline: 0 });
+  // the avenue side (-x): three glass doors in bronze frames under the name; the back (+x): three loading doors
+  for (const dz of [-d / 4, 0, d / 4]) {
+    k.box(0.4, 5.2, 5.2, T(0x8a5a3a), -w / 2 - 0.1, 0.6, dz, { outline: 0.04 });
+    k.box(0.2, 4.4, 4.4, G(0xbfe9ff), -w / 2 - 0.3, 1.0, dz, { outline: 0 });
+    k.box(0.4, 4.6, 6, T(0x4e4a60), w / 2 + 0.1, 0.6, dz, { outline: 0.04 });
+    for (let j = 0; j < 3; j++) k.box(0.1, 0.25, 6, T(YEL), w / 2 + 0.36, 1.2 + j * 1.5, dz, { outline: 0 });
+    k.box(0.4, 0.5, 6.4, T(trim), w / 2 + 0.1, 5.2, dz, { outline: 0.02 });
+  }
+  k.text(name, -w / 2 - 0.35, 0.6 + H - 0.9, 0, -Math.PI / 2, 14, { fg: '#2ec4ff', bg: '#0d1a33', back: false, off: 0.03 });
+  k.solid(w / 2 + 0.6, (0.6 + H + rise) / 2, d / 2 + 0.6, 0, 0);
+  k.at();
+}
+
+// The plaza fountain (built in Blender, tools/blender/build_casino.py): the basin, pedestal, bowl, stem and spigots are baked into
+// the kit; the centrepiece turns (`top`: the casino's 'chip', or the 'dollar' sign in `accent`, the Meridian Exchange's), and the
+// two tiers' ripples, the curtain spilling over the bowl's lip and the jets from the spigots under it run on shaders
+// (fountainFx.js). Colliders for the basin, the pedestal and the stem. Drawn in the settlement's frame (k at the origin).
+export function fountain(k, x, z, { top = 'chip', accent = 0xff2e88 } = {}) {
+  const F = casinoNode('fountain'), I = new THREE.Matrix4();
+  const mat = (slot) => { const c = casinoSlot(slot, accent); return c.glow ? G(c.color) : T(c.color); };
+  k.at(x, z);
+  k.baked(F, mat, I);
+  for (const n of F.kids) {
+    if (n.role === 'spin') {
+      if ((n.data.kind || 'chip') !== top) continue;
+      const piece = part(0xffffff, (q) => q.baked(n, mat, I));
+      piece.userData.spin = n.data.speed || 0.7;
+      k.dyn(piece, n.pos.x, n.pos.y, n.pos.z);
+    } else k.dyn(waterMesh(n), n.pos.x, n.pos.y, n.pos.z);
+  }
+  k.at();
+  k.column(9.8, 1.05, x, z);
+  k.column(2.7, 4.7, x, z);
+  k.column(1.7, 9.2, x, z, 4.7);
+}
+
 // =============================================================================================
-// Meridian Exchange: the trade HQ. A stepped glass trading tower wearing a price ticker, four
-// sawtooth warehouses with docks, a container yard under a travelling gantry crane, two tower
-// cranes, the lab dome and the pads.
+// Meridian Exchange: the trade HQ, laid out on one axis (docs/meridian-layouts.md, layout A): a gate
+// arch on the +z side, a 118 m avenue down to the plaza and the portico of the stepped glass trading
+// tower (which wears the price ticker), the lab dome and a sawtooth trade hall facing each other
+// across the avenue; behind the tower the port (a container yard under a travelling gantry crane,
+// two tower cranes, the motor-pool garage out by the ring road) and, in the north corners, the pads.
 // =============================================================================================
 export function buildMeridian(world, loc) {
   settle(world, loc, 4409, (k, ctx) => {
     const blue = 0x2ec4ff, cols = [0x2ec4ff, 0xff9f1c, 0x7dff6a, 0xff3b5c, 0xffd23f, 0xc77dff];
-    // layout: plaza at the centre, the trading tower south of it, the lab dome north, warehouses
-    // out on the four corners (docks along the ring, not at each other), cranes in the gaps
-    const TZ = -42;
+    // layout: the tower 24 m south of the origin (the name and HQ sprites hang over the origin at
+    // y 50 and 62, which would be inside the tower's cone), its portico facing +z onto the plaza at
+    // (0, 34); the avenue runs from the plaza north to the gate arch at (0, 140); the dome west of
+    // the avenue and the hall east of it; the chairwoman at the foot of the steps; the yard, the
+    // cranes and the garage south of the tower
+    const TZ = -24;
     // the trading tower: three stepped octagonal tiers of glass and white bands (1.5x the old one,
     // set further back off the plaza)
     k.at(0, TZ, Math.PI / 8);
@@ -735,6 +865,9 @@ export function buildMeridian(world, loc) {
       k.at();
       k.lamp(-11, TZ + fz + 10.5, 6); k.lamp(11, TZ + fz + 10.5, 6);
     }
+    // the chairwoman (story.buildLeaders) stands at the foot of the portico's steps, off the doors' line, facing the plaza's fountain
+    // (her ballot stand, 5.5 m in front of her, stays clear of the basin)
+    loc.leaderSpot = { x: 9.5, z: 6, yaw: Math.atan2(-9.5, 14) };
     const crown = part(blue, (q) => {
       for (let i = 0; i < 4; i++) {
         const a = (i / 4) * TAU;
@@ -745,120 +878,86 @@ export function buildMeridian(world, loc) {
     crown.userData.spin = 0.4;
     crown.scale.setScalar(1.5);
     k.dyn(crown, 0, y + 3.6, TZ);
-    // the motor pool: one main garage out by the south-west stretch of the ring road, its bays turned out to face it (a service road
-    // runs from its right-hand bay to the ring, traffic.js), and two small sheds on the plaza's north-west and south-east corners,
-    // their bays turned in to face the tower
+    // the motor pool: the main garage out by the south-west stretch of the ring road, its bays turned out to face it (a service road
+    // runs from its right-hand bay to the ring, traffic.js)
     const GA = GARAGE_AT;
     garage(k, GA.x, GA.z, GA.yaw, [true, false, true], 'main');
-    for (const [sx, sz, open] of [[-60.8, 60.8, [false, true]], [60.8, -60.8, [true, true]]]) {
-      garage(k, sx, sz, Math.atan2(-sx, -sz), open, 'small');
-    }
     loc.garage = { ...GA, bay: 2 }; // (the bay the rovers come out of: it is open and has nothing in the way)
-    // container yard under a travelling gantry crane
-    const yx = -5, yz = -100;
+    // the container yard: a 70 x 30 slab with the gantry crane's rails along its long edges, three rows of stacks of the
+    // land-train's box container (cargo.py, as the cranes carry it) in the freight factions' liveries, a lane along the
+    // north side for the gantry to set its load down in, and the gantry running the length of the yard over it all
+    const yx = 0, yz = -97;
     k.at(yx, yz);
-    k.box(62, 0.3, 30, T(0x6b6880), 0, 0, 0, { outline: 0.04 });
-    for (const s of [-1, 1]) k.box(64, 0.3, 0.6, T(STEEL), 0, 0.3, s * 15, { outline: 0 });
+    k.box(70, 0.3, 30, T(0x6b6880), 0, 0, 0, { outline: 0.04 });
+    for (const s of [-1, 1]) {
+      k.box(70, 0.25, 0.5, T(STEEL), 0, 0.3, s * 15, { outline: 0 });
+      for (let x = -33; x <= 33; x += 3) k.box(0.5, 0.12, 1.6, T(DARK), x, 0.3, s * 15, { outline: 0 });
+      for (const bx of [-34.2, 34.2]) k.box(0.6, 1.1, 1.2, T(YEL), bx, 0.3, s * 15, { outline: 0.03 });
+    }
+    const freight = ['meridian', 'kepler', 'spacecom', 'vostok'];
     for (let i = 0; i < 18; i++) {
-      const cx = -25 + (i % 6) * 10, cz = -6 + Math.floor(i / 6) * 6;
-      const hgt = 1 + ((i * 7) % 3);
-      for (let j = 0; j < hgt; j++) container(k, cx, 0.3 + j * 2.62, cz, cols[(i + j) % cols.length], Math.PI / 2);
-      k.solid(3.2, (hgt * 2.62) / 2, 1.4, cx, cz, 0, 0.3);
+      const col = i % 6, row = Math.floor(i / 6);
+      if (i === 4 || i === 13) continue; // (two bays stand empty)
+      const cx = -26 + col * 9.5, cz = -8.5 + row * 7;
+      const n = 1 + ((i * 7 + row) % 3);
+      cargoStack(k, cx, cz, n, [freight[(i + row) % 4], freight[(i * 3 + 1) % 4], freight[(i + 2) % 4]], Math.PI / 2, 0.3);
     }
     k.at();
-    const gantry = part(YEL, (q) => {
-      for (const s of [-1, 1]) {
-        for (const t of [-1, 1]) q.beam([t * 2.4, 0.6, s * 15], [t * 1.2, 15, s * 15], 0.45, T(YEL), { outline: 0.05 });
-        q.box(5.6, 1.2, 2, T(DARK), 0, 0, s * 15, { outline: 0.04 });
-        q.box(3, 0.8, 1.2, T(YEL), 0, 6, s * 15, { outline: 0 });
-      }
-      q.box(2.2, 1.6, 33, T(YEL), 0, 15, 0, { outline: 0.06 });
-      q.box(2.6, 2.2, 2.6, T(WHITE), 0, 12.6, 13, { outline: 0.04 });
-      q.box(2.64, 0.8, 2.64, G(0xcfefff), 0, 13.6, 13, { outline: 0 });
-      q.blinker(0, 17, -15, 0xffd23f, 0.3);
-      q.blinker(0, 17, 15, 0xffd23f, 0.3);
-    });
-    const trolley = new THREE.Group();
-    trolley.add(new THREE.Mesh(new THREE.BoxGeometry(2.8, 1, 2.6), T(DARK)));
-    const spreader = part(YEL, (q) => {
-      q.box(2.8, 0.5, 6.4, T(YEL), 0, -0.25, 0, { outline: 0.04 });
-      container(q, 0, -3.2, 0, 0xff3b5c, 0);
-    });
-    const cab = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 1, 4).translate(0, -0.5, 0), T(DARK));
-    trolley.add(cab, spreader);
-    gantry.add(trolley);
-    gantry.userData.tick = (o, dt, t) => {
-      o.position.x = yx + Math.sin(t * 0.07) * 24;
-      trolley.position.set(0, 15, Math.sin(t * 0.21) * 10);
-      const drop = 3 + 6 * (0.5 + 0.5 * Math.sin(t * 0.33));
-      cab.scale.y = drop; spreader.position.y = -drop;
-    };
-    k.dyn(gantry, yx, 0.3, yz);
-    // two tower cranes (the old ones, now lattice and slewing)
-    towerCrane(k, -78, 6, 34, 30, YEL, { speed: 0.09, phase: 0 });
-    towerCrane(k, 78, -6, 34, 30, YEL, { speed: 0.11, phase: 2.2 });
-    // the lab dome, a plaza with benches and lamps, signage
-    habDome(k, 0, 60, 22, 0x9be7ff, { door: Math.PI, trim: blue });
-    k.at(0, 6);
-    k.cyl(10, 10.4, 0.25, 32, T(0xd8d4e8), 0, 0, 0, { outline: 0.04 });
-    k.ring(10.2, 0.15, T(blue), 0, 0.25, 0);
-    k.cyl(1.6, 2, 3.2, 10, T(blue), 0, 0, 0, { outline: 0.05 });
-    k.ball(1.4, G(0xbfe9ff), 0, 4.2, 0, { outline: 0 });
-    k.column(2, 3.4, 0, 0);
+    gantryCrane(k, yx, yz, YEL, { speed: 1 / 70, phase: 0.3, travel: 24, lane: 10, faction: 'meridian' });
+    // the yard's slab, the plaza and the avenue have no colliders to say they are taken: keep the traffic's pads, the ring's stop and
+    // the defence pylons off them (traffic.js keepouts, world.js defensePylons); the yard's is sized so the turret at (25, -122) stays put
+    (loc.keep ||= []).push({ x: yx, z: yz, r: 30 }, { x: 0, z: 34, r: 14 }, ...[56, 82, 108, 134].map((z) => ({ x: 0, z, r: 16 })));
+    // two tower cranes over the yard
+    towerCrane(k, -54, -72, 34, 30, YEL, { speed: 0.09, phase: 0 });
+    towerCrane(k, 62, -78, 34, 30, YEL, { speed: 0.11, phase: 2.2 });
+    // the lab dome west of the avenue, its airlock facing it; the trade hall east of it, its doors facing it
+    habDome(k, -58, 40, 22, 0x9be7ff, { door: Math.PI / 2, trim: blue });
+    tradeHall(k, 64, 24, 24, 56, blue);
+    // the plaza between the portico and the avenue, a good way out from the steps so the fountain has room: paving, the
+    // fountain (the casino's, with a dollar sign in Meridian blue turning on top), benches round the basin, lamps
+    k.at(0, 34);
+    k.cyl(12, 12.4, 0.25, 32, T(0xd8d4e8), 0, 0, 0, { outline: 0.04 });
+    k.ring(12.2, 0.15, T(blue), 0, 0.25, 0);
     for (let i = 0; i < 6; i++) {
       const a = (i / 6) * TAU + 0.3;
-      k.box(2.6, 0.5, 0.8, T(0x8a5a3a), Math.cos(a) * 7.5, 0.5, Math.sin(a) * 7.5, { ry: -a + Math.PI / 2, outline: 0.03 });
+      k.box(2.6, 0.5, 0.8, T(0x8a5a3a), Math.cos(a) * 11, 0.5, Math.sin(a) * 11, { ry: -a + Math.PI / 2, outline: 0.03 });
     }
     k.at();
-    k.sign('MERIDIAN EXCHANGE', 0, 120, { w: 18, y: 6, fg: '#2ec4ff', ry: Math.PI });
-    k.lamp(14, 16, 8); k.lamp(-14, 16, 8); k.lamp(16, -4, 8); k.lamp(-16, -4, 8);
-    floodMast(k, 30, -84, 14); floodMast(k, -40, -84, 14);
-    // the landing pads: a spare one for a shuttle out beyond the dome (the freighter's is laid out by the traffic, which keeps the
-    // pads of two flights clear of each other, so it lands out past the crane), and one on the opposite diagonal
-    world.pad(loc, 94, 98, 12, 0x2ec4ff, true);
-    world.pad(loc, -100, -60, 16, 0x2ec4ff, true);
-    world.flag(loc, 0, 110, [0x2ec4ff, 0xffffff, 0x2ec4ff], 20);
+    fountain(k, 0, 34, { top: 'dollar', accent: blue });
+    k.lamp(16, 34, 8); k.lamp(-16, 34, 8);
+    // the avenue: a road from the plaza's edge to the gate, the traffic's own (traffic.js pavedStrip lays its bed, ruts and
+    // berms with the road network, melting in under the plaza's paving and out past the arch); lamps and banners in pairs
+    // along it (the flags between them are the world's)
+    {
+      loc.paved = [{ x0: 0, z0: 44, x1: 0, z1: 150 }];
+      for (const z of [50, 90, 130]) { k.lamp(20, z, 8); k.lamp(-20, z, 8); }
+      for (const z of [70, 130]) for (const sx of [-1, 1]) {
+        k.cyl(0.12, 0.14, 12, 6, T(DARK), sx * 20, 0, z + 4, { outline: 0.02 });
+        k.box(0.1, 6, 2.2, T(blue), sx * 20, 5.4, z + 4 + 1.15, { outline: 0.03 });
+        k.box(0.12, 0.6, 2.2, T(YEL), sx * 20, 6.4, z + 4 + 1.15, { outline: 0 });
+      }
+    }
+    // the gate arch at the avenue's head: two pylons and a beam carrying the exchange's name, read from either side
+    {
+      const az = 140;
+      for (const sx of [-1, 1]) {
+        k.box(2.4, 11, 2.4, T(WHITE), sx * 14.5, 0, az, { outline: 0.1 });
+        k.box(2.8, 0.5, 2.8, T(blue), sx * 14.5, 11, az, { outline: 0.03 });
+        k.solid(1.3, 5.75, 1.3, sx * 14.5, az);
+      }
+      k.box(32, 2.2, 2.6, T(WHITE), 0, 11.5, az, { outline: 0.1 });
+      k.box(32.2, 0.4, 2.8, T(blue), 0, 13.7, az, { outline: 0.03 });
+      k.text('MERIDIAN EXCHANGE', 0, 12.6, az + 1.33, 0, 20, { fg: '#2ec4ff', bg: '#0d1a33', back: false, off: 0.03 });
+      k.text('MERIDIAN EXCHANGE', 0, 12.6, az - 1.33, Math.PI, 20, { fg: '#2ec4ff', bg: '#0d1a33', back: false, off: 0.03 });
+      k.blinker(0, 14.4, az, 0xff2a4a, 0.4);
+    }
+    floodMast(k, 40, -124, 14); floodMast(k, -44, -118, 14);
+    // the landing pads, in the north corners either side of the avenue (spares: the traffic keeps the ones its flights use and lays
+    // the freighter's own, clear of the buildings and of the other flight)
+    world.pad(loc, -96, 96, 14, 0x2ec4ff, true);
+    world.pad(loc, 96, 96, 14, 0x2ec4ff, true);
+    for (const sx of [-1, 1]) world.flag(loc, sx * 18, 110, [0x2ec4ff, 0xffffff, 0x2ec4ff], 20);
   });
-}
-
-// ---------------------------------------------------------------------------------------------
-// skateable shapes: a visible solid plus tilted box colliders whose top faces are the riding
-// surface (anything under ~55 degrees counts as ground in physics.stepSkater)
-// ---------------------------------------------------------------------------------------------
-
-// Collider slab whose top surface runs from A (x, y, z) to B, w wide (settlement frame).
-function slope(world, loc, A, B, w, thick = 0.5, extra = {}) {
-  const dx = B[0] - A[0], dy = B[1] - A[1], dz = B[2] - A[2];
-  const run = Math.hypot(dx, dz), len = Math.hypot(run, dy);
-  const yaw = Math.atan2(dx, dz), pitch = -Math.atan2(dy, run);
-  const n = [Math.sin(pitch) * Math.sin(yaw), Math.cos(pitch), Math.sin(pitch) * Math.cos(yaw)];
-  const c = world.col(loc, {
-    type: 'box', hx: w / 2, hy: thick, hz: len / 2, yaw, pitch,
-    x: (A[0] + B[0]) / 2 - n[0] * thick, y: (A[1] + B[1]) / 2 - n[1] * thick, z: (A[2] + B[2]) / 2 - n[2] * thick,
-  });
-  Object.assign(c, extra);
-  return c;
-}
-
-// A kicker: a wedge rising towards local +z (len long, h high at the lip, w wide) with deck
-// stripes, glowing side rails and a coping bar.
-function kicker(world, loc, k, x, z, yaw, len, h, w, color) {
-  const sh = new THREE.Shape([new THREE.Vector2(0, 0), new THREE.Vector2(len, 0), new THREE.Vector2(len, h)]);
-  const geo = new THREE.ExtrudeGeometry(sh, { depth: w, bevelEnabled: false }).translate(0, 0, -w / 2).rotateY(-Math.PI / 2);
-  k.at(x, z, yaw);
-  k.add(geo, T(color), 0, 0, 0, { outline: 0.1 });
-  const ang = Math.atan2(h, len);
-  for (let i = 1; i < 4; i++) {
-    const t = i / 4;
-    k.add(new THREE.BoxGeometry(w + 0.04, 0.06, 0.5), T(YEL), 0, h * t + 0.04, len * t, { rx: -ang, outline: 0 });
-  }
-  k.add(new THREE.CylinderGeometry(0.16, 0.16, w + 0.2, 8).rotateZ(Math.PI / 2), T(LIGHT), 0, h + 0.05, len - 0.1, { outline: 0.03 });
-  for (const s of [-1, 1]) k.beam([s * (w / 2 + 0.1), 0.2, 0.4], [s * (w / 2 + 0.1), h + 0.2, len - 0.2], 0.08, G(color === YEL ? 0x2ee6ff : YEL), { outline: 0 });
-  k.at();
-  const c = Math.cos(yaw), s = Math.sin(yaw);
-  const P = (lz, y) => [x + s * lz, y, z + c * lz];
-  slope(world, loc, P(-0.6, 0), P(len, h), w);
-  world.col(loc, { type: 'box', x: x + s * (len - 0.3), y: h / 2, z: z + c * (len - 0.3), hx: w / 2, hy: h / 2, hz: 0.3, yaw });
 }
 
 // the gored shapes are outlined by one shell that draws nothing itself (only its ink hull shows)
@@ -866,283 +965,6 @@ let _inkShell = null;
 function inkShell() {
   if (!_inkShell) _inkShell = new THREE.MeshBasicMaterial({ colorWrite: false, depthWrite: false });
   return _inkShell;
-}
-
-// Inflatable bounce dome: alternating coloured gores, a puffy base tube, tethers and a valve.
-export function bounceDome(world, loc, k, x, z, r, c1, c2) {
-  k.at(x, z);
-  const n = 10;
-  for (let i = 0; i < n; i++) k.add(new THREE.SphereGeometry(r, 4, 10, (i / n) * TAU, TAU / n, 0, Math.PI / 2), T(i % 2 ? c1 : c2), 0, -0.4, 0, { outline: 0 });
-  k.add(new THREE.SphereGeometry(r * 1.003, 20, 10, 0, TAU, 0, Math.PI / 2), inkShell(), 0, -0.4, 0, { outline: 0.25 });
-  k.add(new THREE.TorusGeometry(r * 0.98, Math.max(0.6, r * 0.06), 8, 28), T(c2), 0, 0.3, 0, { rx: Math.PI / 2, outline: 0.08 });
-  k.ring(r * 0.72, r * 0.05, T(WHITE), 0, r * 0.66, 0);
-  k.cyl(r * 0.08, r * 0.1, r * 0.08, 10, T(WHITE), 0, r - 0.6, 0, { outline: 0.04 });
-  k.ball(r * 0.05, G(YEL), 0, r - 0.4 + r * 0.08, 0, { outline: 0 });
-  for (let i = 0; i < 6; i++) {
-    const a = (i / 6) * TAU + 0.3;
-    const stake = [Math.cos(a) * (r + 3), 0, Math.sin(a) * (r + 3)];
-    k.beam([Math.cos(a) * r * 0.7, r * 0.7, Math.sin(a) * r * 0.7], stake, 0.05, T(DARK), { outline: 0 });
-    k.cyl(0.18, 0.12, 0.7, 5, T(YEL), stake[0], 0, stake[2], { outline: 0.02 });
-  }
-  k.at();
-  world.col(loc, { type: 'sphere', x, y: -0.5, z, r }).bouncy = true;
-}
-
-// =============================================================================================
-// Bounce Dome Funpark: the inflatables, now joined by a skate park (a volcano bowl you drop into,
-// a kicker line ending in a big launch off the plateau, a big half-pipe and a pyramid funbox), a ferris wheel, a carousel, trampolines and an entrance arch strung with lights.
-// =============================================================================================
-export function buildFunpark(world, loc) {
-  const cols = [0xff2e88, 0xffd23f, 0x2ee6ff, 0x7dff6a, 0xff9f1c, 0xc77dff];
-  settle(world, loc, 5507, (k) => {
-    // ---- the inflatables ----
-    [[0, 0, 26], [-50, 30, 18], [20, -60, 20], [-40, -50, 14], [-80, -10, 12]].forEach(([x, z, r], i) => bounceDome(world, loc, k, x, z, r, cols[i % 6], cols[(i + 2) % 6]));
-    // bouncy castle: puffy walls, four turrets, crenellations and an arched way in
-    k.at(0, 70);
-    k.box(24, 1.2, 24, T(0x2ee6ff), 0, 0, 0, { outline: 0.12 });
-    k.box(22, 5, 22, T(0xff2e88), 0, 1.2, 0, { outline: 0.2 });
-    for (let i = -4; i <= 4; i++) {
-      if (!(i % 2)) continue;
-      for (const [fx, fz, ry] of [[i * 2.4, 11, 0], [i * 2.4, -11, 0], [11, i * 2.4, Math.PI / 2], [-11, i * 2.4, Math.PI / 2]]) k.add(new THREE.CapsuleGeometry(0.7, 1.2, 4, 8), T(YEL), fx, 7.2, fz, { ry, outline: 0.05 });
-    }
-    for (const [tx, tz] of [[-11, -11], [11, -11], [-11, 11], [11, 11]]) {
-      k.cyl(2.4, 2.6, 10, 14, T(YEL), tx, 0, tz, { outline: 0.1 });
-      k.add(new THREE.ConeGeometry(3, 4.5, 14), T(0x2ee6ff), tx, 12.2, tz, { outline: 0.08 });
-      k.ball(0.6, G(0xff2e88), tx, 14.8, tz, { outline: 0 });
-      world.col(loc, { type: 'cyl', x: tx, z: 70 + tz, y0: -2, y1: 10, r: 2.6 }).bouncy = true;
-    }
-    k.add(new THREE.TorusGeometry(4, 1.0, 8, 16, Math.PI), T(YEL), 0, 1.2, -11.4, { outline: 0.08 });
-    k.box(8, 0.8, 5, T(0x7dff6a), 0, 0, -14, { outline: 0.06 });
-    k.at();
-    world.col(loc, { type: 'box', x: 0, y: 3, z: 70, hx: 12, hy: 3.2, hz: 12 }).bouncy = true;
-    // trampolines: a row of springy discs
-    for (let i = 0; i < 4; i++) {
-      const x = -34 + i * 8, z = -73 + (i % 2) * 4;
-      k.at(x, z);
-      k.cyl(3.2, 3.2, 0.9, 20, T(DARK), 0, 0, 0, { outline: 0.06 });
-      k.add(new THREE.TorusGeometry(3.1, 0.35, 6, 20), T(cols[i]), 0, 0.95, 0, { rx: Math.PI / 2, outline: 0.04 });
-      k.cyl(2.7, 2.7, 0.05, 20, T(0x1d1a29), 0, 0.92, 0, { outline: 0 });
-      k.ring(1.2, 0.08, G(cols[i]), 0, 1.0, 0);
-      k.at();
-      world.col(loc, { type: 'cyl', x, z, y0: -2, y1: 0.95, r: 3.2 }).bouncy = true;
-    }
-
-    // ---- skate park ----
-    // volcano bowl: ride up the outside, over the deck and drop in
-    const bx = 148, bz = -4, r0 = 5, r1 = 11, r2 = 14, r3 = 26, H = 4.2;
-    k.at(bx, bz);
-    const lathe = (pts, c, o) => k.add(new THREE.LatheGeometry(pts.map(([a, b]) => new THREE.Vector2(a, b)), 48), D(c), 0, 0, 0, { outline: o });
-    lathe([[r3, 0], [r2, H]], 0x6d78c8, 0.15);
-    lathe([[r2, H], [r1, H]], 0xe8e4f4, 0);
-    lathe([[r1, H], [r0, 0.02]], 0xb8b2cc, 0);
-    k.cyl(r0 + 0.2, r0 + 0.2, 0.06, 32, T(0xb0aac2), 0, 0, 0, { outline: 0 });
-    k.add(new THREE.TorusGeometry(r1, 0.22, 6, 48), T(LIGHT), 0, H + 0.05, 0, { rx: Math.PI / 2, outline: 0.03 });
-    k.add(new THREE.TorusGeometry(r2, 0.12, 4, 48), G(0xff2e88), 0, H + 0.05, 0, { rx: Math.PI / 2, outline: 0 });
-    for (let i = 0; i < 12; i++) {
-      const a = (i / 12) * TAU, rm = (r1 + r0) / 2;
-      k.add(new THREE.BoxGeometry(1.2, 0.05, (r1 - r0) * 1.1), T(cols[i % 6]), Math.sin(a) * rm, H / 2 + 0.06, Math.cos(a) * rm, { q: new THREE.Quaternion().setFromEuler(new THREE.Euler(-Math.atan2(H, r1 - r0), a, 0, 'YXZ')), outline: 0 });
-    }
-    k.at();
-    const N = 24;
-    for (let i = 0; i < N; i++) {
-      const a = (i / N) * TAU, sa = Math.sin(a), ca = Math.cos(a);
-      const at = (r, y) => [bx + sa * r, y, bz + ca * r];
-      slope(world, loc, at(r0 - 0.8, 0), at(r1, H), (TAU * r1) / N + 0.6);
-      slope(world, loc, at(r3 + 0.8, 0), at(r2, H), (TAU * r3) / N + 0.6);
-      slope(world, loc, at(r1 - 0.2, H), at(r2 + 0.2, H), (TAU * r2) / N + 0.6);
-    }
-    // kicker line heading east: small, medium, then a big launch off the plateau edge
-    // (the big one launches you clean over the Derby track)
-    kicker(world, loc, k, 120, -52, Math.PI / 2, 6, 1.4, 5, 0x2ee6ff);
-    kicker(world, loc, k, 134, -52, Math.PI / 2, 9, 2.8, 6, 0xff9f1c);
-    kicker(world, loc, k, 151, -52, Math.PI / 2, 14, 5, 7, 0xff2e88);
-    for (const x of [120, 136, 153]) k.lamp(x, -60, 7, 0xff7ad9);
-    // half-pipe along the north-east: two matching walls facing each other across a flat bottom
-    // (each a big quarter-pipe, ~7 m to the coping), with a deck, coloured tiles and a railing on top
-    const hx0 = 106, hx1 = 152, hw = hx1 - hx0, hm = (hx0 + hx1) / 2, S = 1.35;
-    const prof = [[0, 0], [2.2, 0.3], [4, 1.1], [5.4, 2.3], [6.3, 3.7], [6.8, 5.2]].map(([zz, y]) => [zz * S, y * S]);
-    const topY = prof[prof.length - 1][1], lipZ = prof[prof.length - 1][0], deckZ = 9.5 * S;
-    const flatZ0 = 46, flatZ1 = 60; // the flat bottom between the walls
-    k.at(hm, (flatZ0 + flatZ1) / 2);
-    k.box(hw, 0.06, flatZ1 - flatZ0 + 1, T(0x8a87c8), 0, 0, 0, { outline: 0 });
-    for (let x = -hw / 2 + 4; x < hw / 2; x += 8) k.box(0.4, 0.07, flatZ1 - flatZ0 - 2, T(YEL), x, 0, 0, { outline: 0 });
-    k.at();
-    const wall = (z0, dir, color) => {
-      // dir +1: the wall rises towards +z from z0; -1: towards -z (the local frame is turned round)
-      k.at(hm, z0, dir > 0 ? 0 : Math.PI);
-      const shape = new THREE.Shape([...prof.map(([zz, y]) => new THREE.Vector2(zz, y)), new THREE.Vector2(deckZ, topY), new THREE.Vector2(deckZ, 0)]);
-      k.add(new THREE.ExtrudeGeometry(shape, { depth: hw, bevelEnabled: false }).translate(0, 0, -hw / 2).rotateY(-Math.PI / 2), T(color), 0, 0, 0, { outline: 0.12 });
-      k.add(new THREE.CylinderGeometry(0.24, 0.24, hw, 8).rotateZ(Math.PI / 2), T(LIGHT), 0, topY + 0.05, lipZ + 0.05, { outline: 0.03 });
-      for (let x = -hw / 2 + 3, i = 0; x <= hw / 2 - 3; x += 6, i++) {
-        k.box(0.12, 1.2, 0.12, T(DARK), x, topY, deckZ - 0.2, { outline: 0 });
-        k.box(1.3, 0.06, 3.2, T(cols[(i + (dir > 0 ? 0 : 3)) % 6]), x, topY + 0.01, (lipZ + deckZ) / 2, { outline: 0 });
-      }
-      k.box(hw, 0.12, 0.12, T(YEL), 0, topY + 1.2, deckZ - 0.2, { outline: 0.02 });
-      // a glowing strip along the transition, so the line reads at night
-      k.box(hw, 0.05, 0.25, G(dir > 0 ? 0x2ee6ff : 0xff2e88), 0, 0.32, 2.4, { rx: -0.2, outline: 0 });
-      k.at();
-      for (let i = 0; i < prof.length - 1; i++) {
-        const [za, ya] = prof[i], [zb, yb] = prof[i + 1];
-        slope(world, loc, [hm, ya, z0 + dir * (za - (i ? 0 : 0.8))], [hm, yb, z0 + dir * zb], hw);
-      }
-      slope(world, loc, [hm, topY, z0 + dir * lipZ], [hm, topY, z0 + dir * deckZ], hw);
-      world.col(loc, { type: 'box', x: hm, y: topY / 2, z: z0 + dir * (deckZ - 1.2), hx: hw / 2, hy: topY / 2, hz: 1.2 });
-    };
-    wall(flatZ1, 1, 0x9be7ff);
-    wall(flatZ0, -1, 0xc8b6ff);
-    // stairs up to each deck at the west end
-    for (const [z0, dir] of [[flatZ1, 1], [flatZ0, -1]]) {
-      const zc = z0 + dir * (lipZ + deckZ) / 2;
-      for (let i = 0; i < 6; i++) {
-        const h = ((i + 1) / 6) * topY;
-        k.at(hx0 - 1.2 - (6 - i) * 0.9, zc);
-        k.box(0.9, h, 3, T(CONC), 0, 0, 0, { outline: 0.03 });
-        k.at();
-        world.col(loc, { type: 'box', x: hx0 - 1.2 - (6 - i) * 0.9, y: h / 2, z: zc, hx: 0.45, hy: h / 2, hz: 1.5 });
-      }
-    }
-    // pyramid funbox: four ramps up to a flat top
-    const fx = 100, fz = -32, top = 2.6, half = 3.5, run = 7;
-    k.at(fx, fz);
-    k.add(new THREE.CylinderGeometry(half * Math.SQRT2, (half + run) * Math.SQRT2, top, 4, 1).rotateY(Math.PI / 4), T(0xffd23f), 0, top / 2, 0, { outline: 0.12 });
-    k.box(half * 2 + 0.1, 0.08, half * 2 + 0.1, T(0xff2e88), 0, top, 0, { outline: 0 });
-    k.at();
-    for (let i = 0; i < 4; i++) {
-      const a = (i / 4) * TAU, sa = Math.sin(a), ca = Math.cos(a);
-      slope(world, loc, [fx + sa * (half + run + 0.6), 0, fz + ca * (half + run + 0.6)], [fx + sa * half, top, fz + ca * half], half * 2 + 1);
-    }
-    world.col(loc, { type: 'box', x: fx, y: top - 0.5, z: fz, hx: half, hy: 0.5, hz: half });
-    k.at(96, 30, -Math.PI / 2);
-    k.sign('SKATE ZONE', 0, 0, { w: 9, y: 4.4, fg: '#ff2e88' });
-    k.at();
-
-    // ---- rides ----
-    // ferris wheel: an A-frame, a big turning wheel with lit rims, open gondolas that hang level
-    // (rideable: rides.js seats you in the nearest gondola)
-    const wx = -40, wz = 62, hub = 27, R = 22; // (bottom gondola just clears the platform)
-    k.at(wx, wz);
-    k.box(16, 0.8, 10, T(CONC), 0, 0, 0, { outline: 0.06 });
-    for (const s of [-1, 1]) for (const t of [-1, 1]) k.beam([t * 7, 0.8, s * 3.4], [0, hub, s * 1.4], 0.6, T(WHITE), { outline: 0.06 });
-    for (const s of [-1, 1]) k.beam([-3.5, hub * 0.5, s * 2.4], [3.5, hub * 0.5, s * 2.4], 0.3, T(WHITE), { outline: 0.04 });
-    k.beam([0, hub, -1.9], [0, hub, 1.9], 0.6, T(DARK), { outline: 0.04 });
-    k.box(3, 2.6, 2.4, T(0xff2e88), 6, 0.8, 4.2, { outline: 0.05 });
-    k.at();
-    world.col(loc, { type: 'box', x: wx, y: 0.6, z: wz, hx: 8, hy: 0.6, hz: 5 });
-    for (const t of [-1, 1]) world.col(loc, { type: 'cyl', x: wx + t * 5.5, z: wz, y0: -2, y1: 8, r: 1.1 });
-    const wheel = part(0xff2e88, (q) => {
-      for (const s of [-1, 1]) {
-        q.add(new THREE.TorusGeometry(R, 0.3, 6, 40), T(0xff2e88), 0, 0, s * 1.0, { outline: 0.04 });
-        q.add(new THREE.TorusGeometry(R * 0.55, 0.18, 4, 28), T(YEL), 0, 0, s * 1.0, { outline: 0 });
-        for (let i = 0; i < 24; i++) {
-          const a = (i / 24) * TAU;
-          q.beam([0, 0, s * 1.0], [Math.cos(a) * R, Math.sin(a) * R, s * 1.0], 0.1, T(WHITE), { outline: 0 });
-          q.ball(0.32, G(cols[i % 6]), Math.cos(a) * R, Math.sin(a) * R, s * 1.4, { outline: 0 });
-        }
-      }
-      q.add(new THREE.CylinderGeometry(1.6, 1.6, 3.2, 14).rotateX(Math.PI / 2), T(YEL), 0, 0, 0, { outline: 0.05 });
-    });
-    const gondolas = [];
-    for (let i = 0; i < 12; i++) {
-      const a = (i / 12) * TAU;
-      const g = part(cols[i % 6], (q) => {
-        // an open basket under a little canopy on posts, so you can see who's riding
-        q.beam([0, 0, 0], [0, -1.4, 0], 0.06, T(DARK), { outline: 0 });
-        q.add(new THREE.CylinderGeometry(1.15, 0.95, 0.9, 12, 1, true), D(cols[i % 6]), 0, -3.0, 0, { outline: 0.04 });
-        q.cyl(1.0, 0.95, 0.2, 12, T(DARK), 0, -3.55, 0, { outline: 0 });
-        q.add(new THREE.TorusGeometry(1.15, 0.08, 4, 16).rotateX(Math.PI / 2), T(YEL), 0, -2.55, 0, { outline: 0 });
-        for (let p = 0; p < 3; p++) { const b = (p / 3) * TAU; q.beam([Math.cos(b) * 1.05, -2.55, Math.sin(b) * 1.05], [Math.cos(b) * 1.05, -1.5, Math.sin(b) * 1.05], 0.05, T(WHITE), { outline: 0 }); }
-        q.add(new THREE.ConeGeometry(1.35, 0.8, 12), T(WHITE), 0, -1.1, 0, { outline: 0.03 });
-      });
-      g.position.set(Math.cos(a) * R, Math.sin(a) * R, 0);
-      wheel.add(g);
-      gondolas.push(g);
-    }
-    wheel.userData.tick = (o, dt) => {
-      o.rotation.z += dt * 0.12;
-      for (const g of gondolas) g.rotation.z = -o.rotation.z;
-    };
-    k.dyn(wheel, wx, hub, wz);
-    const P0 = new THREE.Vector3(), P1 = new THREE.Vector3();
-    world.rides.push({
-      loc, name: 'FERRIS WHEEL', camDist: 16,
-      seats: gondolas.map((g) => ({ obj: g, local: new THREE.Vector3(0, -3.35, 0), face: new THREE.Vector3(0, 0, 1) })),
-      // step off sideways, out of the wheel's plane
-      exitDir: (p, out) => { wheel.updateMatrixWorld(true); wheel.localToWorld(P0.set(0, 0, 0)); wheel.localToWorld(P1.set(0, 0, 1)); return out.subVectors(P1, P0).normalize(); },
-    });
-    // carousel: striped canopy, rotating deck, horses bobbing on poles
-    const cx = -58, cz = -22;
-    k.at(cx, cz);
-    k.cyl(8.6, 9, 0.7, 24, T(DARK), 0, 0, 0, { outline: 0.06 });
-    k.cyl(0.6, 0.6, 7.4, 10, T(YEL), 0, 0.7, 0, { outline: 0.04 });
-    k.at();
-    world.col(loc, { type: 'cyl', x: cx, z: cz, y0: -2, y1: 0.7, r: 9 });
-    world.col(loc, { type: 'cyl', x: cx, z: cz, y0: 0, y1: 8, r: 1.4 });
-    const carousel = part(0xff2e88, (q) => {
-      q.cyl(8, 8, 0.3, 24, T(WHITE), 0, 0, 0, { outline: 0.04 });
-      for (let i = 0; i < 12; i++) q.add(new THREE.ConeGeometry(9.6, 3.2, 2, 1, true, (i / 12) * TAU, TAU / 12), D(i % 2 ? 0xff2e88 : WHITE), 0, 8.9, 0, { outline: 0 });
-      q.add(new THREE.ConeGeometry(9.65, 3.25, 24, 1, true), inkShell(), 0, 8.9, 0, { outline: 0.12 });
-      q.ring(9.4, 0.2, T(YEL), 0, 7.3, 0);
-      for (let i = 0; i < 24; i++) { const a = (i / 24) * TAU; q.ball(0.18, G(cols[i % 6]), Math.cos(a) * 9.5, 7.1, Math.sin(a) * 9.5, { outline: 0 }); }
-      q.ball(0.6, G(YEL), 0, 10.8, 0, { outline: 0 });
-    });
-    const horses = [];
-    for (let i = 0; i < 8; i++) {
-      const a = (i / 8) * TAU;
-      const h = part(cols[i % 6], (q) => {
-        q.beam([0, -1.6, 0], [0, 5, 0], 0.06, T(YEL), { outline: 0 });
-        q.add(new THREE.CapsuleGeometry(0.45, 1.4, 4, 8).rotateZ(Math.PI / 2), T(WHITE), 0, 0, 0, { outline: 0.04 });
-        q.add(new THREE.CapsuleGeometry(0.25, 0.7, 4, 6), T(WHITE), 0.85, 0.5, 0, { rz: -0.6, outline: 0.03 });
-        q.box(0.5, 0.35, 0.3, T(WHITE), 1.15, 0.85, 0, { outline: 0.02 });
-        q.box(0.8, 0.15, 0.7, T(cols[i % 6]), -0.1, 0.45, 0, { outline: 0 });
-        for (const [lx, lz] of [[-0.6, -0.2], [-0.6, 0.2], [0.6, -0.2], [0.6, 0.2]]) q.beam([lx, -0.2, lz], [lx * 1.2, -0.9, lz], 0.1, T(WHITE), { outline: 0 });
-      });
-      h.position.set(Math.cos(a) * 6, 1.6, Math.sin(a) * 6);
-      h.rotation.y = -a;
-      carousel.add(h);
-      horses.push(h);
-    }
-    carousel.userData.tick = (o, dt, t) => {
-      o.rotation.y += dt * 0.5;
-      horses.forEach((h, i) => { h.position.y = 1.6 + Math.sin(t * 2 + i * 1.3) * 0.5; });
-    };
-    k.dyn(carousel, cx, 0.7, cz);
-    const C0 = new THREE.Vector3();
-    world.rides.push({
-      loc, name: 'CAROUSEL', camDist: 9,
-      seats: horses.map((h) => ({ obj: h, local: new THREE.Vector3(-0.1, -0.05, 0), face: new THREE.Vector3(1, 0, 0) })),
-      // hop off outward, away from the centre pole
-      exitDir: (p, out) => {
-        carousel.updateMatrixWorld(true);
-        carousel.localToWorld(C0.set(0, 0, 0));
-        const up = p.clone().normalize();
-        out.subVectors(p, C0);
-        return out.addScaledVector(up, -out.dot(up)).normalize();
-      },
-    });
-
-    // ---- entrance: a banner arch spanning the Derby track, ticket booth, strings of lights ----
-    k.at(Math.cos(Math.PI / 4) * 99, Math.sin(Math.PI / 4) * 99, Math.PI / 4);
-    for (const s of [-1, 1]) {
-      k.cyl(1.6, 2, 12, 10, T(0xff2e88), s * 17, 0, 0, { outline: 0.08 });
-      k.add(new THREE.ConeGeometry(2.2, 3, 10), T(YEL), s * 17, 13.5, 0, { outline: 0.06 });
-      k.column(2, 12, s * 17, 0);
-    }
-    k.add(new THREE.TorusGeometry(17, 0.8, 8, 32, Math.PI), T(0x2ee6ff), 0, 9, 0, { outline: 0.1 });
-    for (let i = 0; i <= 16; i++) { const a = (i / 16) * Math.PI; k.ball(0.4, G(cols[i % 6]), Math.cos(a) * 17, 9 + Math.sin(a) * 17, -0.9, { outline: 0 }); }
-    // the banner hangs on two cables inside the arch, clear of the hoop
-    const bh = k.text('BOUNCE DOME FUNPARK', 0, 15.5, 0, 0, 15, { fg: '#ffd23f', bg: '#ff2e88' });
-    k.box(15.6, bh + 0.6, 0.2, T(0xff2e88), 0, 15.5 - bh / 2 - 0.3, 0, { outline: 0.04 });
-    for (const s of [-1, 1]) k.beam([s * 6.5, 15.5 + bh / 2 + 0.3, 0], [s * 6.5, 9 + Math.sqrt(16.2 * 16.2 - 6.5 * 6.5), 0], 0.06, T(DARK), { outline: 0 });
-    k.box(3.4, 3, 2.6, T(YEL), -12, 0, -5, { outline: 0.06 });
-    k.box(3.6, 0.4, 2.8, T(0xff2e88), -12, 3, -5, { outline: 0.04 });
-    k.box(2.2, 1, 0.1, G(WARM), -12, 1.6, -6.32, { outline: 0 });
-    k.solid(1.8, 1.7, 1.4, -12, -5);
-    k.at();
-    lightString(k, [[-31, 6, 50], [-4, 6, 55], [14, 6, 52]], cols, 10, 1.2);
-    lightString(k, [[118, 6, -40], [140, 6, -40], [162, 6, -38]], cols, 10, 1.2);
-    for (const [x, z] of [[-31, 50], [-4, 55], [14, 52], [118, -40], [140, -40], [162, -38]]) k.cyl(0.15, 0.2, 6, 6, T(DARK), x, 0, z, { outline: 0.03 });
-    for (const [x, z] of [[-20, -20], [30, 20], [-4, 36], [40, -30], [-62, 48], [-66, 10], [116, 0], [96, 53]]) k.lamp(x, z, 7, 0xff7ad9);
-  });
 }
 
 // =============================================================================================
@@ -1660,20 +1482,15 @@ export function greenhouse(world, loc, k, x, z, yaw, len = 18) {
   k.at();
 }
 
-// Comms mast with a small dish that turns.
-export function commsMast(world, loc, k, x, z, h, color) {
+// Comms mast with a small dish that turns (a dish head on a boom, in `faction`'s paint).
+export function commsMast(world, loc, k, x, z, h, color, faction) {
   k.at(x, z);
   k.box(3, 0.5, 3, T(CONC), 0, 0, 0, { outline: 0.03 });
   lattice(k, 0, 0, h, 1, 0.4, Math.round(h / 3.5), T(LIGHT), T(DARK), { r: 0.14 });
   k.blinker(0, h + 0.4, 0, 0xff2a4a, 0.35);
   k.column(1, h, 0, 0);
-  const dish = part(color, (q) => {
-    q.add(new THREE.SphereGeometry(1.6, 14, 6, 0, TAU, 0, 0.8).rotateX(-Math.PI / 2), D(LIGHT), 0, 0, 0.8, { outline: 0.03 });
-    q.beam([0, 0, 0.3], [0, 0, 1.6], 0.05, T(DARK), { outline: 0 });
-    q.box(0.5, 0.5, 0.5, T(color), 0, 0, 0, { outline: 0.02 });
-  });
-  dish.userData.spin = 0.25;
-  k.dyn(dish, 0, h * 0.75, 0);
+  k.box(0.5, 0.5, 0.5, T(color), 0, h * 0.75 - 0.25, 0, { outline: 0.02 });
+  k.dishHead(0, h * 0.75, 0, 1.15, faction, { az: Math.PI, el: -0.7, spin: 0.25, arm: 1.7 });
   k.at();
 }
 
@@ -1721,7 +1538,7 @@ export function buildTown(world, loc, { civic = false } = {}) {
     const wt = freeSpot(occ, 5, 50, 90, rr);
     if (wt) waterTower(world, loc, k, wt[0], wt[1], palette[loc.id.length % 6]);
     const cm = freeSpot(occ, 3, 60, 95, rr);
-    if (cm) commsMast(world, loc, k, cm[0], cm[1], 16, 0xff9f1c);
+    if (cm) commsMast(world, loc, k, cm[0], cm[1], 16, 0xff9f1c, 'kepler');
     for (let i = 0; i < 6; i++) { const sp = freeSpot(occ, 1.5, 30, 95, rr); if (sp) k.lamp(sp[0], sp[1], 7); }
     // the town sign by the hub's door
     k.at(0, -hubR - 9, Math.PI);
@@ -1869,7 +1686,7 @@ export function dressIlmb(world, loc) {
     hortonSphere(k, -20, -197, 6.5, WHITE, 0x2ec4ff);
     habDome(k, 70, 140, 16, 0xff7ad9, { door: Math.PI, trim: YEL });
     habDome(k, -60, 145, 14, 0xffd23f, { door: Math.PI, trim: 0xff7ad9 });
-    commsMast(world, loc, k, 140, -120, 30, 0xffd23f);
+    commsMast(world, loc, k, 140, -120, 30, 0xffd23f, 'spacecom');
     // barracks and the vehicle depot
     quonset(k, 175, 120, 7, 34, 0x5b5870, -0.6 + Math.PI, YEL);
     quonset(k, -175, 125, 7, 34, 0x5b5870, 0.6 + Math.PI, YEL);
@@ -2062,7 +1879,7 @@ export function dressArray(world, loc, speeds = []) {
     }
     k.solid(7.4, 1.25, 9.7, 28, -5);
     k.at();
-    commsMast(world, loc, k, 100, -20, 40, green);
+    commsMast(world, loc, k, 100, -20, 40, green, loc.faction);
     // the dish stations, and the cable runs from each to the control centre
     ARRAY_DISHES.forEach(([x, z, size], i) => {
       const kind = DISH_KINDS[(i + (loc.id === 'farside' ? 1 : 0)) % DISH_KINDS.length];
@@ -2340,26 +2157,52 @@ export function jobTerminal(world, loc, x, z, yaw = 0, color = 0xffd23f) {
 
 // =============================================================================================
 // The Lucky Crater Casino's forecourt (the hall itself is casinoWorld.js): a neon boulevard from
-// the doors to a fountain plaza, a pylon sign out by the road, and a car park either side full
+// the doors to a fountain plaza and a car park either side full
 // of parked hover-cars, so the hall doesn't sit alone in an empty crater.
 // =============================================================================================
 export function dressCasinoLot(world, loc, makeCar) {
-  const PINK = 0xff2e88, CYAN = 0x2ee6ff, GOLD = 0xffd23f, PURP = 0x5a1a8f, ASPH = 0x34304a, CRM = 0xd8d4e8, HEDGE = 0x2f6b3a;
+  const PINK = 0xff2e88, CYAN = 0x2ee6ff, GOLD = 0xffd23f, PURP = 0x5a1a8f, ASPH = 0x34304a, CRM = 0xd8d4e8;
   const keep = (x, z, r) => (loc.keep ||= []).push({ x, z, r });
   const cars = [];
   const FZ = 98, PR = 17; // the plaza: its centre and radius
+  // The Valet Court (docs/casino-forecourt.md): one asphalt court from the doors to halfway to the fountain (z 58), a paved walkway from there to the plaza. The court is an avenue (AV
+  // either side of the middle) the carpet runs down, with a wing of parking each side behind the slot carousels: two rows of bays (BAYW x BAYD) either side of an aisle, edged by a
+  // wall of giant cards (NMOD modules of MOD m between posts), its outer end open at the aisle's mouth.
+  const AV = 8.6, W0 = 38.4, W1 = 58.4, MID = (W0 + W1) / 2, MOD = 2.4, NMOD = 14, XA = AV + 0.36, XB = XA + 0.72 + NMOD * MOD;
+  const BX0 = 11, BAYW = 5.2, NB = 6, BAYD = 6.2, AISLE = 5.6;
+  const bayZ = [W0 + 0.6 + 0.4 + BAYD / 2, W1 - 0.6 - 0.4 - BAYD / 2];   // the two rows' middles (z 42.5 and 54.3)
   settle(world, loc, 7707, (k) => {
-    // ---- the boulevard: paving from the carpet's end to the plaza's edge, neon lamps both sides ----
-    const b0 = 44, b1 = FZ - PR + 0.5;
-    k.box(14, 0.1, b1 - b0, T(0x4a4060), 0, 0, (b0 + b1) / 2, { outline: 0 });
-    for (const s of [-1, 1]) k.box(0.3, 0.13, b1 - b0, T(GOLD), s * 7, 0, (b0 + b1) / 2, { outline: 0 });
-    for (let i = 0; i < 3; i++) for (const s of [-1, 1]) {
-      const z = 50 + i * 11, x = s * 8.5, c = (i + (s > 0)) % 2 ? PINK : CYAN;
-      k.cyl(0.18, 0.24, 7, 8, T(0x2a1450), x, 0, z, { outline: 0.03 });
-      k.ring(0.5, 0.12, G(c), x, 2.4, z);
-      k.ring(0.5, 0.12, G(c), x, 4.8, z);
-      k.ball(0.75, G(c), x, 7.4, z, { outline: 0.04 });
-      k.column(0.35, 7, x, z);
+    // ---- the avenue: asphalt from the doors to the court's far edge, its gold edge lines meeting the wall's plinth beyond the gate's piers (which stand at 6 to 7.35), and the same
+    // asphalt through the doors' wall to the hall's floor; Blender-built neon lamp posts ----
+    const DOOR_Z = FRONT_OUT, b1 = FZ - PR + 1;
+    k.box(2 * AV, 0.1, W1 - DOOR_Z, T(0x4a4060), 0, 0, (DOOR_Z + W1) / 2, { outline: 0 });
+    for (const s of [-1, 1]) k.box(0.3, 0.13, W0 - DOOR_Z, T(GOLD), s * AV, 0, (DOOR_Z + W0) / 2, { outline: 0 });
+    // through the doors: a little under the red carpet's strip, which rises from the hall's runner to the outside carpet, so the road runs right up to the hall's floor
+    k.box(2 * HALL.DOOR + 1, 0.06, DOOR_Z - HALL.FRONT + 0.1, T(0x4a4060), 0, 0, (HALL.FRONT + DOOR_Z) / 2, { outline: 0 });
+    // a lamp post (build_casino.py) at `sc` times its size, its small lamp toward `yaw`'s +z; `accent` colours its rings, lantern and small lamp
+    const lamp = casinoNode('lamp_post');
+    const lampAt = (x, z, accent, sc, yaw) => {
+      k.at(x, z, yaw);
+      k.baked(lamp, (slot) => { const c = casinoSlot(slot, accent); return c.glow ? G(c.color) : T(c.color); }, new THREE.Matrix4().makeScale(sc, sc, sc));
+      k.at();
+    };
+    // a forecourt-kit piece (build_lot.py) at (x, z) turned by yaw
+    const I4 = new THREE.Matrix4();
+    const lotAt = (name, x, z, yaw = 0) => {
+      k.at(x, z, yaw);
+      k.baked(lotNode(name), (slot) => { const c = lotSlot(slot); return c.glow ? G(c.color) : T(c.color); }, I4);
+      k.at();
+    };
+    let lampN = 0;
+    const post = (x, z, sc = 0.92) => {            // (the small lamp faces the middle of the way)
+      lampAt(x, z, lampN++ % 2 ? PINK : CYAN, sc, x < 0 ? Math.PI / 2 : -Math.PI / 2);
+      k.column(0.5, 7.5, x, z);
+    };
+    // (the lamps are few: one at each of the wings' north corners, one at each outer south corner and one each side where the walkway starts)
+    for (const s of [-1, 1]) {
+      for (const x of [AV + 1.2, XB + 1.1]) post(s * x, W0 - 1.2);
+      post(s * (XB + 1.1), W1 + 1.2);
+      post(s * 7.4, W1 + 2);
     }
     // ---- the fountain plaza ----
     // paving with a gold edge, and a ring of chip-coloured tiles round the basin
@@ -2370,22 +2213,8 @@ export function dressCasinoLot(world, loc, makeCar) {
       k.add(g, T(i % 2 ? 0x8a1030 : 0x2a1450), 0, 0.16, FZ, { outline: 0 });
     }
     k.ring(12.6, 0.1, G(GOLD), 0, 0.17, FZ);
-    // the basin: a cream wall with a gold lip, lit water just under the lip
-    k.cyl(9, 9.3, 0.95, 40, T(CRM), 0, 0, FZ, { outline: 0.07 });
-    k.ring(9.05, 0.16, T(GOLD), 0, 0.97, FZ);
-    k.cyl(8.5, 8.5, 0.05, 40, G(0x3fb8ff), 0, 0.72, FZ, { outline: 0 });
-    // the tier: a pedestal, an upper bowl spilling a curtain of water, a casino chip on top
-    k.cyl(1.3, 1.7, 3.3, 16, T(CRM), 0, 0.77, FZ, { outline: 0.05 });
-    k.cyl(3.6, 2.4, 0.6, 24, T(CRM), 0, 4.0, FZ, { outline: 0.05 });
-    k.ring(3.6, 0.1, T(GOLD), 0, 4.6, FZ);
-    k.cyl(3.3, 3.3, 0.04, 24, G(0x9be7ff), 0, 4.48, FZ, { outline: 0 });
-    k.add(new THREE.CylinderGeometry(3.45, 3.9, 3.7, 28, 1, true), GLASS(0x9be7ff, 0.32), 0, 2.6, FZ, { outline: 0 });
-    k.cyl(0.55, 0.75, 1.6, 12, T(CRM), 0, 4.6, FZ, { outline: 0.04 });
-    k.add(new THREE.CylinderGeometry(1.5, 1.5, 0.4, 24).rotateX(Math.PI / 2), T(PINK), 0, 7.6, FZ, { outline: 0.05 });
-    k.add(new THREE.CylinderGeometry(1.0, 1.0, 0.42, 24).rotateX(Math.PI / 2), T(0xfff4e0), 0, 7.6, FZ, { outline: 0 });
-    k.column(9.2, 0.95, 0, FZ);
-    k.column(2.2, 4.6, 0, FZ);
-    k.column(1.6, 9.2, 0, FZ, 4.6);
+    // the fountain (build_casino.py), with the casino's chip turning on top
+    fountain(k, 0, FZ);
     // benches round the outside of the tiles, facing in (none across the way in, at -z)
     for (let i = 0; i < 6; i++) {
       const a = (i / 6) * TAU + TAU / 12;
@@ -2398,90 +2227,63 @@ export function dressCasinoLot(world, loc, makeCar) {
       k.solid(1.7, 0.72, 0.55, 0, 0);
       k.at();
     }
-    // neon palms between the benches (the two either side of the way in frame it)
+    // lamp posts between the benches: the boulevard's design, scaled down (the two either side of the way in frame it), their small lamps facing the fountain
     for (let i = 0; i < 6; i++) {
       const a = (i / 6) * TAU;
-      const x = Math.cos(a) * 15, z = FZ + Math.sin(a) * 15, c = i % 2 ? PINK : 0x7dff6a;
-      k.cyl(0.6, 0.7, 0.5, 10, T(0x2a1450), x, 0, z, { outline: 0.03 });
-      k.cyl(0.16, 0.24, 5.4, 6, T(0x6b4a2a), x, 0.5, z, { outline: 0.03 });
-      for (let j = 0; j < 6; j++) {
-        const la = (j / 6) * TAU + i, droop = 0.6 + (j % 2) * 0.25;
-        const q = new THREE.Quaternion().setFromEuler(new THREE.Euler(droop, -la + Math.PI / 2, 0, 'YXZ')); // (turned out, then drooping)
-        k.add(new THREE.BoxGeometry(0.45, 0.08, 2.8).translate(0, 0, 1.4), G(c), x, 5.9, z, { q, outline: 0 });
-      }
-      k.ball(0.35, G(GOLD), x, 6.0, z, { outline: 0 });
+      const x = Math.cos(a) * 15, z = FZ + Math.sin(a) * 15;
+      lampAt(x, z, i % 2 ? PINK : CYAN, 0.62, Math.atan2(-Math.cos(a), -Math.sin(a)));
       k.column(0.7, 1, x, z);
-      k.column(0.3, 6, x, z);
+      k.column(0.25, 5, x, z);
     }
     keep(0, FZ, PR + 2);
-    keep(0, (b0 + b1) / 2, 10);
-    // ---- the pylon sign out by the road: twin posts, a tall marquee, chasing bulbs ----
-    {
-      const px = 26, pz = 118;
-      k.at(px, pz, -0.35);
-      for (const s of [-1, 1]) {
-        k.box(1.2, 23, 1.2, T(PURP), s * 6.6, 0, 0, { outline: 0.08 });
-        k.solid(0.6, 11.5, 0.6, s * 6.6, 0);
-      }
-      // the marquee: LUCKY over CRATER, each on its own line with room between
-      k.box(12, 7.6, 1.4, T(0x120a1e), 0, 13.6, 0, { outline: 0.1 });
-      for (const y of [13.3, 21.2]) k.box(12.4, 0.4, 1.6, T(GOLD), 0, y, 0, { outline: 0.04 });
-      k.text('LUCKY', 0, 19.25, 0, 0, 7, { fg: '#ffd23f', bg: '#120a1e', stroke: '#ff2e88', off: 0.72 });
-      k.text('CRATER', 0, 15.65, 0, 0, 8.2, { fg: '#ff7ad9', bg: '#120a1e', stroke: '#2ee6ff', off: 0.72 });
-      for (let i = 0; i < 12; i++) for (const y of [13.5, 21.4]) k.ball(0.2, G(i % 2 ? GOLD : 0xfff6a8), -5.5 + i, y, 0.82, { outline: 0 });
-      // the reader board under it
-      k.box(10, 2.6, 1, T(PINK), 0, 10.2, 0, { outline: 0.06 });
-      k.text('CASINO · OPEN 25/8', 0, 11.5, 0, 0, 8.8, { fg: '#fff6a8', bg: '#8a1030', stroke: '#120a1e', off: 0.52 });
-      k.add(new THREE.OctahedronGeometry(1.6, 0), G(GOLD), 0, 23.4, 0, { outline: 0.06 });
-      k.solid(6.2, 5.6, 0.7, 0, 0, 0, 10.2);
-      k.at();
-      keep(px, pz, 9);
-    }
-    // ---- car parks either side of the boulevard: asphalt in a curb, bays, wheel stops, hedges ----
+    keep(0, 40, 22);
+    // ---- the walkway: from the court's edge to the plaza, paved, gold lines either side of the carpet's strip, a chip inlay every 6 m, chip-stack bollards along both sides ----
+    k.box(10.4, 0.1, b1 - W1, T(0x6a5a8a), 0, 0, (W1 + b1) / 2, { outline: 0 });
     for (const s of [-1, 1]) {
-      const cx = s * 52, cz = 70, W = 44, Dp = 34, xin = cx - (s * W) / 2, xout = cx + (s * W) / 2;
-      k.box(W, 0.08, Dp, T(ASPH), cx, 0, cz, { outline: 0.02 });
-      // the curb all round, with a gap in the side toward the boulevard (the way in)
-      for (const z of [cz - Dp / 2, cz + Dp / 2]) k.box(W + 0.6, 0.3, 0.6, T(CRM), cx, 0, z, { outline: 0.03 });
-      k.box(0.6, 0.3, Dp, T(CRM), xout, 0, cz, { outline: 0.03 });
-      for (const t of [-1, 1]) k.box(0.6, 0.3, (Dp - 10) / 2, T(CRM), xin, 0, cz + (t * (Dp + 10)) / 4, { outline: 0.03 });
-      // hedges along the outer three sides, a striped strip across the entrance
-      k.box(1.2, 1.0, Dp + 4, T(HEDGE), xout + s * 1.4, 0, cz, { outline: 0.05 });
-      k.solid(0.6, 0.5, Dp / 2 + 2, xout + s * 1.4, cz);
-      for (const t of [-1, 1]) {
-        k.box(W - 2, 1.0, 1.2, T(HEDGE), cx + s * 1, 0, cz + t * (Dp / 2 + 1.4), { outline: 0.05 });
-        k.solid(W / 2 - 1, 0.5, 0.6, cx + s * 1, cz + t * (Dp / 2 + 1.4));
-      }
-      for (let i = 0; i < 6; i++) k.box(0.6, 0.1, 1.4, T(i % 2 ? GOLD : DARK), xin + s * 0.4, 0, cz - 4.2 + i * 1.7, { outline: 0 });
-      // a P sign by the way in, facing the boulevard
-      {
-        const sx = xin - s * 1.2, sz = cz + 7, face = -s * Math.PI / 2;
-        k.cyl(0.1, 0.12, 3.4, 6, T(0x2a1450), sx, 0, sz, { outline: 0.02 });
-        k.at(sx, sz, face);
-        k.box(1.6, 1.6, 0.2, T(0x2e7fa8), 0, 3.2, 0, { outline: 0.04 });
-        k.text('P', 0, 4.0, 0, 0, 1.0, { fg: '#ffffff', bg: '#2e7fa8', off: 0.12 });
-        k.at();
-        k.column(0.25, 4.8, sx, sz);
-      }
-      for (const row of [-1, 1]) {
-        const rz = cz + row * 9;
-        for (let i = 0; i <= 8; i++) k.box(0.18, 0.1, 6, T(CRM), cx - W / 2 + 4 + i * 4.5, 0, rz, { outline: 0 });
-        for (let i = 0; i < 8; i++) {
-          const bx = cx - W / 2 + 6.25 + i * 4.5;
-          k.box(1.8, 0.22, 0.35, T(GOLD), bx, 0, rz + row * 2.6, { outline: 0.02 });
+      k.box(0.25, 0.13, b1 - W1, T(GOLD), s * 5.0, 0, (W1 + b1) / 2, { outline: 0 });
+      for (let i = 0, z = W1 + 3.6; z < b1 - 1; i++, z += 6) k.cyl(0.7, 0.7, 0.04, 16, i % 2 ? G(CYAN) : G(PINK), s * 4.1, 0.1, z, { outline: 0 });
+      for (let z = W1 + 2; z < b1 - 1; z += 3) { lotAt('lot_chip_bollard', s * 5.6, z); k.column(0.45, 1, s * 5.6, z); }
+    }
+    // the card-stripe crossing where the court gives way to the walkway
+    for (let i = 0; i < 9; i++) k.box(1.1, 0.02, 2, T(i % 2 ? GOLD : 0x2a1450), -AV + 0.6 + i * 1.9, 0.1, W1 - 1, { outline: 0 });
+    keep(0, (W1 + b1) / 2, 14);
+
+    // ---- the two wings of the court, one each side of the avenue ----
+    for (const s of [-1, 1]) {
+      const x0 = AV, x1 = XB + 0.36;
+      k.box(x1 - x0, 0.1, W1 - W0, T(ASPH), s * (x0 + x1) / 2, 0, MID, { outline: 0 });
+      for (const [row, rz] of bayZ.entries()) {
+        for (let i = 0; i <= NB; i++) k.box(0.12, 0.02, BAYD - 0.2, T(CRM), s * (BX0 + i * BAYW), 0.1, rz, { outline: 0 });
+        for (let i = 0; i < NB; i++) {
+          const bx = s * (BX0 + (i + 0.5) * BAYW), head = row === 0 ? W0 + 1.0 + 0.5 : W1 - 1.0 - 0.5;
+          lotAt('lot_bay_stud', bx, head);
           // most bays taken: a hover-car parked nose-in
-          if ((i * 3 + (s > 0 ? 1 : 0) + (row > 0 ? 2 : 0)) % 4 !== 0) cars.push([bx, rz - row * 0.2, row > 0 ? 0 : Math.PI]);
+          if ((i * 5 + (row === 0 ? 1 : 3) + (s > 0 ? 2 : 0)) % 4 !== 0) cars.push([bx, rz, row === 0 ? Math.PI : 0]);
         }
       }
-      for (const lz of [cz - 4, cz + 4]) k.lamp(xout - s * 1.5, lz, 7, 0xff9fdc);
-      keep(cx, cz, 27);
+      // the wall of cards: the north and south runs between their posts, the outer end's two stubs either side of the aisle's mouth
+      for (const z of [W0 + 0.3, W1 - 0.3]) {
+        for (let i = 0; i < NMOD; i++) lotAt('lot_card_wall', s * (XA + 0.36 + MOD * (i + 0.5)), z);
+        for (const x of [XA, XB]) lotAt('lot_card_post', s * x, z);
+        k.solid((XB - XA) / 2 + 0.36, 0.65, 0.3, s * (XA + XB) / 2, z);
+      }
+      for (const dir of [1, -1]) {
+        const zc = (z) => MID + dir * (z - MID);                                  // (the south stub mirrors the north one)
+        for (let i = 0; i < 2; i++) lotAt('lot_card_wall', s * XB, zc(W0 + 0.3 + 0.36 + MOD * (i + 0.5)), Math.PI / 2);
+        lotAt('lot_card_post', s * XB, zc(W0 + 0.3 + 0.36 + 2 * MOD + 0.36));
+        k.solid(0.3, 0.65, 2.4 + 0.36, s * XB, zc(W0 + 0.3 + 0.36 + MOD + 0.18));
+      }
+      // the P pylons outside the outer end, turned to the road
+      for (const dz of [-6.4, 6.4]) { lotAt('lot_pylon_p', s * (XB + 2.4), MID + dz, s * Math.PI / 2); k.solid(0.5, 2.3, 0.5, s * (XB + 2.4), MID + dz); }
+      keep(s * 26, MID, 22);
     }
+    // the roads into the court: one from each end of the aisle out to the ring road, the traffic's own bed (traffic.js pavedStrip), melting in under the wings' asphalt and joining the ring by curved sweeps (a T)
+    loc.paved = [-1, 1].map((s) => ({ x0: s * (XB - 4), z0: MID, x1: s * 150, z1: MID, ring: true }));   // (to the ring, which the road joins by flared sweeps like any other: traffic.js inletFor)
   });
   // the parked cars (shared baked models), each a solid block to bump into
-  const pal = [0xff7ad9, 0x2ec4ff, 0x7dff6a, 0xffd23f, 0xff9f1c, 0xd8d4e8, 0xc77dff];
   cars.forEach(([x, z, yaw], i) => {
-    const m = makeCar({ color: pal[(i * 5) % pal.length] });
-    world.put(m.root, loc, x, z, 1.05, yaw + (((i * 7) % 5) - 2) * 0.03);
-    world.col(loc, { type: 'box', x, y: 1.1, z, hx: 1.35, hy: 1.1, hz: 2.6, yaw });
+    const m = makeCar({ paint: i * 2 }); // (civilian cars, the paints in turn)
+    world.put(m.root, loc, x, z, 1.15, yaw + (((i * 7) % 5) - 2) * 0.03);
+    world.col(loc, { type: 'box', x, y: 1.2, z, hx: 1.7, hy: 1.2, hz: 3.1, yaw });
   });
 }

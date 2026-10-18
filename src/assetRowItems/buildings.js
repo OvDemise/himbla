@@ -9,8 +9,9 @@ import { DISH_SIZE } from '../models.js';
 import { buildHomeTown, addBuilding, slotAt } from '../hometown.js';
 import {
   habDome, cabin, warehouse, quonset, lattice, hortonSphere, floodMast, stack, ticker, conveyor, pipe, radar, searchlight, shanty,
-  wreckHull, penTerminal, jobTerminal, playground, waterTower, greenhouse, commsMast, townHall, bounceDome, towerCrane, garage, dishStation,
+  wreckHull, penTerminal, jobTerminal, playground, waterTower, greenhouse, commsMast, townHall, towerCrane, gantryCrane, cargoStack, garage, dishStation,
 } from '../settlements.js';
+import { ferrisWheel, carousel } from '../downsFair.js';
 import { animate, together, lineUp } from './common.js';
 
 // Asset Row catalogue group: the small faction outposts (intact and wreck), the building parts the settlements are made of, and the
@@ -218,15 +219,17 @@ const parts = {
     item('part.water-tower', 'WATER TOWER', 9, 9, () => worldPart((world, loc, k) => waterTower(world, loc, k, 0, 0, 0xff9f1c))),
     item('part.greenhouse', 'GREENHOUSE', 7.5, 18.5, () => worldPart((world, loc, k) => greenhouse(world, loc, k, 0, 0, 0))),
     item('part.comms-mast', 'COMMS MASTS 16 · 30 M', 12, 3, () => row([
-      worldPart((world, loc, k) => commsMast(world, loc, k, 0, 0, 16, 0xff9f1c)),
-      worldPart((world, loc, k) => commsMast(world, loc, k, 0, 0, 30, 0xffd23f)),
+      worldPart((world, loc, k) => commsMast(world, loc, k, 0, 0, 16, 0xff9f1c, 'kepler')),
+      worldPart((world, loc, k) => commsMast(world, loc, k, 0, 0, 30, 0xffd23f, 'spacecom')),
     ], 6)),
     item('part.town-hall', 'KEPLER TOWN HALL', 44, 19, () => worldPart((world, loc, k) => townHall(world, loc, k))),
-    item('part.bounce-dome', 'BOUNCE DOMES 12 · 26 M', 89, 57, () => row([
-      worldPart((world, loc, k) => bounceDome(world, loc, k, 0, 0, 12, 0xff2e88, 0xffd23f)),
-      worldPart((world, loc, k) => bounceDome(world, loc, k, 0, 0, 26, 0x2ec4ff, 0x7dff6a)),
-    ], 4)),
+    item('part.ferris-wheel', 'FERRIS WHEEL', 50, 12, () => worldPart((world, loc, k) => ferrisWheel(world, loc, k, 0, 0))),
+    item('part.carousel', 'CAROUSEL', 22, 22, () => worldPart((world, loc, k) => carousel(world, loc, k, 0, 0))),
     item('part.tower-crane', 'TOWER CRANE', 44, 9, () => kitPart((k) => towerCrane(k, 0, 0, 34, 30, YEL, { speed: 0.12 }))),
+    item('part.gantry-crane', 'GANTRY CRANE', 58, 36, () => kitPart((k) => gantryCrane(k, 0, 0, YEL, { speed: 1 / 40, phase: 0.3, travel: 24 }))),
+    item('part.cargo-stacks', 'CARGO CONTAINER STACKS', 42, 9, () => kitPart((k) => {
+      ['spacecom', 'vostok', 'kepler', 'meridian'].forEach((f, i) => cargoStack(k, -16 + i * 10.5, 0, 1 + (i % 3), [f, f, f], Math.PI / 2));
+    })),
     item('part.garage.main', 'MOTOR POOL GARAGE', 54, 26, () => kitPart((k) => garage(k, 0, 0, 0, [true, false, true], 'main'))),
     item('part.garage.small', 'SMALL GARAGE', 34, 20, () => kitPart((k) => garage(k, 0, 0, 0, [true, true], 'small'))),
     item('part.dish-stations', 'DISH STATIONS (CRYO · GANTRY)', 66, 30, () => row([
@@ -280,13 +283,14 @@ const parts = {
 // ---------------------------------------------------------------------------------------------
 const HOME = [
   ['housing', 'HOUSING DOMES'], ['market', 'MARKET HALL'], ['clinic', 'CLINIC'], ['farm', 'GREENHOUSE FARM'], ['motorpool', 'MOTOR POOL'],
-  ['barracks', 'MILITIA BARRACKS'], ['school', 'SCHOOL & PLAYGROUND'], ['radio', 'RADIO TOWER'], ['pad', 'SHUTTLE PAD'],
+  ['barracks', 'MILITIA BARRACKS'], ['roads', 'ROADS'], ['radio', 'RADIO TOWER'], ['pad', 'SHUTTLE PAD'],
 ];
 const hometown = {
   id: 'buildings.hometown',
   title: '10 · HOMETOWN',
   items: [
-    ...HOME.map(([type, label]) => item(`hometown.${type}`, label, 27, 27, () => {
+    // (the Shuttle Pad's deck is 28.6 m across and its stairs run 6 m further toward the hall)
+    ...HOME.map(([type, label]) => item(`hometown.${type}`, label, type === 'pad' ? 31 : 27, type === 'pad' ? 37 : 27, () => {
       const slot = slotAt(0);
       return viaWorld((world, loc) => addBuilding(world, loc, 0, type), { faction: 'kepler', frame: slot });
     })),
