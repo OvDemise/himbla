@@ -1,6 +1,6 @@
-// The Kepler Hitch-Line Winch (Kepler's unique upgrade, an active on Z). Fire a cable onto a passing
+// The Kepler Hitch-Line Winch (Kepler's unique upgrade, an active on E). Fire a cable onto a passing
 // vehicle and ride its pull: swing under a flying transit like a pendulum (momentum and all), or trail
-// along behind a rover or a land-train. It holds as long as you hold Z, up to ten seconds.
+// along behind a rover or a land-train. It holds as long as you hold E, up to ten seconds.
 //
 // The cable is a rope, not a rod: it only pulls when it's taut, and when it is, the pull goes both
 // ways, split by mass. A hover-car weighs a couple of you and goes where you drag it, well off the
@@ -103,7 +103,7 @@ export class Winch {
     return best;
   }
 
-  // Z pressed with the winch selected
+  // E pressed with the winch selected
   fire() {
     const g = this.game;
     const P = g.player;
@@ -208,7 +208,7 @@ export class Winch {
     this.hook.rotation.y += dt * 6;
   }
 
-  // the Z chip's line
+  // the E chip's line
   status() {
     if (this.on) return `HITCHED ${Math.ceil(HOLD - this.on.t)} s`;
     if (this.cd > 0) return `${Math.ceil(this.cd)} s`;

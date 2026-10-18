@@ -61,7 +61,7 @@ const SAVE_KEY = 'moonrunner-save-v1';
 const TIPS = [
   'Hold <b>SPACE</b> to engage the Quantum-Lock skates — they grip the ground and glide without friction.',
   'On skates, <b>A/D</b> steer you along the ground: full input carves hard, <b>W+A</b> carves gently. Aim for ramps and crater rims!',
-  'Hold <b>E</b> / <b>RIGHT MOUSE</b> for thrusters (mostly forward). <b>SHIFT</b> mag-jumps.',
+  'Hold <b>RIGHT MOUSE</b> for thrusters (mostly forward). <b>SHIFT</b> mag-jumps.',
   'In the air, hold <b>Q</b> + <b>W/S</b> to flip, <b>Q</b> + <b>A/D</b> to spin. Land upright! Buses and freighters make great ramps.',
   'Press <b>M</b> for the globe map (drag to spin). Unexplored ground stays fogged until you visit.',
   'Factions post <b>EVENTS</b> (beacons on the map). <b>J</b> opens your Reputation Log — higher standing means better pay and faction gear.',
@@ -263,7 +263,7 @@ class Game {
     this.assetRow = null; // the dev menu's flat showroom, made on first use (cheats.js, assetRow.js; not in a release build)
     this.garage = new Garage(this);
     this.winch = new Winch(this); // Kepler Hitch-Line Winch
-    this.powers = new Powers(this); // Z: the selected power; the mouse wheel picks
+    this.powers = new Powers(this); // E: the selected power; the mouse wheel picks
     this.tutorial = new Tutorial(this);
     this.recall = new Recall(this);
     this.secrets = new Secrets(this);

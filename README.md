@@ -89,7 +89,7 @@ Vite's hot reload restarts the page.
 | Mouse | Look / aim |
 | `W A S D` | Run in boots. On skates, `A`/`D` steer you along the ground: full input carves hard, `W`+`A` carves gently |
 | `SPACE` (hold) | **Quantum-Lock Skates**: near-frictionless glide. Release to brake hard in boots |
-| `E` / right mouse (hold) | Thrusters: mostly forward, with only a little lift or dive (drains JET) |
+| Right mouse (hold) | Thrusters: mostly forward, with only a little lift or dive (drains JET) |
 | `SHIFT` | Mag-jump; in the air, press again and hold to **Dive** |
 | `Q` + `W`/`S` (air) | Front / back flips |
 | `Q` + `A`/`D` (air) | Spins |
@@ -98,7 +98,7 @@ Vite's hot reload restarts the page.
 | `C` | Wardrobe: cycle owned outfits, skate finishes and pulse-disc colours; `J` in the wardrobe shows or hides the containment jar |
 | `N` | Music on / off |
 | `V` (hold: radial) | Call / board / leave your faction vehicle; hold to pick one (story unlock) |
-| `Z` · mouse wheel | Use your selected **power** · step through your powers. Powers: Phase Dash, the Teleporter (`T` too), the Slipstream Vanes (steer in the air for 10 s), the Kepler Hitch-Line Winch (hold) and the pen link (`P` too) |
+| `E` · mouse wheel | Use your selected **power** · step through your powers. Powers: Phase Dash, the Teleporter (`T` too), the Slipstream Vanes (steer in the air for 10 s), the Kepler Hitch-Line Winch (hold) and the pen link (`P` too) |
 | `Esc` → SETTINGS | Graphics, gameplay, camera, audio and key remapping |
 | `P` | Holding pen, anywhere (needs the remote pen link from Dr. Zbornak) |
 | `Shift`+`X` (hold) | Dump the jar anywhere: materials are destroyed, creatures pop back out |
@@ -164,7 +164,7 @@ an arrow showing which way it lies from where you're looking; the event you're r
 **Style** pays half what it used to and can at most double a contract's base reward (a ₵400 job tops out at
 ₵800 before condition). The package's condition then scales the whole payout.
 
-**Rail Lance scope:** with the Rail Lance equipped, hold right mouse to scope in (E still fires thrusters). The beam pierces
+**Rail Lance scope:** with the Rail Lance equipped, hold right mouse to scope in (L3 on a pad still fires thrusters). The beam pierces
 pirates, troops, buildings and traffic, but the ground and any rock (boulders, ramps, arches, spires, ridges) stop it, so nothing behind a rock is hit.
 
 **First shift:** a new game offers to send **BOLT**, a courier-school drone, along with you. It hovers at your
@@ -249,7 +249,7 @@ Daedalus, and vice versa.
 - **Faction gear:** each HQ sells unique gear gated by reputation: SPACECOM Seeker Module (homing),
   Meridian Gyro-Edges (steering) and Market Uplink (pay), the Kepler Twin Cradle (carry two contracts at
   once, crates stacked; both waypoints on the HUD), Vostok Flak Weave (health, knockback), Daedalus
-  Overcharger (fire rate) and Rustmoon Shadow Rig (harder to hit). Kepler also sells the **Hitch-Line Winch**: hold `Z` to cable onto a vehicle within 85 m and ride its pull for up to 10 s, swinging under flying transits or trailing behind rovers and land-trains (they're heavy; drag one off its route and it eases back on). Rustmoon's black market at the Hold
+  Overcharger (fire rate) and Rustmoon Shadow Rig (harder to hit). Kepler also sells the **Hitch-Line Winch**: hold `E` to cable onto a vehicle within 85 m and ride its pull for up to 10 s, swinging under flying transits or trailing behind rovers and land-trains (they're heavy; drag one off its route and it eases back on). Rustmoon's black market at the Hold
   stocks the ILMB kit and other factions' upgrades, weapons, tech and vehicles, each one brought in by a
   smuggling run that carries it as a payload (named on the job board).
 - **Clearance:** FRIENDLY (10+) with Vostok or Daedalus means their turrets stop shooting you and you
@@ -308,7 +308,7 @@ guns silent, its outposts the clans'). Kepler founds **your own town** (a real s
 and the Moon Council's hall), and Meridian sends you to **the Spindle**, the long asteroid rolling overhead,
 for its Quantum Core, with an alien mothership hunting you across it. The Spindle is a real cylinder: you can
 run all the way round its girth (gravity points at its axis) on the way to the core at the far end. The prize
-is the **Quantum Slipstream Vanes**, a power (pick it on the power wheel, then `Z`): for 10 s your skates keep a
+is the **Quantum Slipstream Vanes**, a power (pick it on the power wheel, then `E`): for 10 s your skates keep a
 share of their handling in the air, so you can steer mid-flight (30 s from using them until they're ready again).
 
 **The Moon Council** (once you have your town): call votes from the hall. Each member faction votes with you
@@ -334,7 +334,7 @@ Trade, a Militia Pact) reshapes the Moon and puts other factions' vehicles, weap
   already built, or its price in credits if both are.
 - **Research (Meridian, plus Daedalus):** plant sensor relays, survive **phase-field experiments**
   (anomalies strike where the warning rings appear), carry unstable antimatter without cracking it, and
-  build a research station. Rewards are **tech**: Phase Dash (`Z`, swings all your momentum, plus a kick, to where you
+  build a research station. Rewards are **tech**: Phase Dash (`E`, swings all your momentum, plus a kick, to where you
   look, leaving a trail of violet ghost copies of you along the way) and a Personal Teleporter (`T`, any discovered location or your outposts). The **Deflector Shield**
   (an invisible field that absorbs a hit every 12 s, and shows itself when it does) comes with SPACECOM's,
   Vostok's and Rustmoon's third chapters.
